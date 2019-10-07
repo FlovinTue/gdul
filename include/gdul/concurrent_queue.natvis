@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+
+	<Type Name="gdul::concurrent_queue&lt;*&gt;">
+		<Expand>
+			<CustomListItems>
+				<Variable Name = "sizeAccumulator" InitialValue = "0"/>
+				<Variable Name = "producerIndex" InitialValue = "0" />
+				<Variable Name = "producerSlotsRaw" InitialValue="(*(atomic_shared_ptr_slot_type**)(+8
+					+ ((myProducerSlots.myDebugView.myU64 >> 1) * 2)
+					- ((uint64_t)myProducerSlots.myDebugView.myU8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
+					- ((uint64_t)myProducerSlots.myDebugView.myU8[aspdetail::STORAGE_BYTE_COPYREQUEST] * (aspdetail::Ptr_Mask + 1))
+					))"/>
+				<Variable Name = "pBuffer" InitialValue = "(buffer_type*)(0)" />
+				
+				<Loop>
+					<Break Condition = "producerIndex == myProducerCount._My_val" />
+					<Exec>
+						pBuffer =
+						(*(buffer_type**)(+8
+						+ ((producerSlotsRaw[producerIndex].myDebugView.myU64 >> 1) * 2)
+						- ((uint64_t)producerSlotsRaw[producerIndex].myDebugView.myU8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
+						- ((uint64_t)producerSlotsRaw[producerIndex].myDebugView.myU8[aspdetail::STORAGE_BYTE_COPYREQUEST] * (aspdetail::Ptr_Mask + 1))
+						))
+					</Exec>
+					<Loop>
+						<Exec>
+							sizeAccumulator += (pBuffer->myPostWriteIterator._My_val - pBuffer->myReadSlot._My_val)
+						</Exec>
+						<Break Condition = "pBuffer->myNext.myPtr == 0"/>
+						<Exec>
+							pBuffer = pBuffer->myNext.myPtr
+						</Exec>
+					</Loop>
+					<Exec>
+						++producerIndex
+					</Exec>
+				</Loop>
+
+				<Item Name = "[size]">sizeAccumulator</Item>
+				<Item Name = "[producer_count]">myProducerCount._My_val</Item>
+
+				<Exec>pBuffer = 0</Exec>
+				<Exec>producerIndex = 0</Exec>
+				
+				<Loop>
+					<Break Condition = "producerIndex == myProducerCount._My_val" />
+					<Exec>
+						pBuffer =
+						(*(buffer_type**)(+8
+						+ ((producerSlotsRaw[producerIndex].myDebugView.myU64 >> 1) * 2)
+						- ((uint64_t)producerSlotsRaw[producerIndex].myDebugView.myU8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
+						- ((uint64_t)producerSlotsRaw[producerIndex].myDebugView.myU8[aspdetail::STORAGE_BYTE_COPYREQUEST] * (aspdetail::Ptr_Mask + 1))
+						))
+					</Exec>
+					<Item Name='[producer_{producerIndex + 1}]'>*pBuffer</Item>
+					<Exec>
+						++producerIndex
+					</Exec>
+				</Loop>
+				
+				
+			</CustomListItems>
+		</Expand>
+	</Type>
+	<Type Name="gdul::cqdetail::producer_buffer&lt;*&gt;">
+
+		<Expand>
+			<CustomListItems MaxItemsPerView="512">
+				<Variable Name="pBuffer" InitialValue="this" />
+				<Variable Name="itemCount" InitialValue="0"/>
+				<Variable Name="pItem" InitialValue="myDataBlock + (pBuffer->myReadSlot._My_val - ((pBuffer->myReadSlot._My_val / pBuffer->myCapacity) * pBuffer->myCapacity))"/>
+				<Variable Name="sizeAccumulator" InitialValue="0"/>
+
+				<Loop>
+					<Exec>sizeAccumulator += (pBuffer->myPostWriteIterator._My_val - pBuffer->myReadSlot._My_val)</Exec>
+					<Break Condition="(pBuffer->myNext.myPtr == nullptr)" />
+					<Exec>pBuffer = pBuffer->myNext.myPtr</Exec>
+				</Loop>
+
+				<Item Name="[size]">sizeAccumulator</Item>
+
+				<Exec>pBuffer = this</Exec>
+
+				<Loop>
+					<If Condition="itemCount == (pBuffer->myPostWriteIterator._My_val - pBuffer->myReadSlot._My_val)">
+						<Break Condition="pBuffer->myNext.myPtr == nullptr" />
+						<Exec>pBuffer = pBuffer->myNext.myPtr</Exec>
+						<Exec>pItem = pBuffer->myDataBlock + (pBuffer->myReadSlot._My_val - ((pBuffer->myReadSlot._My_val / pBuffer->myCapacity) * pBuffer->myCapacity))</Exec>
+						<Exec>itemCount = 0</Exec>
+					</If>
+					<If Condition="itemCount != (pBuffer->myPostWriteIterator._My_val - pBuffer->myReadSlot._My_val)">
+						<Item>pItem->myData</Item>
+						<Exec>++pItem</Exec>
+						<If Condition="pItem == (pBuffer->myDataBlock + pBuffer->myPostWriteIterator._My_val - pBuffer->myReadSlot._My_val)">
+							<Exec>pItem= pBuffer->myDataBlock</Exec>
+						</If>
+						<Exec>++itemCount</Exec>
+					</If>
+				</Loop>
+			</CustomListItems>
+      <ArrayItems>
+        <Size>myCapacity</Size>
+        <ValuePointer>myDataBlock</ValuePointer>
+      </ArrayItems>
+		</Expand>
+	</Type>
+
+
+</AutoVisualizer>
+
+
