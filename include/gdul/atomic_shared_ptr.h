@@ -91,6 +91,7 @@ public:
 
 	inline constexpr atomic_shared_ptr();
 	inline constexpr atomic_shared_ptr(std::nullptr_t);
+	inline constexpr atomic_shared_ptr(std::nullptr_t, uint8_t version);
 
 	inline atomic_shared_ptr(const shared_ptr<T, Allocator>& from);
 	inline atomic_shared_ptr(shared_ptr<T, Allocator>&& from);
@@ -114,6 +115,8 @@ public:
 	inline shared_ptr<T, Allocator> exchange(const shared_ptr<T, Allocator>& with);
 	inline shared_ptr<T, Allocator> exchange(shared_ptr<T, Allocator>&& with);
 
+	inline uint8_t get_version() const;
+
 	inline shared_ptr<T, Allocator> unsafe_load();
 
 	inline shared_ptr<T, Allocator> unsafe_exchange(const shared_ptr<T, Allocator>& with);
@@ -122,8 +125,14 @@ public:
 	inline void unsafe_store(const shared_ptr<T, Allocator>& from);
 	inline void unsafe_store(shared_ptr<T, Allocator>&& from);
 
+	// cheap hint to see if this object holds a value
 	operator bool() const;
+
+	// cheap hint comparison to ptr_base derivatives
 	bool operator==(const aspdetail::ptr_base<T, Allocator>& other) const;
+
+	// cheap hint comparison to ptr_base derivatives
+	bool operator!=(const aspdetail::ptr_base<T, Allocator>& other) const;
 
 	size_type unsafe_use_count() const;
 
@@ -132,10 +141,10 @@ public:
 	T* unsafe_get_owned();
 	const T* unsafe_get_owned() const;
 
-	const aspdetail::control_block_base<T, Allocator>* unsafe_get_control_block() const;
-	aspdetail::control_block_base<T, Allocator>* unsafe_get_control_block();
-
 private:
+	inline constexpr aspdetail::control_block_base<T, Allocator>* get_control_block();
+	inline constexpr const aspdetail::control_block_base<T, Allocator>* get_control_block() const;
+
 	typedef typename aspdetail::compressed_storage compressed_storage;
 	typedef typename aspdetail::ptr_base<T, Allocator>::size_type size_type;
 
@@ -151,13 +160,12 @@ private:
 	template <class PtrType>
 	inline bool compare_exchange_strong(typename aspdetail::disable_deduction<PtrType>::type& expected, shared_ptr<T, Allocator>&& desired);
 
-	inline bool try_help_increment_and_try_swap(compressed_storage& expected, compressed_storage desired, uint64_t compareMask);
+	inline bool try_help_increment_and_try_swap(compressed_storage& expected, compressed_storage desired);
 
 	inline bool cas_internal(compressed_storage& expected, compressed_storage desired, aspdetail::CAS_FLAG flags);
 
 	inline void try_help_increment(compressed_storage expected);
 
-	inline constexpr aspdetail::control_block_base<T, Allocator>* get_control_block() const;
 	inline constexpr aspdetail::control_block_base<T, Allocator>* to_control_block(compressed_storage from) const;
 
 	friend class shared_ptr<T, Allocator>;
@@ -172,13 +180,18 @@ private:
 };
 template <class T, class Allocator>
 inline constexpr atomic_shared_ptr<T, Allocator>::atomic_shared_ptr()
-	: myStorage{ 0ULL }
+	: myStorage(0ULL)
 {
 	static_assert(std::is_same<Allocator::value_type, uint8_t>(), "value_type for allocator must be uint8_t");
 }
 template<class T, class Allocator>
 inline constexpr atomic_shared_ptr<T, Allocator>::atomic_shared_ptr(std::nullptr_t)
 	: atomic_shared_ptr<T, Allocator>()
+{
+}
+template<class T, class Allocator>
+inline constexpr atomic_shared_ptr<T, Allocator>::atomic_shared_ptr(std::nullptr_t, uint8_t version)
+	: myStorage(0ULL | (uint64_t(version) << (aspdetail::STORAGE_BYTE_VERSION * 8)))
 {
 }
 template <class T, class Allocator>
@@ -289,6 +302,12 @@ inline shared_ptr<T, Allocator> atomic_shared_ptr<T, Allocator>::exchange(shared
 	return shared_ptr<T, Allocator>(previous);
 }
 template<class T, class Allocator>
+inline uint8_t atomic_shared_ptr<T, Allocator>::get_version() const
+{
+	const compressed_storage storage(myStorage.load(std::memory_order_acquire));
+	return storage.myU8[aspdetail::STORAGE_BYTE_VERSION];
+}
+template<class T, class Allocator>
 inline shared_ptr<T, Allocator> atomic_shared_ptr<T, Allocator>::unsafe_load()
 {
 	return shared_ptr<T, Allocator>(unsafe_copy_internal());
@@ -352,24 +371,56 @@ inline const T * atomic_shared_ptr<T, Allocator>::unsafe_get_owned() const
 	return nullptr;
 }
 template<class T, class Allocator>
-inline const aspdetail::control_block_base<T, Allocator>* atomic_shared_ptr<T, Allocator>::unsafe_get_control_block() const
+inline constexpr const aspdetail::control_block_base<T, Allocator>* atomic_shared_ptr<T, Allocator>::get_control_block() const
 {
-	return get_control_block();
+	return to_control_block(myStorage.load(std::memory_order_acquire));;
 }
 template<class T, class Allocator>
-inline aspdetail::control_block_base<T, Allocator>* atomic_shared_ptr<T, Allocator>::unsafe_get_control_block()
+inline constexpr aspdetail::control_block_base<T, Allocator>* atomic_shared_ptr<T, Allocator>::get_control_block()
 {
-	return get_control_block();
+	return to_control_block(myStorage.load(std::memory_order_acquire));
 }
+// cheap hint to see if this object holds a value
 template<class T, class Allocator>
 inline atomic_shared_ptr<T, Allocator>::operator bool() const
 {
 	return static_cast<bool>(myStorage.load(std::memory_order_acquire) & aspdetail::Ptr_Mask);
 }
+// cheap hint to see if this object holds a value
+template <class T, class Allocator>
+inline constexpr bool operator==(std::nullptr_t /*aNullptr*/, const atomic_shared_ptr<T, Allocator>& ptr)
+{
+	return !ptr;
+}
+// cheap hint to see if this object holds a value
+template <class T, class Allocator>
+inline constexpr bool operator!=(std::nullptr_t /*aNullptr*/, const atomic_shared_ptr<T, Allocator>& ptr)
+{
+	return ptr;
+}
+// cheap hint to see if this object holds a value
+template <class T, class Allocator>
+inline constexpr bool operator==(const atomic_shared_ptr<T, Allocator>& ptr, std::nullptr_t /*aNullptr*/)
+{
+	return !ptr;
+}
+// cheap hint to see if this object holds a value
+template <class T, class Allocator>
+inline constexpr bool operator!=(const atomic_shared_ptr<T, Allocator>& ptr, std::nullptr_t /*aNullptr*/)
+{
+	return ptr;
+}
+// cheap hint comparison to ptr_base derivatives
 template<class T, class Allocator>
 inline bool atomic_shared_ptr<T, Allocator>::operator==(const aspdetail::ptr_base<T, Allocator>& other) const
 {
 	return !((myStorage.load(std::memory_order_acquire) ^ other.myControlBlockStorage.myU64) & aspdetail::Versioned_Ptr_Mask);
+}
+// cheap hint comparison to ptr_base derivatives
+template<class T, class Allocator>
+inline bool atomic_shared_ptr<T, Allocator>::operator!=(const aspdetail::ptr_base<T, Allocator>& other) const
+{
+	return !operator==(other);
 }
 // ------------------------------------------------------------------------------------
 
@@ -382,15 +433,15 @@ inline void atomic_shared_ptr<T, Allocator>::store_internal(compressed_storage f
 	exchange_internal(from, aspdetail::CAS_FLAG_NONE);
 }
 template <class T, class Allocator>
-inline bool atomic_shared_ptr<T, Allocator>::try_help_increment_and_try_swap(compressed_storage & expected, compressed_storage desired, uint64_t compareMask)
+inline bool atomic_shared_ptr<T, Allocator>::try_help_increment_and_try_swap(compressed_storage & expected, compressed_storage desired)
 {
-	const compressed_storage initialPtrBlock(expected.myU64 & compareMask);
+	const compressed_storage initialPtrBlock(expected.myU64 & aspdetail::Versioned_Ptr_Mask);
 
 	aspdetail::control_block_base<T, Allocator>* const controlBlock(to_control_block(expected));
 
 	compressed_storage desired_(desired);
 	do {
-		const uint16_t copyRequests(expected.myU8[aspdetail::STORAGE_BYTE_COPYREQUEST]);
+		const uint8_t copyRequests(expected.myU8[aspdetail::STORAGE_BYTE_COPYREQUEST]);
 
 		if (controlBlock)
 			controlBlock->incref(copyRequests);
@@ -402,7 +453,7 @@ inline bool atomic_shared_ptr<T, Allocator>::try_help_increment_and_try_swap(com
 		if (controlBlock)
 			controlBlock->decref(copyRequests);
 
-	} while ((expected.myU64 & compareMask) == initialPtrBlock.myU64);
+	} while ((expected.myU64 & aspdetail::Versioned_Ptr_Mask) == initialPtrBlock.myU64);
 
 	return false;
 }
@@ -433,11 +484,6 @@ inline void atomic_shared_ptr<T, Allocator>::try_help_increment(compressed_stora
 	} while (
 		(expected_.myU64 & aspdetail::Versioned_Ptr_Mask) == initialPtrBlock.myU64 &&
 		expected_.myU8[aspdetail::STORAGE_BYTE_COPYREQUEST]);
-}
-template<class T, class Allocator>
-inline constexpr aspdetail::control_block_base<T, Allocator>* atomic_shared_ptr<T, Allocator>::get_control_block() const
-{
-	return to_control_block(myStorage.load(std::memory_order_acquire));
 }
 template<class T, class Allocator>
 inline constexpr aspdetail::control_block_base<T, Allocator>* atomic_shared_ptr<T, Allocator>::to_control_block(compressed_storage from) const
@@ -479,7 +525,7 @@ inline bool atomic_shared_ptr<T, Allocator>::cas_internal(compressed_storage & e
 		const bool otherInterjection((expected_.myU64 ^ expected.myU64) & aspdetail::Versioned_Ptr_Mask);
 
 		if (!otherInterjection) {
-			success = try_help_increment_and_try_swap(expected_, desired_, aspdetail::Versioned_Ptr_Mask);
+			success = try_help_increment_and_try_swap(expected_, desired_);
 		}
 		else {
 			try_help_increment(expected_);
@@ -635,7 +681,9 @@ template <class T, class Allocator>
 class control_block_make_shared : public control_block_base<T, Allocator>
 {
 public:
-	template <class ...Args>
+	template <class ...Args, class U = T, std::enable_if_t<std::is_array<U>::value>* = nullptr>
+	control_block_make_shared(Allocator& alloc, Args&& ...args);
+	template <class ...Args, class U = T, std::enable_if_t<!std::is_array<U>::value>* = nullptr>
 	control_block_make_shared(Allocator& alloc, Args&& ...args);
 
 	void destroy() override;
@@ -643,7 +691,14 @@ private:
 	T myOwned;
 };
 template<class T, class Allocator>
-template <class ...Args>
+template <class ...Args, class U, std::enable_if_t<std::is_array<U>::value>*>
+inline control_block_make_shared<T, Allocator>::control_block_make_shared(Allocator& alloc, Args&& ...args)
+	: control_block_base<T, Allocator>(&myOwned, alloc)
+	, myOwned{ std::forward<Args&&>(args)... }
+{
+}
+template<class T, class Allocator>
+template <class ...Args, class U, std::enable_if_t<!std::is_array<U>::value>*>
 inline control_block_make_shared<T, Allocator>::control_block_make_shared(Allocator& alloc, Args&& ...args)
 	: control_block_base<T, Allocator>(&myOwned, alloc)
 	, myOwned(std::forward<Args&&>(args)...)
@@ -703,11 +758,10 @@ inline void control_block_claim_custom_delete<T, Allocator, Deleter>::destroy()
 	Allocator alloc(this->myAllocator);
 
 	T* const ptrAddr(this->myPtr);
-	(*this).~control_block_claim_custom_delete<T, Allocator, Deleter>();
-
-	alloc.deallocate(reinterpret_cast<uint8_t*>(this), sizeof(decltype(*this)));
-
 	myDeleter(ptrAddr, alloc);
+
+	(*this).~control_block_claim_custom_delete<T, Allocator, Deleter>();
+	alloc.deallocate(reinterpret_cast<uint8_t*>(this), sizeof(decltype(*this)));
 }
 template <class T>
 struct disable_deduction
@@ -730,19 +784,24 @@ class ptr_base
 {
 public:
 	typedef std::uint32_t size_type;
+	typedef T value_type;
+	typedef Allocator allocator_type;
+
+	inline constexpr ptr_base(std::nullptr_t);
+	inline constexpr ptr_base(std::nullptr_t, uint8_t version);
 
 	inline constexpr operator bool() const;
 
 	inline constexpr bool operator==(const ptr_base<T, Allocator>& other) const;
 	inline constexpr bool operator!=(const ptr_base<T, Allocator>& other) const;
 
+	inline bool operator==(const atomic_shared_ptr<T, Allocator>& other) const;
+	inline bool operator!=(const atomic_shared_ptr<T, Allocator>& other) const;
+
 	inline constexpr explicit operator T*();
 	inline constexpr explicit operator const T*() const;
 
-	inline constexpr const control_block_base<T, Allocator>* get_control_block() const;
 	inline constexpr const T* get_owned() const;
-
-	inline constexpr control_block_base<T, Allocator>* get_control_block();
 	inline constexpr T* get_owned();
 
 	inline constexpr versioned_raw_ptr<T, Allocator> get_versioned_raw_ptr() const;
@@ -761,6 +820,9 @@ public:
 	inline T& operator[](size_type index);
 
 protected:
+	inline constexpr const control_block_base<T, Allocator>* get_control_block() const;
+	inline constexpr control_block_base<T, Allocator>* get_control_block();
+
 	inline constexpr ptr_base();
 	inline constexpr ptr_base(compressed_storage from);
 
@@ -782,6 +844,17 @@ inline constexpr ptr_base<T, Allocator>::ptr_base()
 	: myPtr(nullptr)
 {
 }
+template<class T, class Allocator>
+inline constexpr ptr_base<T, Allocator>::ptr_base(std::nullptr_t)
+	: ptr_base<T, Allocator>()
+{
+}
+template<class T, class Allocator>
+inline constexpr ptr_base<T, Allocator>::ptr_base(std::nullptr_t, uint8_t version)
+	: myPtr(nullptr)
+	, myControlBlockStorage(0ULL | (uint64_t(version) << (STORAGE_BYTE_VERSION * 8)))
+{
+}
 template <class T, class Allocator>
 inline constexpr ptr_base<T, Allocator>::ptr_base(compressed_storage from)
 	: ptr_base<T, Allocator>()
@@ -799,7 +872,7 @@ inline void ptr_base<T, Allocator>::reset()
 template <class T, class Allocator>
 inline constexpr ptr_base<T, Allocator>::operator bool() const
 {
-	return get_owned();
+	return myControlBlockStorage.myU64 & aspdetail::Ptr_Mask;
 }
 template <class T, class Allocator>
 inline constexpr bool ptr_base<T, Allocator>::operator==(const ptr_base<T, Allocator>& other) const
@@ -808,6 +881,16 @@ inline constexpr bool ptr_base<T, Allocator>::operator==(const ptr_base<T, Alloc
 }
 template <class T, class Allocator>
 inline constexpr bool ptr_base<T, Allocator>::operator!=(const ptr_base<T, Allocator>& other) const
+{
+	return !operator==(other);
+}
+template<class T, class Allocator>
+inline bool ptr_base<T, Allocator>::operator==(const atomic_shared_ptr<T, Allocator>& other) const
+{
+	return other == *this;
+}
+template<class T, class Allocator>
+inline bool ptr_base<T, Allocator>::operator!=(const atomic_shared_ptr<T, Allocator>& other) const
 {
 	return !operator==(other);
 }
@@ -853,12 +936,12 @@ inline constexpr const T & ptr_base<T, Allocator>::operator*() const
 template <class T, class Allocator>
 inline const T & ptr_base<T, Allocator>::operator[](size_type index) const
 {
-	return(*get_owned())[index];
+	return get_owned()[index];
 }
 template <class T, class Allocator>
 inline T & ptr_base<T, Allocator>::operator[](size_type index)
 {
-	return(*get_owned())[index];
+	return get_owned()[index];
 }
 template <class T, class Allocator>
 inline constexpr bool operator==(std::nullptr_t /*aNullptr*/, const ptr_base<T, Allocator>& ptr)
@@ -944,13 +1027,16 @@ template <class T, class Allocator>
 class shared_ptr : public aspdetail::ptr_base<T, Allocator>
 {
 public:
-	inline constexpr shared_ptr();
+	inline constexpr shared_ptr() = default;
+
+	using aspdetail::ptr_base<T, Allocator>::ptr_base;
 
 	inline shared_ptr(const shared_ptr<T, Allocator>& other);
 	inline shared_ptr(shared_ptr<T, Allocator>&& other);
-	inline shared_ptr(std::nullptr_t);
 
 	inline explicit shared_ptr(T* object);
+	template <class Deleter>
+	inline explicit shared_ptr(T* object, Deleter&& deleter);
 	template <class Deleter>
 	inline explicit shared_ptr(T* object, Deleter&& deleter, Allocator& allocator);
 
@@ -989,11 +1075,6 @@ private:
 	friend shared_ptr<T, Allocator> make_shared<T, Allocator>(Allocator&, Args&&...);
 };
 template<class T, class Allocator>
-inline constexpr shared_ptr<T, Allocator>::shared_ptr()
-	: aspdetail::ptr_base<T, Allocator>()
-{
-}
-template<class T, class Allocator>
 inline shared_ptr<T, Allocator>::~shared_ptr()
 {
 	aspdetail::control_block_base<T, Allocator>* const cb(this->get_control_block());
@@ -1008,11 +1089,6 @@ inline shared_ptr<T, Allocator>::shared_ptr(shared_ptr<T, Allocator>&& other)
 	operator=(std::move(other));
 }
 template<class T, class Allocator>
-inline shared_ptr<T, Allocator>::shared_ptr(std::nullptr_t)
-	: shared_ptr<T, Allocator>()
-{
-}
-template<class T, class Allocator>
 inline shared_ptr<T, Allocator>::shared_ptr(const shared_ptr<T, Allocator>& other)
 	: shared_ptr<T, Allocator>()
 {
@@ -1024,6 +1100,16 @@ inline shared_ptr<T, Allocator>::shared_ptr(T * object)
 {
 	Allocator alloc;
 	this->myControlBlockStorage = create_control_block(object, alloc);
+	this->myPtr = this->to_object(this->myControlBlockStorage);
+}
+// The Deleter callable has signature void(T* obj, Allocator& alloc)
+template<class T, class Allocator>
+template<class Deleter>
+inline shared_ptr<T, Allocator>::shared_ptr(T* object, Deleter && deleter)
+	: shared_ptr<T, Allocator>()
+{
+	Allocator alloc;
+	this->myControlBlockStorage = create_control_block(object, std::forward<Deleter&&>(deleter), alloc);
 	this->myPtr = this->to_object(this->myControlBlockStorage);
 }
 // The Deleter callable has signature void(T* obj, Allocator& alloc)
@@ -1131,8 +1217,9 @@ template <class T, class Allocator>
 class versioned_raw_ptr : public aspdetail::ptr_base<T, Allocator>
 {
 public:
-	constexpr versioned_raw_ptr();
-	constexpr versioned_raw_ptr(std::nullptr_t);
+	inline constexpr versioned_raw_ptr() = default;
+
+	using aspdetail::ptr_base<T, Allocator>::ptr_base;
 
 	constexpr versioned_raw_ptr(versioned_raw_ptr<T, Allocator>&& other);
 	constexpr versioned_raw_ptr(const versioned_raw_ptr<T, Allocator>& other);
@@ -1154,16 +1241,6 @@ private:
 	friend class aspdetail::ptr_base<T, Allocator>;
 	friend class atomic_shared_ptr<T, Allocator>;
 };
-template<class T, class Allocator>
-inline constexpr versioned_raw_ptr<T, Allocator>::versioned_raw_ptr()
-	: aspdetail::ptr_base<T, Allocator>()
-{
-}
-template<class T, class Allocator>
-inline constexpr versioned_raw_ptr<T, Allocator>::versioned_raw_ptr(std::nullptr_t)
-	: versioned_raw_ptr<T, Allocator>()
-{
-}
 template<class T, class Allocator>
 inline constexpr versioned_raw_ptr<T, Allocator>::versioned_raw_ptr(versioned_raw_ptr<T, Allocator>&& other)
 	: versioned_raw_ptr()

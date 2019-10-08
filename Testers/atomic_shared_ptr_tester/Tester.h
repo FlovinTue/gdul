@@ -1,7 +1,6 @@
 #pragma once
 
 #include "ThreadPool.h"
-
 #include <gdul/atomic_shared_ptr.h>
 #include <random>
 #include <string>
@@ -288,16 +287,16 @@ template<class T, uint32_t ArraySize, uint32_t NumThreads>
 inline void Tester<T, ArraySize, NumThreads>::CheckPointers() const
 {
 #ifndef ASP_MUTEX_COMPARE
-	uint32_t count(0);
-	for (uint32_t i = 0; i < ArraySize; ++i) {
-		const gdul::aspdetail::control_block_base<T, gdul::aspdetail::default_allocator>* const controlBlock(myTestArray[i].unsafe_get_control_block());
-		const T* const directObject(myTestArray[i].unsafe_get_owned());
-		const T* const sharedObject(controlBlock->get_owned());
-	
-		if (directObject != sharedObject) {
-			++count;
-		}
-	}
-	std::cout << "Mismatch shared / object count: " << count << std::endl;
+	//uint32_t count(0);
+	//for (uint32_t i = 0; i < ArraySize; ++i) {
+	//	const gdul::aspdetail::control_block_base<T, gdul::aspdetail::default_allocator>* const controlBlock(myTestArray[i].unsafe_get_control_block());
+	//	const T* const directObject(myTestArray[i].unsafe_get_owned());
+	//	const T* const sharedObject(controlBlock->get_owned());
+	//
+	//	if (directObject != sharedObject) {
+	//		++count;
+	//	}
+	//}
+	//std::cout << "Mismatch shared / object count: " << count << std::endl;
 #endif
 }
