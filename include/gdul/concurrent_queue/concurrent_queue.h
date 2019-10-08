@@ -23,7 +23,7 @@
 #include <atomic>
 #include <vector>
 #include <limits>
-#include <gdul\atomic_shared_ptr.h>
+#include <gdul\atomic_shared_ptr\atomic_shared_ptr.h>
 #include <cassert>
 
 // Exception handling may be enabled for basic exception safety at the cost of 

@@ -2,7 +2,7 @@
 
 #include <thread>
 #include "ThreadPool.h"
-#include <gdul\concurrent_queue.h>
+#include <gdul\concurrent_queue\concurrent_queue.h>
 #include "Timer.h"
 #include <concurrent_queue.h>
 #include <queue>

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "ThreadPool.h"
-#include <gdul/atomic_shared_ptr.h>
+#include <gdul\atomic_shared_ptr\atomic_shared_ptr.h>
 #include <random>
 #include <string>
 #include "Timer.h"

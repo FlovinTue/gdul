@@ -89,7 +89,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\include\gdul\atomic_shared_ptr.h" />
+    <ClInclude Include="..\..\include\gdul\atomic_shared_ptr\atomic_shared_ptr.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="Tester.h" />
     <ClInclude Include="ThreadPool.h" />
@@ -105,9 +105,7 @@
     <ClCompile Include="Timer.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <Natvis Include="..\..\include\gdul\atomic_shared_ptr.natvis">
-      <SubType>Designer</SubType>
-    </Natvis>
+    <Natvis Include="..\..\include\gdul\atomic_shared_ptr\atomic_shared_ptr.natvis" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

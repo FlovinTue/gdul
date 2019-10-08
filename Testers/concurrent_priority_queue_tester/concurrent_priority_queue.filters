@@ -6,6 +6,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
-    <ClInclude Include="..\..\include\gdul\concurrent_object_pool\concurrent_object_pool.h" />
+    <ClInclude Include="concurrent_sorted_list.h" />
   </ItemGroup>
 </Project>

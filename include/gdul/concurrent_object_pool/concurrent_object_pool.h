@@ -21,7 +21,7 @@
 #pragma once
 
 #include <assert.h>
-#include <gdul/concurrent_queue.h>
+#include <gdul\concurrent_queue\concurrent_queue.h>
 #include <atomic>
 
 #undef get_object
@@ -110,7 +110,7 @@ inline void concurrent_object_pool<Object>::unsafe_destroy()
 template<class Object>
 inline void concurrent_object_pool<Object>::try_alloc_block()
 {
-	/*block_node* expected(myLastBlock.load(std::memory_order_relaxed));
+	block_node* expected(myLastBlock.load(std::memory_order_relaxed));
 
 	if (myUnusedObjects.size()) {
 		return;
@@ -131,6 +131,6 @@ inline void concurrent_object_pool<Object>::try_alloc_block()
 
 	for (std::size_t i = 0; i < myBlockSize; ++i) {
 		myUnusedObjects.push(&block[i]);
-	}*/
+	}
 }
 }

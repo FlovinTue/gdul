@@ -12,11 +12,10 @@
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>
-    <ProjectGuid>{F2B36960-1C2E-402A-91BE-CD8C1539E38B}</ProjectGuid>
+    <ProjectGuid>{38AC6E3A-729D-4527-83C6-3805A7274AA8}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>ConcurrentSharedPtr</RootNamespace>
+    <RootNamespace>JobSystem</RootNamespace>
     <WindowsTargetPlatformVersion>10.0.17763.0</WindowsTargetPlatformVersion>
-    <ProjectName>atomic_uint128</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
@@ -54,14 +53,15 @@
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level4</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(ProjectDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)External\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -70,7 +70,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level4</WarningLevel>
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -79,7 +79,8 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(ProjectDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)External\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -89,21 +90,19 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\include\gdul\atomic_uint128\atomic_uint128.h" />
-    <ClInclude Include="pch.h" />
+    <ClInclude Include="..\..\include\gdul\WIP_job_handler\job.h" />
+    <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_handler.h" />
+    <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_sequence.h" />
+    <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_sequence_impl.h" />
+    <ClInclude Include="spin_lock.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\include\gdul\WIP_job_handler\job.cpp" />
+    <ClCompile Include="..\..\include\gdul\WIP_job_handler\job_handler.cpp" />
     <ClCompile Include="Main.cpp" />
-    <ClCompile Include="pch.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="..\atomic_shared_ptr_tester\atomic_shared_ptr.vcxproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <Natvis Include="..\..\include\gdul\atomic_uint128\atomic_uint128.natvis" />
+    <ClCompile Include="..\..\include\gdul\WIP_job_handler\job_sequence.cpp" />
+    <ClCompile Include="..\..\include\gdul\WIP_job_handler\job_sequence_impl.cpp" />
+    <ClCompile Include="spin_lock.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

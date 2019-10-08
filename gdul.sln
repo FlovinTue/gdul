@@ -11,6 +11,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "concurrent_queue", "Testers
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "atomic_shared_ptr", "Testers\atomic_shared_ptr_tester\atomic_shared_ptr.vcxproj", "{471962A3-BFAE-46B3-BBE9-0CB842BC1444}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "job_handler", "Testers\job_handler_tester\job_handler.vcxproj", "{38AC6E3A-729D-4527-83C6-3805A7274AA8}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -33,6 +35,10 @@ Global
 		{471962A3-BFAE-46B3-BBE9-0CB842BC1444}.Debug|x64.Build.0 = Debug|x64
 		{471962A3-BFAE-46B3-BBE9-0CB842BC1444}.Release|x64.ActiveCfg = Release|x64
 		{471962A3-BFAE-46B3-BBE9-0CB842BC1444}.Release|x64.Build.0 = Release|x64
+		{38AC6E3A-729D-4527-83C6-3805A7274AA8}.Debug|x64.ActiveCfg = Debug|x64
+		{38AC6E3A-729D-4527-83C6-3805A7274AA8}.Debug|x64.Build.0 = Debug|x64
+		{38AC6E3A-729D-4527-83C6-3805A7274AA8}.Release|x64.ActiveCfg = Release|x64
+		{38AC6E3A-729D-4527-83C6-3805A7274AA8}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

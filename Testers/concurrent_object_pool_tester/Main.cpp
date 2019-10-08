@@ -3,7 +3,7 @@
 
 #include "pch.h"
 #include <iostream>
-#include <gdul\concurrent_object_pool.h>
+#include <gdul\concurrent_object_pool\concurrent_object_pool.h>
 int main()
 {
 	gdul::concurrent_object_pool<int> pool(1);
