@@ -187,7 +187,8 @@ private:
 	typedef atomic_shared_ptr<atomic_shared_ptr_slot_type, allocator_type> atomic_shared_ptr_array_type;
 	typedef shared_ptr<atomic_shared_ptr_slot_type, allocator_type> shared_ptr_array_type;
 
-	using vector_allocator = typename std::allocator_traits<allocator_type>::template rebind_alloc<shared_ptr_slot_type>;
+	using consumer_vector_allocator = typename std::allocator_traits<allocator_type>::template rebind_alloc<cqdetail::consumer_wrapper<shared_ptr_slot_type, shared_ptr_array_type>>;
+	using producer_vector_allocator = typename std::allocator_traits<allocator_type>::template rebind_alloc<shared_ptr_slot_type>;
 
 	template <class ...Arg>
 	void push_internal(Arg&&... in);
@@ -220,8 +221,8 @@ private:
 	const size_type myInitBufferCapacity;
 	const size_type myInstanceIndex;
 
-	static thread_local std::vector<shared_ptr_slot_type, vector_allocator> ourProducers;
-	static thread_local std::vector<cqdetail::consumer_wrapper<shared_ptr_slot_type, shared_ptr_array_type>, vector_allocator> ourConsumers;
+	static thread_local std::vector<shared_ptr_slot_type, producer_vector_allocator> ourProducers;
+	static thread_local std::vector<cqdetail::consumer_wrapper<shared_ptr_slot_type, shared_ptr_array_type>, consumer_vector_allocator> ourConsumers;
 
 	static thread_local cqdetail::accessor_cache<T, allocator_type> ourLastConsumerCache;
 	static thread_local cqdetail::accessor_cache<T, allocator_type> ourLastProducerCache;
@@ -1691,9 +1692,9 @@ inline dummy_container<T, Allocator>::dummy_container()
 template <class T, class Allocator>
 cqdetail::index_pool<typename concurrent_queue<T, Allocator>::size_type, typename concurrent_queue<T, Allocator>::allocator_type> concurrent_queue<T, Allocator>::ourIndexPool;
 template <class T, class Allocator>
-thread_local std::vector<typename concurrent_queue<T, Allocator>::shared_ptr_slot_type, typename concurrent_queue<T, Allocator>::vector_allocator> concurrent_queue<T, Allocator>::ourProducers(0);
+thread_local std::vector<typename concurrent_queue<T, Allocator>::shared_ptr_slot_type, typename concurrent_queue<T, Allocator>::producer_vector_allocator> concurrent_queue<T, Allocator>::ourProducers(0);
 template <class T, class Allocator>
-thread_local std::vector<cqdetail::consumer_wrapper<typename concurrent_queue<T, Allocator>::shared_ptr_slot_type, typename concurrent_queue<T, Allocator>::shared_ptr_array_type>, typename concurrent_queue<T, Allocator>::vector_allocator> concurrent_queue<T, Allocator>::ourConsumers;
+thread_local std::vector<cqdetail::consumer_wrapper<typename concurrent_queue<T, Allocator>::shared_ptr_slot_type, typename concurrent_queue<T, Allocator>::shared_ptr_array_type>, typename concurrent_queue<T, Allocator>::consumer_vector_allocator> concurrent_queue<T, Allocator>::ourConsumers;
 template <class T, class Allocator>
 cqdetail::dummy_container<T, typename concurrent_queue<T, Allocator>::allocator_type> concurrent_queue<T, Allocator>::ourDummyContainer;
 template <class T, class Allocator>
