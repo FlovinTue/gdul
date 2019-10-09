@@ -1,10 +1,9 @@
 #include "stdafx.h"
 #include "CppUnitTest.h"
-#include <..\\concurrent_priority_queue\concurrent_priority_queue.h>
-#include <gdul/concurrent_queue.h>
+#include <gdul\WIP_concurrent_priority_queue\concurrent_priority_queue.h>
+#include <gdul\concurrent_queue\concurrent_queue.h>
 #include <thread>
 #include <random>
-#include <heap.h>
 
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 

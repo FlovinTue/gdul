@@ -23,8 +23,8 @@
 #include <atomic>
 #include <vector>
 #include <iostream>
-#include <atomic_shared_ptr.h>
-#include <concurrent_object_pool.h>
+#include <gdul\atomic_shared_ptr\atomic_shared_ptr.h>
+#include <gdul\concurrent_object_pool\concurrent_object_pool.h>
 #include <random>
 #include <sstream>
 

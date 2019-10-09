@@ -2,9 +2,9 @@
 
 #include <functional>
 
+
 namespace gdul {
 
-class job_sequence_impl;
 class job
 {
 public:

@@ -3,8 +3,7 @@
 #include <iostream>
 
 //#include <vld.h>
-#include "concurrent_priority_queue.h"
-#include <heap.h>
+#include <gdul\WIP_concurrent_priority_queue\concurrent_priority_queue.h>
 #include <thread>
 #include <random>
 
