@@ -99,10 +99,6 @@
 					</If>
 				</Loop>
 			</CustomListItems>
-      <ArrayItems>
-        <Size>myCapacity</Size>
-        <ValuePointer>myDataBlock</ValuePointer>
-      </ArrayItems>
 		</Expand>
 	</Type>
 

@@ -4,9 +4,12 @@
 #include "pch.h"
 #include <iostream>
 #include <gdul\concurrent_object_pool\concurrent_object_pool.h>
+#include <vld.h>
+
 int main()
 {
-	gdul::concurrent_object_pool<int> pool(1);
+	std::allocator<uint8_t> alloc;
+	gdul::concurrent_object_pool<int, decltype(alloc)> pool(1, alloc);
 	int* second = pool.get_object();
 	int* first = pool.get_object();
 	pool.recycle_object(first);

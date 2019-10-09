@@ -28,11 +28,13 @@
 
 namespace gdul {
 
-template <class Object>
+template <class Object, class Allocator = std::allocator<uint8_t>>
 class concurrent_object_pool
 {
 public:
+
 	concurrent_object_pool(std::size_t blockSize);
+	concurrent_object_pool(std::size_t blockSize, Allocator& allocator);
 	~concurrent_object_pool();
 
 	inline Object* get_object();
@@ -51,28 +53,41 @@ private:
 		std::atomic<block_node*> myPrevious;
 	};
 
-	concurrent_queue<Object*> myUnusedObjects;
+	using node_allocator = typename std::allocator_traits<Allocator>::template rebind_alloc<block_node>;
+
+	Allocator myAllocator;
+
+	concurrent_queue<Object*, Allocator> myUnusedObjects;
 
 	std::atomic<block_node*> myLastBlock;
 
 	const std::size_t myBlockSize;
 };
 
-template<class Object>
-inline concurrent_object_pool<Object>::concurrent_object_pool(std::size_t blockSize)
+template<class Object, class Allocator>
+inline concurrent_object_pool<Object, Allocator>::concurrent_object_pool(std::size_t blockSize)
 	: myBlockSize(blockSize)
-	, myUnusedObjects(blockSize)
+	, myUnusedObjects(blockSize, myAllocator)
 	, myLastBlock(nullptr)
 {
 	try_alloc_block();
 }
-template<class Object>
-inline concurrent_object_pool<Object>::~concurrent_object_pool()
+template<class Object, class Allocator>
+inline concurrent_object_pool<Object, Allocator>::concurrent_object_pool(std::size_t blockSize, Allocator & allocator)
+	: myAllocator(allocator)
+	, myBlockSize(blockSize)
+	, myUnusedObjects(blockSize, allocator)
+	, myLastBlock(nullptr)
+{
+	try_alloc_block();
+}
+template<class Object, class Allocator>
+inline concurrent_object_pool<Object, Allocator>::~concurrent_object_pool()
 {
 	unsafe_destroy();
 }
-template<class Object>
-inline Object * concurrent_object_pool<Object>::get_object()
+template<class Object, class Allocator>
+inline Object * concurrent_object_pool<Object, Allocator>::get_object()
 {
 	Object* out;
 
@@ -81,25 +96,30 @@ inline Object * concurrent_object_pool<Object>::get_object()
 	}
 	return out;
 }
-template<class Object>
-inline void concurrent_object_pool<Object>::recycle_object(Object * object)
+template<class Object, class Allocator>
+inline void concurrent_object_pool<Object, Allocator>::recycle_object(Object * object)
 {
 	myUnusedObjects.push(object);
 }
-template<class Object>
-inline std::size_t concurrent_object_pool<Object>::avaliable()
+template<class Object, class Allocator>
+inline std::size_t concurrent_object_pool<Object, Allocator>::avaliable()
 {
 	return static_cast<uint32_t>(myUnusedObjects.size());
 }
-template<class Object>
-inline void concurrent_object_pool<Object>::unsafe_destroy()
+template<class Object, class Allocator>
+inline void concurrent_object_pool<Object, Allocator>::unsafe_destroy()
 {
 	block_node* blockNode(myLastBlock.load(std::memory_order_acquire));
 	while (blockNode) {
 		block_node* const previous(blockNode->myPrevious);
 
-		delete[] blockNode->myBlock;
-		delete blockNode;
+		for (std::size_t i = 0; i < myBlockSize; ++i) {
+			blockNode->myBlock->~Object();
+		}
+		myAllocator.deallocate(reinterpret_cast<uint8_t*>(blockNode->myBlock), myBlockSize * sizeof(Object));
+
+		blockNode->~block_node();
+		myAllocator.deallocate(reinterpret_cast<uint8_t*>(blockNode), sizeof(block_node));
 
 		blockNode = previous;
 	}
@@ -107,8 +127,8 @@ inline void concurrent_object_pool<Object>::unsafe_destroy()
 
 	myUnusedObjects.unsafe_reset();
 }
-template<class Object>
-inline void concurrent_object_pool<Object>::try_alloc_block()
+template<class Object, class Allocator>
+inline void concurrent_object_pool<Object, Allocator>::try_alloc_block()
 {
 	block_node* expected(myLastBlock.load(std::memory_order_acquire));
 
@@ -116,15 +136,25 @@ inline void concurrent_object_pool<Object>::try_alloc_block()
 		return;
 	}
 
-	Object* const block(new Object[myBlockSize]);
+	Object* const block(reinterpret_cast<Object*>(myAllocator.allocate(myBlockSize * sizeof(Object))));
 
-	block_node* const desired(new block_node);
+	for (std::size_t i = 0; i < myBlockSize; ++i) {
+		new (&block[i]) (Object);
+	}
+
+	block_node* const desired(reinterpret_cast<block_node*>(myAllocator.allocate(sizeof(block_node))));
+	new (desired)(block_node);
 	desired->myPrevious = expected;
 	desired->myBlock = block;
 
 	if (!myLastBlock.compare_exchange_strong(expected, desired)) {
-		delete desired;
-		delete[] block;
+		for (std::size_t i = 0; i < myBlockSize; ++i) {
+			block->~Object();
+		}
+		myAllocator.deallocate(reinterpret_cast<uint8_t*>(block), myBlockSize * sizeof(Object));
+
+		desired->~block_node();
+		myAllocator.deallocate(reinterpret_cast<uint8_t*>(desired), sizeof(block_node));
 
 		return;
 	}
