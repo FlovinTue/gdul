@@ -28,18 +28,9 @@ namespace gdul {
 
 struct job_priority_comparator
 {
-	constexpr const bool operator()(uint64_t aFirst, uint64_t aSecond) const
-	{
-		const uint64_t delta(aSecond - aFirst);
-		const uint64_t underflowBarrier(std::numeric_limits<uint64_t>::max() / 2);
-
-		const bool noUnderflow(delta < underflowBarrier);
-		const bool noEq(delta);
-		const bool returnValue(noEq & noUnderflow);
-
-		return returnValue;
-	}
+	constexpr bool operator()(uint64_t aFirst, uint64_t aSecond) const;
 };
+
 enum class Job_layer : uint8_t;
 class job;
 class job_sequence_impl

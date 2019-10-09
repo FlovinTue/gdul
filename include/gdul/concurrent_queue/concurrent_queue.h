@@ -356,7 +356,7 @@ inline void concurrent_queue<T, Allocator>::unsafe_clear()
 	std::atomic_thread_fence(std::memory_order_acquire);
 
 	shared_ptr_array_type producerArray(myProducerSlots.unsafe_load());
-	for (uint16_t i = 0; i < myProducerCount.load(std::memory_order_relaxed); ++i) {
+	for (uint16_t i = 0; i < myProducerCount.load(std::memory_order_acquire); ++i) {
 		producerArray[i].unsafe_get_owned()->unsafe_clear();
 	}
 
@@ -367,7 +367,7 @@ inline void concurrent_queue<T, Allocator>::unsafe_reset()
 {
 	std::atomic_thread_fence(std::memory_order_acquire);
 
-	const uint16_t producerCount(myProducerCount.load(std::memory_order_relaxed));
+	const uint16_t producerCount(myProducerCount.load(std::memory_order_acquire));
 	const uint16_t slots(cqdetail::to_store_array_slot<void>(producerCount - static_cast<bool>(producerCount)) + static_cast<bool>(producerCount));
 
 	kill_store_array_below(slots, true);
@@ -919,7 +919,7 @@ inline producer_buffer<T, Allocator>::~producer_buffer()
 template<class T, class Allocator>
 inline bool producer_buffer<T, Allocator>::is_active() const
 {
-	return (!myNext || (myReadSlot.load(std::memory_order_relaxed) != myPostWriteIterator.load(std::memory_order_relaxed)));
+	return (!myNext || (myReadSlot.load(std::memory_order_acquire) != myPostWriteIterator.load(std::memory_order_acquire)));
 }
 template<class T, class Allocator>
 inline bool producer_buffer<T, Allocator>::is_valid() const
@@ -965,8 +965,8 @@ inline typename producer_buffer<T, Allocator>::shared_ptr_slot_type producer_buf
 template<class T, class Allocator>
 inline typename producer_buffer<T, Allocator>::size_type producer_buffer<T, Allocator>::size() const
 {
-	const size_type readSlot(myReadSlot.load(std::memory_order_relaxed));
-	size_type accumulatedSize(myPostWriteIterator.load(std::memory_order_relaxed));
+	const size_type readSlot(myReadSlot.load(std::memory_order_acquire));
+	size_type accumulatedSize(myPostWriteIterator.load(std::memory_order_acquire));
 	accumulatedSize -= readSlot;
 
 	if (myNextState.load(std::memory_order_acquire))
@@ -1071,7 +1071,7 @@ inline void producer_buffer<T, Allocator>::push_front(shared_ptr_slot_type newBu
 template<class T, class Allocator>
 inline void producer_buffer<T, Allocator>::unsafe_clear()
 {
-	const size_type postWrite(myPostWriteIterator.load(std::memory_order_relaxed));
+	const size_type postWrite(myPostWriteIterator.load(std::memory_order_acquire));
 	myPreReadIterator.store(postWrite, std::memory_order_relaxed);
 	myReadSlot.store(postWrite, std::memory_order_relaxed);
 

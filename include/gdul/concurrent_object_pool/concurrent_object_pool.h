@@ -94,7 +94,7 @@ inline std::size_t concurrent_object_pool<Object>::avaliable()
 template<class Object>
 inline void concurrent_object_pool<Object>::unsafe_destroy()
 {
-	block_node* blockNode(myLastBlock.load(std::memory_order_relaxed));
+	block_node* blockNode(myLastBlock.load(std::memory_order_acquire));
 	while (blockNode) {
 		block_node* const previous(blockNode->myPrevious);
 
@@ -110,7 +110,7 @@ inline void concurrent_object_pool<Object>::unsafe_destroy()
 template<class Object>
 inline void concurrent_object_pool<Object>::try_alloc_block()
 {
-	block_node* expected(myLastBlock.load(std::memory_order_relaxed));
+	block_node* expected(myLastBlock.load(std::memory_order_acquire));
 
 	if (myUnusedObjects.size()) {
 		return;

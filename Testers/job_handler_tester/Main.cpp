@@ -34,6 +34,10 @@ void Sequential(uint32_t aIndex)
 	//std::cout << "Sequential# " << aIndex << std::endl;
 	//mtx.unlock();
 	//spinFlag.clear();
+	
+	if (!(aIndex % 10000)) {
+		std::cout << "." << std::endl;
+	}
 }
 
 int main()
@@ -49,7 +53,7 @@ int main()
 
 	job_sequence jobSequence(&handler);
 
-	for (uint32_t j = 0; j < 200; ++j) {
+	for (uint32_t j = 0; j < 1000000; ++j) {
 		jobSequence.push([j]()
 		{
 			Sequential(1 + j * 4);
@@ -80,6 +84,7 @@ int main()
 				Parallel(4 + j * 4);
 			}, Job_layer::back);
 		}
+		
 	}
 	jobSequence.push([&handler]() { handler.abort(); }, Job_layer::next);
 

@@ -232,7 +232,7 @@ inline void concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, C
 
 	node_type* prev(static_cast<node_type*>(myFrontSentry));
 
-	for (size_type i = 0; i < mySize.load(std::memory_order_relaxed); ++i) {
+	for (size_type i = 0; i < mySize.load(std::memory_order_acquire); ++i) {
 		prev = static_cast<node_type*>(prev->myNext[0]);
 		arr.push_back(prev);
 	}

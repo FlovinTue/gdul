@@ -6,12 +6,21 @@ namespace gdul
 {
 job::job()
 	: myWorkItem([]() {})
+	, myPriorityIndex(0)
 {
 }
 
 job::job(std::function<void()>&& callable)
 	: myWorkItem(std::move(callable))
+	, myPriorityIndex(0)
 {
+}
+
+job::job(std::function<void()>&& callable, const job & /*dependency*/)
+	: myWorkItem(std::move(callable))
+	, myPriorityIndex(0)
+{
+
 }
 
 

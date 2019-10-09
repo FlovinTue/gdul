@@ -10,6 +10,8 @@ class job
 public:
 	job();
 	job(std::function<void()>&& callable);
+	job(std::function<void()>&& callable, const job& dependency);
+
 	~job();
 
 	job(job&&) = default;
@@ -21,6 +23,7 @@ public:
 
 private:
 	std::function<void()> myWorkItem;
+	uint64_t myPriorityIndex;
 };
 
 }

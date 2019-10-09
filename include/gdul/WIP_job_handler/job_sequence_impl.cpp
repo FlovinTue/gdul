@@ -11,6 +11,18 @@ class function;
 
 namespace gdul
 {
+constexpr bool job_priority_comparator::operator()(uint64_t aFirst, uint64_t aSecond) const
+{
+	const uint64_t delta(aSecond - aFirst);
+	const uint64_t underflowBarrier(std::numeric_limits<uint64_t>::max() / 2);
+
+	const bool noUnderflow(delta < underflowBarrier);
+	const bool noEq(delta);
+	const bool returnValue(noEq & noUnderflow);
+
+	return returnValue;
+}
+
 job_sequence_impl::job_sequence_impl()
 	: myJobQueue(job_handler::Job_Queues_Init_Alloc)
 	, myPriorityIndexIterator(0)
@@ -31,15 +43,17 @@ void job_sequence_impl::reset()
 	myLastJobPriorityIndex.store(1, std::memory_order_relaxed);
 	myIsPaused.store(false, std::memory_order_relaxed);
 	myNumActiveJobs.store(0, std::memory_order_relaxed);
+
+	std::atomic_thread_fence(std::memory_order_release);
 }
 
 void job_sequence_impl::pause()
 {
-	myIsPaused.store(true, std::memory_order_relaxed);
+	myIsPaused.store(true, std::memory_order_release);
 }
 void job_sequence_impl::resume()
 {
-	myIsPaused.store(false, std::memory_order_relaxed);
+	myIsPaused.store(false, std::memory_order_release);
 }
 void job_sequence_impl::push(const std::function<void()>& inJob, Job_layer jobPlacement)
 {
@@ -48,7 +62,7 @@ void job_sequence_impl::push(const std::function<void()>& inJob, Job_layer jobPl
 		priorityIndex = (myPriorityIndexIterator.fetch_add(1, std::memory_order_relaxed) + 1);
 	}
 	else {
-		priorityIndex = myLastJobPriorityIndex.load(std::memory_order_relaxed);
+		priorityIndex = myLastJobPriorityIndex.load(std::memory_order_acquire);
 	}
 	myJobQueue.push(inJob, priorityIndex);
 }
@@ -60,7 +74,7 @@ void job_sequence_impl::push(std::function<void()>&& inJob, Job_layer jobPlaceme
 		priorityIndex = (myPriorityIndexIterator.fetch_add(1, std::memory_order_relaxed) + 1);
 	}
 	else {
-		priorityIndex = myPriorityIndexIterator.load(std::memory_order_relaxed);
+		priorityIndex = myPriorityIndexIterator.load(std::memory_order_acquire);
 	}
 
 	myJobQueue.push(std::move(inJob), priorityIndex);
@@ -68,14 +82,14 @@ void job_sequence_impl::push(std::function<void()>&& inJob, Job_layer jobPlaceme
 
 bool job_sequence_impl::fetch_job(job& aOut)
 {
-	if (myIsPaused.load(std::memory_order_relaxed)) {
+	if (myIsPaused.load(std::memory_order_acquire)) {
 		return false;
 	}
 	if (!myJobQueue.size()) {
 		return false;
 	}
 
-	const uint64_t lastPriorityIndex(myLastJobPriorityIndex.load(std::memory_order_relaxed));
+	const uint64_t lastPriorityIndex(myLastJobPriorityIndex.load(std::memory_order_acquire));
 
 	uint64_t topPriorityIndex(0);
 	const bool foundKey(myJobQueue.try_peek_top_key(topPriorityIndex));
@@ -84,7 +98,7 @@ bool job_sequence_impl::fetch_job(job& aOut)
 		return false;
 	}
 
-	myNumActiveJobs.fetch_add(1, std::memory_order_relaxed);
+	myNumActiveJobs.fetch_add(1, std::memory_order_acq_rel);
 
 	std::function<void()> out;
 	uint64_t expectedKey(lastPriorityIndex);
@@ -99,20 +113,25 @@ bool job_sequence_impl::fetch_job(job& aOut)
 }
 void job_sequence_impl::advance()
 {
-	const uint64_t lastPriorityIndex(myLastJobPriorityIndex.load(std::memory_order_relaxed));
-	const uint64_t nextPriorityIndex(lastPriorityIndex + 1);
+	const uint64_t lastPriorityIndex(myLastJobPriorityIndex.load(std::memory_order_acquire));
 
 	uint64_t topPriorityIndex(0);
 	const bool foundKey(myJobQueue.try_peek_top_key(topPriorityIndex));
-	const bool matchingIndices(!(topPriorityIndex ^ nextPriorityIndex));
-	const bool foundNextIndex(foundKey & matchingIndices);
+	const bool oldPriorityIndex(lastPriorityIndex == topPriorityIndex);
+	const bool foundNextIndex(foundKey & !oldPriorityIndex);
 
-	const bool hasActiveJobs(myNumActiveJobs.fetch_sub(1, std::memory_order_relaxed) - 1);
+	const bool hasActiveJobs(myNumActiveJobs.fetch_sub(1, std::memory_order_acq_rel) - 1);
 
 	if (foundNextIndex & !hasActiveJobs) {
 		uint64_t expected(lastPriorityIndex);
-		const uint64_t desired(nextPriorityIndex);
-		myLastJobPriorityIndex.compare_exchange_strong(expected, desired, std::memory_order_relaxed);
+		const uint64_t desired(topPriorityIndex);
+
+		const job_priority_comparator comparator;
+		do {
+			if (myLastJobPriorityIndex.compare_exchange_strong(expected, desired, std::memory_order_acquire, std::memory_order_release)) {
+				break;
+			}
+		} while (comparator(expected, desired));
 	}
 }
 }
