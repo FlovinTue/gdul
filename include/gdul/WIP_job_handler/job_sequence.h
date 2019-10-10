@@ -27,14 +27,6 @@ namespace std
 }
 namespace gdul {
 
-enum class Job_layer : uint8_t
-{
-	// Places the job in the backmost joblayer
-	back,
-
-	// Places the job after the backmost joblayer
-	next
-};
 class job_handler;
 class job_sequence_impl;
 class job_sequence
@@ -53,14 +45,22 @@ public:
 	void swap(job_sequence& other);
 	void swap(job_sequence&& other);
 
-	void push(const std::function<void()>& inJob, Job_layer jobLayer);
-	void push(std::function<void()>&& inJob, Job_layer jobLayer);
+	// Support live submission of job dependant on job that is not submitted?
+	// Get job handle? ('future' on when job is done) 
+	// Why job_sequence?
+
+	void run_synchronous(job&& job);
+	void run_synchronous(const job& job);
+
+	void run_asynchronous(job&& job);
+	void run_asynchronous(const job& job);
 
 	void pause();
 	void resume();
 
 private:
 	job_sequence_impl* myImpl;
+	job_handler* myHandler;
 };
 
 }

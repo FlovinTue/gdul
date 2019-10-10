@@ -6,14 +6,17 @@ namespace gdul
 {
 job_sequence::job_sequence(job_handler* jobHandler)
 	: myImpl(jobHandler->create_job_sequence())
+	, myHandler(jobHandler)
 {
 }
 job_sequence::job_sequence()
 	: myImpl(nullptr)
+	, myHandler(nullptr)
 {
 }
 job_sequence::~job_sequence()
 {
+	myImpl->return_to_pool();
 }
 job_sequence::job_sequence(job_sequence && other)
 	: job_sequence()
@@ -34,13 +37,20 @@ void job_sequence::swap(job_sequence && other)
 {
 	swap(other);
 }
-void job_sequence::push(const std::function<void()>& inJob, Job_layer jobLayer)
+void job_sequence::run_synchronous(job && job)
 {
-	myImpl->push(inJob, jobLayer);
+	myImpl->run_synchronous(std::move(job));
 }
-void job_sequence::push(std::function<void()>&& inJob, Job_layer jobLayer)
+void job_sequence::run_synchronous(const job & job)
 {
-	myImpl->push(std::move(inJob), jobLayer);
+	myImpl->run_synchronous(job);
+}
+void job_sequence::run_asynchronous(job && job)
+{
+	
+}
+void job_sequence::run_asynchronous(const job & job)
+{
 }
 void job_sequence::pause()
 {

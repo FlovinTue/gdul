@@ -21,9 +21,11 @@ public:
 	
 	void operator()() const;
 
+	uint64_t get_sequence_key() const;
+
 private:
-	std::function<void()> myWorkItem;
-	uint64_t myPriorityIndex;
+	std::function<void()> myCallable;
+	uint64_t mySequenceKey;
 };
 
 }

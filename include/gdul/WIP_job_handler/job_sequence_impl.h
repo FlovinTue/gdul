@@ -45,8 +45,11 @@ public:
 	job_sequence_impl(job_sequence_impl&&) = delete;
 	job_sequence_impl& operator=(job_sequence_impl&&) = delete;
 
-	void push(const std::function<void()>& inJob, Job_layer jobPlacement);
-	void push(std::function<void()>&& inJob, Job_layer jobPlacement);
+	void run_synchronous(job&& job);
+	void run_synchronous(const job& job);
+
+	void run_asynchronous(job&& job);
+	void run_asynchronous(const job& job);
 
 	void reset();
 
@@ -55,18 +58,23 @@ public:
 
 	bool fetch_job(job& aOut);
 
-	void advance();
+	void advance(uint64_t fromPriorityKey);
+
+	bool active() const;
+
+	void  return_to_pool();
 
 private:
+	concurrent_heap<job, job_priority_comparator> myJobQueue;
 
-	concurrent_heap<std::function<void()>, job_priority_comparator> myJobQueue;
+	job_handler* const myHandler;
 
-	std::atomic<uint64_t> myPriorityIndexIterator;
+	std::atomic<uint64_t> mySequenceKeyIterator;
+	std::atomic<uint64_t> myLastJobSequenceKey;
 	std::atomic<uint16_t> myNumActiveJobs;
-
-	std::atomic<uint64_t> myLastJobPriorityIndex;
-
 	std::atomic<bool> myIsPaused;
+
+
 };
 
 }

@@ -94,6 +94,10 @@ job_sequence_impl * job_handler::create_job_sequence()
 
 	return jobSequence;
 }
+void job_handler::recycle_job_sequence(job_sequence_impl * jobSequence)
+{
+	myJobSequencePool.recycle_object(jobSequence);
+}
 void job_handler::launch_worker(uint32_t workerIndex)
 {
 	set_thread_name(std::string("job_handler_thread# " + std::to_string(workerIndex)));

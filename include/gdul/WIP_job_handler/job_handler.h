@@ -78,8 +78,10 @@ public:
 	static thread_local job_sequence_impl* this_JobSequence;
 private:
 	friend class job_sequence;
+	friend class job_sequence_impl;
 
 	job_sequence_impl* create_job_sequence();
+	void recycle_job_sequence(job_sequence_impl* jobSequence);
 
 private:
 	void launch_worker(uint32_t workerIndex);

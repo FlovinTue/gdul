@@ -5,20 +5,20 @@
 namespace gdul
 {
 job::job()
-	: myWorkItem([]() {})
-	, myPriorityIndex(0)
+	: myCallable([]() {})
+	, mySequenceKey(0)
 {
 }
 
 job::job(std::function<void()>&& callable)
-	: myWorkItem(std::move(callable))
-	, myPriorityIndex(0)
+	: myCallable(std::move(callable))
+	, mySequenceKey(0)
 {
 }
 
-job::job(std::function<void()>&& callable, const job & /*dependency*/)
-	: myWorkItem(std::move(callable))
-	, myPriorityIndex(0)
+job::job(std::function<void()>&& callable, const job & dependency)
+	: myCallable(std::move(callable))
+	, mySequenceKey(dependency.mySequenceKey - 1)
 {
 
 }
@@ -29,10 +29,14 @@ job::~job()
 }
 void job::operator()() const
 {
-	myWorkItem();
+	myCallable();
 
 	if (job_handler::this_JobSequence) {
-		job_handler::this_JobSequence->advance();
+		job_handler::this_JobSequence->advance(*this);
 	}
+}
+uint64_t job::get_sequence_key() const
+{
+	return mySequenceKey;
 }
 }
