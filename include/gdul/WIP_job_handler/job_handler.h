@@ -73,6 +73,11 @@ struct job_handler_info
 
 // Use externally supplied threads or internal ones?
 
+// Optimize for throughput or latency? Or both?
+
+// Clever solution for asynchronous queues? Keep in mind the need to avoid starvation .. (Simply consume more from the high priority ones?)
+
+
 
 
 class job_handler
