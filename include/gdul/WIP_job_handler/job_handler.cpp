@@ -105,11 +105,11 @@ void job_handler::launch_worker(uint32_t workerIndex)
 
 	ourLastJobTimepoint = ourSleepTimer.now();
 
-	myInitInfo.myOnLaunchJob();
+	myInitInfo.myOnThreadLaunch();
 
 	work();
 
-	myInitInfo.myOnExitJob();
+	myInitInfo.myOnThreadExit();
 }
 void job_handler::work()
 {
