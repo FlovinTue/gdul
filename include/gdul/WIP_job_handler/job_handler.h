@@ -52,12 +52,29 @@ struct job_handler_info
 
 	// This will be run per worker upon launch. Good to have in case there is 
 	// thread specific initializations that needs to be done.
-	std::function<void()> myOnLaunchJob = []() {};
+	job myOnThreadLaunch = job([]() {});
 
 	// This will be run per worker upon exit. Good to have in case there is 
 	// thread specific clean up that needs to be done.
-	std::function<void()> myOnExitJob = []() {};
+	job myOnThreadExit = job([]() {});
 };
+
+// Usage ideas / functionality
+// Asynchronous submission of delegates with priorities
+// Synchronous submission of delegates with posibility of parallel execution
+
+// Submission of delegates from within current job, suspending current job until completed? ? 
+// -- would be practical. Run on current worker, farming out 'some' jobs to other workers?
+
+// Use some form of fiber system for execution? (Allowing suspension in the middle of a job, 
+// only to be resumed by the first avaliable thread)
+
+// Change design to each thread having a native sequence? Hmm. May harm modularity and simplicity..
+
+// Use externally supplied threads or internal ones?
+
+
+
 class job_handler
 {
 public:
