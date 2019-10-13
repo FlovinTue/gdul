@@ -5,14 +5,14 @@
     <ClCompile Include="spin_lock.cpp" />
     <ClCompile Include="..\..\include\gdul\WIP_job_handler\job.cpp" />
     <ClCompile Include="..\..\include\gdul\WIP_job_handler\job_handler.cpp" />
-    <ClCompile Include="..\..\include\gdul\WIP_job_handler\job_sequence.cpp" />
-    <ClCompile Include="..\..\include\gdul\WIP_job_handler\job_sequence_impl.cpp" />
+    <ClCompile Include="..\..\include\gdul\WIP_job_handler\job_impl.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="spin_lock.h" />
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\job.h" />
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_handler.h" />
-    <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_sequence.h" />
-    <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_sequence_impl.h" />
+    <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_callable.h" />
+    <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_callable_base.h" />
+    <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_impl.h" />
   </ItemGroup>
 </Project>

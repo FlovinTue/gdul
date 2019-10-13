@@ -34,6 +34,12 @@
 
 namespace gdul {
 
+namespace job_handler_detail {
+
+constexpr uint8_t Num_Priority_Queues = 4;
+using allocator_type = std::allocator<uint8_t>;
+
+}
 struct job_handler_info
 {
 	uint16_t myNumWorkers = static_cast<uint16_t>(std::thread::hardware_concurrency() * 2);
@@ -59,27 +65,6 @@ struct job_handler_info
 	job myOnThreadExit = job([]() {});
 };
 
-// Usage ideas / functionality
-// Asynchronous submission of delegates with priorities
-// Synchronous submission of delegates with posibility of parallel execution
-
-// Submission of delegates from within current job, suspending current job until completed? ? 
-// -- would be practical. Run on current worker, farming out 'some' jobs to other workers?
-
-// Use some form of fiber system for execution? (Allowing suspension in the middle of a job, 
-// only to be resumed by the first avaliable thread)
-
-// Change design to each thread having a native sequence? Hmm. May harm modularity and simplicity..
-
-// Use externally supplied threads or internal ones?
-
-// Optimize for throughput or latency? Or both?
-
-// Clever solution for asynchronous queues? Keep in mind the need to avoid starvation .. (Simply consume more from the high priority ones?)
-
-
-
-
 class job_handler
 {
 public:
@@ -91,6 +76,12 @@ public:
 	void Init(const job_handler_info& info = job_handler_info());
 
 	// Restores initial values & recycles all job sequences in use
+
+
+	job create_job()
+	void submit(const job& job);
+	void submit(job&& job);
+
 	void reset();
 
 	void run();
@@ -122,9 +113,7 @@ private:
 
 	const job myIdleJob;
 
-	concurrent_object_pool<job_sequence_impl> myJobSequencePool;
-
-	concurrency::concurrent_vector<job_sequence_impl*> myJobSequences;
+	concurrent_queue<job, job_handler_detail::allocator_type> myJobQueues[job_handler_detail::Num_Priority_Queues];
 
 	std::vector<std::thread> myWorkers;
 
@@ -134,3 +123,35 @@ private:
 };
 
 }
+
+
+// Usage ideas / functionality
+// Asynchronous submission of delegates with priorities
+// Synchronous submission of delegates with posibility of parallel execution
+
+// Submission of delegates from within current job, suspending current job until completed? ? 
+// -- would be practical. Run on current worker, farming out 'some' jobs to other workers?
+
+// Use some form of fiber system for execution? (Allowing suspension in the middle of a job, 
+// only to be resumed by the first avaliable thread)
+
+// Change design to each thread having a native sequence? Hmm. May harm modularity and simplicity..
+
+// Use externally supplied threads or internal ones?
+
+// Optimize for throughput or latency? Or both?
+
+// .. Array scatter-gather helper?
+// Needs Source array.. oor.. begin -> end iterator. Probably better.
+// Needs operation to perform... Hmm generalize more.. hmmm
+// And an output array? ( or output begin->end iterator) 
+// Use cases? Hmm. Need to generalize for more use cases?
+// For example sort? How would that work?
+// Culling? Output arrays would not match input.
+// 
+// Fundamental rebuild:
+// A choice of number of queues, each next one with a lower priority
+// Support multiple dependancies
+// Job dependancies structured in a graph
+// Jobs submitted to their queues by post job examination of children
+// Consumption from queues with a log2 relationship to lower priority?

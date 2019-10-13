@@ -93,4 +93,6 @@ int main()
 	while (spinFlag.test_and_set()) std::this_thread::yield();
 
 	std::cout << "Hello World!\n";
+
+	std::size_t blah;
 }
