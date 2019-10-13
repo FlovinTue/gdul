@@ -31,6 +31,12 @@
 
 namespace gdul {
 
+#if  defined(_MSC_VER) && !defined(__INTEL_COMPILER)
+#define GDUL_NOVTABLE __declspec(novtable)
+#else
+#define GDUL_NOVTABLE
+#endif
+
 namespace aspdetail {
 
 typedef std::allocator<uint8_t> default_allocator;
@@ -616,7 +622,7 @@ inline typename aspdetail::compressed_storage atomic_shared_ptr<T, Allocator>::e
 }
 namespace aspdetail {
 template <class T, class Allocator>
-class control_block_base
+class GDUL_NOVTABLE control_block_base
 {
 public:
 	typedef typename atomic_shared_ptr<T>::size_type size_type;

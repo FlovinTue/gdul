@@ -278,7 +278,7 @@ constexpr uint128 & atomic_uint128::my_val()
 {
 	return myStorage;
 }
-#ifdef _WIN64
+#if  defined(_MSC_VER) && !defined(__INTEL_COMPILER)
 bool atomic_uint128::cas_internal(std::int64_t* const expected, const std::int64_t* desired)
 {
 	return _InterlockedCompareExchange128(reinterpret_cast<volatile std::int64_t*>(&myStorage.myS64[0]), desired[1], desired[0], expected);
@@ -301,6 +301,8 @@ bool atomic_int128::cas_internal(std::int64_t* const expected, const std::int64_
 	);
 	return result;
 }
+#else
+#error Unsupported platform
 #endif
 }
 

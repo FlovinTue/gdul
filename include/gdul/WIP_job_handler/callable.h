@@ -5,11 +5,11 @@ namespace gdul {
 namespace job_handler_detail {
 
 template <class Callable>
-class job_callable
+class callable
 {
 public:
-	job_callable(Callable&& callable);
-	job_callable(const Callable& callable);
+	callable(Callable&& callable);
+	callable(const Callable& callable);
 
 	void operator()();
 

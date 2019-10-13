@@ -91,8 +91,8 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\job.h" />
-    <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_callable.h" />
-    <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_callable_base.h" />
+    <ClInclude Include="..\..\include\gdul\WIP_job_handler\callable.h" />
+    <ClInclude Include="..\..\include\gdul\WIP_job_handler\callable_base.h" />
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_handler.h" />
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_impl.h" />
     <ClInclude Include="spin_lock.h" />
