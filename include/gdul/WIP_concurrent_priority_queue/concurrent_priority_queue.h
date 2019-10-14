@@ -34,7 +34,7 @@
 #define MAKE_UNIQUE_NAME(prefix) EXPAND_AND_CONCAT(prefix, __COUNTER__)
 #endif
 
-#define CSL_PADD(bytes) const uint8_t MAKE_UNIQUE_NAME(padding)[bytes] {}
+#define CSL_PADD(bytes) const std::uint8_t MAKE_UNIQUE_NAME(padding)[bytes] {}
 
 #pragma warning(disable:4505)
 
@@ -75,7 +75,7 @@ public:
 	typedef Comparator comparator_type;
 	typedef KeyType key_type;
 	typedef ValueType value_type;
-	typedef allocator<uint8_t> allocator_type;
+	typedef allocator<std::uint8_t> allocator_type;
 	typedef cpqdetail::node<key_type, value_type, Max_Node_Height, allocator_type> node_type;
 	typedef shared_ptr<node_type, allocator_type> shared_ptr_type;
 	typedef atomic_shared_ptr<node_type, allocator_type> atomic_shared_ptr_type;
@@ -119,14 +119,14 @@ private:
 	{
 	public:
 		allocator(concurrent_object_pool<alloc_type>* memPool) : myMemoryPool(memPool) {}
-		allocator(const allocator<uint8_t>& other) : myMemoryPool(other.myMemoryPool) {}
+		allocator(const allocator<std::uint8_t>& other) : myMemoryPool(other.myMemoryPool) {}
 
-		typedef uint8_t value_type;
+		typedef std::uint8_t value_type;
 
 		uint8_t* allocate(std::size_t /*n*/) {
-			return reinterpret_cast<uint8_t*>(myMemoryPool->get_object());
+			return reinterpret_cast<std::uint8_t*>(myMemoryPool->get_object());
 		}
-		void deallocate(uint8_t* ptr, std::size_t /*n*/) {
+		void deallocate(std::uint8_t* ptr, std::size_t /*n*/) {
 			myMemoryPool->recycle_object(reinterpret_cast<alloc_type*>(ptr));
 		}
 

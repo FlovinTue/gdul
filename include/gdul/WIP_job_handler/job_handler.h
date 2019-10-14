@@ -23,7 +23,6 @@
 #include <vector>
 #include <thread>
 #include <chrono>
-#include <gdul\WIP_job_handler\job_sequence.h>
 #include <gdul\WIP_job_handler\job.h>
 #include <gdul\concurrent_object_pool\concurrent_object_pool.h>
 #include <concurrent_vector.h>
@@ -36,18 +35,18 @@ namespace gdul {
 
 namespace job_handler_detail {
 
-constexpr uint8_t Num_Priority_Queues = 4;
-using allocator_type = std::allocator<uint8_t>;
+constexpr std::uint8_t Num_Priority_Queues = 4;
+using allocator_type = std::allocator<std::uint8_t>;
 
 }
 struct job_handler_info
 {
-	uint16_t myNumWorkers = static_cast<uint16_t>(std::thread::hardware_concurrency() * 2);
+	uint16_t myNumWorkers = static_cast<std::uint16_t>(std::thread::hardware_concurrency() * 2);
 
 	// The maximum number of workers that are allowed to work on asynchronous 
 	// jobs concurrently. Should be tuned so that synchronous operation is 
 	// not interrupted
-	uint16_t myMaxAsyncWorkers = static_cast<uint16_t>(ceil(static_cast<float>(myNumWorkers) / 3.0f));
+	uint16_t myMaxAsyncWorkers = static_cast<std::uint16_t>(ceil(static_cast<float>(myNumWorkers) / 3.0f));
 
 	// Thread priority as defined in WinBase.h
 	uint32_t myWorkerPriorities = THREAD_PRIORITY_NORMAL;
@@ -78,7 +77,6 @@ public:
 	// Restores initial values & recycles all job sequences in use
 
 
-	job create_job()
 	void submit(const job& job);
 	void submit(job&& job);
 
@@ -88,16 +86,11 @@ public:
 
 	void abort();
 
-	static thread_local job_sequence_impl* this_JobSequence;
 private:
-	friend class job_sequence;
-	friend class job_sequence_impl;
 
-	job_sequence_impl* create_job_sequence();
-	void recycle_job_sequence(job_sequence_impl* jobSequence);
 
 private:
-	void launch_worker(uint32_t workerIndex);
+	void launch_worker(std::uint32_t workerIndex);
 
 	void work();
 	void idle();

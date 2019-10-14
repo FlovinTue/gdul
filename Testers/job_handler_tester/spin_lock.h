@@ -14,7 +14,7 @@ public:
 	void unlock();
 
 private:
-	alignas(64) std::atomic<uint16_t> myEntryCounter;
-	alignas(64) std::atomic<uint16_t> myExitCounter;
+	alignas(64) std::atomic<std::uint16_t> myEntryCounter;
+	alignas(64) std::atomic<std::uint16_t> myExitCounter;
 };
 #pragma warning(pop)

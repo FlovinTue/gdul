@@ -9,9 +9,9 @@
 std::atomic_flag spinFlag;
 std::mutex mtx;
 
-std::atomic<uint32_t> count = 0;
+std::atomic<std::uint32_t> count = 0;
 
-void Parallel(uint32_t aIndex)
+void Parallel(std::uint32_t aIndex)
 {
 	aIndex;
 	//if (count.load() != aIndex) {
@@ -24,7 +24,7 @@ void Parallel(uint32_t aIndex)
 	//mtx.unlock();
 	//spinFlag.clear();
 }
-void Sequential(uint32_t aIndex)
+void Sequential(std::uint32_t aIndex)
 {
 	//while (spinFlag.test_and_set()) std::this_thread::yield();
 	if (++count != aIndex) {
@@ -53,13 +53,13 @@ int main()
 
 	job_sequence jobSequence(&handler);
 
-	for (uint32_t j = 0; j < 1000000; ++j) {
+	for (std::uint32_t j = 0; j < 1000000; ++j) {
 		jobSequence.push([j]()
 		{
 			Sequential(1 + j * 4);
 		}, Job_layer::next);
 
-		for (uint32_t i = 0; i < 5; ++i) {
+		for (std::uint32_t i = 0; i < 5; ++i) {
 			jobSequence.push([j]()
 			{
 				Parallel(1 + j * 4);
@@ -78,7 +78,7 @@ int main()
 			Sequential(4 + j * 4);
 		}, Job_layer::next);
 
-		for (uint32_t i = 0; i < 5; ++i) {
+		for (std::uint32_t i = 0; i < 5; ++i) {
 			jobSequence.push([j]()
 			{
 				Parallel(4 + j * 4);

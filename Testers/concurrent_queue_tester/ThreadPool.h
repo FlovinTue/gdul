@@ -9,7 +9,7 @@
 class ThreadPool
 {
 public:
-	ThreadPool(uint32_t aThreads = std::thread::hardware_concurrency(), uint32_t affinityBegin = 0);
+	ThreadPool(std::uint32_t aThreads = std::thread::hardware_concurrency(), std::uint32_t affinityBegin = 0);
 	~ThreadPool();
 
 	void AddTask(std::function<void()> aWorkFunction);
@@ -17,7 +17,7 @@ public:
 
 	bool HasUnfinishedTasks() const;
 private:
-	void Idle(uint64_t affinityMask);
+	void Idle(std::uint64_t affinityMask);
 
 	std::vector<std::thread> myThreads;
 
@@ -25,6 +25,6 @@ private:
 
 	std::atomic<bool> myIsInCommission;
 
-	std::atomic<uint32_t> myTaskCounter;
+	std::atomic<std::uint32_t> myTaskCounter;
 };
 

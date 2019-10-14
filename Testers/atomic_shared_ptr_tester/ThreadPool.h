@@ -11,7 +11,7 @@
 class ThreadPool
 {
 public:
-	ThreadPool(uint32_t aThreads = std::thread::hardware_concurrency(), float aSleepThreshHold = .25f);
+	ThreadPool(std::uint32_t aThreads = std::thread::hardware_concurrency(), float aSleepThreshHold = .25f);
 	~ThreadPool();
 
 	void AddTask(const std::function<void()>& aWorkFunction);
@@ -32,6 +32,6 @@ private:
 	const float mySleepThreshhold;
 
 	std::condition_variable myWaitCondition;
-	std::atomic<uint32_t> myTaskCounter;
+	std::atomic<std::uint32_t> myTaskCounter;
 };
 

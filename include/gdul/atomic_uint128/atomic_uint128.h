@@ -21,7 +21,7 @@
 //SOFTWARE.
 
 
-#ifdef _WIN64
+#if  defined(_MSC_VER) && !defined(__INTEL_COMPILER)
 #include <intrin.h>
 #endif
 #include <cstdint>

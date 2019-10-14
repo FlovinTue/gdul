@@ -3,16 +3,14 @@
 #include <functional>
 
 
-// Idea for future: 
-// use x byte block to construct
-// abstracted-away callable. (Type erasure)
-// If > size use std::function
-
 namespace gdul {
 
 
-// If jobs are to have lifetimes, then (probably an object-pool should be used)
-// ...
+
+// Jobs are thread-safe to depend on?
+// Thread A job, depends on thread B job. Needs atomic_shared_ptr... 
+// Depend on job, or depend on job_impl ? 
+// Depend on job, and return job_impl to pool?
 
 namespace job_handler_detail {
 
@@ -23,10 +21,11 @@ class job
 public:
 	job();
 	job(std::function<void()>&& callable);
-	// Ugh. Register dependency. Lock-free? Race conditions galore. Hmm....
+	// If jobs are to have lifetimes, then (probably an object-pool should be used)
+	// Ugh. Register dependency. Lock-free? Race conditions galore. Hmm.... Maybe use shared_ptr, coupled with object-pool(chunk) allocation
 	job(std::function<void()>&& callable, const job& dependency);
-	job(std::function<void()>&& callable, uint8_t priority);
-	job(std::function<void()>&& callable, const job& dependency, uint8_t priority);
+	job(std::function<void()>&& callable, std::uint8_t priority);
+	job(std::function<void()>&& callable, const job& dependency, std::uint8_t priority);
 
 	~job();
 
@@ -40,8 +39,8 @@ public:
 	uint64_t get_sequence_key() const;
 
 private:
+	// That'd mean atomic_shared_ptr<job_handler_detail::job_impl ? , pool_allocator> myImpl;
 	job_handler_detail::job_impl* myImpl;
-	uint8_t priority;
 };
 
 }

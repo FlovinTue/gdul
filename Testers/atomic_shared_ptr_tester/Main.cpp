@@ -14,9 +14,9 @@
 
 int main()
 {
-		const uint32_t testArraySize(32);
-		const uint32_t numThreads(8);
-		Tester<uint64_t, testArraySize, numThreads> tester(true, rand());
+		const std::uint32_t testArraySize(32);
+		const std::uint32_t numThreads(8);
+		Tester<std::uint64_t, testArraySize, numThreads> tester(true, rand());
 	
 		const bool
 			doassign(true),
@@ -28,7 +28,7 @@ int main()
 		uint32_t arraySweeps(10000);
 		uint32_t runs(256);
 		float time(0.f);
-		for (uint32_t i = 0; i < runs; ++i) {
+		for (std::uint32_t i = 0; i < runs; ++i) {
 			time += tester.Execute(arraySweeps, doassign, doreassign, doCAStest, doreferencetest);
 		}
 	
@@ -63,7 +63,7 @@ int main()
 
 		using namespace gdul;
 
-		std::allocator<uint8_t> alloc;
+		std::allocator<std::uint8_t> alloc;
 
 		shared_ptr<int> first;
 		shared_ptr<int> second(nullptr);
@@ -73,10 +73,10 @@ int main()
 		shared_ptr<int> sixth(new int(6));
 		shared_ptr<int> seventh(new int(7), [](int* arg, decltype(alloc)&) {delete arg; });	
 		shared_ptr<int> eighth(new int(8), [](int* arg, decltype(alloc)& alloc) { delete arg; alloc; }, alloc);
-		shared_ptr<int, std::allocator<uint8_t>> ninth(make_shared<int, std::allocator<uint8_t>>(alloc, 8));
-		shared_ptr<int, std::allocator<uint8_t>> tenth;
+		shared_ptr<int, std::allocator<std::uint8_t>> ninth(make_shared<int, std::allocator<std::uint8_t>>(alloc, 8));
+		shared_ptr<int, std::allocator<std::uint8_t>> tenth;
 		tenth = ninth;
-		shared_ptr<int, std::allocator<uint8_t>> eleventh;
+		shared_ptr<int, std::allocator<std::uint8_t>> eleventh;
 		eleventh = std::move(ninth);
 		
 		atomic_shared_ptr<int> afirst;
@@ -115,7 +115,7 @@ int main()
 		athirteenth.unsafe_get_versioned_raw_ptr();
 		athirteenthdes.get_versioned_raw_ptr();
 		
-		shared_ptr<int> fourteenth(new int[10]{ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }, [](int* obj, std::allocator<uint8_t>& /*alloc*/)
+		shared_ptr<int> fourteenth(new int[10]{ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }, [](int* obj, std::allocator<std::uint8_t>& /*alloc*/)
 		{
 			delete[] obj;
 		}, alloc);
@@ -125,7 +125,7 @@ int main()
 
 		shared_ptr<int[10]> fifteenth(make_shared<int[10]>(1, 2, 3, 4, 5, 6, 7, 8, 9, 10));
 
-		shared_ptr<int> nulla(nullptr, uint8_t(5));
+		shared_ptr<int> nulla(nullptr, std::uint8_t(5));
 		versioned_raw_ptr<int> nullb(nullptr, 10);
 		atomic_shared_ptr<int> nullc(nullptr, 15);
 
@@ -144,13 +144,13 @@ int main()
 
 		uint32_t iter(50000);
 		auto lama = [&des, &tar, iter]() {
-			for (uint32_t i = 0; i < iter; ++i) {
+			for (std::uint32_t i = 0; i < iter; ++i) {
 				versioned_raw_ptr<int> exp(nullptr);
 				assert(!tar.compare_exchange_strong(exp, des));
 			}
 					};
 		auto lamb = [&des, &tar, iter]() {
-			for (uint32_t i = 0; i < iter; ++i) {
+			for (std::uint32_t i = 0; i < iter; ++i) {
 				versioned_raw_ptr<int> exp(nullptr);
 				assert(!tar.compare_exchange_strong(exp, des));
 			}

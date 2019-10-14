@@ -10,25 +10,25 @@
 
 int main()
 {
-	const uint32_t numOps(1000);
-	const uint32_t numthreads(8);
+	const std::uint32_t numOps(1000);
+	const std::uint32_t numthreads(8);
 	
-	gdul::concurrent_priority_queue<uint64_t, int, numOps * numthreads> list;
-	std::pair<uint64_t, int> in(5, 0);
+	gdul::concurrent_priority_queue<std::uint64_t, int, numOps * numthreads> list;
+	std::pair<std::uint64_t, int> in(5, 0);
 	list.insert(in);
-	std::pair<uint64_t, int> in2(4, 0);
+	std::pair<std::uint64_t, int> in2(4, 0);
 	list.insert(in2);
 
-	//gdul::concurrent_queue<uint64_t> inQue;
-	//gdul::concurrent_queue<uint64_t> outQue;
+	//gdul::concurrent_queue<std::uint64_t> inQue;
+	//gdul::concurrent_queue<std::uint64_t> outQue;
 	//
 	//std::random_device rd;
 	//std::mt19937 rng(rd());
 	//
-	//std::atomic<uint32_t> popCount(0);
+	//std::atomic<std::uint32_t> popCount(0);
 	//
 	//std::atomic<bool> begin(false);
-	//std::atomic<uint32_t> finished(0);
+	//std::atomic<std::uint32_t> finished(0);
 	//
 	//auto lam = [&list, &begin, &finished, numOps, &rng, &popCount, &inQue, &outQue]() {
 	//	inQue.reserve(numOps);
@@ -37,14 +37,14 @@ int main()
 	//	while (!begin)
 	//		std::this_thread::yield();
 	//
-	//	for (uint32_t i = 0; i < numOps; ++i) {
-	//		std::pair<uint64_t, int> a(rng(), rng());
-	//		std::pair<uint64_t, int> b(rng(), rng());
+	//	for (std::uint32_t i = 0; i < numOps; ++i) {
+	//		std::pair<std::uint64_t, int> a(rng(), rng());
+	//		std::pair<std::uint64_t, int> b(rng(), rng());
 	//
 	//		list.insert(a);
 	//		list.insert(b);
 	//
-	//		std::pair<uint64_t, int> out;
+	//		std::pair<std::uint64_t, int> out;
 	//		list.try_pop(out);
 	//
 	//		inQue.push(a.first);
@@ -56,7 +56,7 @@ int main()
 	//};
 	//
 	//
-	//for (uint32_t i = 0; i < numthreads; ++i) {
+	//for (std::uint32_t i = 0; i < numthreads; ++i) {
 	//	std::thread thread(lam);
 	//	thread.detach();
 	//}
@@ -69,7 +69,7 @@ int main()
 	//assert(list.size() == numOps * numthreads && "Bad size");
 	//
 	//uint64_t last(0);
-	//std::pair<uint64_t, int> out;
+	//std::pair<std::uint64_t, int> out;
 	//while (list.try_pop(out)) {
 	//	assert(!(out.first < last) && "Popped value less than last");
 	//	last = out.first;
@@ -88,7 +88,7 @@ int main()
 	//	hepb.push(0, outb);
 	//}
 	//
-	//uint64_t compa(UINT64_MAX);
+	//uint64_t compa(std::uint64_MAX);
 	//uint64_t compb(0);
 	//int dummya(0), dummyb(0);
 	//while (hepa.try_pop(dummya, compa)) {

@@ -14,7 +14,7 @@ TEST_CLASS(UnitTest1)
 public:
 
 	//TEST_METHOD(insert) {
-	//	gdul::concurrent_priority_queue<uint64_t, int, 2> list;
+	//	gdul::concurrent_priority_queue<std::uint64_t, int, 2> list;
 
 	//	list.insert({2, 2});
 	//	list.insert({1, 1});
@@ -24,7 +24,7 @@ public:
 	//	Assert::IsTrue(list.size() == 2);
 	//}
 	//TEST_METHOD(try_peek){
-	//	gdul::concurrent_priority_queue<uint64_t, int, 2> list;
+	//	gdul::concurrent_priority_queue<std::uint64_t, int, 2> list;
 
 	//	uint64_t firstKey(2);
 	//	uint64_t secondKey(1);
@@ -39,7 +39,7 @@ public:
 	//	Assert::IsTrue(key == secondKey);
 	//}
 	//TEST_METHOD(try_pop) {
-	//	gdul::concurrent_priority_queue<uint64_t, int, 2> list;
+	//	gdul::concurrent_priority_queue<std::uint64_t, int, 2> list;
 
 	//	int first(2);
 	//	int second(1);
@@ -49,8 +49,8 @@ public:
 	//	list.insert({ firstKey, first });
 	//	list.insert({ secondKey, second });
 
-	//	std::pair<uint64_t, int> out1;
-	//	std::pair<uint64_t, int> out2;
+	//	std::pair<std::uint64_t, int> out1;
+	//	std::pair<std::uint64_t, int> out2;
 
 	//	list.try_pop(out1);
 	//	list.try_pop(out2);
@@ -62,17 +62,17 @@ public:
 	//	Assert::IsFalse(list.try_pop(out1), L"Did not return empty upon try_pop. List should be empty");
 	//}
 	//TEST_METHOD(flood_insert) {
-	//	gdul::concurrent_priority_queue<uint64_t, int, 8 * 2000> list;
+	//	gdul::concurrent_priority_queue<std::uint64_t, int, 8 * 2000> list;
 
 	//	list.insert({ 0, 0 });
 
 	//	uint32_t numInserts(2000);
 	//	uint32_t numthreads(8);
-	//	gdul::concurrent_queue<uint64_t> que;
+	//	gdul::concurrent_queue<std::uint64_t> que;
 
 	//	{
 	//		std::atomic<bool> begin(false);
-	//		std::atomic<uint32_t> finished(0);
+	//		std::atomic<std::uint32_t> finished(0);
 
 	//		auto insertLam = [&list, &begin, &finished, numInserts, &que]() {
 
@@ -84,7 +84,7 @@ public:
 	//			while (!begin)
 	//				std::this_thread::yield();
 
-	//			for (uint32_t i = 0; i < numInserts; ++i) {
+	//			for (std::uint32_t i = 0; i < numInserts; ++i) {
 	//				uint64_t key(rng());
 	//				int val(rng());
 
@@ -96,7 +96,7 @@ public:
 	//		};
 
 	//		
-	//		for (uint32_t i = 0; i < numthreads; ++i) {
+	//		for (std::uint32_t i = 0; i < numthreads; ++i) {
 	//			std::thread thread(insertLam);
 	//			thread.detach();
 	//		}
@@ -116,13 +116,13 @@ public:
 
 	//	Assert::IsTrue(list.size() == numthreads * numInserts + 1, L"size does not match after insertions");
 	//	
-	//	uint64_t topKey(UINT64_MAX);
+	//	uint64_t topKey(std::uint64_MAX);
 	//	list.try_peek_top_key(topKey);
 
 	//	Assert::IsTrue(topKey == 0, L"Top key has changed....");
 
-	//	for (uint32_t i = 0; i < numInserts * numthreads; ++i) {
-	//		std::pair<uint64_t, int> out;
+	//	for (std::uint32_t i = 0; i < numInserts * numthreads; ++i) {
+	//		std::pair<std::uint64_t, int> out;
 	//		Assert::IsTrue(list.try_pop(out), L"Failed to pop entry that should be present");
 	//		uint64_t heapKey;
 	//		int heapOut;
@@ -132,11 +132,11 @@ public:
 	//	}
 	//}
 	//TEST_METHOD(flood_pop) {
-	//	gdul::concurrent_priority_queue<uint64_t, int, 4000> list;
+	//	gdul::concurrent_priority_queue<std::uint64_t, int, 4000> list;
 
 	//	uint32_t numInserts(500);
 	//	uint32_t numthreads(8);
-	//	for (uint32_t i = 0; i < numInserts * numthreads; ++i) {
+	//	for (std::uint32_t i = 0; i < numInserts * numthreads; ++i) {
 	//		list.insert({ rand(), rand() });
 	//	}
 
@@ -144,7 +144,7 @@ public:
 
 	//	{
 	//		std::atomic<bool> begin(false);
-	//		std::atomic<uint32_t> finished(0);
+	//		std::atomic<std::uint32_t> finished(0);
 
 
 	//		auto insertLam = [&list, &begin, &finished, numInserts]() {
@@ -152,15 +152,15 @@ public:
 	//			while (!begin)
 	//				std::this_thread::yield();
 
-	//			for (uint32_t i = 0; i < numInserts; ++i) {
-	//				std::pair<uint64_t, int> out;
+	//			for (std::uint32_t i = 0; i < numInserts; ++i) {
+	//				std::pair<std::uint64_t, int> out;
 	//				Assert::IsTrue(list.try_pop(out), L"Failed to pop when element should be present");
 	//			}
 
 	//			++finished;
 	//		};
 
-	//		for (uint32_t i = 0; i < numthreads; ++i) {
+	//		for (std::uint32_t i = 0; i < numthreads; ++i) {
 	//			std::thread thread(insertLam);
 	//			thread.detach();
 	//		}
@@ -177,20 +177,20 @@ public:
 	//	}
 	//}
 	//TEST_METHOD(flood_push_pop) {
-	//	gdul::concurrent_priority_queue<uint64_t, int, 4000> list;
-	//	gdul::concurrent_queue<uint64_t> inQue;
-	//	gdul::concurrent_queue<uint64_t> outQue;
+	//	gdul::concurrent_priority_queue<std::uint64_t, int, 4000> list;
+	//	gdul::concurrent_queue<std::uint64_t> inQue;
+	//	gdul::concurrent_queue<std::uint64_t> outQue;
 
 	//	std::random_device rd;
 	//	std::mt19937 rng(rd());
 
-	//	std::atomic<uint32_t> popCount(0);
+	//	std::atomic<std::uint32_t> popCount(0);
 
 	//	uint32_t numOps(500);
 	//	uint32_t numthreads(8);
 
 	//	std::atomic<bool> begin(false);
-	//	std::atomic<uint32_t> finished(0);
+	//	std::atomic<std::uint32_t> finished(0);
 
 	//	auto lam = [&list, &begin, &finished, numOps, &rng, &popCount, &inQue, &outQue]() {
 	//		inQue.reserve(numOps);
@@ -199,14 +199,14 @@ public:
 	//		while (!begin)
 	//			std::this_thread::yield();
 
-	//		for (uint32_t i = 0; i < numOps; ++i) {
-	//			std::pair<uint64_t, int> a(rng(), rng());
-	//			std::pair<uint64_t, int> b(rng(), rng());
+	//		for (std::uint32_t i = 0; i < numOps; ++i) {
+	//			std::pair<std::uint64_t, int> a(rng(), rng());
+	//			std::pair<std::uint64_t, int> b(rng(), rng());
 
 	//			list.insert(a);
 	//			list.insert(b);
 
-	//			std::pair<uint64_t, int> out;
+	//			std::pair<std::uint64_t, int> out;
 	//			list.try_pop(out);
 
 	//			inQue.push(a.first);
@@ -218,7 +218,7 @@ public:
 	//	};
 
 
-	//	for (uint32_t i = 0; i < numthreads; ++i) {
+	//	for (std::uint32_t i = 0; i < numthreads; ++i) {
 	//		std::thread thread(lam);
 	//		thread.detach();
 	//	}
@@ -231,7 +231,7 @@ public:
 	//	Assert::IsTrue(list.size() == numOps * numthreads, L"Bad size");
 
 	//	uint64_t last(0);
-	//	std::pair<uint64_t, int> out;
+	//	std::pair<std::uint64_t, int> out;
 	//	while (list.try_pop(out)) {
 	//		Assert::IsFalse(out.first < last, L"Popped value less than last");
 	//		last = out.first;
@@ -250,7 +250,7 @@ public:
 	//		hepb.push(0, outb);
 	//	}
 
-	//	uint64_t compa(UINT64_MAX);
+	//	uint64_t compa(std::uint64_MAX);
 	//	uint64_t compb(0);
 	//	int dummya(0), dummyb(0);
 	//	while (hepa.try_pop(dummya, compa)) {

@@ -15,16 +15,16 @@ public:
 	~job_impl();
 
 	template <class Callable, std::enable_if_t<!(Callable_Max_Size_No_Heap_Alloc < sizeof(Callable))>* = nullptr>
-	construct(Callable&& callable, allocator_type);
+	construct_callable(Callable&& callable, allocator_type);
 	template <class Callable, std::enable_if_t<!(Callable_Max_Size_No_Heap_Alloc < sizeof(Callable))>* = nullptr>
-	construct(const Callable& callable, allocator_type);
+	construct_callable(const Callable& callable, allocator_type);
 
 	template <class Callable, std::enable_if_t<(Callable_Max_Size_No_Heap_Alloc < sizeof(Callable))>* = nullptr>
-	construct(Callable&& callable, allocator_type alloc);
+	construct_callable(Callable&& callable, allocator_type alloc);
 	template <class Callable, std::enable_if_t<(Callable_Max_Size_No_Heap_Alloc < sizeof(Callable))>* = nullptr>
-	construct(const Callable& callable, allocator_type alloc);
+	construct_callable(const Callable& callable, allocator_type alloc);
 
-	void deconstruct(allocator_type& alloc);
+	void deconstruct_callable(allocator_type& alloc);
 
 	void operator()();
 private:

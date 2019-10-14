@@ -1,14 +1,14 @@
 #include "stdafx.h"
 #include "ThreadPool.h"
 
-ThreadPool::ThreadPool(uint32_t aThreads, uint32_t affinityBegin) :
+ThreadPool::ThreadPool(std::uint32_t aThreads, std::uint32_t affinityBegin) :
 	myIsInCommission(true),
 	myTaskCounter(0)
 {
 	const std::size_t numThreads(std::thread::hardware_concurrency());
-	for (uint32_t i = 0; i < aThreads; ++i) {
-		const uint64_t affinity(((affinityBegin + i) % numThreads));
-		const uint64_t affinityMask((std::size_t(1) << affinity));
+	for (std::uint32_t i = 0; i < aThreads; ++i) {
+		const std::uint64_t affinity(((affinityBegin + i) % numThreads));
+		const std::uint64_t affinityMask((std::size_t(1) << affinity));
 		myThreads.push_back(std::thread(&ThreadPool::Idle, this, affinityMask));
 	}
 }
@@ -39,7 +39,7 @@ bool ThreadPool::HasUnfinishedTasks() const
 {
 	return 0 < myTaskCounter.load(std::memory_order_acquire);
 }
-void ThreadPool::Idle(uint64_t affinityMask)
+void ThreadPool::Idle(std::uint64_t affinityMask)
 {
 	uint64_t result(0);
 

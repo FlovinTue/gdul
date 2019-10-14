@@ -28,7 +28,7 @@
 
 namespace gdul {
 
-template <class Object, class Allocator = std::allocator<uint8_t>>
+template <class Object, class Allocator = std::allocator<std::uint8_t>>
 class concurrent_object_pool
 {
 public:
@@ -104,7 +104,7 @@ inline void concurrent_object_pool<Object, Allocator>::recycle_object(Object * o
 template<class Object, class Allocator>
 inline std::size_t concurrent_object_pool<Object, Allocator>::avaliable()
 {
-	return static_cast<uint32_t>(myUnusedObjects.size());
+	return static_cast<std::uint32_t>(myUnusedObjects.size());
 }
 template<class Object, class Allocator>
 inline void concurrent_object_pool<Object, Allocator>::unsafe_destroy()
@@ -116,10 +116,10 @@ inline void concurrent_object_pool<Object, Allocator>::unsafe_destroy()
 		for (std::size_t i = 0; i < myBlockSize; ++i) {
 			blockNode->myBlock->~Object();
 		}
-		myAllocator.deallocate(reinterpret_cast<uint8_t*>(blockNode->myBlock), myBlockSize * sizeof(Object));
+		myAllocator.deallocate(reinterpret_cast<std::uint8_t*>(blockNode->myBlock), myBlockSize * sizeof(Object));
 
 		blockNode->~block_node();
-		myAllocator.deallocate(reinterpret_cast<uint8_t*>(blockNode), sizeof(block_node));
+		myAllocator.deallocate(reinterpret_cast<std::uint8_t*>(blockNode), sizeof(block_node));
 
 		blockNode = previous;
 	}
@@ -151,10 +151,10 @@ inline void concurrent_object_pool<Object, Allocator>::try_alloc_block()
 		for (std::size_t i = 0; i < myBlockSize; ++i) {
 			block->~Object();
 		}
-		myAllocator.deallocate(reinterpret_cast<uint8_t*>(block), myBlockSize * sizeof(Object));
+		myAllocator.deallocate(reinterpret_cast<std::uint8_t*>(block), myBlockSize * sizeof(Object));
 
 		desired->~block_node();
-		myAllocator.deallocate(reinterpret_cast<uint8_t*>(desired), sizeof(block_node));
+		myAllocator.deallocate(reinterpret_cast<std::uint8_t*>(desired), sizeof(block_node));
 
 		return;
 	}

@@ -8,7 +8,7 @@
 
 int main()
 {
-	std::allocator<uint8_t> alloc;
+	std::allocator<std::uint8_t> alloc;
 	gdul::concurrent_object_pool<int, decltype(alloc)> pool(1, alloc);
 	int* second = pool.get_object();
 	int* first = pool.get_object();

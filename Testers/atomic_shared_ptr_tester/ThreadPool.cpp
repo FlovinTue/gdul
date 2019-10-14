@@ -3,12 +3,12 @@
 #include "ThreadPool.h"
 #include "Timer.h"
 
-ThreadPool::ThreadPool(uint32_t aThreads, float aSleepThreshhold) :
+ThreadPool::ThreadPool(std::uint32_t aThreads, float aSleepThreshhold) :
 	myIsInCommission(true),
 	myTaskCounter(0),
 	mySleepThreshhold(aSleepThreshhold)
 {
-	for (uint32_t i = 0; i < aThreads; ++i)
+	for (std::uint32_t i = 0; i < aThreads; ++i)
 		myThreads.push_back(std::thread(&ThreadPool::Idle, this));
 }
 
@@ -31,7 +31,7 @@ void ThreadPool::Decommission()
 
 	myWaitCondition.notify_all();
 
-	for (uint16_t i = 0; i < myThreads.size(); ++i)
+	for (std::uint16_t i = 0; i < myThreads.size(); ++i)
 		myThreads[i].join();
 
 	myThreads.clear();
