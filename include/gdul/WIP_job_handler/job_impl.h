@@ -30,50 +30,56 @@ class callable_base;
 class alignas(Job_Impl_Align) job_impl
 {
 public:
-	job_impl();
-	~job_impl();
-
 	template <class Callable, std::enable_if_t<!(Callable_Max_Size_No_Heap_Alloc < sizeof(Callable))>* = nullptr>
-	void construct_callable(Callable&& callable, allocator_type);
-
+	job_impl(Callable&& callable, allocator_type);
 	template <class Callable, std::enable_if_t<(Callable_Max_Size_No_Heap_Alloc < sizeof(Callable))>* = nullptr>
-	void construct_callable(Callable&& callable, allocator_type alloc);
-
-	void deconstruct_callable(allocator_type& alloc);
+	job_impl(Callable&& callable, allocator_type alloc);
+	~job_impl();
 
 	void operator()();
 private:
+
 	union
 	{
 		std::uint8_t myStorage[Callable_Max_Size_No_Heap_Alloc];
 		struct
 		{
+			allocator_type myAllocator;
 			std::uint8_t* myCallableBegin;
 			std::size_t myAllocated;
-		};
+		}myAllocatedFields;
 	};
+
 	callable_base* myCallable;
 };
 template<class Callable, std::enable_if_t<(Callable_Max_Size_No_Heap_Alloc < sizeof(Callable))>*>
-inline void job_impl::construct_callable(Callable && callable, allocator_type alloc)
+inline job_impl::job_impl(Callable && callable, allocator_type alloc)
+	: myStorage{}
+	, myCallable(nullptr)
 {
+	static_assert(!(Callable_Max_Size_No_Heap_Alloc < sizeof(myAllocatedFields)), "too high size / alignment on allocator_type");
+
+	myAllocatedFields.myAllocator = alloc;
+
 	if (16 < align) {
-		myAllocated = sizeof(Callable) + alignof(Callable);
+		myAllocatedFields.myAllocated = sizeof(Callable) + alignof(Callable);
 	}
 	else {
-		myAllocated = sizeof(Callable);
+		myAllocatedFields.myAllocated = sizeof(Callable);
 	}
-
-	myCallableBegin = alloc.allocate(myAllocated);
+	myAllocatedFields.myCallableBegin = myAllocatedFields.myAllocator.allocate(myAllocatedFields.myAllocated);
 
 	const std::uintptr_t callableBeginAsInt(reinterpret_cast<std::uintptr_t>(myCallableBegin));
 	const std::uintptr_t mod(callableBeginAsInt % alignof(Callable));
 	const std::size_t offset(mod ? align - mod : 0);
 
-	new (myCallableBegin + offset) Callable(std::forward<Callable&&>(callable));
+	new (myAllocatedFields.myCallableBegin + offset) Callable(std::forward<Callable&&>(callable));
 }
-template<class Callable, std::enable_if_t<!(Callable_Max_Size_No_Heap_Alloc < sizeof(Callable))>*>
-inline void job_impl::construct_callable(Callable && callable, allocator_type alloc)
+
+template<class Callable, std::enable_if_t<(Callable_Max_Size_No_Heap_Alloc < sizeof(Callable))>*>
+inline job_impl::job_impl(Callable && callable, allocator_type)
+	: myStorage{}
+	, myCallable(nullptr)
 {
 	new (&myStorage[0]) Callable(std::forward<Callable&&>(callable));
 }
