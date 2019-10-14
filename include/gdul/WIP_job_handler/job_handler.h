@@ -31,22 +31,21 @@
 #define THREAD_PRIORITY_NORMAL 0
 #endif
 
+// replace_worker()
+
 namespace gdul {
 
 namespace job_handler_detail {
 
-constexpr std::uint8_t Num_Priority_Queues = 4;
+constexpr std::uint8_t Priority_Granularity = 4;
+
 using allocator_type = std::allocator<std::uint8_t>;
 
+class job_impl;
 }
 struct job_handler_info
 {
-	uint16_t myNumWorkers = static_cast<std::uint16_t>(std::thread::hardware_concurrency() * 2);
-
-	// The maximum number of workers that are allowed to work on asynchronous 
-	// jobs concurrently. Should be tuned so that synchronous operation is 
-	// not interrupted
-	uint16_t myMaxAsyncWorkers = static_cast<std::uint16_t>(ceil(static_cast<float>(myNumWorkers) / 3.0f));
+	uint16_t myNumWorkers = static_cast<std::uint16_t>(std::thread::hardware_concurrency());
 
 	// Thread priority as defined in WinBase.h
 	uint32_t myWorkerPriorities = THREAD_PRIORITY_NORMAL;
@@ -74,9 +73,6 @@ public:
 
 	void Init(const job_handler_info& info = job_handler_info());
 
-	// Restores initial values & recycles all job sequences in use
-
-
 	void submit(const job& job);
 	void submit(job&& job);
 
@@ -95,7 +91,7 @@ private:
 	void work();
 	void idle();
 
-	job fetch_job();
+	job_handler_detail::job_impl* fetch_job();
 
 	void set_thread_name(const std::string& name);
 
@@ -106,7 +102,7 @@ private:
 
 	const job myIdleJob;
 
-	concurrent_queue<job, job_handler_detail::allocator_type> myJobQueues[job_handler_detail::Num_Priority_Queues];
+	concurrent_queue<job, job_handler_detail::allocator_type> myJobQueues[job_handler_detail::Priority_Granularity];
 
 	std::vector<std::thread> myWorkers;
 

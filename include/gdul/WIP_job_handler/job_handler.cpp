@@ -1,6 +1,5 @@
 #include <gdul\WIP_job_handler\job_handler.h>
-#include <gdul\WIP_job_handler\job_sequence.h>
-#include <gdul\WIP_job_handler\job_sequence_impl.h>
+#include <gdul\WIP_job_handler\job_impl.h>
 #include <string>
 
 #define WIN32_LEAN_AND_MEAN
@@ -27,12 +26,10 @@ namespace thread_naming {
 thread_local std::chrono::high_resolution_clock job_handler::ourSleepTimer;
 thread_local std::chrono::high_resolution_clock::time_point job_handler::ourLastJobTimepoint;
 thread_local size_t job_handler::ourLastJobSequence(0);
-thread_local job_sequence_impl* job_handler::this_JobSequence(nullptr);
 
 job_handler::job_handler()
 	: myIdleJob([this]() { idle(); })
 	, myIsRunning(false)
-	, myJobSequencePool(32)
 {
 }
 
@@ -86,18 +83,6 @@ void job_handler::abort()
 	myIsRunning.store(false, std::memory_order_relaxed);
 }
 
-job_sequence_impl * job_handler::create_job_sequence()
-{
-	job_sequence_impl* const jobSequence(myJobSequencePool.get_object());
-
-	myJobSequences.push_back(jobSequence);
-
-	return jobSequence;
-}
-void job_handler::recycle_job_sequence(job_sequence_impl * jobSequence)
-{
-	myJobSequencePool.recycle_object(jobSequence);
-}
 void job_handler::launch_worker(std::uint32_t workerIndex)
 {
 	set_thread_name(std::string("job_handler_thread# " + std::to_string(workerIndex)));
@@ -105,22 +90,25 @@ void job_handler::launch_worker(std::uint32_t workerIndex)
 
 	ourLastJobTimepoint = ourSleepTimer.now();
 
-	myInitInfo.myOnThreadLaunch();
+	//myInitInfo.myOnThreadLaunch();
+
+	const uint64_t affinityMask(1ULL << workerIndex);
+	while (!SetThreadAffinityMask(GetCurrentThread(), affinityMask));
 
 	work();
 
-	myInitInfo.myOnThreadExit();
+	//myInitInfo.myOnThreadExit();
 }
 void job_handler::work()
 {
 	while (myIsRunning) {
-		const job job(fetch_job());
-		job();
+		const job_handler_detail::job_impl* job(fetch_job());
+		(*job)();
 	}
 }
 void job_handler::idle()
 {
-	job_handler::this_JobSequence = nullptr;
+	//job_handler::this_job = nullptr
 
 	const std::chrono::high_resolution_clock::time_point current(ourSleepTimer.now());
 	const std::chrono::high_resolution_clock::time_point delta(current - ourLastJobTimepoint);

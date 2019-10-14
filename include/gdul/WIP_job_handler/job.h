@@ -8,7 +8,6 @@ namespace gdul {
 // Thread A job, depends on thread B job. Needs atomic_shared_ptr... 
 // Depend on job, or depend on job_impl ? 
 // Depend on job, and return job_impl to pool?
-
 namespace job_handler_detail {
 
 class job_impl;
@@ -21,9 +20,9 @@ public:
 	template <class Callable>
 	job(Callable&& callable);
 	template <class Callable>
-	job(Callable&& callable, const job& dependency);
-	template <class Callable>
 	job(Callable&& callable, std::uint8_t priority);
+	template <class Callable>
+	job(Callable&& callable, const job& dependency);
 	template <class Callable>
 	job(Callable&& callable, const job& dependency, std::uint8_t priority);
 
