@@ -51,7 +51,7 @@ int main()
 
 	handler.Init(initInfo);
 
-	job_sequence jobSequence(&handler);
+	/*job_sequence jobSequence(&handler);
 
 	for (std::uint32_t j = 0; j < 1000000; ++j) {
 		jobSequence.push([j]()
@@ -90,9 +90,7 @@ int main()
 
 	handler.run();
 
-	while (spinFlag.test_and_set()) std::this_thread::yield();
+	while (spinFlag.test_and_set()) std::this_thread::yield();*/
 
 	std::cout << "Hello World!\n";
-
-	std::size_t blah;
 }

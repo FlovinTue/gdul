@@ -95,6 +95,7 @@
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\callable_base.h" />
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_handler.h" />
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_impl.h" />
+    <ClInclude Include="job_impl_allocator.h" />
     <ClInclude Include="spin_lock.h" />
   </ItemGroup>
   <ItemGroup>

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <functional>
-
+#include <gdul\atomic_shared_ptr\atomic_shared_ptr.h>
 
 namespace gdul {
 
@@ -39,8 +39,7 @@ public:
 	uint64_t get_sequence_key() const;
 
 private:
-	// That'd mean atomic_shared_ptr<job_handler_detail::job_impl ? , pool_allocator> myImpl;
-	job_handler_detail::job_impl* myImpl;
+	atomic_shared_ptr<job_handler_detail::job_impl> myImpl;
 };
 
 }

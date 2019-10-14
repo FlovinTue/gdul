@@ -1,9 +1,8 @@
 #include "job_impl.h"
-#include <gdul\WIP_job_handler\job_callable_base.h>
+#include <gdul\WIP_job_handler\callable_base.h>
 
 namespace gdul {
 namespace job_handler_detail {
-
 job_impl::job_impl()
 	: myStorage{}
 	, myCallable(nullptr)
@@ -14,12 +13,11 @@ job_impl::job_impl()
 job_impl::~job_impl()
 {
 }
-
-void job_impl::deconstruct(allocator_type & alloc)
+void job_impl::deconstruct_callable(allocator_type & alloc)
 {
 	myCallable->~callable_base();
 
-	if (myAllocated) {
+	if ((void*)myCallable != (void*)&myStorage[0]) {
 		alloc.deallocate(myCallableBegin, myAllocated);
 	}
 
