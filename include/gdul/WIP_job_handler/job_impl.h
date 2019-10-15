@@ -51,6 +51,8 @@ private:
 	};
 
 	callable_base* myCallable;
+
+	atomic_shared_ptr<job_impl, job_impl_allocator<uint8_t>> myFirstChild;
 };
 template<class Callable, std::enable_if_t<(Callable_Max_Size_No_Heap_Alloc < sizeof(Callable))>*>
 inline job_impl::job_impl(Callable && callable, allocator_type alloc)

@@ -21,6 +21,7 @@
 #pragma once
 
 #include <gdul\atomic_shared_ptr\atomic_shared_ptr.h>
+#include <gdul\WIP_job_handler\job_impl_allocator.h>
 
 namespace gdul {
 
@@ -35,16 +36,14 @@ class job_impl;
 class job
 {
 public:
-	job();
-
 	template <class Callable>
-	job(Callable&& callable);
+	job(job_handler* handler, Callable&& callable);
 	template <class Callable>
-	job(Callable&& callable, std::uint8_t priority);
+	job(job_handler* handler, Callable&& callable, std::uint8_t priority);
 	template <class Callable>
-	job(Callable&& callable, const job& dependency);
+	job(job_handler* handler, Callable&& callable, const job& dependency);
 	template <class Callable>
-	job(Callable&& callable, const job& dependency, std::uint8_t priority);
+	job(job_handler* handler, Callable&& callable, const job& dependency, std::uint8_t priority);
 
 	~job();
 
@@ -55,7 +54,7 @@ public:
 	job& operator=(const job&) = delete;
 
 private:
-	atomic_shared_ptr<job_handler_detail::job_impl> myImpl;
+	shared_ptr<job_handler_detail::job_impl, job_handler_detail::job_impl_allocator<uint8_t>> myImpl;
 };
 
 }
