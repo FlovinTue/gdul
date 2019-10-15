@@ -106,6 +106,8 @@ private:
 
 	shared_ptr<job_handler_detail::job_impl, job_handler_detail::job_impl_allocator<uint8_t>> myIdleJob;
 
+	// Don't look, helper value
+	const std::size_t myTotalQueueDistributionChunks;
 
 	std::atomic<bool> myIsRunning;
 };

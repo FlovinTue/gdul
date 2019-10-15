@@ -1,10 +1,6 @@
 #pragma once
 
-#if  defined(_MSC_VER) && !defined(__INTEL_COMPILER) && !defined(GDUL_NOVTABLE)
-#define GDUL_NOVTABLE __declspec(novtable)
-#else
-#define GDUL_NOVTABLE
-#endif
+#include <gdul\WIP_job_handler\job_handler_commons.h>
 
 
 namespace gdul {

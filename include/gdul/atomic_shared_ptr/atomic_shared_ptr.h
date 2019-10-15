@@ -31,8 +31,10 @@
 
 namespace gdul {
 
-#if  defined(_MSC_VER) && !defined(__INTEL_COMPILER) && !defined(GDUL_NOVTABLE)
+#if defined(_MSC_VER) && !defined(__INTEL_COMPILER) 
+#ifndef GDUL_NOVTABLE
 #define GDUL_NOVTABLE __declspec(novtable)
+#endif
 #else
 #define GDUL_NOVTABLE
 #endif

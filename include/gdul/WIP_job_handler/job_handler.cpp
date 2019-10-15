@@ -25,6 +25,7 @@ job_handler::job_handler()
 	, myJobImplAllocator(&myJobImplChunkPool)
 	, myIdleJob(make_shared<job_handler_detail::job_impl, job_handler_detail::job_impl_allocator<uint8_t>>(myJobImplAllocator, [this]() {idle(); }))
 	, myIsRunning(false)
+	, myTotalQueueDistributionChunks(job_handler_detail::summation(1, job_handler_detail::Priority_Granularity))
 {
 }
 
@@ -126,17 +127,20 @@ job_handler_detail::job_impl* job_handler::fetch_job()
 uint8_t job_handler::generate_priority_index()
 {
 	const std::size_t iteration(++ourPriorityDistributionIteration);
+	const std::size_t queues(4);
+
 	uint8_t index(0);
 
-	for (uint8_t i = 1; i < job_handler_detail::Priority_Granularity + 1; ++i) {
-		const uint8_t toMod(std::pow(2, i));
+	for (uint8_t i = 1; i < queues; ++i) {
+		const std::size_t desiredSlice(std::pow(2, (queues)-(i + 1)));
+		const std::size_t awardedSlice((myTotalQueueDistributionChunks) / desiredSlice);
 		const uint8_t prev(index);
-		const uint8_t eval(iteration % toMod == 0);
+		const uint8_t eval(iteration % awardedSlice == 0);
 		index += eval * i;
 		index -= prev * eval;
 	}
 
-	return index % job_handler_detail::Priority_Granularity;
+	return index % 4;
 }
 
 
