@@ -1,16 +1,14 @@
 #pragma once
 
+#include <gdul\WIP_job_handler\job_handler_commons.h>
 #include <gdul\WIP_job_handler\job_handler.h>
-#include <gdul\atomic_shared_ptr\atomic_shared_ptr.h>
 #include <gdul\WIP_job_handler\job_impl.h>
 
 namespace gdul
 {
 namespace job_handler_detail
 {
-constexpr std::size_t Job_Impl_Chunk_Size(shared_ptr<job_impl, allocator_type>::alloc_size_make_shared());
 
-struct alignas(Job_Impl_Align) Job_Impl_Chunk_Rep { uint8_t dummy[Job_Impl_Chunk_Size]; };
 
 template <class Dummy>
 class job_impl_allocator

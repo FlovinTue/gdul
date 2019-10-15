@@ -1,13 +1,27 @@
 #pragma once
 
 #include <thread>
+#include <gdul\atomic_shared_ptr\atomic_shared_ptr.h>
 
 namespace gdul
 {
 namespace job_handler_detail
 {
-constexpr std::uint8_t Priority_Granularity = 4;
+
+// The number of internal job queues. 
+constexpr std::uint8_t Priority_Granularity = 3;
+
 constexpr std::size_t Callable_Max_Size_No_Heap_Alloc = 24;
+
+constexpr std::size_t Job_Impl_Chunk_Size(shared_ptr<job_impl, allocator_type>::alloc_size_make_shared());
+
+struct alignas(Job_Impl_Align) Job_Impl_Chunk_Rep { 
+	operator uint8_t*()
+	{
+		return reinterpret_cast<uint8_t*>(this);
+	}
+	uint8_t dummy[Job_Impl_Chunk_Size]; 
+};
 
 using allocator_type = std::allocator<std::uint8_t>;
 

@@ -27,6 +27,7 @@
 #include <gdul\WIP_job_handler\job.h>
 #include <gdul\concurrent_object_pool\concurrent_object_pool.h>
 #include <gdul\WIP_job_handler\job_handler_commons.h>
+#include <gdul\WIP_job_handler\job_impl_allocator.h>
 
 
 // replace_worker()
@@ -39,22 +40,22 @@ class job_impl;
 }
 struct job_handler_info
 {
-	uint16_t myNumWorkers = static_cast<std::uint16_t>(std::thread::hardware_concurrency());
+	std::uint16_t myMaxWorkers = static_cast<std::uint16_t>(std::thread::hardware_concurrency());
 
 	// Thread priority as defined in WinBase.h
-	uint32_t myWorkerPriorities = 0;
+	std::uint32_t myWorkerPriorities = 0;
 
 	// Number of milliseconds passed before an unemployed worker starts
 	// sleeping away time instead of yielding
-	uint16_t mySleepThreshhold = 250;
+	std::uint16_t mySleepThreshhold = 250;
 
-	// This will be run per worker upon launch. Good to have in case there is 
-	// thread specific initializations that needs to be done.
-	job myOnThreadLaunch = job([]() {});
+	//// This will be run per worker upon launch. Good to have in case there is 
+	//// thread specific initializations that needs to be done.
+	//job myOnThreadLaunch = job([]() {});
 
-	// This will be run per worker upon exit. Good to have in case there is 
-	// thread specific clean up that needs to be done.
-	job myOnThreadExit = job([]() {});
+	//// This will be run per worker upon exit. Good to have in case there is 
+	//// thread specific clean up that needs to be done.
+	//job myOnThreadExit = job([]() {});
 };
 
 class job_handler
@@ -63,8 +64,6 @@ public:
 	job_handler();
 	~job_handler();
 
-	static constexpr size_t Job_Queues_Init_Alloc = 16;
-
 	void Init(const job_handler_info& info = job_handler_info());
 
 	void submit(const job& job);
@@ -72,12 +71,11 @@ public:
 
 	void reset();
 
+	// Entrypoint for external threads. If max workers is exceeded, this thread will replace an internal
+	// worker.
 	void run();
 
 	void abort();
-
-private:
-
 
 private:
 	void launch_worker(std::uint32_t workerIndex);
@@ -87,18 +85,27 @@ private:
 
 	job_handler_detail::job_impl* fetch_job();
 
+	std::uint8_t generate_priority_index();
+
 	static thread_local std::chrono::high_resolution_clock ourSleepTimer;
 	static thread_local std::chrono::high_resolution_clock::time_point ourLastJobTimepoint;
 
-	static thread_local size_t ourLastJobSequence;
+	static thread_local std::size_t ourLastJobSequence;
+	static thread_local std::size_t ourPriorityDistributionIteration;
 
-	const job myIdleJob;
+	job_handler_detail::allocator_type myMainAllocator;
 
-	concurrent_queue<job, job_handler_detail::allocator_type> myJobQueues[job_handler_detail::Priority_Granularity];
+	concurrent_queue<job_handler_detail::job_impl*, job_handler_detail::allocator_type> myJobQueues[job_handler_detail::Priority_Granularity];
+	concurrent_object_pool<job_handler_detail::Job_Impl_Chunk_Rep, job_handler_detail::allocator_type> myJobImplChunkPool;
+
+	job_handler_detail::job_impl_allocator<uint8_t> myJobImplAllocator;
 
 	std::vector<std::thread> myWorkers;
 
 	job_handler_info myInitInfo;
+
+	shared_ptr<job_handler_detail::job_impl, job_handler_detail::job_impl_allocator<uint8_t>> myIdleJob;
+
 
 	std::atomic<bool> myIsRunning;
 };

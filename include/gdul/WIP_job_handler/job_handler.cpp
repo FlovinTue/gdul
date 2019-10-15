@@ -2,6 +2,7 @@
 
 #include <gdul\WIP_job_handler\job_handler.h>
 #include <gdul\WIP_job_handler\job_impl.h>
+#include <gdul\WIP_job_handler\job_impl_allocator.h>
 #include <string>
 
 #define WIN32_LEAN_AND_MEAN
@@ -16,10 +17,13 @@ namespace gdul
 
 thread_local std::chrono::high_resolution_clock job_handler::ourSleepTimer;
 thread_local std::chrono::high_resolution_clock::time_point job_handler::ourLastJobTimepoint;
+thread_local std::size_t job_handler::ourPriorityDistributionIteration(0);
 thread_local size_t job_handler::ourLastJobSequence(0);
 
 job_handler::job_handler()
-	: myIdleJob([this]() { idle(); })
+	: myJobImplChunkPool(128, myMainAllocator)
+	, myJobImplAllocator(&myJobImplChunkPool)
+	, myIdleJob(make_shared<job_handler_detail::job_impl, job_handler_detail::job_impl_allocator<uint8_t>>(myJobImplAllocator, [this]() {idle(); }))
 	, myIsRunning(false)
 {
 }
@@ -36,9 +40,9 @@ void job_handler::Init(const job_handler_info & info)
 	
 	myIsRunning = true;
 
-	myWorkers.reserve(myInitInfo.myNumWorkers);
+	myWorkers.reserve(myInitInfo.myMaxWorkers);
 
-	for (std::uint32_t i = 0; i < info.myNumWorkers; ++i) {
+	for (std::uint32_t i = 0; i < info.myMaxWorkers; ++i) {
 		myWorkers.push_back(std::thread([this, i]() { launch_worker(i); }));
 	}
 }
@@ -86,7 +90,7 @@ void job_handler::launch_worker(std::uint32_t workerIndex)
 void job_handler::work()
 {
 	while (myIsRunning) {
-		const job_handler_detail::job_impl* job(fetch_job());
+		job_handler_detail::job_impl* const job(fetch_job());
 		(*job)();
 	}
 }
@@ -106,20 +110,33 @@ void job_handler::idle()
 }
 job_handler_detail::job_impl* job_handler::fetch_job()
 {
-	job returnValue(myIdleJob);
+	uint8_t queueIndex(0);
+	job_handler_detail::job_impl* returnValue(myIdleJob);
 
-	const size_t size(myJobSequences.size());
-	size_t currentIndex(ourLastJobSequence);
-	for (size_t i = 0; i < size; ++i, ++currentIndex %= size) {
-		job_sequence_impl* const currentSequence(myJobSequences[currentIndex]);
+	for (uint8_t i = 0; i < job_handler_detail::Priority_Granularity; ++i) {
+		queueIndex = generate_priority_index();
 
-		if (currentSequence->fetch_job(returnValue)) {
-			job_handler::this_JobSequence = currentSequence;
-			ourLastJobSequence = currentIndex;
+		if (myJobQueues[queueIndex].try_pop(returnValue)) {
 			break;
 		}
 	}
 	return returnValue;
+}
+
+uint8_t job_handler::generate_priority_index()
+{
+	const std::size_t iteration(++ourPriorityDistributionIteration);
+	uint8_t index(0);
+
+	for (uint8_t i = 1; i < job_handler_detail::Priority_Granularity + 1; ++i) {
+		const uint8_t toMod(std::pow(2, i));
+		const uint8_t prev(index);
+		const uint8_t eval(iteration % toMod == 0);
+		index += eval * i;
+		index -= prev * eval;
+	}
+
+	return index % job_handler_detail::Priority_Granularity;
 }
 
 
