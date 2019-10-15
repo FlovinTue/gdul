@@ -21,25 +21,19 @@
 #pragma once
 
 #include <vector>
-#include <thread>
 #include <chrono>
-#include <gdul\WIP_job_handler\job.h>
-#include <gdul\concurrent_object_pool\concurrent_object_pool.h>
 #include <concurrent_vector.h>
 
-#ifndef THREAD_PRIORITY_NORMAL
-#define THREAD_PRIORITY_NORMAL 0
-#endif
+#include <gdul\WIP_job_handler\job.h>
+#include <gdul\concurrent_object_pool\concurrent_object_pool.h>
+#include <gdul\WIP_job_handler\job_handler_commons.h>
+
 
 // replace_worker()
 
 namespace gdul {
 
 namespace job_handler_detail {
-
-constexpr std::uint8_t Priority_Granularity = 4;
-
-using allocator_type = std::allocator<std::uint8_t>;
 
 class job_impl;
 }
@@ -48,7 +42,7 @@ struct job_handler_info
 	uint16_t myNumWorkers = static_cast<std::uint16_t>(std::thread::hardware_concurrency());
 
 	// Thread priority as defined in WinBase.h
-	uint32_t myWorkerPriorities = THREAD_PRIORITY_NORMAL;
+	uint32_t myWorkerPriorities = 0;
 
 	// Number of milliseconds passed before an unemployed worker starts
 	// sleeping away time instead of yielding
@@ -92,8 +86,6 @@ private:
 	void idle();
 
 	job_handler_detail::job_impl* fetch_job();
-
-	void set_thread_name(const std::string& name);
 
 	static thread_local std::chrono::high_resolution_clock ourSleepTimer;
 	static thread_local std::chrono::high_resolution_clock::time_point ourLastJobTimepoint;

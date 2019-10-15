@@ -1,33 +1,13 @@
 #pragma once
 
+#include <gdul\WIP_job_handler\job_handler_commons.h>
 #include <gdul\WIP_job_handler\job_handler.h>
 
 namespace gdul{
 namespace job_handler_detail {
 
-constexpr std::size_t log2align(std::size_t value)
-{
-	std::size_t highBit(0);
-	std::size_t shift(value);
-	for (; shift; ++highBit) {
-		shift >>= 1;
-	}
-
-	highBit -= static_cast<bool>(highBit);
-
-	const std::size_t mask((std::size_t(1) << (highBit)) - 1);
-	const std::size_t remainder((static_cast<bool>(value & mask)));
-
-	const std::size_t sum(highBit + remainder);
-
-	return std::size_t(1) << sum;
-}
-
-constexpr std::size_t Callable_Max_Size_No_Heap_Alloc = 24;
-constexpr std::size_t Job_Impl_Align(log2align(Callable_Max_Size_No_Heap_Alloc));
-
 class callable_base;
-class alignas(Job_Impl_Align) job_impl
+class alignas(log2align(Callable_Max_Size_No_Heap_Alloc)) job_impl
 {
 public:
 	template <class Callable, std::enable_if_t<!(Callable_Max_Size_No_Heap_Alloc < sizeof(Callable))>* = nullptr>

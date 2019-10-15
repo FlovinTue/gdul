@@ -6,6 +6,7 @@
     <ClCompile Include="..\..\include\gdul\WIP_job_handler\job.cpp" />
     <ClCompile Include="..\..\include\gdul\WIP_job_handler\job_handler.cpp" />
     <ClCompile Include="..\..\include\gdul\WIP_job_handler\job_impl.cpp" />
+    <ClCompile Include="..\..\include\gdul\WIP_job_handler\job_handler_commons.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="spin_lock.h" />
@@ -14,6 +15,7 @@
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_impl.h" />
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\callable.h" />
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\callable_base.h" />
-    <ClInclude Include="job_impl_allocator.h" />
+    <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_impl_allocator.h" />
+    <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_handler_commons.h" />
   </ItemGroup>
 </Project>

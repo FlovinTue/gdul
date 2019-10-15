@@ -1,3 +1,5 @@
+
+
 #include <gdul\WIP_job_handler\job_handler.h>
 #include <gdul\WIP_job_handler\job_impl.h>
 #include <string>
@@ -7,18 +9,7 @@
 
 namespace gdul
 {
-namespace thread_naming {
-	const DWORD MS_VC_EXCEPTION = 0x406D1388;
-	#pragma pack(push,8)  
-	typedef struct tagTHREADNAME_INFO
-	{
-		DWORD dwType; 
-		LPCSTR szName; 
-		DWORD dwThreadID; 
-		DWORD dwFlags;  
-	} THREADNAME_INFO;
-	#pragma pack(pop)  
-};
+
 
 #undef GetObject
 #undef max
@@ -45,7 +36,6 @@ void job_handler::Init(const job_handler_info & info)
 	
 	myIsRunning = true;
 
-	myJobSequences.reserve(Job_Queues_Init_Alloc);
 	myWorkers.reserve(myInitInfo.myNumWorkers);
 
 	for (std::uint32_t i = 0; i < info.myNumWorkers; ++i) {
@@ -60,12 +50,6 @@ void job_handler::reset()
 	for (size_t i = 0; i < myWorkers.size(); ++i) {
 		myWorkers[i].join();
 	}
-	for (size_t i = 0; i < myJobSequences.size(); ++i) {
-		myJobSequences[i]->reset();
-		myJobSequencePool.recycle_object(myJobSequences[i]);
-	}
-	myJobSequences.clear();
-	myJobSequences.shrink_to_fit();
 
 	myWorkers.clear();
 	myWorkers.shrink_to_fit();
@@ -85,7 +69,7 @@ void job_handler::abort()
 
 void job_handler::launch_worker(std::uint32_t workerIndex)
 {
-	set_thread_name(std::string("job_handler_thread# " + std::to_string(workerIndex)));
+	job_handler_detail::set_thread_name(std::string("job_handler_thread# " + std::to_string(workerIndex)).c_str());
 	SetThreadPriority(GetCurrentThread(), myInitInfo.myWorkerPriorities);
 
 	ourLastJobTimepoint = ourSleepTimer.now();
@@ -120,7 +104,7 @@ void job_handler::idle()
 		std::this_thread::sleep_for(std::chrono::microseconds(10));
 	}
 }
-job job_handler::fetch_job()
+job_handler_detail::job_impl* job_handler::fetch_job()
 {
 	job returnValue(myIdleJob);
 
@@ -138,19 +122,5 @@ job job_handler::fetch_job()
 	return returnValue;
 }
 
-void job_handler::set_thread_name(const std::string & name)
-{
-	thread_naming::THREADNAME_INFO info;
-	info.dwType = 0x1000;
-	info.szName = name.c_str();
-	info.dwThreadID = GetCurrentThreadId();
-	info.dwFlags = 0;
 
-	__try {
-		RaiseException(thread_naming::MS_VC_EXCEPTION, 0, sizeof(info) / sizeof(ULONG_PTR), (ULONG_PTR*)&info);
-	}
-	__except (EXCEPTION_EXECUTE_HANDLER)
-	{
-	}
-}
 }
