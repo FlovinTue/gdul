@@ -44,29 +44,31 @@ using job_impl_shared_ptr = shared_ptr<job_handler_detail::job_impl, job_handler
 using job_impl_atomic_shared_ptr = atomic_shared_ptr<job_impl, job_impl_allocator<uint8_t>>;
 using job_impl_raw_ptr = raw_ptr<job_impl, job_impl_allocator<uint8_t>>;
 
-constexpr std::size_t summation(std::size_t from, std::size_t to);
 
 // The number of internal job queues. 
 constexpr std::uint8_t Priority_Granularity = 3;
 constexpr std::uint8_t Default_Job_Priority = 0;
-
+constexpr std::uint8_t Job_Max_Dependencies = 127;
 constexpr std::size_t Callable_Max_Size_No_Heap_Alloc = 24;
-
-
 
 constexpr std::size_t Job_Impl_Chunk_Size(shared_ptr<job_impl, allocator_type>::alloc_size_make_shared());
 
-struct alignas(Job_Impl_Align) job_impl_chunk_rep { 
-	operator uint8_t*()
-	{
-		return reinterpret_cast<uint8_t*>(this);
+constexpr std::size_t pow2(std::size_t n)
+{
+	std::size_t sum(1);
+	for (std::size_t i = 0; i < n; ++i) {
+		sum *= 2;
 	}
-	uint8_t dummy[Job_Impl_Chunk_Size]; 
-};
-
-
-void set_thread_name(const char* name);
-
+	return sum;
+}
+constexpr std::size_t pow2summation(std::size_t from, std::size_t to)
+{
+	std::size_t sum(from);
+	for (std::size_t i = from; i < to; ++i) {
+		sum += pow2(i);
+	}
+	return sum;
+}
 constexpr std::size_t log2align(std::size_t value)
 {
 	std::size_t highBit(0);
@@ -84,5 +86,16 @@ constexpr std::size_t log2align(std::size_t value)
 
 	return std::size_t(1) << sum;
 }
+struct alignas(Job_Impl_Align) job_impl_chunk_rep { 
+	operator uint8_t*()
+	{
+		return reinterpret_cast<uint8_t*>(this);
+	}
+	uint8_t dummy[Job_Impl_Chunk_Size]; 
+};
+
+
+void set_thread_name(const char* name);
+
 }
 }

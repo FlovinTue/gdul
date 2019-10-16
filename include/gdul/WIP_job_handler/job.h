@@ -20,7 +20,6 @@
 
 #pragma once
 
-#include <gdul\atomic_shared_ptr\atomic_shared_ptr.h>
 #include <gdul\WIP_job_handler\job_handler_commons.h>
 
 namespace gdul {
@@ -34,54 +33,25 @@ class job_impl;
 class job
 {
 public:
-	template <class Callable>
-	job(job_handler* handler, Callable&& callable);
-	template <class Callable>
-	job(job_handler* handler, Callable&& callable, std::uint8_t priority);
-	template <class Callable>
-	job(job_handler* handler, Callable&& callable, job& dependency);
-	template <class Callable>
-	job(job_handler* handler, Callable&& callable, job& dependency, std::uint8_t priority);
-
-	~job() noexcept;
-
 	job(job&& other);
 	job& operator=(job&& other);
+
+
+	~job() = default;
 
 	job(const job&) = delete;
 	job& operator=(const job&) = delete;
 
+	void add_dependency(job& dependency);
+
+	void enable();
+
 private:
+	friend class job_handler;
+
+	job(job_handler_detail::job_impl_shared_ptr impl);
+
 	job_handler_detail::job_impl_shared_ptr myImpl;
+	std::atomic_flag myEnabled;
 };
-
-template<class Callable>
-inline job::job(job_handler * handler, Callable && callable)
-	: job(handler, std::forward<Callable&&>(callable), job_handler_detail::Default_Job_Priority)
-{
-}
-
-template<class Callable>
-inline job::job(job_handler * handler, Callable && callable, std::uint8_t priority)
-{
-	handler->enqueue_job(handler->make_job(handler, std::forward<Callable&&>(callable), priority);
-}
-
-template<class Callable>
-inline job::job(job_handler * handler, Callable && callable, job & dependency)
-	: job(handler, std::forward<Callable&&>(callable), dependency, job_handler_detail::Default_Job_Priority)
-{
-}
-
-template<class Callable>
-inline job::job(job_handler * handler, Callable && callable, job & dependency, std::uint8_t priority)
-{
-	myImpl = handler->make_job(handler, std::forward<Callable&&>(callable), priority);
-
-	// OR something. 
-	if (dependency.myImpl->try_attach_child(myImpl)) {
-
-	}
-}
-
 }

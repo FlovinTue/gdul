@@ -2,7 +2,6 @@
 //
 
 #include <iostream>
-#include <gdul\WIP_job_handler\job_sequence.h>
 #include <gdul\WIP_job_handler\job_handler.h>
 #include <mutex>
 
@@ -42,14 +41,16 @@ void Sequential(std::uint32_t aIndex)
 
 int main()
 {
-	using namespace gdul;
 
-	job_handler handler;
+	//using namespace gdul;
+	//
+	//job_handler handler;
+	//
+	//job_handler_info initInfo;
+	//initInfo.myNumWorkers = 7;
+	//
+	//handler.Init(initInfo);
 
-	job_handler_info initInfo;
-	initInfo.myNumWorkers = 7;
-
-	handler.Init(initInfo);
 
 	/*job_sequence jobSequence(&handler);
 
@@ -91,6 +92,8 @@ int main()
 	handler.run();
 
 	while (spinFlag.test_and_set()) std::this_thread::yield();*/
+
+	
 
 	std::cout << "Hello World!\n";
 }

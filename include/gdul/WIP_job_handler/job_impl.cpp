@@ -21,8 +21,10 @@
 #include "job_impl.h"
 #include <gdul\WIP_job_handler\callable_base.h>
 
-namespace gdul {
-namespace job_handler_detail {
+namespace gdul
+{
+namespace job_handler_detail
+{
 
 
 job_impl::~job_impl()
@@ -67,6 +69,21 @@ std::uint8_t job_impl::get_priority() const
 {
 	return myPriority;
 }
+void job_impl::add_dependency()
+{
+	myDependencies.fetch_add(1, std::memory_order_relaxed);
+}
+void job_impl::remove_dependencies(std::uint8_t n)
+{
+	std::uint8_t result(myDependencies.fetch_sub(n, std::memory_order_acq_rel));
+	if (!(result - n)) {
+		myHandler->enqueue_job(*this);
+	}
+}
+void job_impl::enable()
+{
+	remove_dependencies(Job_Max_Dependencies);
+}
 void job_impl::attach_sibling(job_impl_shared_ptr sibling)
 {
 	myFirstSibling.unsafe_store(std::move(sibling));
@@ -77,7 +94,7 @@ void job_impl::enqueue_children()
 	if (child) {
 		child->enqueue_siblings();
 
-		myHandler->enqueue_job(std::move(child));
+		child->remove_dependencies(1);
 	}
 }
 void job_impl::enqueue_siblings()
@@ -87,7 +104,7 @@ void job_impl::enqueue_siblings()
 	if (sibling) {
 		sibling->enqueue_siblings();
 
-		myHandler->enqueue_job(std::move(sibling));
+		sibling->remove_dependencies(1);
 	}
 }
 }

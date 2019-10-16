@@ -46,14 +46,6 @@ typedef struct tagTHREADNAME_INFO
 #endif
 
 #if defined(_WIN64) | defined(_WIN32)
-constexpr std::size_t summation(std::size_t from, std::size_t to)
-{
-	std::size_t sum(from);
-	for (std::size_t i = from; i < to; ++i) {
-		sum += i + 1;
-	}
-	return sum;
-}
 void gdul::job_handler_detail::set_thread_name(const char * name)
 {
 

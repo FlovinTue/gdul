@@ -42,6 +42,10 @@ public:
 
 	std::uint8_t get_priority() const;
 
+	void add_dependency();
+	void remove_dependencies(std::uint8_t n = 1);
+
+	void enable();
 private:
 
 	void attach_sibling(job_impl_shared_ptr sibling);
@@ -66,9 +70,10 @@ private:
 	job_impl_atomic_shared_ptr myFirstSibling;
 	job_impl_atomic_shared_ptr myFirstChild;
 
-	std::atomic<bool> myFinished;
-
 	const std::uint8_t myPriority;
+
+	std::atomic<bool> myFinished;
+	std::atomic<std::uint8_t> myDependencies;
 };
 template<class Callable, std::enable_if_t<(Callable_Max_Size_No_Heap_Alloc < sizeof(Callable))>*>
 inline job_impl::job_impl(Callable && callable, std::uint8_t priority, allocator_type alloc)
@@ -78,6 +83,7 @@ inline job_impl::job_impl(Callable && callable, std::uint8_t priority, allocator
 	, myFirstChild(nullptr)
 	, myFirstSibling(nullptr)
 	, myPriority(priority)
+	, myDependencies(Job_Max_Dependencies)
 {
 	static_assert(!(Callable_Max_Size_No_Heap_Alloc < sizeof(myAllocatedFields)), "too high size / alignment on allocator_type");
 
@@ -106,6 +112,7 @@ inline job_impl::job_impl(Callable && callable, std::uint8_t priority, allocator
 	, myFirstChild(nullptr)
 	, myFirstSibling(nullptr)
 	, myPriority(priority)
+	, myDependencies(Job_Max_Dependencies)
 {
 	new (&myStorage[0]) Callable(std::forward<Callable&&>(callable));
 }

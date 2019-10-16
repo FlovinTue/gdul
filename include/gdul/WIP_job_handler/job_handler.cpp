@@ -25,7 +25,6 @@ job_handler::job_handler()
 	, myJobImplAllocator(&myJobImplChunkPool)
 	, myIdleJob(make_shared<job_handler_detail::job_impl, job_handler_detail::job_impl_allocator<uint8_t>>(myJobImplAllocator, [this]() {idle(); }))
 	, myIsRunning(false)
-	, myTotalQueueDistributionChunks(job_handler_detail::summation(1, job_handler_detail::Priority_Granularity))
 {
 }
 
@@ -116,38 +115,40 @@ void job_handler::idle()
 		std::this_thread::sleep_for(std::chrono::microseconds(10));
 	}
 }
-job_handler_detail::job_impl* job_handler::fetch_job()
+job_handler_detail::job_impl_shared_ptr job_handler::fetch_job()
 {
-	uint8_t queueIndex(0);
-	job_handler_detail::job_impl* returnValue(myIdleJob);
+	uint8_t queueIndex(generate_priority_index());
+	job_handler_detail::job_impl_shared_ptr returnValue(myIdleJob);
 
 	for (uint8_t i = 0; i < job_handler_detail::Priority_Granularity; ++i) {
-		queueIndex = generate_priority_index();
 
-		if (myJobQueues[queueIndex].try_pop(returnValue)) {
+		const uint8_t index((queueIndex + i) % job_handler_detail::Priority_Granularity);
+
+		if (myJobQueues[index].try_pop(returnValue)) {
 			break;
 		}
 	}
-	return returnValue;
+	return std::move(returnValue);
 }
 
 uint8_t job_handler::generate_priority_index()
 {
+	constexpr std::size_t totalDistributionChunks(job_handler_detail::pow2summation(1, job_handler_detail::Priority_Granularity));
+
 	const std::size_t iteration(++ourPriorityDistributionIteration);
-	const std::size_t queues(4);
 
 	uint8_t index(0);
 
-	for (uint8_t i = 1; i < queues; ++i) {
-		const std::size_t desiredSlice(std::pow(2, (queues)-(i + 1)));
-		const std::size_t awardedSlice((myTotalQueueDistributionChunks) / desiredSlice);
+	for (uint8_t i = 1; i < job_handler_detail::Priority_Granularity; ++i) {
+		const std::size_t desiredSlice(std::pow(2, (job_handler_detail::Priority_Granularity)-(i + 1)));
+		const std::size_t awardedSlice((totalDistributionChunks) / desiredSlice);
 		const uint8_t prev(index);
 		const uint8_t eval(iteration % awardedSlice == 0);
 		index += eval * i;
 		index -= prev * eval;
 	}
 
-	return index % 4;
+	return index;
 }
 
 

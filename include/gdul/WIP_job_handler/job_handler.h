@@ -27,7 +27,7 @@
 #include <gdul\WIP_job_handler\job.h>
 #include <gdul\concurrent_object_pool\concurrent_object_pool.h>
 #include <gdul\WIP_job_handler\job_handler_commons.h>
-
+#include <gdul\WIP_job_handler\job.h>
 
 namespace gdul {
 
@@ -63,13 +63,12 @@ public:
 
 	void Init(const job_handler_info& info = job_handler_info());
 
-	void submit(const job& job);
-	void submit(job&& job);
+	template <class Callable>
+	job make_job(Callable&& callable, std::uint8_t priority);
+	template <class Callable>
+	job make_job(Callable&& callable);
 
-	void reset();
-
-	// Entrypoint for external threads. If max workers is exceeded, this thread will replace an internal
-	// worker.
+ 	void reset();
 	void run();
 
 	void abort();
@@ -80,7 +79,7 @@ private:
 	friend class job;
 
 	template <class Callable>
-	job_handler_detail::job_impl_shared_ptr make_job(job_handler* handler, Callable&& callable, std::uint8_t priority);
+	job_handler_detail::job_impl_shared_ptr make_job_impl(Callable&& callable, std::uint8_t priority);
 
 
 	void enqueue_job(job_handler_detail::job_impl_shared_ptr job);
@@ -90,7 +89,7 @@ private:
 	void work();
 	void idle();
 
-	job_handler_detail::job_impl* fetch_job();
+	job_handler_detail::job_impl_shared_ptr fetch_job();
 
 	std::uint8_t generate_priority_index();
 
@@ -113,16 +112,25 @@ private:
 
 	job_handler_detail::job_impl_shared_ptr myIdleJob;
 
-	// Don't look, helper value
-	const std::size_t myTotalQueueDistributionChunks;
-
 	std::atomic<bool> myIsRunning;
 };
 
 template<class Callable>
-inline job_handler_detail::job_impl_shared_ptr job_handler::make_job(job_handler * handler, Callable && callable, std::uint8_t priority)
+inline job job_handler::make_job(Callable && callable, std::uint8_t priority)
 {
-	return make_shared<job_handler_detail::job_impl, job_handler_detail::job_impl_allocator<uint8_t>>(myJobImplAllocator, handler, std::forward<Callable&&>(callable), priority);
+	return job(make_job_impl(std::forward<Callable&&>(callable), priority));
+}
+
+template<class Callable>
+inline job job_handler::make_job(Callable && callable)
+{
+	return make_job(std::forward<Callable&&>(callable), priority);
+}
+
+template<class Callable>
+inline job_handler_detail::job_impl_shared_ptr job_handler::make_job_impl(Callable&& callable, std::uint8_t priority)
+{
+	return make_shared<job_handler_detail::job_impl, job_handler_detail::job_impl_allocator<uint8_t>>(myJobImplAllocator, this, std::forward<Callable&&>(callable), priority);
 }
 
 }

@@ -23,29 +23,33 @@
 
 namespace gdul
 {
-job::job()
+job::job(job && other)
 {
+	operator=(std::move(other));
 }
-
-job::job(std::function<void()>&& callable)
-	: myCallable(std::move(callable))
-	, mySequenceKey(0)
+job & job::operator=(job && other)
 {
+	myImpl = std::move(other.myImpl);
+
+	return *this;
 }
-
-job::job(std::function<void()>&& callable, const job & dependency)
-	: myCallable(std::move(callable))
-	, mySequenceKey(dependency.mySequenceKey - 1)
+void job::add_dependency(job & dependency)
 {
-
+	if (dependency.myImpl->try_attach_child(myImpl)) {
+		myImpl->add_dependency();
+	}
 }
-
-
-job::~job()
+void job::enable()
 {
+	if (!myEnabled.test_and_set(std::memory_order_relaxed)) {
+		return;
+	}
+
+	myImpl->enable();
 }
-void job::operator()() const
+job::job(job_handler_detail::job_impl_shared_ptr impl)
+	: myImpl(std::move(impl))
+	, myEnabled{ATOMIC_FLAG_INIT}
 {
-	
 }
 }
