@@ -74,8 +74,14 @@ public:
 
 	void abort();
 
+
 private:
 	friend class job_handler_detail::job_impl;
+	friend class job;
+
+	template <class Callable>
+	job_handler_detail::job_impl_shared_ptr make_job(job_handler* handler, Callable&& callable, std::uint8_t priority);
+
 
 	void enqueue_job(job_handler_detail::job_impl_shared_ptr job);
 
@@ -112,6 +118,12 @@ private:
 
 	std::atomic<bool> myIsRunning;
 };
+
+template<class Callable>
+inline job_handler_detail::job_impl_shared_ptr job_handler::make_job(job_handler * handler, Callable && callable, std::uint8_t priority)
+{
+	return make_shared<job_handler_detail::job_impl, job_handler_detail::job_impl_allocator<uint8_t>>(myJobImplAllocator, handler, std::forward<Callable&&>(callable), priority);
+}
 
 }
 

@@ -25,10 +25,8 @@
 
 namespace gdul {
 
-// Jobs are thread-safe to depend on?
-// Thread A job, depends on thread B job. Needs atomic_shared_ptr... 
-// Depend on job, or depend on job_impl ? 
-// Depend on job, and return job_impl to pool?
+class job_handler;
+
 namespace job_handler_detail {
 
 class job_impl;
@@ -41,11 +39,11 @@ public:
 	template <class Callable>
 	job(job_handler* handler, Callable&& callable, std::uint8_t priority);
 	template <class Callable>
-	job(job_handler* handler, Callable&& callable, const job& dependency);
+	job(job_handler* handler, Callable&& callable, job& dependency);
 	template <class Callable>
-	job(job_handler* handler, Callable&& callable, const job& dependency, std::uint8_t priority);
+	job(job_handler* handler, Callable&& callable, job& dependency, std::uint8_t priority);
 
-	~job();
+	~job() noexcept;
 
 	job(job&& other);
 	job& operator=(job&& other);
@@ -56,5 +54,34 @@ public:
 private:
 	job_handler_detail::job_impl_shared_ptr myImpl;
 };
+
+template<class Callable>
+inline job::job(job_handler * handler, Callable && callable)
+	: job(handler, std::forward<Callable&&>(callable), job_handler_detail::Default_Job_Priority)
+{
+}
+
+template<class Callable>
+inline job::job(job_handler * handler, Callable && callable, std::uint8_t priority)
+{
+	handler->enqueue_job(handler->make_job(handler, std::forward<Callable&&>(callable), priority);
+}
+
+template<class Callable>
+inline job::job(job_handler * handler, Callable && callable, job & dependency)
+	: job(handler, std::forward<Callable&&>(callable), dependency, job_handler_detail::Default_Job_Priority)
+{
+}
+
+template<class Callable>
+inline job::job(job_handler * handler, Callable && callable, job & dependency, std::uint8_t priority)
+{
+	myImpl = handler->make_job(handler, std::forward<Callable&&>(callable), priority);
+
+	// OR something. 
+	if (dependency.myImpl->try_attach_child(myImpl)) {
+
+	}
+}
 
 }

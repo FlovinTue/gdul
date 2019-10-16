@@ -48,8 +48,11 @@ constexpr std::size_t summation(std::size_t from, std::size_t to);
 
 // The number of internal job queues. 
 constexpr std::uint8_t Priority_Granularity = 3;
+constexpr std::uint8_t Default_Job_Priority = 0;
 
 constexpr std::size_t Callable_Max_Size_No_Heap_Alloc = 24;
+
+
 
 constexpr std::size_t Job_Impl_Chunk_Size(shared_ptr<job_impl, allocator_type>::alloc_size_make_shared());
 
