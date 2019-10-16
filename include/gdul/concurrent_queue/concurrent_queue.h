@@ -1059,7 +1059,7 @@ template<class T, class Allocator>
 inline void producer_buffer<T, Allocator>::push_front(shared_ptr_slot_type newBuffer)
 {
 	producer_buffer<T, allocator_type>* last(this);
-	versioned_raw_ptr<typename shared_ptr_slot_type::value_type, typename shared_ptr_slot_type::allocator_type> verLast(nullptr);
+	raw_ptr<typename shared_ptr_slot_type::value_type, typename shared_ptr_slot_type::allocator_type> verLast(nullptr);
 
 	while (last->myNext) {
 		verLast = last->myNext;
@@ -1661,7 +1661,7 @@ inline IndexType index_pool<IndexType, Allocator>::get()
 {
 	shared_ptr<node, Allocator> top(myTop.load());
 	while (top) {
-		versioned_raw_ptr<node, Allocator> expected(top);
+		raw_ptr<node, Allocator> expected(top);
 		if (myTop.compare_exchange_strong(expected, top->myNext.load())) {
 			return top->myIndex;
 		}
@@ -1674,10 +1674,10 @@ inline void index_pool<IndexType, Allocator>::add(IndexType index)
 {
 	shared_ptr<node, Allocator> entry(make_shared<node, Allocator>(index, nullptr));
 
-	versioned_raw_ptr<node, Allocator> expected;
+	raw_ptr<node, Allocator> expected;
 	do {
 		shared_ptr<node, Allocator> top(myTop.load());
-		expected = top.get_versioned_raw_ptr();
+		expected = top.get_raw_ptr();
 		entry->myNext = std::move(top);
 	} while (!myTop.compare_exchange_strong(expected, std::move(entry)));
 }

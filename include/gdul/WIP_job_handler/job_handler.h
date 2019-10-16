@@ -27,10 +27,7 @@
 #include <gdul\WIP_job_handler\job.h>
 #include <gdul\concurrent_object_pool\concurrent_object_pool.h>
 #include <gdul\WIP_job_handler\job_handler_commons.h>
-#include <gdul\WIP_job_handler\job_impl_allocator.h>
 
-
-// replace_worker()
 
 namespace gdul {
 
@@ -78,6 +75,10 @@ public:
 	void abort();
 
 private:
+	friend class job_handler_detail::job_impl;
+
+	void enqueue_job(job_handler_detail::job_impl_shared_ptr job);
+
 	void launch_worker(std::uint32_t workerIndex);
 
 	void work();
@@ -95,8 +96,8 @@ private:
 
 	job_handler_detail::allocator_type myMainAllocator;
 
-	concurrent_queue<job_handler_detail::job_impl*, job_handler_detail::allocator_type> myJobQueues[job_handler_detail::Priority_Granularity];
-	concurrent_object_pool<job_handler_detail::Job_Impl_Chunk_Rep, job_handler_detail::allocator_type> myJobImplChunkPool;
+	concurrent_queue<job_handler_detail::job_impl_shared_ptr, job_handler_detail::allocator_type> myJobQueues[job_handler_detail::Priority_Granularity];
+	concurrent_object_pool<job_handler_detail::job_impl_chunk_rep, job_handler_detail::allocator_type> myJobImplChunkPool;
 
 	job_handler_detail::job_impl_allocator<uint8_t> myJobImplAllocator;
 
@@ -104,7 +105,7 @@ private:
 
 	job_handler_info myInitInfo;
 
-	shared_ptr<job_handler_detail::job_impl, job_handler_detail::job_impl_allocator<uint8_t>> myIdleJob;
+	job_handler_detail::job_impl_shared_ptr myIdleJob;
 
 	// Don't look, helper value
 	const std::size_t myTotalQueueDistributionChunks;

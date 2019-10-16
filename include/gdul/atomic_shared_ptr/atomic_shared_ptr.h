@@ -82,7 +82,7 @@ template <class T, class Allocator = aspdetail::default_allocator>
 class shared_ptr;
 
 template <class T, class Allocator = aspdetail::default_allocator>
-class versioned_raw_ptr;
+class raw_ptr;
 
 template <class T, class ...Args>
 inline shared_ptr<T> make_shared(Args&&...);
@@ -106,8 +106,8 @@ public:
 
 	inline ~atomic_shared_ptr();
 
-	inline bool compare_exchange_strong(versioned_raw_ptr<T, Allocator>& expected, const shared_ptr<T, Allocator>& desired);
-	inline bool compare_exchange_strong(versioned_raw_ptr<T, Allocator>& expected, shared_ptr<T, Allocator>&& desired);
+	inline bool compare_exchange_strong(raw_ptr<T, Allocator>& expected, const shared_ptr<T, Allocator>& desired);
+	inline bool compare_exchange_strong(raw_ptr<T, Allocator>& expected, shared_ptr<T, Allocator>&& desired);
 
 	inline bool compare_exchange_strong(shared_ptr<T, Allocator>& expected, const shared_ptr<T, Allocator>& desired);
 	inline bool compare_exchange_strong(shared_ptr<T, Allocator>& expected, shared_ptr<T, Allocator>&& desired);
@@ -144,7 +144,7 @@ public:
 
 	size_type unsafe_use_count() const;
 
-	versioned_raw_ptr<T, Allocator> unsafe_get_versioned_raw_ptr() const;
+	raw_ptr<T, Allocator> unsafe_get_raw_ptr() const;
 
 	T* unsafe_get_owned();
 	const T* unsafe_get_owned() const;
@@ -177,7 +177,7 @@ private:
 	inline constexpr aspdetail::control_block_base<T, Allocator>* to_control_block(compressed_storage from) const;
 
 	friend class shared_ptr<T, Allocator>;
-	friend class versioned_raw_ptr<T, Allocator>;
+	friend class raw_ptr<T, Allocator>;
 	friend class aspdetail::ptr_base<T, Allocator>;
 
 	union
@@ -221,12 +221,12 @@ inline atomic_shared_ptr<T, Allocator>::~atomic_shared_ptr()
 }
 
 template<class T, class Allocator>
-inline bool atomic_shared_ptr<T, Allocator>::compare_exchange_strong(versioned_raw_ptr<T, Allocator>& expected, const shared_ptr<T, Allocator>& desired)
+inline bool atomic_shared_ptr<T, Allocator>::compare_exchange_strong(raw_ptr<T, Allocator>& expected, const shared_ptr<T, Allocator>& desired)
 {
 	return compare_exchange_strong(expected, shared_ptr<T, Allocator>(desired));
 }
 template<class T, class Allocator>
-inline bool atomic_shared_ptr<T, Allocator>::compare_exchange_strong(versioned_raw_ptr<T, Allocator>& expected, shared_ptr<T, Allocator>&& desired)
+inline bool atomic_shared_ptr<T, Allocator>::compare_exchange_strong(raw_ptr<T, Allocator>& expected, shared_ptr<T, Allocator>&& desired)
 {
 	return compare_exchange_strong<decltype(expected)>(expected, std::move(desired));
 }
@@ -354,10 +354,10 @@ inline typename atomic_shared_ptr<T, Allocator>::size_type atomic_shared_ptr<T, 
 	return 0;
 }
 template<class T, class Allocator>
-inline versioned_raw_ptr<T, Allocator> atomic_shared_ptr<T, Allocator>::unsafe_get_versioned_raw_ptr() const
+inline raw_ptr<T, Allocator> atomic_shared_ptr<T, Allocator>::unsafe_get_raw_ptr() const
 {
 	compressed_storage storage(myStorage.load(std::memory_order_acquire));
-	return versioned_raw_ptr<T, Allocator>(storage);
+	return raw_ptr<T, Allocator>(storage);
 }
 template<class T, class Allocator>
 inline T * atomic_shared_ptr<T, Allocator>::unsafe_get_owned()
@@ -812,7 +812,7 @@ public:
 	inline constexpr const T* get_owned() const;
 	inline constexpr T* get_owned();
 
-	inline constexpr versioned_raw_ptr<T, Allocator> get_versioned_raw_ptr() const;
+	inline constexpr raw_ptr<T, Allocator> get_raw_ptr() const;
 
 	inline constexpr std::uint8_t get_version() const;
 
@@ -1026,9 +1026,9 @@ inline constexpr std::uint8_t ptr_base<T, Allocator>::get_version() const
 	return myControlBlockStorage.myU8[STORAGE_BYTE_VERSION];
 }
 template<class T, class Allocator>
-inline constexpr versioned_raw_ptr<T, Allocator> ptr_base<T, Allocator>::get_versioned_raw_ptr() const
+inline constexpr raw_ptr<T, Allocator> ptr_base<T, Allocator>::get_raw_ptr() const
 {
-	return versioned_raw_ptr<T, Allocator>(myControlBlockStorage);
+	return raw_ptr<T, Allocator>(myControlBlockStorage);
 }
 };
 template <class T, class Allocator>
@@ -1076,7 +1076,7 @@ private:
 	inline compressed_storage create_control_block(T* object, Deleter&& deleter, Allocator& allocator);
 	inline compressed_storage create_control_block(T* object, Allocator& allocator);
 
-	friend class versioned_raw_ptr<T, Allocator>;
+	friend class raw_ptr<T, Allocator>;
 	friend class atomic_shared_ptr<T, Allocator>;
 
 	template <class T, class Allocator, class ...Args>
@@ -1220,84 +1220,84 @@ inline constexpr std::size_t shared_ptr<T, Allocator>::alloc_size_claim_custom_d
 {
 	return sizeof(aspdetail::control_block_claim_custom_delete<T, Allocator, Deleter>);
 }
-// versioned_raw_ptr does not share in ownership of the object
+// raw_ptr does not share in ownership of the object
 template <class T, class Allocator>
-class versioned_raw_ptr : public aspdetail::ptr_base<T, Allocator>
+class raw_ptr : public aspdetail::ptr_base<T, Allocator>
 {
 public:
-	inline constexpr versioned_raw_ptr() = default;
+	inline constexpr raw_ptr() = default;
 
 	using aspdetail::ptr_base<T, Allocator>::ptr_base;
 
-	constexpr versioned_raw_ptr(versioned_raw_ptr<T, Allocator>&& other);
-	constexpr versioned_raw_ptr(const versioned_raw_ptr<T, Allocator>& other);
+	constexpr raw_ptr(raw_ptr<T, Allocator>&& other);
+	constexpr raw_ptr(const raw_ptr<T, Allocator>& other);
 
-	explicit constexpr versioned_raw_ptr(const shared_ptr<T, Allocator>& from);
+	explicit constexpr raw_ptr(const shared_ptr<T, Allocator>& from);
 
-	explicit versioned_raw_ptr(const atomic_shared_ptr<T, Allocator>& from);
+	explicit raw_ptr(const atomic_shared_ptr<T, Allocator>& from);
 
-	constexpr versioned_raw_ptr<T, Allocator>& operator=(const versioned_raw_ptr<T, Allocator>& other);
-	constexpr versioned_raw_ptr<T, Allocator>& operator=(versioned_raw_ptr<T, Allocator>&& other);
-	constexpr versioned_raw_ptr<T, Allocator>& operator=(const shared_ptr<T, Allocator>& from);
-	constexpr versioned_raw_ptr<T, Allocator>& operator=(const atomic_shared_ptr<T, Allocator>& from);
+	constexpr raw_ptr<T, Allocator>& operator=(const raw_ptr<T, Allocator>& other);
+	constexpr raw_ptr<T, Allocator>& operator=(raw_ptr<T, Allocator>&& other);
+	constexpr raw_ptr<T, Allocator>& operator=(const shared_ptr<T, Allocator>& from);
+	constexpr raw_ptr<T, Allocator>& operator=(const atomic_shared_ptr<T, Allocator>& from);
 
 private:
 	typedef aspdetail::compressed_storage compressed_storage;
 
-	explicit constexpr versioned_raw_ptr(compressed_storage from);
+	explicit constexpr raw_ptr(compressed_storage from);
 
 	friend class aspdetail::ptr_base<T, Allocator>;
 	friend class atomic_shared_ptr<T, Allocator>;
 };
 template<class T, class Allocator>
-inline constexpr versioned_raw_ptr<T, Allocator>::versioned_raw_ptr(versioned_raw_ptr<T, Allocator>&& other)
-	: versioned_raw_ptr()
+inline constexpr raw_ptr<T, Allocator>::raw_ptr(raw_ptr<T, Allocator>&& other)
+	: raw_ptr()
 {
 	operator=(std::move(other));
 }
 template<class T, class Allocator>
-inline constexpr versioned_raw_ptr<T, Allocator>::versioned_raw_ptr(const versioned_raw_ptr<T, Allocator>& other)
-	: versioned_raw_ptr()
+inline constexpr raw_ptr<T, Allocator>::raw_ptr(const raw_ptr<T, Allocator>& other)
+	: raw_ptr()
 {
 	operator=(other);
 }
 template<class T, class Allocator>
-inline constexpr versioned_raw_ptr<T, Allocator>::versioned_raw_ptr(const shared_ptr<T, Allocator>& from)
+inline constexpr raw_ptr<T, Allocator>::raw_ptr(const shared_ptr<T, Allocator>& from)
 	: aspdetail::ptr_base<T, Allocator>(from.myControlBlockStorage)
 {
 }
 template<class T, class Allocator>
-inline versioned_raw_ptr<T, Allocator>::versioned_raw_ptr(const atomic_shared_ptr<T, Allocator>& from)
+inline raw_ptr<T, Allocator>::raw_ptr(const atomic_shared_ptr<T, Allocator>& from)
 	: aspdetail::ptr_base<T, Allocator>(from.myStorage.load())
 {
 }
 template<class T, class Allocator>
-inline constexpr versioned_raw_ptr<T, Allocator>& versioned_raw_ptr<T, Allocator>::operator=(const versioned_raw_ptr<T, Allocator>& other) {
+inline constexpr raw_ptr<T, Allocator>& raw_ptr<T, Allocator>::operator=(const raw_ptr<T, Allocator>& other) {
 	this->myControlBlockStorage = other.myControlBlockStorage;
 	this->myPtr = other.myPtr;
 
 	return *this;
 }
 template<class T, class Allocator>
-inline constexpr versioned_raw_ptr<T, Allocator>& versioned_raw_ptr<T, Allocator>::operator=(versioned_raw_ptr<T, Allocator>&& other) {
+inline constexpr raw_ptr<T, Allocator>& raw_ptr<T, Allocator>::operator=(raw_ptr<T, Allocator>&& other) {
 	std::swap(this->myControlBlockStorage, other.myControlBlockStorage);
 	std::swap(this->myPtr, other.myPtr);
 	return *this;
 }
 template<class T, class Allocator>
-inline constexpr versioned_raw_ptr<T, Allocator>& versioned_raw_ptr<T, Allocator>::operator=(const shared_ptr<T, Allocator>& from)
+inline constexpr raw_ptr<T, Allocator>& raw_ptr<T, Allocator>::operator=(const shared_ptr<T, Allocator>& from)
 {
-	*this = versioned_raw_ptr<T, Allocator>(from);
+	*this = raw_ptr<T, Allocator>(from);
 	return *this;
 }
 template<class T, class Allocator>
-inline constexpr versioned_raw_ptr<T, Allocator>& versioned_raw_ptr<T, Allocator>::operator=(const atomic_shared_ptr<T, Allocator>& from)
+inline constexpr raw_ptr<T, Allocator>& raw_ptr<T, Allocator>::operator=(const atomic_shared_ptr<T, Allocator>& from)
 {
-	*this = versioned_raw_ptr<T, Allocator>(from);
+	*this = raw_ptr<T, Allocator>(from);
 	return *this;
 }
 template<class T, class Allocator>
-inline constexpr versioned_raw_ptr<T, Allocator>::versioned_raw_ptr(compressed_storage from)
+inline constexpr raw_ptr<T, Allocator>::raw_ptr(compressed_storage from)
 	: aspdetail::ptr_base<T, Allocator>(from)
 {
 }

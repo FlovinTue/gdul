@@ -79,7 +79,7 @@ public:
 	typedef cpqdetail::node<key_type, value_type, Max_Node_Height, allocator_type> node_type;
 	typedef shared_ptr<node_type, allocator_type> shared_ptr_type;
 	typedef atomic_shared_ptr<node_type, allocator_type> atomic_shared_ptr_type;
-	typedef versioned_raw_ptr<node_type, allocator_type> versioned_raw_ptr_type;
+	typedef raw_ptr<node_type, allocator_type> raw_ptr_type;
 
 	concurrent_priority_queue();
 	~concurrent_priority_queue();
@@ -266,7 +266,7 @@ inline bool concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, C
 		}
 	}
 	
-	versioned_raw_ptr_type expected(current[0].get_versioned_raw_ptr());
+	raw_ptr_type expected(current[0].get_raw_ptr());
 	entry->myNext[0].unsafe_store(std::move(current[0]));
 
 	if (insertionPoint[0]->myNext[0].compare_exchange_strong(expected, entry)) {
@@ -292,7 +292,7 @@ inline bool concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, C
 	shared_ptr_type head(nullptr);
 	shared_ptr_type splice(nullptr);
 
-	versioned_raw_ptr_type expected(nullptr);
+	raw_ptr_type expected(nullptr);
 
 	for (;;) {
 		head = myFrontSentry->myNext[0].load();
@@ -353,7 +353,7 @@ inline bool concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, C
 template <class KeyType, class ValueType, cpqdetail::size_type ExpectedEntriesHint , class Comparator>
 inline void concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, Comparator>::try_splice(node_type* at, shared_ptr_type&& with, shared_ptr_type& current)
 {
-	versioned_raw_ptr_type expected(current);
+	raw_ptr_type expected(current);
 	if (at->myNext[0].compare_exchange_strong(expected, std::move(with))) {
 		shared_ptr_type null(nullptr);
 		null.set_tag();
@@ -366,7 +366,7 @@ inline void concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, C
 	// Must combine a write to current->myNext[index] with a successfull previous->current linkage....
 
 	const size_type height(toLink->myHeight);
-	versioned_raw_ptr_type expected_[Max_Node_Height]{ nullptr };
+	raw_ptr_type expected_[Max_Node_Height]{ nullptr };
 	memcpy(&expected_[0], &expected[0], sizeof(shared_ptr_type) * Max_Node_Height);
 
 	for (size_type index(toLink->myNumLinked.load(std::memory_order_acquire));  index < height; index = (toLink->myNumLinked.fetch_add(1, std::memory_order_acq_rel) + 1)){

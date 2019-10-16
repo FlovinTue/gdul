@@ -31,13 +31,23 @@ class alignas(log2align(Callable_Max_Size_No_Heap_Alloc)) job_impl
 {
 public:
 	template <class Callable, std::enable_if_t<!(Callable_Max_Size_No_Heap_Alloc < sizeof(Callable))>* = nullptr>
-	job_impl(Callable&& callable, allocator_type);
+	job_impl(Callable&& callable, std::uint8_t priority, allocator_type);
 	template <class Callable, std::enable_if_t<(Callable_Max_Size_No_Heap_Alloc < sizeof(Callable))>* = nullptr>
-	job_impl(Callable&& callable, allocator_type alloc);
+	job_impl(Callable&& callable, std::uint8_t priority, allocator_type alloc);
 	~job_impl();
-
+	
 	void operator()();
+
+	bool try_attach_child(job_impl_shared_ptr child);
+
+	std::uint8_t get_priority() const;
+
 private:
+
+	void attach_sibling(job_impl_shared_ptr sibling);
+
+	void enqueue_children();
+	void enqueue_siblings();
 
 	union
 	{
@@ -51,13 +61,23 @@ private:
 	};
 
 	callable_base* myCallable;
+	job_handler* myHandler;
 
-	atomic_shared_ptr<job_impl, job_impl_allocator<uint8_t>> myFirstChild;
+	job_impl_atomic_shared_ptr myFirstSibling;
+	job_impl_atomic_shared_ptr myFirstChild;
+
+	std::atomic<bool> myFinished;
+
+	const std::uint8_t myPriority;
 };
 template<class Callable, std::enable_if_t<(Callable_Max_Size_No_Heap_Alloc < sizeof(Callable))>*>
-inline job_impl::job_impl(Callable && callable, allocator_type alloc)
+inline job_impl::job_impl(Callable && callable, std::uint8_t priority, allocator_type alloc)
 	: myStorage{}
 	, myCallable(nullptr)
+	, myFinished(false)
+	, myFirstChild(nullptr)
+	, myFirstSibling(nullptr)
+	, myPriority(priority)
 {
 	static_assert(!(Callable_Max_Size_No_Heap_Alloc < sizeof(myAllocatedFields)), "too high size / alignment on allocator_type");
 
@@ -79,9 +99,13 @@ inline job_impl::job_impl(Callable && callable, allocator_type alloc)
 }
 
 template<class Callable, std::enable_if_t<(Callable_Max_Size_No_Heap_Alloc < sizeof(Callable))>*>
-inline job_impl::job_impl(Callable && callable, allocator_type)
+inline job_impl::job_impl(Callable && callable, std::uint8_t priority, allocator_type)
 	: myStorage{}
 	, myCallable(nullptr)
+	, myFinished(false)
+	, myFirstChild(nullptr)
+	, myFirstSibling(nullptr)
+	, myPriority(priority)
 {
 	new (&myStorage[0]) Callable(std::forward<Callable&&>(callable));
 }

@@ -98,7 +98,7 @@ int main()
 		const bool tenres = atenth.compare_exchange_strong(atenthexp, atenthdes);
 		
 		atomic_shared_ptr<int> aeleventh(make_shared<int>(11));
-		versioned_raw_ptr<int> aeleventhexp(aeleventh.unsafe_get_versioned_raw_ptr());
+		raw_ptr<int> aeleventhexp(aeleventh.unsafe_get_raw_ptr());
 		shared_ptr<int> aeleventhdes(make_shared<int>(1111));
 		const bool eleres = aeleventh.compare_exchange_strong(aeleventhexp, aeleventhdes);
 		
@@ -108,12 +108,12 @@ int main()
 		const bool twelres = atwelfth.compare_exchange_strong(atwelfthexp, atwelfthdes);
 		
 		atomic_shared_ptr<int> athirteenth(make_shared<int>(13));
-		versioned_raw_ptr<int> athirteenthexp(nullptr);
+		raw_ptr<int> athirteenthexp(nullptr);
 		shared_ptr<int> athirteenthdes(make_shared<int>(131));
 		const bool thirtres = athirteenth.compare_exchange_strong(athirteenthexp, athirteenthdes);
 
-		athirteenth.unsafe_get_versioned_raw_ptr();
-		athirteenthdes.get_versioned_raw_ptr();
+		athirteenth.unsafe_get_raw_ptr();
+		athirteenthdes.get_raw_ptr();
 		
 		shared_ptr<int> fourteenth(new int[10]{ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }, [](int* obj, std::allocator<std::uint8_t>& /*alloc*/)
 		{
@@ -126,7 +126,7 @@ int main()
 		shared_ptr<int[10]> fifteenth(make_shared<int[10]>(1, 2, 3, 4, 5, 6, 7, 8, 9, 10));
 
 		shared_ptr<int> nulla(nullptr, std::uint8_t(5));
-		versioned_raw_ptr<int> nullb(nullptr, 10);
+		raw_ptr<int> nullb(nullptr, 10);
 		atomic_shared_ptr<int> nullc(nullptr, 15);
 
 		// Removed tagging for now. Made things complicated
@@ -145,13 +145,13 @@ int main()
 		uint32_t iter(50000);
 		auto lama = [&des, &tar, iter]() {
 			for (std::uint32_t i = 0; i < iter; ++i) {
-				versioned_raw_ptr<int> exp(nullptr);
+				raw_ptr<int> exp(nullptr);
 				assert(!tar.compare_exchange_strong(exp, des));
 			}
 					};
 		auto lamb = [&des, &tar, iter]() {
 			for (std::uint32_t i = 0; i < iter; ++i) {
-				versioned_raw_ptr<int> exp(nullptr);
+				raw_ptr<int> exp(nullptr);
 				assert(!tar.compare_exchange_strong(exp, des));
 			}
 		};

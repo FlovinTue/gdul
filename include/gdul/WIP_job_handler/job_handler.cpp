@@ -72,6 +72,13 @@ void job_handler::abort()
 	myIsRunning.store(false, std::memory_order_relaxed);
 }
 
+void job_handler::enqueue_job(job_handler_detail::job_impl_shared_ptr job)
+{
+	const std::uint8_t priority(job->get_priority());
+
+	myJobQueues[priority].push(std::move(job));
+}
+
 void job_handler::launch_worker(std::uint32_t workerIndex)
 {
 	job_handler_detail::set_thread_name(std::string("job_handler_thread# " + std::to_string(workerIndex)).c_str());

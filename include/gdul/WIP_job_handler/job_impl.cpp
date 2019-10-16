@@ -39,6 +39,56 @@ job_impl::~job_impl()
 void job_impl::operator()()
 {
 	(*myCallable)();
+
+	myFinished.store(true, std::memory_order_seq_cst);
+
+	enqueue_children();
+}
+bool job_impl::try_attach_child(job_impl_shared_ptr child)
+{
+	job_impl_shared_ptr firstChild(nullptr);
+	job_impl_raw_ptr rawRep(nullptr);
+	do {
+		firstChild = myFirstChild.load();
+		rawRep = firstChild;
+
+		child->attach_sibling(std::move(firstChild));
+
+		if (myFinished.load(std::memory_order_seq_cst)) {
+			child->myFirstSibling.unsafe_store(nullptr);
+			return false;
+		}
+
+	} while (!myFirstChild.compare_exchange_strong(rawRep, std::move(child)));
+
+	return false;
+}
+std::uint8_t job_impl::get_priority() const
+{
+	return myPriority;
+}
+void job_impl::attach_sibling(job_impl_shared_ptr sibling)
+{
+	myFirstSibling.unsafe_store(std::move(sibling));
+}
+void job_impl::enqueue_children()
+{
+	job_impl_shared_ptr child(myFirstChild.exchange(nullptr));
+	if (child) {
+		child->enqueue_siblings();
+
+		myHandler->enqueue_job(std::move(child));
+	}
+}
+void job_impl::enqueue_siblings()
+{
+	job_impl_shared_ptr sibling(myFirstSibling.unsafe_load());
+
+	if (sibling) {
+		sibling->enqueue_siblings();
+
+		myHandler->enqueue_job(std::move(sibling));
+	}
 }
 }
 }

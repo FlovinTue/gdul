@@ -22,6 +22,7 @@
 
 #include <thread>
 #include <gdul\atomic_shared_ptr\atomic_shared_ptr.h>
+#include <gdul\WIP_job_handler\job_impl_allocator.h>
 
 #if defined(_MSC_VER) && !defined(__INTEL_COMPILER) 
 #ifndef GDUL_NOVTABLE
@@ -38,6 +39,11 @@ namespace gdul
 {
 namespace job_handler_detail
 {
+using allocator_type = std::allocator<std::uint8_t>;
+using job_impl_shared_ptr = shared_ptr<job_handler_detail::job_impl, job_handler_detail::job_impl_allocator<uint8_t>>;
+using job_impl_atomic_shared_ptr = atomic_shared_ptr<job_impl, job_impl_allocator<uint8_t>>;
+using job_impl_raw_ptr = raw_ptr<job_impl, job_impl_allocator<uint8_t>>;
+
 constexpr std::size_t summation(std::size_t from, std::size_t to);
 
 // The number of internal job queues. 
@@ -47,7 +53,7 @@ constexpr std::size_t Callable_Max_Size_No_Heap_Alloc = 24;
 
 constexpr std::size_t Job_Impl_Chunk_Size(shared_ptr<job_impl, allocator_type>::alloc_size_make_shared());
 
-struct alignas(Job_Impl_Align) Job_Impl_Chunk_Rep { 
+struct alignas(Job_Impl_Align) job_impl_chunk_rep { 
 	operator uint8_t*()
 	{
 		return reinterpret_cast<uint8_t*>(this);
@@ -55,7 +61,6 @@ struct alignas(Job_Impl_Align) Job_Impl_Chunk_Rep {
 	uint8_t dummy[Job_Impl_Chunk_Size]; 
 };
 
-using allocator_type = std::allocator<std::uint8_t>;
 
 void set_thread_name(const char* name);
 

@@ -21,7 +21,7 @@
 #pragma once
 
 #include <gdul\atomic_shared_ptr\atomic_shared_ptr.h>
-#include <gdul\WIP_job_handler\job_impl_allocator.h>
+#include <gdul\WIP_job_handler\job_handler_commons.h>
 
 namespace gdul {
 
@@ -54,7 +54,7 @@ public:
 	job& operator=(const job&) = delete;
 
 private:
-	shared_ptr<job_handler_detail::job_impl, job_handler_detail::job_impl_allocator<uint8_t>> myImpl;
+	job_handler_detail::job_impl_shared_ptr myImpl;
 };
 
 }
