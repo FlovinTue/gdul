@@ -28,7 +28,6 @@ class job_handler;
 
 namespace job_handler_detail {
 
-class job_impl;
 }
 class job
 {
@@ -38,7 +37,6 @@ public:
 	job(job&& other);
 	job& operator=(job&& other);
 
-
 	~job() = default;
 
 	job(const job&) = delete;
@@ -46,7 +44,12 @@ public:
 
 	void add_dependency(job& dependency);
 
+	// when enable has been run, this object may be discarded
 	void enable();
+
+	bool finished() const;
+
+	void wait_for_finish();
 
 private:
 	friend class job_handler;

@@ -70,18 +70,15 @@ public:
 	job_handler(allocator_type& allocator);
 	~job_handler();
 
-
 	void Init(const job_handler_info& info = job_handler_info());
+ 	void reset();
 
 	template <class Callable>
 	job make_job(Callable&& callable, std::uint8_t priority);
 	template <class Callable>
 	job make_job(Callable&& callable);
 
- 	void reset();
-	void run();
-
-	void abort();
+	static thread_local job this_job;
 
 private:
 	friend class job_handler_detail::job_impl;
@@ -138,7 +135,18 @@ inline job job_handler::make_job(Callable && callable)
 template<class Callable>
 inline job_handler::job_impl_shared_ptr job_handler::make_job_impl(Callable&& callable, std::uint8_t priority)
 {
-	return make_shared<job_handler_detail::job_impl, job_handler_detail::job_impl_allocator<std::uint8_t>>(myJobImplAllocator, this, std::forward<Callable&&>(callable), priority, myMainAllocator);
+	assert(priority < job_handler_detail::Priority_Granularity && "Priority value out of bounds");
+
+	const uint8_t _priority(std::clamp<std::uint8_t>(priority, 0, job_handler_detail::Priority_Granularity - 1));
+
+	return make_shared<job_handler_detail::job_impl, job_handler_detail::job_impl_allocator<std::uint8_t>>
+		(
+			myJobImplAllocator, 
+			this, 
+			std::forward<Callable&&>(callable), 
+			_priority, 
+			myMainAllocator
+			);
 }
 
 }

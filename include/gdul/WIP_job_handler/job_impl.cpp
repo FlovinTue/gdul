@@ -35,7 +35,7 @@ job_impl::~job_impl()
 		myAllocFields.myAllocator.deallocate(myAllocFields.myCallableBegin, myAllocFields.myAllocated);
 	}
 
-	std::uninitialized_fill_n(myStorage, Callable_Max_Size_No_Heap_Alloc, 0);
+	std::uninitialized_fill_n(myStorage, Callable_Max_Size_No_Heap_Alloc, std::uint8_t(0));
 }
 
 void job_impl::operator()()
@@ -63,26 +63,32 @@ bool job_impl::try_attach_child(job_impl_shared_ptr child)
 
 	} while (!myFirstChild.compare_exchange_strong(rawRep, std::move(child)));
 
-	return false;
+	return true;
 }
 std::uint8_t job_impl::get_priority() const
 {
 	return myPriority;
 }
-void job_impl::add_dependency()
+void job_impl::add_dependencies(std::uint16_t n)
 {
-	myDependencies.fetch_add(1, std::memory_order_relaxed);
+	myDependencies.fetch_add(n, std::memory_order_relaxed);
 }
-void job_impl::remove_dependencies(std::uint8_t n)
+std::uint16_t job_impl::remove_dependencies(std::uint16_t n)
 {
-	std::uint8_t result(myDependencies.fetch_sub(n, std::memory_order_acq_rel));
-	if (!(result - n)) {
-		myHandler->enqueue_job(*this);
-	}
+	std::uint16_t result(myDependencies.fetch_sub(n, std::memory_order_acq_rel));
+	return result - n;
 }
-void job_impl::enable()
+bool job_impl::enable()
 {
-	remove_dependencies(Job_Max_Dependencies);
+	return !remove_dependencies(Job_Max_Dependencies);
+}
+job_handler * job_impl::get_handler() const
+{
+	return myHandler;
+}
+bool job_impl::finished() const
+{
+	return myFinished.load(std::memory_order_relaxed);
 }
 void job_impl::attach_sibling(job_impl_shared_ptr sibling)
 {
@@ -94,19 +100,24 @@ void job_impl::enqueue_children()
 	if (child) {
 		child->enqueue_siblings();
 
-		child->remove_dependencies(1);
+		if (!child->remove_dependencies(1)) {
+			child->get_handler()->enqueue_job(std::move(child));
+		}
 	}
 }
 void job_impl::enqueue_siblings()
 {
 	job_impl_shared_ptr sibling(myFirstSibling.unsafe_load());
 
-	if (sibling) {
-		sibling->enqueue_siblings();
+	while (sibling) {
+		job_impl_shared_ptr next(sibling->myFirstSibling.unsafe_load());
 
-		sibling->remove_dependencies(1);
+		if (!sibling->remove_dependencies(1)) {
+			sibling->get_handler()->enqueue_job(std::move(sibling));
+		}
+
+		sibling = std::move(next);
 	}
 }
-
 }
 }

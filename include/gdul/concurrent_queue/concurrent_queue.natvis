@@ -8,8 +8,8 @@
 				<Variable Name = "producerIndex" InitialValue = "0" />
 				<Variable Name = "producerSlotsRaw" InitialValue="(*(atomic_shared_ptr_slot_type**)(+8
 					+ ((myProducerSlots.myDebugView.myU64 >> 1) * 2)
-					- ((std::uint64_t)myProducerSlots.myDebugView.myU8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
-					- ((std::uint64_t)myProducerSlots.myDebugView.myU8[aspdetail::STORAGE_BYTE_COPYREQUEST] * (aspdetail::Ptr_Mask + 1))
+					- ((uint64_t)myProducerSlots.myDebugView.myU8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
+					- ((uint64_t)myProducerSlots.myDebugView.myU8[aspdetail::STORAGE_BYTE_COPYREQUEST] * (aspdetail::Ptr_Mask + 1))
 					))"/>
 				<Variable Name = "pBuffer" InitialValue = "(buffer_type*)(0)" />
 				
@@ -19,8 +19,8 @@
 						pBuffer =
 						(*(buffer_type**)(+8
 						+ ((producerSlotsRaw[producerIndex].myDebugView.myU64 >> 1) * 2)
-						- ((std::uint64_t)producerSlotsRaw[producerIndex].myDebugView.myU8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
-						- ((std::uint64_t)producerSlotsRaw[producerIndex].myDebugView.myU8[aspdetail::STORAGE_BYTE_COPYREQUEST] * (aspdetail::Ptr_Mask + 1))
+						- ((uint64_t)producerSlotsRaw[producerIndex].myDebugView.myU8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
+						- ((uint64_t)producerSlotsRaw[producerIndex].myDebugView.myU8[aspdetail::STORAGE_BYTE_COPYREQUEST] * (aspdetail::Ptr_Mask + 1))
 						))
 					</Exec>
 					<Loop>
@@ -49,8 +49,8 @@
 						pBuffer =
 						(*(buffer_type**)(+8
 						+ ((producerSlotsRaw[producerIndex].myDebugView.myU64 >> 1) * 2)
-						- ((std::uint64_t)producerSlotsRaw[producerIndex].myDebugView.myU8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
-						- ((std::uint64_t)producerSlotsRaw[producerIndex].myDebugView.myU8[aspdetail::STORAGE_BYTE_COPYREQUEST] * (aspdetail::Ptr_Mask + 1))
+						- ((uint64_t)producerSlotsRaw[producerIndex].myDebugView.myU8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
+						- ((uint64_t)producerSlotsRaw[producerIndex].myDebugView.myU8[aspdetail::STORAGE_BYTE_COPYREQUEST] * (aspdetail::Ptr_Mask + 1))
 						))
 					</Exec>
 					<Item Name='[producer_{producerIndex + 1}]'>*pBuffer</Item>

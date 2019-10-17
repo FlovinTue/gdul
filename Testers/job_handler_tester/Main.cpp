@@ -2,43 +2,8 @@
 //
 
 #include <iostream>
-#include <atomic>
 #include <gdul\WIP_job_handler\job_handler.h>
-#include <mutex>
 
-std::atomic_flag spinFlag;
-std::mutex mtx;
-
-std::atomic<std::uint32_t> testCounter = 0;
-
-void Parallel(std::uint32_t aIndex)
-{
-	aIndex;
-	//if (testCounter.load() != aIndex) {
-	//	bool test = true; test;
-	//}
-	//while (spinFlag.test_and_set()) std::this_thread::yield();
-
-	//mtx.lock();
-	//std::cout << "Parallel# " << aIndex << std::endl;
-	//mtx.unlock();
-	//spinFlag.clear();
-}
-void Sequential(std::uint32_t aIndex)
-{
-	//while (spinFlag.test_and_set()) std::this_thread::yield();
-	if (++testCounter != aIndex) {
-		bool test = true; test;
-	}
-	//mtx.lock();
-	//std::cout << "Sequential# " << aIndex << std::endl;
-	//mtx.unlock();
-	//spinFlag.clear();
-	
-	if (!(aIndex % 10000)) {
-		std::cout << "." << std::endl;
-	}
-}
 
 int main()
 {
@@ -46,65 +11,35 @@ int main()
 
 	gdul::job_handler handler(alloc);
 
-	handler.Init();
-
-	gdul::job job(handler.make_job([]() {std::cout << "did something" << std::endl; }, 0));
-
-	job.enable();
-
-
-	//using namespace gdul;
-	//
-	//job_handler handler;
-	//
-	//job_handler_info initInfo;
-	//initInfo.myNumWorkers = 7;
-	//
-	//handler.Init(initInfo);
-
-
-	/*job_sequence jobSequence(&handler);
-
-	for (std::uint32_t j = 0; j < 1000000; ++j) {
-		jobSequence.push([j]()
-		{
-			Sequential(1 + j * 4);
-		}, Job_layer::next);
-
-		for (std::uint32_t i = 0; i < 5; ++i) {
-			jobSequence.push([j]()
-			{
-				Parallel(1 + j * 4);
-			}, Job_layer::back);
-		}
-		jobSequence.push([j]()
-		{
-			Sequential(2 + j * 4);
-		}, Job_layer::next);
-		jobSequence.push([j]()
-		{
-			Sequential(3 + j * 4);
-		}, Job_layer::next);
-		jobSequence.push([j]()
-		{
-			Sequential(4 + j * 4);
-		}, Job_layer::next);
-
-		for (std::uint32_t i = 0; i < 5; ++i) {
-			jobSequence.push([j]()
-			{
-				Parallel(4 + j * 4);
-			}, Job_layer::back);
-		}
-		
-	}
-	jobSequence.push([&handler]() { handler.abort(); }, Job_layer::next);
-
-	handler.run();
-
-	while (spinFlag.test_and_set()) std::this_thread::yield();*/
+	gdul::job_handler_info info;
+	info.myMaxWorkers = 8;
+	handler.Init(info);
 
 	
+	gdul::job hey(handler.make_job([]() {std::cout << "Hey" << std::endl; }, 0));
+	gdul::job there(handler.make_job([]() {std::cout << "there" << std::endl; }, 0));
+	gdul::job mr(handler.make_job([]() {std::cout << "mr" << std::endl; }, 0));
+
+	gdul::job guy(handler.make_job([]() {std::cout << "guy!" << std::endl; }, 0));
+	for (uint16_t i = 0; i < 4096; ++i) {
+		uint8_t prio(i % gdul::job_handler_detail::Priority_Granularity);
+
+		gdul::job nice(handler.make_job([prio]() {std::cout << "nice (" << uint32_t(prio) << " prio)" << std::endl; }, prio));
+		nice.add_dependency(mr);
+		guy.add_dependency(nice);
+		nice.enable();
+	}
+
+
+	there.add_dependency(hey);
+	mr.add_dependency(there);
+
+	mr.enable();
+	hey.enable();
+	guy.enable();
+	there.enable();
+
+	guy.wait_for_finish();
 
 	std::cout << "Hello World!\n";
 }

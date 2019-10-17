@@ -11,17 +11,17 @@
 namespace gdul
 {
 
-
 #undef GetObject
 #undef max
 
+thread_local job job_handler::this_job(nullptr);
 thread_local std::chrono::high_resolution_clock job_handler::ourSleepTimer;
 thread_local std::chrono::high_resolution_clock::time_point job_handler::ourLastJobTimepoint;
 thread_local std::size_t job_handler::ourPriorityDistributionIteration(0);
 thread_local size_t job_handler::ourLastJobSequence(0);
 
 job_handler::job_handler()
-	: myJobImplChunkPool(128, myMainAllocator)
+	: myJobImplChunkPool(512, myMainAllocator)
 	, myJobImplAllocator(&myJobImplChunkPool)
 	, myIsRunning(false)
 {
@@ -54,23 +54,18 @@ void job_handler::Init(const job_handler_info & info)
 
 void job_handler::reset()
 {
-	myIsRunning.store(false, std::memory_order_relaxed);
+	bool exp(true);
+	if (!myIsRunning.compare_exchange_strong(exp, false, std::memory_order_relaxed)) {
+		return;
+	}
 
 	for (size_t i = 0; i < myInitInfo.myMaxWorkers; ++i) {
-		myWorkers[i].join();
+		if (myWorkers[i].joinable()) {
+			myWorkers[i].join();
+		}
 	}
 
 	myInitInfo = job_handler_info();
-}
-
-void job_handler::run()
-{
-	launch_worker(0);
-}
-
-void job_handler::abort()
-{
-	myIsRunning.store(false, std::memory_order_relaxed);
 }
 
 void job_handler::enqueue_job(job_impl_shared_ptr job)
@@ -99,10 +94,11 @@ void job_handler::launch_worker(std::uint32_t workerIndex)
 void job_handler::work()
 {
 	while (myIsRunning.load(std::memory_order_relaxed)) {
-		job_impl_shared_ptr job(fetch_job());
 
-		if (job) {
-			(*job)();
+		this_job = job(fetch_job());
+
+		if (this_job.myImpl) {
+			(*this_job.myImpl)();
 		}
 		else {
 			idle();
@@ -111,8 +107,6 @@ void job_handler::work()
 }
 void job_handler::idle()
 {
-	//job_handler::this_job = nullptr
-
 	const std::chrono::high_resolution_clock::time_point current(ourSleepTimer.now());
 	const std::chrono::high_resolution_clock::time_point delta(current - ourLastJobTimepoint);
 
@@ -125,7 +119,7 @@ void job_handler::idle()
 }
 job_handler::job_impl_shared_ptr job_handler::fetch_job()
 {
-	uint8_t queueIndex(generate_priority_index());
+	const uint8_t queueIndex(generate_priority_index());
 
 	job_handler::job_impl_shared_ptr out(nullptr);
 
@@ -141,6 +135,7 @@ job_handler::job_impl_shared_ptr job_handler::fetch_job()
 	return out;
 }
 
+// Maybe find some way to stick around at an index for a while? Better for cache...
 uint8_t job_handler::generate_priority_index()
 {
 	constexpr std::size_t totalDistributionChunks(job_handler_detail::pow2summation(1, job_handler_detail::Priority_Granularity));

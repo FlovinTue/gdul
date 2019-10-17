@@ -55,12 +55,15 @@ public:
 
 	std::uint8_t get_priority() const;
 
-	void add_dependency();
-	void remove_dependencies(std::uint8_t n = 1);
+	void add_dependencies(std::uint16_t n = 1);
+	std::uint16_t remove_dependencies(std::uint16_t n = 1);
 
-	void enable();
+	bool enable();
+
+	job_handler* get_handler() const;
+
+	bool finished() const;
 private:
-
 	void attach_sibling(job_impl_shared_ptr sibling);
 
 	void enqueue_children();
@@ -78,16 +81,18 @@ private:
 	};
 
 	callable_base* myCallable;
-	job_handler* myHandler;
+	job_handler* const myHandler;
 
 	job_impl_atomic_shared_ptr myFirstSibling;
 	job_impl_atomic_shared_ptr myFirstChild;
 
-	const std::uint8_t myPriority;
+	std::atomic<std::uint16_t> myDependencies;
 
 	std::atomic<bool> myFinished;
-	std::atomic<std::uint8_t> myDependencies;
+
+	const std::uint8_t myPriority;
 };
+
 template<class Callable, std::enable_if_t<(Callable_Max_Size_No_Heap_Alloc < sizeof(Callable))>*>
 inline job_impl::job_impl(job_handler* handler, Callable && callable, std::uint8_t priority, allocator_type alloc)
 	: myStorage{}

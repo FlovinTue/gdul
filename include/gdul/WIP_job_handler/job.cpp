@@ -29,14 +29,16 @@ job::job(job && other)
 }
 job & job::operator=(job && other)
 {
+	myEnabled._My_flag = other.myEnabled._My_flag;
 	myImpl = std::move(other.myImpl);
 
 	return *this;
 }
+
 void job::add_dependency(job & dependency)
 {
 	if (dependency.myImpl->try_attach_child(myImpl)) {
-		myImpl->add_dependency();
+		myImpl->add_dependencies(1);
 	}
 }
 void job::enable()
@@ -45,7 +47,19 @@ void job::enable()
 		return;
 	}
 
-	myImpl->enable();
+	if (myImpl->enable()) {
+		myImpl->get_handler()->enqueue_job(myImpl);
+	}
+}
+bool job::finished() const
+{
+	return myImpl->finished();
+}
+void job::wait_for_finish()
+{
+	while (!finished()) {
+		myImpl->get_handler()->idle();
+	}
 }
 job::job(job_impl_shared_ptr impl)
 	: myImpl(std::move(impl))
