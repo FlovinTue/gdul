@@ -29,12 +29,21 @@ class callable
 {
 public:
 	callable(Callable&& callable);
-	callable(const Callable& callable);
 
 	void operator()();
 
 private:
 	Callable myCallable;
 };
+template<class Callable>
+inline callable<Callable>::callable(Callable && callable)
+	: myCallable(std::forward<Callable&&>(callable))
+{
+}
+template<class Callable>
+inline void callable<Callable>::operator()()
+{
+	myCallable();
+}
 }
 }

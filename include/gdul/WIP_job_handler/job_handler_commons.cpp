@@ -46,25 +46,24 @@ typedef struct tagTHREADNAME_INFO
 #endif
 
 #if defined(_WIN64) | defined(_WIN32)
-void gdul::job_handler_detail::set_thread_name(const char * name)
+void set_thread_name(const char * name)
 {
 
-		thread_naming::THREADNAME_INFO info;
-		info.dwType = 0x1000;
-		info.szName = name;
-		info.dwThreadID = GetCurrentThreadId();
-		info.dwFlags = 0;
+	thread_naming::THREADNAME_INFO info;
+	info.dwType = 0x1000;
+	info.szName = name;
+	info.dwThreadID = GetCurrentThreadId();
+	info.dwFlags = 0;
 
-		__try {
-			RaiseException(thread_naming::MS_VC_EXCEPTION, 0, sizeof(info) / sizeof(ULONG_PTR), (ULONG_PTR*)&info);
-		}
-		__except (EXCEPTION_EXECUTE_HANDLER)
-		{
-		}
+	__try {
+		RaiseException(thread_naming::MS_VC_EXCEPTION, 0, sizeof(info) / sizeof(ULONG_PTR), (ULONG_PTR*)&info);
+	}
+	__except (EXCEPTION_EXECUTE_HANDLER)
+	{
 	}
 }
 #else
-void gdul::job_handler_detail::set_thread_name(const char * /*name*/)
+void set_thread_name(const char * /*name*/)
 {
 }
 #endif

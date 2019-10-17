@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <cstdint>
 
 #pragma warning(push)
 #pragma warning(disable : 4324)

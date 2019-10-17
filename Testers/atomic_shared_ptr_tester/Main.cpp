@@ -14,7 +14,7 @@
 
 int main()
 {
-		const std::uint32_t testArraySize(32);
+		/*const std::uint32_t testArraySize(32);
 		const std::uint32_t numThreads(8);
 		Tester<std::uint64_t, testArraySize, numThreads> tester(true, rand());
 	
@@ -59,7 +59,7 @@ int main()
 			<< referencetest
 			<< ". The number of threads used were " 
 			<< numThreads
-			<< std::endl;
+			<< std::endl;*/
 
 		using namespace gdul;
 
@@ -124,6 +124,8 @@ int main()
 		const int access5(fourteenth[4]);
 
 		shared_ptr<int[10]> fifteenth(make_shared<int[10]>(1, 2, 3, 4, 5, 6, 7, 8, 9, 10));
+
+		shared_ptr<int> sixteenth(new int, alloc);
 
 		shared_ptr<int> nulla(nullptr, std::uint8_t(5));
 		raw_ptr<int> nullb(nullptr, 10);

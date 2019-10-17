@@ -30,6 +30,10 @@ class callable_base;
 class alignas(log2align(Callable_Max_Size_No_Heap_Alloc)) job_impl
 {
 public:
+
+	template <class Callable, std::enable_if_t<!(Callable_Max_Size_No_Heap_Alloc < sizeof(Callable))>* = nullptr>
+	job_impl(Callable& arg);
+
 	template <class Callable, std::enable_if_t<!(Callable_Max_Size_No_Heap_Alloc < sizeof(Callable))>* = nullptr>
 	job_impl(Callable&& callable, std::uint8_t priority, allocator_type);
 	template <class Callable, std::enable_if_t<(Callable_Max_Size_No_Heap_Alloc < sizeof(Callable))>* = nullptr>
@@ -75,6 +79,10 @@ private:
 	std::atomic<bool> myFinished;
 	std::atomic<std::uint8_t> myDependencies;
 };
+template<class Callable, std::enable_if_t<!(Callable_Max_Size_No_Heap_Alloc < sizeof(Callable))>*>
+inline job_impl::job_impl(Callable& arg)
+{
+}
 template<class Callable, std::enable_if_t<(Callable_Max_Size_No_Heap_Alloc < sizeof(Callable))>*>
 inline job_impl::job_impl(Callable && callable, std::uint8_t priority, allocator_type alloc)
 	: myStorage{}
@@ -89,7 +97,7 @@ inline job_impl::job_impl(Callable && callable, std::uint8_t priority, allocator
 
 	myAllocatedFields.myAllocator = alloc;
 
-	if (16 < align) {
+	if (16 < alignof(Callable)) {
 		myAllocatedFields.myAllocated = sizeof(Callable) + alignof(Callable);
 	}
 	else {
@@ -99,12 +107,12 @@ inline job_impl::job_impl(Callable && callable, std::uint8_t priority, allocator
 
 	const std::uintptr_t callableBeginAsInt(reinterpret_cast<std::uintptr_t>(myCallableBegin));
 	const std::uintptr_t mod(callableBeginAsInt % alignof(Callable));
-	const std::size_t offset(mod ? align - mod : 0);
+	const std::size_t offset(mod ? alignof(Callable) - mod : 0);
 
 	new (myAllocatedFields.myCallableBegin + offset) Callable(std::forward<Callable&&>(callable));
 }
 
-template<class Callable, std::enable_if_t<(Callable_Max_Size_No_Heap_Alloc < sizeof(Callable))>*>
+template<class Callable, std::enable_if_t<!(Callable_Max_Size_No_Heap_Alloc < sizeof(Callable))>*>
 inline job_impl::job_impl(Callable && callable, std::uint8_t priority, allocator_type)
 	: myStorage{}
 	, myCallable(nullptr)

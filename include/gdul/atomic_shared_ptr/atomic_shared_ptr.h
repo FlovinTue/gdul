@@ -851,6 +851,7 @@ template <class T, class Allocator>
 inline constexpr ptr_base<T, Allocator>::ptr_base()
 	: myPtr(nullptr)
 {
+	static_assert(std::is_same<Allocator::value_type, std::uint8_t>(), "value_type for allocator must be std::uint8_t");
 }
 template<class T, class Allocator>
 inline constexpr ptr_base<T, Allocator>::ptr_base(std::nullptr_t)
@@ -1043,6 +1044,7 @@ public:
 	inline shared_ptr(shared_ptr<T, Allocator>&& other);
 
 	inline explicit shared_ptr(T* object);
+	inline explicit shared_ptr(T* object, Allocator& allocator);
 	template <class Deleter>
 	inline explicit shared_ptr(T* object, Deleter&& deleter);
 	template <class Deleter>
@@ -1063,7 +1065,6 @@ public:
 
 	// The amount of memory requested from the allocator when taking 
 	// ownership of an object using a custom deleter
-
 	template <class Deleter>
 	static constexpr std::size_t alloc_size_claim_custom_delete();
 
@@ -1108,6 +1109,13 @@ inline shared_ptr<T, Allocator>::shared_ptr(T * object)
 {
 	Allocator alloc;
 	this->myControlBlockStorage = create_control_block(object, alloc);
+	this->myPtr = this->to_object(this->myControlBlockStorage);
+}
+template <class T, class Allocator>
+inline shared_ptr<T, Allocator>::shared_ptr(T * object, Allocator& allocator)
+	: shared_ptr<T, Allocator>()
+{
+	this->myControlBlockStorage = create_control_block(object, allocator);
 	this->myPtr = this->to_object(this->myControlBlockStorage);
 }
 // The Deleter callable has signature void(T* obj, Allocator& alloc)

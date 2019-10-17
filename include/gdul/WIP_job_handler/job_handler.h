@@ -27,7 +27,7 @@
 #include <gdul\WIP_job_handler\job.h>
 #include <gdul\concurrent_object_pool\concurrent_object_pool.h>
 #include <gdul\WIP_job_handler\job_handler_commons.h>
-#include <gdul\WIP_job_handler\job.h>
+#include <gdul\WIP_job_handler\job_impl.h>
 
 namespace gdul {
 
@@ -101,7 +101,7 @@ private:
 
 	job_handler_detail::allocator_type myMainAllocator;
 
-	concurrent_queue<job_handler_detail::job_impl_shared_ptr, job_handler_detail::allocator_type> myJobQueues[job_handler_detail::Priority_Granularity];
+	concurrent_queue<job_handler_detail::job_impl_shared_ptr, typename job_handler_detail::allocator_type> myJobQueues[job_handler_detail::Priority_Granularity];
 	concurrent_object_pool<job_handler_detail::job_impl_chunk_rep, job_handler_detail::allocator_type> myJobImplChunkPool;
 
 	job_handler_detail::job_impl_allocator<uint8_t> myJobImplAllocator;
