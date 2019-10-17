@@ -20,7 +20,7 @@
 
 #pragma once
 
-#include <gdul\WIP_job_handler\job_handler_commons.h>
+#include <gdul\WIP_job_handler\job_impl.h>
 
 namespace gdul {
 
@@ -33,6 +33,8 @@ class job_impl;
 class job
 {
 public:
+	using job_impl_shared_ptr = job_handler_detail::job_impl::job_impl_shared_ptr;
+
 	job(job&& other);
 	job& operator=(job&& other);
 
@@ -49,9 +51,9 @@ public:
 private:
 	friend class job_handler;
 
-	job(job_handler_detail::job_impl_shared_ptr impl);
+	job(job_impl_shared_ptr impl);
 
-	job_handler_detail::job_impl_shared_ptr myImpl;
+	job_impl_shared_ptr myImpl;
 	std::atomic_flag myEnabled;
 };
 }

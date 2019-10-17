@@ -22,8 +22,6 @@
 
 #include <thread>
 #include <cstdint>
-#include <gdul\atomic_shared_ptr\atomic_shared_ptr.h>
-#include <gdul\WIP_job_handler\job_impl.h>
 
 
 namespace gdul
@@ -32,16 +30,12 @@ namespace job_handler_detail
 {
 // The number of internal job queues. 
 constexpr std::uint8_t Priority_Granularity = 3;
+
 constexpr std::uint8_t Default_Job_Priority = 0;
 constexpr std::uint8_t Job_Max_Dependencies = 127;
-constexpr std::size_t Callable_Max_Size_No_Heap_Alloc = 24;
-
+constexpr std::uint8_t Callable_Max_Size_No_Heap_Alloc = 24;
 
 using allocator_type = std::allocator<uint8_t>;
-//typedef shared_ptr<job_impl, job_impl_allocator<std::uint8_t>> job_impl_shared_ptr;
-//typedef atomic_shared_ptr<job_impl, job_impl_allocator<uint8_t>> job_impl_atomic_shared_ptr;
-//typedef raw_ptr<job_impl, job_impl_allocator<uint8_t>> job_impl_raw_ptr;
-
 
 constexpr std::size_t pow2(std::size_t n)
 {
@@ -76,8 +70,6 @@ constexpr std::size_t log2align(std::size_t value)
 
 	return std::size_t(1) << sum;
 }
-
-
 
 void set_thread_name(const char* name);
 

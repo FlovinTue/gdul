@@ -3,7 +3,7 @@
 
 #include <iostream>
 #include <atomic>
-#include <gdul\WIP_job_handler\job_impl.h>
+#include <gdul\WIP_job_handler\job_handler.h>
 #include <mutex>
 
 std::atomic_flag spinFlag;
@@ -42,9 +42,16 @@ void Sequential(std::uint32_t aIndex)
 
 int main()
 {
-	std::allocator<uint8_t> blaha;
+	std::allocator<uint8_t> alloc;
 
-	gdul::job_handler_detail::job_impl blah([]() {}, 0, blaha);
+	gdul::job_handler handler(alloc);
+
+	handler.Init();
+
+	gdul::job job(handler.make_job([]() {std::cout << "did something" << std::endl; }, 0));
+
+	job.enable();
+
 
 	//using namespace gdul;
 	//

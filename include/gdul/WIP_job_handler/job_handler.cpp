@@ -21,10 +21,17 @@ thread_local std::size_t job_handler::ourPriorityDistributionIteration(0);
 thread_local size_t job_handler::ourLastJobSequence(0);
 
 job_handler::job_handler()
-	//: myJobImplChunkPool(128, myMainAllocator)
-	//, myJobImplAllocator(&myJobImplChunkPool)
-	//, myIdleJob(make_shared<job_handler_detail::job_impl, job_handler_detail::job_impl_allocator<uint8_t>>(myJobImplAllocator, [this]() {idle(); }))
-	: myIsRunning(false)
+	: myJobImplChunkPool(128, myMainAllocator)
+	, myJobImplAllocator(&myJobImplChunkPool)
+	, myIsRunning(false)
+{
+}
+
+job_handler::job_handler(allocator_type & allocator)
+	: myMainAllocator(allocator)
+	, myJobImplChunkPool(128, myMainAllocator)
+	, myJobImplAllocator(&myJobImplChunkPool)
+	, myIsRunning(false)
 {
 }
 
@@ -38,7 +45,7 @@ void job_handler::Init(const job_handler_info & info)
 {
 	myInitInfo = info;
 	
-	myIsRunning = true;
+	myIsRunning.store(true, std::memory_order_relaxed);
 
 	for (std::uint32_t i = 0; i < info.myMaxWorkers; ++i) {
 		myWorkers[i] = (std::thread([this, i]() { launch_worker(i); }));
@@ -47,7 +54,7 @@ void job_handler::Init(const job_handler_info & info)
 
 void job_handler::reset()
 {
-	myIsRunning = false;
+	myIsRunning.store(false, std::memory_order_relaxed);
 
 	for (size_t i = 0; i < myInitInfo.myMaxWorkers; ++i) {
 		myWorkers[i].join();
@@ -66,12 +73,12 @@ void job_handler::abort()
 	myIsRunning.store(false, std::memory_order_relaxed);
 }
 
-//void job_handler::enqueue_job(job_handler_detail::job_impl_shared_ptr job)
-//{
-//	const std::uint8_t priority(job->get_priority());
-//
-//	myJobQueues[priority].push(std::move(job));
-//}
+void job_handler::enqueue_job(job_impl_shared_ptr job)
+{
+	const std::uint8_t priority(job->get_priority());
+
+	myJobQueues[priority].push(std::move(job));
+}
 
 void job_handler::launch_worker(std::uint32_t workerIndex)
 {
@@ -91,9 +98,15 @@ void job_handler::launch_worker(std::uint32_t workerIndex)
 }
 void job_handler::work()
 {
-	while (myIsRunning) {
-		//job_handler_detail::job_impl* const job(fetch_job());
-		//(*job)();
+	while (myIsRunning.load(std::memory_order_relaxed)) {
+		job_impl_shared_ptr job(fetch_job());
+
+		if (job) {
+			(*job)();
+		}
+		else {
+			idle();
+		}
 	}
 }
 void job_handler::idle()
@@ -110,21 +123,23 @@ void job_handler::idle()
 		std::this_thread::sleep_for(std::chrono::microseconds(10));
 	}
 }
-//job_handler_detail::job_impl_shared_ptr job_handler::fetch_job()
-//{
-//	uint8_t queueIndex(generate_priority_index());
-//	job_handler_detail::job_impl_shared_ptr returnValue(myIdleJob);
-//
-//	for (uint8_t i = 0; i < job_handler_detail::Priority_Granularity; ++i) {
-//
-//		const uint8_t index((queueIndex + i) % job_handler_detail::Priority_Granularity);
-//
-//		if (myJobQueues[index].try_pop(returnValue)) {
-//			break;
-//		}
-//	}
-//	return std::move(returnValue);
-//}
+job_handler::job_impl_shared_ptr job_handler::fetch_job()
+{
+	uint8_t queueIndex(generate_priority_index());
+
+	job_handler::job_impl_shared_ptr out(nullptr);
+
+	for (uint8_t i = 0; i < job_handler_detail::Priority_Granularity; ++i) {
+
+		const uint8_t index((queueIndex + i) % job_handler_detail::Priority_Granularity);
+
+		if (myJobQueues[index].try_pop(out)) {
+			return out;
+		}
+	}
+
+	return out;
+}
 
 uint8_t job_handler::generate_priority_index()
 {

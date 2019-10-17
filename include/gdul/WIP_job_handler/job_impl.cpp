@@ -18,7 +18,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include "job_impl.h"
+#include <gdul\WIP_job_handler\job_impl.h>
+#include <gdul\WIP_job_handler\job_handler.h>
 
 namespace gdul
 {
@@ -76,7 +77,7 @@ void job_impl::remove_dependencies(std::uint8_t n)
 {
 	std::uint8_t result(myDependencies.fetch_sub(n, std::memory_order_acq_rel));
 	if (!(result - n)) {
-		//myHandler->enqueue_job(*this);
+		myHandler->enqueue_job(*this);
 	}
 }
 void job_impl::enable()
@@ -106,5 +107,6 @@ void job_impl::enqueue_siblings()
 		sibling->remove_dependencies(1);
 	}
 }
+
 }
 }

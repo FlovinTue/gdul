@@ -27,15 +27,8 @@ namespace gdul
 {
 namespace job_handler_detail
 {
-constexpr std::size_t Job_Impl_Chunk_Size(shared_ptr<gdul::job_handler_detail::job_impl, allocator_type>::alloc_size_make_shared());
-
-struct alignas(log2align(Callable_Max_Size_No_Heap_Alloc)) job_impl_chunk_rep { 
-	operator uint8_t*()
-	{
-		return reinterpret_cast<uint8_t*>(this);
-	}
-	uint8_t dummy[64]; 
-};
+// Defined in job_impl.h
+struct alignas(log2align(Callable_Max_Size_No_Heap_Alloc)) job_impl_chunk_rep;
 
 template <class Dummy>
 class job_impl_allocator
@@ -63,12 +56,12 @@ inline job_impl_allocator<Dummy>::job_impl_allocator(concurrent_object_pool<job_
 template<class Dummy>
 inline uint8_t * job_impl_allocator<Dummy>::allocate(std::size_t)
 {
-	return myChunkSrc->get_object();
+	return reinterpret_cast<uint8_t*>(myChunkSrc->get_object());
 }
 template<class Dummy>
 inline void job_impl_allocator<Dummy>::deallocate(uint8_t * block, std::size_t)
 {
-	myChunkSrc->recycle_object(block);
+	myChunkSrc->recycle_object(reinterpret_cast<job_impl_chunk_rep*>(block));
 }
 }
 }
