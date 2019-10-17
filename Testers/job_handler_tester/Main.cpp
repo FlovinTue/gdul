@@ -2,18 +2,19 @@
 //
 
 #include <iostream>
-#include <gdul\WIP_job_handler\job_handler.h>
+#include <atomic>
+#include <gdul\WIP_job_handler\job_impl.h>
 #include <mutex>
 
 std::atomic_flag spinFlag;
 std::mutex mtx;
 
-std::atomic<std::uint32_t> count = 0;
+std::atomic<std::uint32_t> testCounter = 0;
 
 void Parallel(std::uint32_t aIndex)
 {
 	aIndex;
-	//if (count.load() != aIndex) {
+	//if (testCounter.load() != aIndex) {
 	//	bool test = true; test;
 	//}
 	//while (spinFlag.test_and_set()) std::this_thread::yield();
@@ -26,7 +27,7 @@ void Parallel(std::uint32_t aIndex)
 void Sequential(std::uint32_t aIndex)
 {
 	//while (spinFlag.test_and_set()) std::this_thread::yield();
-	if (++count != aIndex) {
+	if (++testCounter != aIndex) {
 		bool test = true; test;
 	}
 	//mtx.lock();
@@ -41,6 +42,9 @@ void Sequential(std::uint32_t aIndex)
 
 int main()
 {
+	std::allocator<uint8_t> blaha;
+
+	gdul::job_handler_detail::job_impl blah([]() {}, 0, blaha);
 
 	//using namespace gdul;
 	//

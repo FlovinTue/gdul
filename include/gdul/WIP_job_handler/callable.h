@@ -20,17 +20,18 @@
 
 #pragma once
 
+#include <gdul\WIP_job_handler\callable_base.h>
 
 namespace gdul {
 namespace job_handler_detail {
 
 template <class Callable>
-class callable
+class callable : public callable_base
 {
 public:
 	callable(Callable&& callable);
 
-	void operator()();
+	void operator()() override;
 
 private:
 	Callable myCallable;

@@ -41,7 +41,7 @@ void job::add_dependency(job & dependency)
 }
 void job::enable()
 {
-	if (!myEnabled.test_and_set(std::memory_order_relaxed)) {
+	if (myEnabled.test_and_set(std::memory_order_relaxed)) {
 		return;
 	}
 

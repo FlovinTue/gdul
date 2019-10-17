@@ -1,8 +1,8 @@
 
 
 #include <gdul\WIP_job_handler\job_handler.h>
-#include <gdul\WIP_job_handler\job_impl.h>
-#include <gdul\WIP_job_handler\job_impl_allocator.h>
+//#include <gdul\WIP_job_handler\job_impl.h>
+//#include <gdul\WIP_job_handler\job_impl_allocator.h>
 #include <string>
 
 #define WIN32_LEAN_AND_MEAN
@@ -21,10 +21,10 @@ thread_local std::size_t job_handler::ourPriorityDistributionIteration(0);
 thread_local size_t job_handler::ourLastJobSequence(0);
 
 job_handler::job_handler()
-	: myJobImplChunkPool(128, myMainAllocator)
-	, myJobImplAllocator(&myJobImplChunkPool)
-	, myIdleJob(make_shared<job_handler_detail::job_impl, job_handler_detail::job_impl_allocator<uint8_t>>(myJobImplAllocator, [this]() {idle(); }))
-	, myIsRunning(false)
+	//: myJobImplChunkPool(128, myMainAllocator)
+	//, myJobImplAllocator(&myJobImplChunkPool)
+	//, myIdleJob(make_shared<job_handler_detail::job_impl, job_handler_detail::job_impl_allocator<uint8_t>>(myJobImplAllocator, [this]() {idle(); }))
+	: myIsRunning(false)
 {
 }
 
@@ -40,10 +40,8 @@ void job_handler::Init(const job_handler_info & info)
 	
 	myIsRunning = true;
 
-	myWorkers.reserve(myInitInfo.myMaxWorkers);
-
 	for (std::uint32_t i = 0; i < info.myMaxWorkers; ++i) {
-		myWorkers.push_back(std::thread([this, i]() { launch_worker(i); }));
+		myWorkers[i] = (std::thread([this, i]() { launch_worker(i); }));
 	}
 }
 
@@ -51,12 +49,9 @@ void job_handler::reset()
 {
 	myIsRunning = false;
 
-	for (size_t i = 0; i < myWorkers.size(); ++i) {
+	for (size_t i = 0; i < myInitInfo.myMaxWorkers; ++i) {
 		myWorkers[i].join();
 	}
-
-	myWorkers.clear();
-	myWorkers.shrink_to_fit();
 
 	myInitInfo = job_handler_info();
 }
@@ -71,12 +66,12 @@ void job_handler::abort()
 	myIsRunning.store(false, std::memory_order_relaxed);
 }
 
-void job_handler::enqueue_job(job_handler_detail::job_impl_shared_ptr job)
-{
-	const std::uint8_t priority(job->get_priority());
-
-	myJobQueues[priority].push(std::move(job));
-}
+//void job_handler::enqueue_job(job_handler_detail::job_impl_shared_ptr job)
+//{
+//	const std::uint8_t priority(job->get_priority());
+//
+//	myJobQueues[priority].push(std::move(job));
+//}
 
 void job_handler::launch_worker(std::uint32_t workerIndex)
 {
@@ -97,8 +92,8 @@ void job_handler::launch_worker(std::uint32_t workerIndex)
 void job_handler::work()
 {
 	while (myIsRunning) {
-		job_handler_detail::job_impl* const job(fetch_job());
-		(*job)();
+		//job_handler_detail::job_impl* const job(fetch_job());
+		//(*job)();
 	}
 }
 void job_handler::idle()
@@ -115,21 +110,21 @@ void job_handler::idle()
 		std::this_thread::sleep_for(std::chrono::microseconds(10));
 	}
 }
-job_handler_detail::job_impl_shared_ptr job_handler::fetch_job()
-{
-	uint8_t queueIndex(generate_priority_index());
-	job_handler_detail::job_impl_shared_ptr returnValue(myIdleJob);
-
-	for (uint8_t i = 0; i < job_handler_detail::Priority_Granularity; ++i) {
-
-		const uint8_t index((queueIndex + i) % job_handler_detail::Priority_Granularity);
-
-		if (myJobQueues[index].try_pop(returnValue)) {
-			break;
-		}
-	}
-	return std::move(returnValue);
-}
+//job_handler_detail::job_impl_shared_ptr job_handler::fetch_job()
+//{
+//	uint8_t queueIndex(generate_priority_index());
+//	job_handler_detail::job_impl_shared_ptr returnValue(myIdleJob);
+//
+//	for (uint8_t i = 0; i < job_handler_detail::Priority_Granularity; ++i) {
+//
+//		const uint8_t index((queueIndex + i) % job_handler_detail::Priority_Granularity);
+//
+//		if (myJobQueues[index].try_pop(returnValue)) {
+//			break;
+//		}
+//	}
+//	return std::move(returnValue);
+//}
 
 uint8_t job_handler::generate_priority_index()
 {
@@ -140,7 +135,9 @@ uint8_t job_handler::generate_priority_index()
 	uint8_t index(0);
 
 	for (uint8_t i = 1; i < job_handler_detail::Priority_Granularity; ++i) {
-		const std::size_t desiredSlice(std::pow(2, (job_handler_detail::Priority_Granularity)-(i + 1)));
+		const std::uint8_t power(((job_handler_detail::Priority_Granularity) - (i + 1)));
+		const float fdesiredSlice(std::powf((float)2, (float)power));
+		const std::size_t desiredSlice((std::size_t)fdesiredSlice);
 		const std::size_t awardedSlice((totalDistributionChunks) / desiredSlice);
 		const uint8_t prev(index);
 		const uint8_t eval(iteration % awardedSlice == 0);

@@ -19,7 +19,6 @@
 // SOFTWARE.
 
 #include "job_impl.h"
-#include <gdul\WIP_job_handler\callable_base.h>
 
 namespace gdul
 {
@@ -32,7 +31,7 @@ job_impl::~job_impl()
 	myCallable->~callable_base();
 
 	if ((void*)myCallable != (void*)&myStorage[0]) {
-		myAllocatedFields.myAllocator.deallocate(myAllocatedFields.myCallableBegin, myAllocatedFields.myAllocated);
+		myAllocFields.myAllocator.deallocate(myAllocFields.myCallableBegin, myAllocFields.myAllocated);
 	}
 
 	std::uninitialized_fill_n(myStorage, Callable_Max_Size_No_Heap_Alloc, 0);
@@ -77,7 +76,7 @@ void job_impl::remove_dependencies(std::uint8_t n)
 {
 	std::uint8_t result(myDependencies.fetch_sub(n, std::memory_order_acq_rel));
 	if (!(result - n)) {
-		myHandler->enqueue_job(*this);
+		//myHandler->enqueue_job(*this);
 	}
 }
 void job_impl::enable()

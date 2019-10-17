@@ -21,18 +21,23 @@
 #pragma once
 
 #include <gdul\WIP_job_handler\job_handler_commons.h>
-#include <gdul\WIP_job_handler\job_handler.h>
+#include <gdul\WIP_job_handler\callable.h>
+#include <gdul\WIP_job_handler\job_impl_allocator.h>
 
 namespace gdul{
+
+class job_handler;
 namespace job_handler_detail {
 
 class callable_base;
 class alignas(log2align(Callable_Max_Size_No_Heap_Alloc)) job_impl
 {
 public:
+	using job_impl_shared_ptr = shared_ptr<job_impl, job_impl_allocator<std::uint8_t>>;
+	using job_impl_atomic_shared_ptr = atomic_shared_ptr<job_impl, job_impl_allocator<std::uint8_t>>;
+	using job_impl_raw_ptr = raw_ptr<job_impl, job_impl_allocator<std::uint8_t>>;
 
-	template <class Callable, std::enable_if_t<!(Callable_Max_Size_No_Heap_Alloc < sizeof(Callable))>* = nullptr>
-	job_impl(Callable& arg);
+	job_impl() = default;
 
 	template <class Callable, std::enable_if_t<!(Callable_Max_Size_No_Heap_Alloc < sizeof(Callable))>* = nullptr>
 	job_impl(Callable&& callable, std::uint8_t priority, allocator_type);
@@ -65,7 +70,7 @@ private:
 			allocator_type myAllocator;
 			std::uint8_t* myCallableBegin;
 			std::size_t myAllocated;
-		}myAllocatedFields;
+		}myAllocFields;
 	};
 
 	callable_base* myCallable;
@@ -79,10 +84,6 @@ private:
 	std::atomic<bool> myFinished;
 	std::atomic<std::uint8_t> myDependencies;
 };
-template<class Callable, std::enable_if_t<!(Callable_Max_Size_No_Heap_Alloc < sizeof(Callable))>*>
-inline job_impl::job_impl(Callable& arg)
-{
-}
 template<class Callable, std::enable_if_t<(Callable_Max_Size_No_Heap_Alloc < sizeof(Callable))>*>
 inline job_impl::job_impl(Callable && callable, std::uint8_t priority, allocator_type alloc)
 	: myStorage{}
@@ -93,23 +94,23 @@ inline job_impl::job_impl(Callable && callable, std::uint8_t priority, allocator
 	, myPriority(priority)
 	, myDependencies(Job_Max_Dependencies)
 {
-	static_assert(!(Callable_Max_Size_No_Heap_Alloc < sizeof(myAllocatedFields)), "too high size / alignment on allocator_type");
+	static_assert(!(Callable_Max_Size_No_Heap_Alloc < sizeof(myAllocFields)), "too high size / alignment on allocator_type");
 
-	myAllocatedFields.myAllocator = alloc;
+	myAllocFields.myAllocator = alloc;
 
 	if (16 < alignof(Callable)) {
-		myAllocatedFields.myAllocated = sizeof(Callable) + alignof(Callable);
+		myAllocFields.myAllocated = sizeof(Callable) + alignof(Callable);
 	}
 	else {
-		myAllocatedFields.myAllocated = sizeof(Callable);
+		myAllocFields.myAllocated = sizeof(Callable);
 	}
-	myAllocatedFields.myCallableBegin = myAllocatedFields.myAllocator.allocate(myAllocatedFields.myAllocated);
+	myAllocFields.myCallableBegin = myAllocFields.myAllocator.allocate(myAllocFields.myAllocated);
 
-	const std::uintptr_t callableBeginAsInt(reinterpret_cast<std::uintptr_t>(myCallableBegin));
+	const std::uintptr_t callableBeginAsInt(reinterpret_cast<std::uintptr_t>(myAllocFields.myCallableBegin));
 	const std::uintptr_t mod(callableBeginAsInt % alignof(Callable));
 	const std::size_t offset(mod ? alignof(Callable) - mod : 0);
 
-	new (myAllocatedFields.myCallableBegin + offset) Callable(std::forward<Callable&&>(callable));
+	myCallable = new (myAllocFields.myCallableBegin + offset) gdul::job_handler_detail::callable(std::forward<Callable&&>(callable));
 }
 
 template<class Callable, std::enable_if_t<!(Callable_Max_Size_No_Heap_Alloc < sizeof(Callable))>*>
@@ -122,7 +123,7 @@ inline job_impl::job_impl(Callable && callable, std::uint8_t priority, allocator
 	, myPriority(priority)
 	, myDependencies(Job_Max_Dependencies)
 {
-	new (&myStorage[0]) Callable(std::forward<Callable&&>(callable));
+	myCallable = new (&myStorage[0]) gdul::job_handler_detail::callable(std::forward<Callable&&>(callable));
 }
 }
 }

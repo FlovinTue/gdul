@@ -20,33 +20,42 @@
 
 #pragma once
 
+#include <gdul\concurrent_object_pool\concurrent_object_pool.h>
 #include <gdul\WIP_job_handler\job_handler_commons.h>
-#include <gdul\WIP_job_handler\job_handler.h>
-#include <gdul\WIP_job_handler\job_impl.h>
 
 namespace gdul
 {
 namespace job_handler_detail
 {
+constexpr std::size_t Job_Impl_Chunk_Size(shared_ptr<gdul::job_handler_detail::job_impl, allocator_type>::alloc_size_make_shared());
 
+struct alignas(log2align(Callable_Max_Size_No_Heap_Alloc)) job_impl_chunk_rep { 
+	operator uint8_t*()
+	{
+		return reinterpret_cast<uint8_t*>(this);
+	}
+	uint8_t dummy[64]; 
+};
 
 template <class Dummy>
 class job_impl_allocator
 {
 public:
-	using value_type = uint8_t;
+	using value_type = std::uint8_t;
+	using allocator_type = job_handler_detail::allocator_type;
 
-	job_impl_allocator(concurrent_object_pool<typename job_impl_chunk_rep, typename allocator_type>* chunkSrc);
+
+	job_impl_allocator(concurrent_object_pool<job_impl_chunk_rep, allocator_type>* chunkSrc);
 
 	uint8_t* allocate(std::size_t);
 	void deallocate(uint8_t* block, std::size_t);
 
 private:
-	concurrent_object_pool<typename job_impl_chunk_rep, typename allocator_type>* myChunkSrc;
+	concurrent_object_pool<job_impl_chunk_rep, allocator_type>* myChunkSrc;
 };
 
 template<class Dummy>
-inline job_impl_allocator<Dummy>::job_impl_allocator(concurrent_object_pool<typename job_impl_chunk_rep, typename allocator_type>* chunkSrc)
+inline job_impl_allocator<Dummy>::job_impl_allocator(concurrent_object_pool<job_impl_chunk_rep, allocator_type>* chunkSrc)
 	: myChunkSrc(chunkSrc)
 {
 }
