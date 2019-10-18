@@ -75,8 +75,11 @@ class ptr_base;
 enum STORAGE_BYTE : std::uint8_t;
 enum CAS_FLAG : std::uint8_t;
 
-static constexpr std::uint8_t CopyRequestIndex(7);
-static constexpr std::uint64_t Copy_Request_Step(1ULL << (CopyRequestIndex * 8));
+static constexpr std::uint8_t Copy_Request_Index(7);
+static constexpr std::uint64_t Copy_Request_Step(1ULL << (Copy_Request_Index * 8));
+
+// Batching concept inspired by the folly library implementation of AtomicSharedPtr
+static constexpr std::uint8_t Copy_Request_Accumulation(std::numeric_limits<uint8_t>::max() / 2);
 }
 template <class T, class Allocator = aspdetail::default_allocator>
 class shared_ptr;
@@ -173,6 +176,8 @@ private:
 	inline bool cas_internal(compressed_storage& expected, compressed_storage desired, aspdetail::CAS_FLAG flags) noexcept;
 
 	inline void try_help_increment(compressed_storage expected) noexcept;
+
+	inline bool copy_request_accumulation_check(compressed_storage expected) const noexcept;
 
 	inline constexpr aspdetail::control_block_base<T, Allocator>* to_control_block(compressed_storage from) const noexcept;
 
@@ -468,6 +473,10 @@ inline bool atomic_shared_ptr<T, Allocator>::try_help_increment_and_try_swap(com
 template<class T, class Allocator>
 inline void atomic_shared_ptr<T, Allocator>::try_help_increment(compressed_storage expected) noexcept
 {
+	if (!copy_request_accumulation_check(expected)) {
+		return;
+	}
+
 	const compressed_storage initialPtrBlock(expected.myU64 & aspdetail::Versioned_Ptr_Mask);
 
 	aspdetail::control_block_base<T, Allocator>* const controlBlock(to_control_block(expected));
@@ -492,6 +501,11 @@ inline void atomic_shared_ptr<T, Allocator>::try_help_increment(compressed_stora
 	} while (
 		(expected_.myU64 & aspdetail::Versioned_Ptr_Mask) == initialPtrBlock.myU64 &&
 		expected_.myU8[aspdetail::STORAGE_BYTE_COPYREQUEST]);
+}
+template<class T, class Allocator>
+inline bool atomic_shared_ptr<T, Allocator>::copy_request_accumulation_check(compressed_storage expected) const noexcept
+{
+	return !(expected.myU8[aspdetail::STORAGE_BYTE_COPYREQUEST] < aspdetail::Copy_Request_Accumulation);
 }
 template<class T, class Allocator>
 inline constexpr aspdetail::control_block_base<T, Allocator>* atomic_shared_ptr<T, Allocator>::to_control_block(compressed_storage from) const noexcept
@@ -778,7 +792,7 @@ struct disable_deduction
 enum STORAGE_BYTE : std::uint8_t
 {
 	STORAGE_BYTE_VERSION = 6,
-	STORAGE_BYTE_COPYREQUEST = CopyRequestIndex,
+	STORAGE_BYTE_COPYREQUEST = Copy_Request_Index,
 };
 enum CAS_FLAG : std::uint8_t
 {

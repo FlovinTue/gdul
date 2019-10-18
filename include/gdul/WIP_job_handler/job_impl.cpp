@@ -33,6 +33,7 @@ job_impl::~job_impl()
 
 	if ((void*)myCallable != (void*)&myStorage[0]) {
 		myAllocFields.myAllocator.deallocate(myAllocFields.myCallableBegin, myAllocFields.myAllocated);
+		myAllocFields.myAllocator.~allocator_type();
 	}
 
 	std::uninitialized_fill_n(myStorage, Callable_Max_Size_No_Heap_Alloc, std::uint8_t(0));
