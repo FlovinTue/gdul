@@ -66,6 +66,8 @@ public:
 	using allocator_type = job_handler_detail::allocator_type;
 	using job_impl_shared_ptr = job_handler_detail::job_impl::job_impl_shared_ptr;
 
+	static thread_local job this_job;
+
 	job_handler();
 	job_handler(allocator_type& allocator);
 	~job_handler();
@@ -73,12 +75,17 @@ public:
 	void Init(const job_handler_info& info = job_handler_info());
  	void reset();
 
+	// Callable will allocate if size is above job_handler_detail::Callable_Max_Size_No_Heap_Alloc
+	// It needs to have operator() defined with signature void(void). 
+	// Priority corresponds to the internal queue it will be placed in. Priority 0 -> highest. 
+	// job_handler_detail::Priority_Granularity defines the number of queueus
 	template <class Callable>
 	job make_job(Callable&& callable, std::uint8_t priority);
+
+	// Callable will allocate if size is above job_handler_detail::Callable_Max_Size_No_Heap_Alloc
+	// It needs to have operator() defined with signature void(void). 
 	template <class Callable>
 	job make_job(Callable&& callable);
-
-	static thread_local job this_job;
 
 private:
 	friend class job_handler_detail::job_impl;
@@ -97,6 +104,8 @@ private:
 
 	job_impl_shared_ptr fetch_job();
 
+	// The distribution of queue consumption is meant to happen in a log2 fashion.
+	// The next queue down gets consumed from half as much...
 	std::uint8_t generate_priority_index();
 
 	static thread_local std::chrono::high_resolution_clock ourSleepTimer;

@@ -190,11 +190,11 @@ inline void Tester<T, ArraySize, NumThreads>::WorkAssign(std::uint32_t aArrayPas
 
 	for (std::uint32_t pass = 0; pass < aArrayPasses; ++pass) {
 		for (std::uint32_t i = 0; i < ArraySize; ++i) {
-			myTestArray[i] = 
+			myTestArray[i].store(
 #ifdef ASP_MUTEX_COMPARE
 				std::
 #endif
-				make_shared<T>();
+				make_shared<T>(), std::memory_order_relaxed);
 		}
 	}
 }
@@ -209,7 +209,7 @@ inline void Tester<T, ArraySize, NumThreads>::WorkReassign(std::uint32_t aArrayP
 	for (std::uint32_t pass = 0; pass < aArrayPasses; ++pass) {
 		for (std::uint32_t i = 0; i < ArraySize; ++i) {
 #ifndef CSP_MUTEX_COMPARE
-			myTestArray[i] = myTestArray[(i + myRng()) % ArraySize].load();
+			myTestArray[i].store(myTestArray[(i + myRng()) % ArraySize].load(std::memory_order_relaxed), std::memory_order_relaxed);
 #else
 			myTestArray[i] = myTestArray[(i + myRng()) % ArraySize];
 #endif
@@ -254,19 +254,19 @@ inline void Tester<T, ArraySize, NumThreads>::WorkCAS(std::uint32_t aArrayPasses
 
 #ifndef ASP_MUTEX_COMPARE
 			shared_ptr<T> desired(make_shared<T>());
-			shared_ptr<T> expected(myTestArray[i].load());
+			shared_ptr<T> expected(myTestArray[i].load(std::memory_order_relaxed));
 			raw_ptr<T> check(expected);
-			const bool resulta = myTestArray[i].compare_exchange_strong(expected, std::move(desired));
+			const bool resulta = myTestArray[i].compare_exchange_strong(expected, std::move(desired), std::memory_order_relaxed);
 
 			if (!(resulta == (expected == check))) {
 				throw std::runtime_error("output from expected do not correspond to CAS results");
 			}
 
 			shared_ptr<T> desired_(make_shared<T>());
-			shared_ptr<T> expected_(myTestArray[i].load());
+			shared_ptr<T> expected_(myTestArray[i].load(std::memory_order_relaxed));
 			raw_ptr<T> rawExpected(expected_);
 			raw_ptr<T> check_(expected_);
-			const bool resultb = myTestArray[i].compare_exchange_strong(rawExpected, std::move(desired_));
+			const bool resultb = myTestArray[i].compare_exchange_strong(rawExpected, std::move(desired_), std::memory_order_relaxed);
 
 			if (!(resultb == (rawExpected == check_))) {
 				throw std::runtime_error("output from expected do not correspond to CAS results");

@@ -1,8 +1,6 @@
 
 
 #include <gdul\WIP_job_handler\job_handler.h>
-//#include <gdul\WIP_job_handler\job_impl.h>
-//#include <gdul\WIP_job_handler\job_impl_allocator.h>
 #include <string>
 
 #define WIN32_LEAN_AND_MEAN
@@ -21,7 +19,7 @@ thread_local std::size_t job_handler::ourPriorityDistributionIteration(0);
 thread_local size_t job_handler::ourLastJobSequence(0);
 
 job_handler::job_handler()
-	: myJobImplChunkPool(512, myMainAllocator)
+	: myJobImplChunkPool(job_handler_detail::Job_Impl_Allocator_Block_Size, myMainAllocator)
 	, myJobImplAllocator(&myJobImplChunkPool)
 	, myIsRunning(false)
 {
@@ -138,6 +136,7 @@ job_handler::job_impl_shared_ptr job_handler::fetch_job()
 }
 
 // Maybe find some way to stick around at an index for a while? Better for cache...
+// Also, maybe avoid retrying at a failed index twice in a row.
 uint8_t job_handler::generate_priority_index()
 {
 	constexpr std::size_t totalDistributionChunks(job_handler_detail::pow2summation(1, job_handler_detail::Priority_Granularity));
@@ -146,6 +145,9 @@ uint8_t job_handler::generate_priority_index()
 
 	uint8_t index(0);
 
+
+	// Find way to remove loop.
+	// Maybe find the highest mod in one check somehow?
 	for (uint8_t i = 1; i < job_handler_detail::Priority_Granularity; ++i) {
 		const std::uint8_t power(((job_handler_detail::Priority_Granularity) - (i + 1)));
 		const float fdesiredSlice(std::powf((float)2, (float)power));

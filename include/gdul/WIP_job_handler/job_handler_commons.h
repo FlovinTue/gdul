@@ -35,6 +35,10 @@ constexpr std::uint8_t Priority_Granularity = 4;
 constexpr std::uint8_t Default_Job_Priority = 0;
 constexpr std::uint8_t Callable_Max_Size_No_Heap_Alloc = 24;
 
+// The number of job chunks that the Job_Impl block allocator will allocate
+// when empty
+constexpr std::size_t Job_Impl_Allocator_Block_Size = 128;
+
 using allocator_type = std::allocator<uint8_t>;
 
 constexpr std::size_t pow2(std::size_t n)

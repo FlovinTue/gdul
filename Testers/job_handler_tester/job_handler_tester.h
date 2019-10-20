@@ -22,8 +22,6 @@ public:
 	float run_consumption_parallel_test(std::size_t numInserts);
 	float run_construction_parallel_test(std::size_t numInserts);
 	float run_mixed_parallel_test(std::size_t numInserts);
-
-	float run_construction_strand_test(std::size_t numInserts);
 	float run_consumption_strand_test(std::size_t numInserts);
 
 	gdul::job_handler myHandler;

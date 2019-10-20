@@ -18,6 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#include <cassert>
 #include <gdul\WIP_job_handler\Job.h>
 #include <gdul\WIP_job_handler\job_handler.h>
 
@@ -37,6 +38,8 @@ job & job::operator=(job && other)
 
 void job::add_dependency(job & dependency)
 {
+	assert(myImpl && "Job not set");
+
 	if (dependency.myImpl->try_attach_child(myImpl)) {
 		myImpl->add_dependencies(1);
 	}
@@ -47,19 +50,29 @@ void job::enable()
 		return;
 	}
 
+	assert(myImpl && "Job not set");
+
 	if (myImpl->enable()) {
 		myImpl->get_handler()->enqueue_job(myImpl);
 	}
 }
-bool job::finished() const
+bool job::is_finished() const
 {
-	return myImpl->finished();
+	assert(myImpl && "Job not set");
+
+	return myImpl->is_finished();
 }
 void job::wait_for_finish()
 {
-	while (!finished()) {
+	assert(myImpl && "Job not set");
+
+	while (!is_finished()) {
 		myImpl->get_handler()->idle();
 	}
+}
+job::operator bool() const
+{
+	return myImpl;
 }
 job::job(job_impl_shared_ptr impl)
 	: myImpl(std::move(impl))

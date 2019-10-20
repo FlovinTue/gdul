@@ -76,7 +76,7 @@ void job_impl::add_dependencies(std::uint16_t n)
 }
 std::uint16_t job_impl::remove_dependencies(std::uint16_t n)
 {
-	std::uint16_t result(myDependencies.fetch_sub(n, std::memory_order_acq_rel));
+	std::uint16_t result(myDependencies.fetch_sub(n, std::memory_order_relaxed));
 	return result - n;
 }
 bool job_impl::enable()
@@ -87,7 +87,7 @@ job_handler * job_impl::get_handler() const
 {
 	return myHandler;
 }
-bool job_impl::finished() const
+bool job_impl::is_finished() const
 {
 	return myFinished.load(std::memory_order_relaxed);
 }

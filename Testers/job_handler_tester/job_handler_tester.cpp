@@ -22,9 +22,8 @@ float job_handler_tester::run_all_tests(std::size_t numInserts)
 	const float parallelConstru(run_construction_parallel_test(numInserts));
 	const float parallelMixed(run_mixed_parallel_test(numInserts));
 	const float strandConsume(run_consumption_strand_test(numInserts));
-	const float strandConstru(run_construction_strand_test(numInserts));
 
-	return parallelConsume + parallelConstru + parallelMixed + strandConstru + strandConsume;
+	return parallelConsume + parallelConstru + parallelMixed + strandConsume;
 }
 
 float job_handler_tester::run_consumption_parallel_test(std::size_t numInserts)
@@ -84,13 +83,23 @@ float job_handler_tester::run_mixed_parallel_test(std::size_t numInserts)
 	return 0.0f;
 }
 
-float job_handler_tester::run_construction_strand_test(std::size_t numInserts)
-{
-	return 0.0f;
-}
-
 float job_handler_tester::run_consumption_strand_test(std::size_t numInserts)
 {
+	numInserts;
+
+	// Reset
+	// Init ( max threads )
+
+	// Create root
+
+	// LOOP
+	// Create 1 children
+	// ------
+	// Create end
+
+	// Enable root
+	// Wait for end
+
 	return 0.0f;
 }
 

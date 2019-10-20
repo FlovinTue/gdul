@@ -47,12 +47,15 @@ public:
 	// when enable has been run, this object may be discarded
 	void enable();
 
-	bool finished() const;
+	bool is_finished() const;
+
 
 	void wait_for_finish();
 
 private:
 	friend class job_handler;
+
+	operator bool() const;
 
 	job(job_impl_shared_ptr impl);
 

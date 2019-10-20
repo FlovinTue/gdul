@@ -62,7 +62,7 @@ public:
 
 	job_handler* get_handler() const;
 
-	bool finished() const;
+	bool is_finished() const;
 private:
 	void set_sibling(job_impl_shared_ptr sibling);
 
