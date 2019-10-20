@@ -38,6 +38,16 @@ namespace gdul {
 
 namespace job_handler_detail {
 
+
+
+
+// Implement worker class
+// Contains queue affinity (static / dynamic)
+// Contains (OS) thread priority
+// Contains core affinity (automatic / manual)
+// Contains sleep threshHold
+// Also, implement this_worker
+
 class job_impl;
 }
 struct job_handler_info
