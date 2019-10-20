@@ -39,15 +39,9 @@ job_handler::~job_handler()
 	reset();
 }
 
-void job_handler::Init(const job_handler_info & info)
+void job_handler::Init()
 {
-	myInitInfo = info;
-	
 	myIsRunning.store(true, std::memory_order_relaxed);
-
-	for (std::uint32_t i = 0; i < info.myMaxWorkers; ++i) {
-		myWorkers[i] = (std::thread([this, i]() { launch_worker(i); }));
-	}
 }
 
 void job_handler::reset()
@@ -62,8 +56,6 @@ void job_handler::reset()
 			myWorkers[i].join();
 		}
 	}
-
-	myInitInfo = job_handler_info();
 }
 
 void job_handler::enqueue_job(job_impl_shared_ptr job)

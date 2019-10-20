@@ -7,6 +7,7 @@
     <ClCompile Include="..\..\include\gdul\WIP_job_handler\job_impl.cpp" />
     <ClCompile Include="..\..\include\gdul\WIP_job_handler\job_handler_commons.cpp" />
     <ClCompile Include="job_handler_tester.cpp" />
+    <ClCompile Include="..\..\include\gdul\WIP_job_handler\worker.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\job.h" />
@@ -18,5 +19,6 @@
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_handler_commons.h" />
     <ClInclude Include="..\..\include\gdul\job_handler_master.h" />
     <ClInclude Include="job_handler_tester.h" />
+    <ClInclude Include="..\..\include\gdul\WIP_job_handler\worker.h" />
   </ItemGroup>
 </Project>

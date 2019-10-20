@@ -28,11 +28,14 @@
 #include <chrono>
 #include <concurrent_vector.h>
 
-#include <gdul\WIP_job_handler\job.h>
 #include <gdul\concurrent_object_pool\concurrent_object_pool.h>
+#include <gdul\concurrent_queue\concurrent_queue.h>
+
+#include <gdul\WIP_job_handler\job.h>
 #include <gdul\WIP_job_handler\job_handler_commons.h>
 #include <gdul\WIP_job_handler\job_impl.h>
 #include <gdul\WIP_job_handler\job_impl_allocator.h>
+#include <gdul\WIP_job_handler\worker.h>
 
 namespace gdul {
 
@@ -50,25 +53,6 @@ namespace job_handler_detail {
 
 class job_impl;
 }
-struct job_handler_info
-{
-	std::uint16_t myMaxWorkers = static_cast<std::uint16_t>(std::thread::hardware_concurrency());
-
-	// Thread priority as defined in WinBase.h
-	std::uint32_t myWorkerPriorities = 0;
-
-	// Number of milliseconds passed before an unemployed worker starts
-	// sleeping away time instead of yielding
-	std::uint16_t mySleepThreshhold = 250;
-
-	//// This will be run per worker upon launch. Good to have in case there is 
-	//// thread specific initializations that needs to be done.
-	//job myOnThreadLaunch = job([]() {});
-
-	//// This will be run per worker upon exit. Good to have in case there is 
-	//// thread specific clean up that needs to be done.
-	//job myOnThreadExit = job([]() {});
-};
 
 class job_handler
 {
@@ -82,7 +66,7 @@ public:
 	job_handler(allocator_type& allocator);
 	~job_handler();
 
-	void Init(const job_handler_info& info = job_handler_info());
+	void Init();
  	void reset();
 
 	// Callable will allocate if size is above job_handler_detail::Callable_Max_Size_No_Heap_Alloc
@@ -114,8 +98,6 @@ private:
 
 	job_impl_shared_ptr fetch_job();
 
-	// The distribution of queue consumption is meant to happen in a log2 fashion.
-	// The next queue down gets consumed from half as much...
 	std::uint8_t generate_priority_index();
 
 	static thread_local std::chrono::high_resolution_clock ourSleepTimer;
@@ -132,9 +114,7 @@ private:
 	
 	job_handler_detail::job_impl_allocator<uint8_t> myJobImplAllocator;
 
-	std::array<std::thread, 32> myWorkers;
-
-	job_handler_info myInitInfo;
+	std::array<worker, 32> myWorkers;
 
 	std::atomic<bool> myIsRunning;
 };
