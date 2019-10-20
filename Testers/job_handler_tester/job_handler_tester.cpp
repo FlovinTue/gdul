@@ -18,31 +18,16 @@ void job_handler_tester::init()
 
 float job_handler_tester::run_all_tests(std::size_t numInserts)
 {
-	const float consum(run_consumption_test(numInserts));
-	const float constr(run_construction_test(numInserts));
-	const float mixed(run_mixed_test(numInserts));
+	const float parallelConsume(run_consumption_parallel_test(numInserts));
+	const float parallelConstru(run_construction_parallel_test(numInserts));
+	const float parallelMixed(run_mixed_parallel_test(numInserts));
+	const float strandConsume(run_consumption_strand_test(numInserts));
+	const float strandConstru(run_construction_strand_test(numInserts));
 
-	return consum + constr + mixed;
+	return parallelConsume + parallelConstru + parallelMixed + strandConstru + strandConsume;
 }
 
-float job_handler_tester::run_construction_test(std::size_t numInserts)
-{
-	numInserts;
-	// Reset
-	// Init ( 1 threads )
-
-	// Create root
-
-	// 2 threads building trees
-	// 6 threads building jobs depending on latest in each tree
-	// Create end
-
-	// Enable root
-	// Wait for end
-	return 0.0f;
-}
-
-float job_handler_tester::run_consumption_test(std::size_t numInserts)
+float job_handler_tester::run_consumption_parallel_test(std::size_t numInserts)
 {
 	numInserts;
 
@@ -62,7 +47,24 @@ float job_handler_tester::run_consumption_test(std::size_t numInserts)
 	return 0.0f;
 }
 
-float job_handler_tester::run_mixed_test(std::size_t numInserts)
+float job_handler_tester::run_construction_parallel_test(std::size_t numInserts)
+{
+	numInserts;
+	// Reset
+	// Init ( 1 threads )
+
+	// Create root
+
+	// 2 threads building trees
+	// 6 threads building jobs depending on latest in each tree
+	// Create end
+
+	// Enable root
+	// Wait for end
+	return 0.0f;
+}
+
+float job_handler_tester::run_mixed_parallel_test(std::size_t numInserts)
 {
 	numInserts;
 
@@ -81,3 +83,14 @@ float job_handler_tester::run_mixed_test(std::size_t numInserts)
 
 	return 0.0f;
 }
+
+float job_handler_tester::run_construction_strand_test(std::size_t numInserts)
+{
+	return 0.0f;
+}
+
+float job_handler_tester::run_consumption_strand_test(std::size_t numInserts)
+{
+	return 0.0f;
+}
+
