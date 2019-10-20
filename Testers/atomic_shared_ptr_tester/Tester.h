@@ -21,7 +21,7 @@ struct ReferenceComparison
 template <class T>
 struct MutextedWrapper
 {
-	std::shared_ptr<T> load() {
+	std::shared_ptr<T> load(std::memory_order) {
 		lock.lock();
 		std::shared_ptr<T> returnValue(ptr);
 		lock.unlock();
@@ -63,7 +63,7 @@ struct MutextedWrapper
 		ptr.reset();
 		lock.unlock();
 	}
-	bool compare_exchange_strong(std::shared_ptr<T>& expected, std::shared_ptr<T>&& desired)
+	bool compare_exchange_strong(std::shared_ptr<T>& expected, std::shared_ptr<T>&& desired, std::memory_order)
 	{
 		bool returnValue(false);
 		lock.lock();
@@ -190,11 +190,12 @@ inline void Tester<T, ArraySize, NumThreads>::WorkAssign(std::uint32_t aArrayPas
 
 	for (std::uint32_t pass = 0; pass < aArrayPasses; ++pass) {
 		for (std::uint32_t i = 0; i < ArraySize; ++i) {
-			myTestArray[i].store(
+			myTestArray[i]
 #ifdef ASP_MUTEX_COMPARE
-				std::
+				= std::make_shared<T>();
+#else
+				.store(make_shared<T>(), std::memory_order_relaxed);
 #endif
-				make_shared<T>(), std::memory_order_relaxed);
 		}
 	}
 }
@@ -208,10 +209,10 @@ inline void Tester<T, ArraySize, NumThreads>::WorkReassign(std::uint32_t aArrayP
 
 	for (std::uint32_t pass = 0; pass < aArrayPasses; ++pass) {
 		for (std::uint32_t i = 0; i < ArraySize; ++i) {
-#ifndef CSP_MUTEX_COMPARE
+#ifndef ASP_MUTEX_COMPARE
 			myTestArray[i].store(myTestArray[(i + myRng()) % ArraySize].load(std::memory_order_relaxed), std::memory_order_relaxed);
 #else
-			myTestArray[i] = myTestArray[(i + myRng()) % ArraySize];
+			myTestArray[i] = myTestArray[(i + myRng()) % ArraySize].load(std::memory_order::memory_order_acquire);
 #endif
 		}
 	}
@@ -256,26 +257,31 @@ inline void Tester<T, ArraySize, NumThreads>::WorkCAS(std::uint32_t aArrayPasses
 			shared_ptr<T> desired(make_shared<T>());
 			shared_ptr<T> expected(myTestArray[i].load(std::memory_order_relaxed));
 			raw_ptr<T> check(expected);
-			const bool resulta = myTestArray[i].compare_exchange_strong(expected, std::move(desired), std::memory_order_relaxed);
+			const bool resulta = myTestArray[i].compare_exchange_weak(expected, std::move(desired), std::memory_order_relaxed);
 
+			static std::atomic<uint32_t> spurious = 0;
+			static std::atomic<uint32_t> succeeded = 0;
 			if (!(resulta == (expected == check))) {
-				throw std::runtime_error("output from expected do not correspond to CAS results");
+				++spurious;
+			}
+			else{
+				++succeeded;
 			}
 
-			shared_ptr<T> desired_(make_shared<T>());
-			shared_ptr<T> expected_(myTestArray[i].load(std::memory_order_relaxed));
-			raw_ptr<T> rawExpected(expected_);
-			raw_ptr<T> check_(expected_);
-			const bool resultb = myTestArray[i].compare_exchange_strong(rawExpected, std::move(desired_), std::memory_order_relaxed);
+			//shared_ptr<T> desired_(make_shared<T>());
+			//shared_ptr<T> expected_(myTestArray[i].load(std::memory_order_relaxed));
+			//raw_ptr<T> rawExpected(expected_);
+			//raw_ptr<T> check_(expected_);
+			//const bool resultb = myTestArray[i].compare_exchange_strong(rawExpected, std::move(desired_), std::memory_order_relaxed);
 
-			if (!(resultb == (rawExpected == check_))) {
-				throw std::runtime_error("output from expected do not correspond to CAS results");
-			}
+			//if (!(resultb == (rawExpected == check_))) {
+			//	throw std::runtime_error("output from expected do not correspond to CAS results");
+			//}
 
 #else
 			std::shared_ptr<T> desired_(std::make_shared<T>());
-			std::shared_ptr<T> expected_(myTestArray[i].load());
-			const bool resultb = myTestArray[i].compare_exchange_strong(expected_, std::move(desired_));
+			std::shared_ptr<T> expected_(myTestArray[i].load(std::memory_order_acquire));
+			const bool resultb = myTestArray[i].compare_exchange_strong(expected_, std::move(desired_), std::memory_order_acquire);
 #endif
 		}
 	}

@@ -26,7 +26,7 @@ int main()
 			doreferencetest(false);
 	
 		uint32_t arraySweeps(10000);
-		uint32_t runs(256);
+		uint32_t runs(16);
 		float time(0.f);
 		for (std::uint32_t i = 0; i < runs; ++i) {
 			time += tester.Execute(arraySweeps, doassign, doreassign, doCAStest, doreferencetest);
@@ -111,6 +111,21 @@ int main()
 		raw_ptr<int> athirteenthexp(nullptr);
 		shared_ptr<int> athirteenthdes(make_shared<int>(131));
 		const bool thirtres = athirteenth.compare_exchange_strong(athirteenthexp, athirteenthdes);
+
+		atomic_shared_ptr<int> aeleventhweak(make_shared<int>(11));
+		raw_ptr<int> aeleventhexpweak(aeleventhweak.unsafe_get_raw_ptr());
+		shared_ptr<int> aeleventhdesweak(make_shared<int>(1111));
+		const bool eleweakres = aeleventhweak.compare_exchange_strong(aeleventhexpweak, aeleventhdesweak);
+
+		atomic_shared_ptr<int> atwelfthweak(make_shared<int>(12));
+		shared_ptr<int> atwelfthexpweak(make_shared<int>(121));
+		shared_ptr<int> atwelfthdesweak(make_shared<int>(1212));
+		const bool twelweakres = atwelfthweak.compare_exchange_strong(atwelfthexpweak, atwelfthdesweak);
+
+		atomic_shared_ptr<int> athirteenthweak(make_shared<int>(13));
+		raw_ptr<int> athirteenthexpweak(nullptr);
+		shared_ptr<int> athirteenthdesweak(make_shared<int>(131));
+		const bool thirtweakres = athirteenthweak.compare_exchange_strong(athirteenthexpweak, athirteenthdesweak);
 
 		athirteenth.unsafe_get_raw_ptr();
 		athirteenthdes.get_raw_ptr();
