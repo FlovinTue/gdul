@@ -28,10 +28,10 @@ namespace gdul
 {
 namespace job_handler_detail
 {
-// The number of internal job queues. 
 constexpr std::uint16_t Job_Max_Dependencies = std::numeric_limits<std::uint16_t>::max() / 2;
 
-constexpr std::uint8_t Priority_Granularity = 5;
+// The number of internal job queues. 
+constexpr std::uint8_t Priority_Granularity = 4;
 constexpr std::uint8_t Default_Job_Priority = 0;
 constexpr std::uint8_t Callable_Max_Size_No_Heap_Alloc = 24;
 

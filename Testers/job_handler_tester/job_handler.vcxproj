@@ -90,6 +90,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\include\gdul\job_handler_master.h" />
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\job.h" />
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\callable.h" />
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\callable_base.h" />
@@ -97,6 +98,7 @@
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_handler_commons.h" />
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_impl.h" />
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_impl_allocator.h" />
+    <ClInclude Include="job_handler_tester.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\include\gdul\WIP_job_handler\job.cpp" />
@@ -104,6 +106,7 @@
     <ClCompile Include="..\..\include\gdul\WIP_job_handler\job_handler_commons.cpp" />
     <ClCompile Include="..\..\include\gdul\WIP_job_handler\job_impl.cpp" />
     <ClCompile Include="Main.cpp" />
+    <ClCompile Include="job_handler_tester.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

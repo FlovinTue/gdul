@@ -64,10 +64,9 @@ public:
 
 	bool finished() const;
 private:
-	void attach_sibling(job_impl_shared_ptr sibling);
+	void set_sibling(job_impl_shared_ptr sibling);
 
 	void enqueue_children();
-	void enqueue_siblings();
 
 	union
 	{

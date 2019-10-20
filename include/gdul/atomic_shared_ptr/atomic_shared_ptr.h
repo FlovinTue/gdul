@@ -78,8 +78,6 @@ enum CAS_FLAG : std::uint8_t;
 static constexpr std::uint8_t Copy_Request_Index(7);
 static constexpr std::uint64_t Copy_Request_Step(1ULL << (Copy_Request_Index * 8));
 
-// Batching concept inspired by the folly library implementation of AtomicSharedPtr
-static constexpr std::uint8_t Copy_Request_Accumulation(std::numeric_limits<uint8_t>::max() / 2);
 }
 template <class T, class Allocator = aspdetail::default_allocator>
 class shared_ptr;
@@ -177,8 +175,6 @@ private:
 
 	inline void try_help_increment(compressed_storage expected) noexcept;
 
-	inline bool copy_request_accumulation_check(compressed_storage expected) const noexcept;
-
 	inline constexpr aspdetail::control_block_base<T, Allocator>* to_control_block(compressed_storage from) const noexcept;
 
 	friend class shared_ptr<T, Allocator>;
@@ -254,11 +250,10 @@ inline bool atomic_shared_ptr<T, Allocator>::compare_exchange_strong(typename as
 
 	typedef typename std::remove_reference<PtrType>::type raw_type;
 
+	const bool needsCapture(std::is_same<raw_type, shared_ptr<T, Allocator>>::value);
+	const std::uint8_t flags(aspdetail::CAS_FLAG_CAPTURE_ON_FAILURE * static_cast<std::uint8_t>(needsCapture));
+
 	const std::uint64_t compareBlock(expected_.myU64 & aspdetail::Versioned_Ptr_Mask);
-
-	const bool sharedPtrVersion(static_cast<bool>(std::is_same<raw_type, shared_ptr<T, Allocator>>()));
-	const std::uint8_t flags(aspdetail::CAS_FLAG_CAPTURE_ON_FAILURE * static_cast<std::uint8_t>(sharedPtrVersion));
-
 	do {
 		if (cas_internal(expected_, desired_, static_cast<aspdetail::CAS_FLAG>(flags))) {
 
@@ -473,10 +468,6 @@ inline bool atomic_shared_ptr<T, Allocator>::try_help_increment_and_try_swap(com
 template<class T, class Allocator>
 inline void atomic_shared_ptr<T, Allocator>::try_help_increment(compressed_storage expected) noexcept
 {
-	if (!copy_request_accumulation_check(expected)) {
-		return;
-	}
-
 	const compressed_storage initialPtrBlock(expected.myU64 & aspdetail::Versioned_Ptr_Mask);
 
 	aspdetail::control_block_base<T, Allocator>* const controlBlock(to_control_block(expected));
@@ -501,11 +492,6 @@ inline void atomic_shared_ptr<T, Allocator>::try_help_increment(compressed_stora
 	} while (
 		(expected_.myU64 & aspdetail::Versioned_Ptr_Mask) == initialPtrBlock.myU64 &&
 		expected_.myU8[aspdetail::STORAGE_BYTE_COPYREQUEST]);
-}
-template<class T, class Allocator>
-inline bool atomic_shared_ptr<T, Allocator>::copy_request_accumulation_check(compressed_storage expected) const noexcept
-{
-	return !(expected.myU8[aspdetail::STORAGE_BYTE_COPYREQUEST] < aspdetail::Copy_Request_Accumulation);
 }
 template<class T, class Allocator>
 inline constexpr aspdetail::control_block_base<T, Allocator>* atomic_shared_ptr<T, Allocator>::to_control_block(compressed_storage from) const noexcept

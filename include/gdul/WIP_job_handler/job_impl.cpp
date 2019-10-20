@@ -55,7 +55,7 @@ bool job_impl::try_attach_child(job_impl_shared_ptr child)
 		firstChild = myFirstChild.load();
 		rawRep = firstChild;
 
-		child->attach_sibling(std::move(firstChild));
+		child->set_sibling(std::move(firstChild));
 
 		if (myFinished.load(std::memory_order_seq_cst)) {
 			child->myFirstSibling.unsafe_store(nullptr);
@@ -91,33 +91,22 @@ bool job_impl::finished() const
 {
 	return myFinished.load(std::memory_order_relaxed);
 }
-void job_impl::attach_sibling(job_impl_shared_ptr sibling)
+void job_impl::set_sibling(job_impl_shared_ptr sibling)
 {
 	myFirstSibling.unsafe_store(std::move(sibling));
 }
 void job_impl::enqueue_children()
 {
 	job_impl_shared_ptr child(myFirstChild.exchange(nullptr));
-	if (child) {
-		child->enqueue_siblings();
+
+	while (child) {
+		job_impl_shared_ptr next(child->myFirstSibling.unsafe_load());
 
 		if (!child->remove_dependencies(1)) {
 			child->get_handler()->enqueue_job(std::move(child));
 		}
-	}
-}
-void job_impl::enqueue_siblings()
-{
-	job_impl_shared_ptr sibling(myFirstSibling.unsafe_load());
 
-	while (sibling) {
-		job_impl_shared_ptr next(sibling->myFirstSibling.unsafe_load());
-
-		if (!sibling->remove_dependencies(1)) {
-			sibling->get_handler()->enqueue_job(std::move(sibling));
-		}
-
-		sibling = std::move(next);
+		child = std::move(next);
 	}
 }
 }

@@ -99,6 +99,8 @@ void job_handler::work()
 
 		if (this_job.myImpl) {
 			(*this_job.myImpl)();
+
+			ourLastJobTimepoint = ourSleepTimer.now();
 		}
 		else {
 			idle();
