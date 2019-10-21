@@ -2,6 +2,7 @@
 
 #include <gdul\WIP_job_handler\job_handler.h>
 #include <string>
+#include <thread>
 
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
@@ -13,8 +14,9 @@ namespace gdul
 #undef max
 
 thread_local job job_handler::this_job(nullptr);
-thread_local worker job_handler::this_worker(nullptr);
-thread_local worker_impl* job_handler::this_worker_impl(nullptr);
+thread_local worker job_handler::this_worker(&job_handler::ourImplicitWorker);
+thread_local job_handler_detail::worker_impl* job_handler::this_worker_impl(&job_handler::ourImplicitWorker);
+thread_local job_handler_detail::worker_impl job_handler::ourImplicitWorker;
 
 job_handler::job_handler()
 	: myJobImplChunkPool(job_handler_detail::Job_Impl_Allocator_Block_Size, myMainAllocator)

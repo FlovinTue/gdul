@@ -4,11 +4,14 @@
 
 namespace gdul
 {
+namespace job_handler_detail
+{
 class worker_impl;
+}
 class worker
 {
 public:
-	worker(worker_impl* impl);
+	worker(job_handler_detail::worker_impl* impl);
 	worker(const worker&) = default;
 	worker(worker&&) = default;
 	worker& operator=(const worker&) = default;
@@ -24,7 +27,7 @@ public:
 	void set_queue_affinity(std::uint8_t queue = job_handler_detail::Worker_Auto_Affinity);
 
 	// Thread priority as defined in WinBase.h
-	void set_execution_priority(uint32_t priority);
+	void set_execution_priority(std::uint32_t priority);
 
 	// Thread name
 	void set_name(const char* name);
@@ -36,6 +39,6 @@ public:
 private:
 	friend class job_handler;
 
-	worker_impl* myImpl;
+	job_handler_detail::worker_impl* myImpl;
 };
 }

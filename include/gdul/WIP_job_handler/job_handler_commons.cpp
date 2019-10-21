@@ -48,7 +48,6 @@ typedef struct tagTHREADNAME_INFO
 #if defined(_WIN64) | defined(_WIN32)
 void set_thread_name(const char * name, HANDLE handle)
 {
-
 	thread_naming::THREADNAME_INFO info;
 	info.dwType = 0x1000;
 	info.szName = name;
@@ -71,6 +70,10 @@ void set_thread_core_affinity(std::uint8_t core, HANDLE handle)
 	const uint64_t affinityMask(1ULL << core);
 	while (!SetThreadAffinityMask(handle, affinityMask));
 }
+HANDLE get_thread_handle()
+{
+	return GetCurrentThread();
+}
 #else
 void set_thread_name(const char * /*name*/)
 {
@@ -80,6 +83,10 @@ void set_thread_priority(std::uint8_t, HANDLE)
 }
 void set_thread_core_affinity(std::uint8_t, HANDLE)
 {
+}
+HANDLE get_thread_handle()
+{
+	return nullptr;
 }
 #endif
 }

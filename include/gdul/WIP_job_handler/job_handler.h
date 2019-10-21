@@ -72,7 +72,8 @@ public:
 	job make_job(Callable&& callable);
 
 private:
-	static thread_local worker_impl* this_worker_impl;
+	static thread_local job_handler_detail::worker_impl* this_worker_impl;
+	static thread_local job_handler_detail::worker_impl ourImplicitWorker;
 
 	friend class job_handler_detail::job_impl;
 	friend class job;
@@ -96,7 +97,7 @@ private:
 	
 	job_handler_detail::job_impl_allocator<std::uint8_t> myJobImplAllocator;
 
-	std::array<worker_impl, job_handler_detail::Job_Handler_Max_Workers> myWorkers;
+	std::array<job_handler_detail::worker_impl, job_handler_detail::Job_Handler_Max_Workers> myWorkers;
 
 	std::atomic<std::uint16_t> myWorkerCount;
 };

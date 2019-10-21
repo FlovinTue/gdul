@@ -1,9 +1,25 @@
 #include <gdul\WIP_job_handler\worker_impl.h>
 #include <cassert>
 
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
+
 namespace gdul
 {
+namespace job_handle_detail
+{
 
+worker_impl::worker_impl()
+	: myAutoCoreAffinity(0)
+	, myCoreAffinity(0)
+	, myIsRunning(false)
+	, myPriorityDistributionIteration(0)
+	, myQueueAffinity(0)
+	, mySleepThreshhold(0)
+	, myThreadHandle(nullptr)
+{
+	myThreadHandle = get_thread_handle();
+}
 worker_impl::worker_impl(std::thread&& thread, std::uint8_t coreAffinity)
 	: myAutoCoreAffinity(coreAffinity)
 	, myThread(std::move(thread))
@@ -63,6 +79,10 @@ void worker_impl::set_sleep_threshhold(std::uint16_t ms)
 {
 	mySleepThreshhold = ms;
 }
+void worker_impl::set_thread_handle(HANDLE handle)
+{
+	myThreadHandle = handle;
+}
 bool worker_impl::retire()
 {
 	return myIsRunning.exchange(false, std::memory_order_relaxed);
@@ -81,13 +101,6 @@ bool worker_impl::is_sleepy() const
 bool worker_impl::is_retired() const
 {
 	return myIsRunning.load(std::memory_order_relaxed);
-}
-#if  defined(_WIN64) || defined(_WIN32)
-void worker_impl::set_name(const char * name)
-{
-	assert(!is_retired() && "Cannot set name to inactive worker");
-
-	job_handler_detail::set_thread_name(name, myThreadHandle);
 }
 void worker_impl::idle()
 {
@@ -128,10 +141,11 @@ std::uint8_t worker_impl::get_queue_affinity()
 
 	return index;
 }
-#else
-void worker_impl::set_name(const char*)
+void worker_impl::set_name(const char * name)
 {
-}
-#endif
+	assert(!is_retired() && "Cannot set name to inactive worker");
 
+	job_handler_detail::set_thread_name(name, myThreadHandle);
+}
+}
 }

@@ -3,7 +3,7 @@
 
 namespace gdul
 {
-worker::worker(worker_impl * impl)
+worker::worker(job_handler_detail::worker_impl * impl)
 	: myImpl(impl)
 {
 }
@@ -22,7 +22,7 @@ void worker::set_queue_affinity(std::uint8_t queue)
 	myImpl->set_queue_affinity(queue);
 }
 
-void worker::set_execution_priority(uint32_t priority)
+void worker::set_execution_priority(std::uint32_t priority)
 {
 	myImpl->set_execution_priority(priority);
 }

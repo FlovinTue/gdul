@@ -10,12 +10,13 @@
 #include <gdul\WIP_job_handler\job_handler_commons.h>
 
 namespace gdul {
-
+namespace job_handler_detail
+{
 class job_handler;
 class alignas(64) worker_impl
 {
 public:
-	worker_impl() = default;
+	worker_impl();
 	worker_impl(std::thread&& thread, std::uint8_t coreAffinity);
 	~worker_impl();
 
@@ -32,6 +33,8 @@ public:
 	void set_execution_priority(std::uint32_t priority);
 
 	void set_sleep_threshhold(std::uint16_t ms);
+
+	void set_thread_handle(HANDLE handle);
 
 	bool retire();
 
@@ -53,10 +56,11 @@ private:
 
 	std::size_t myPriorityDistributionIteration;
 
-	std::chrono::high_resolution_clock mySleepTimer;
 	std::chrono::high_resolution_clock::time_point myLastJobTimepoint;
 
 	std::uint16_t mySleepThreshhold;
+
+	std::chrono::high_resolution_clock mySleepTimer;
 
 	std::uint8_t myAutoCoreAffinity;
 	std::uint8_t myCoreAffinity;
@@ -64,5 +68,6 @@ private:
 
 	std::atomic_bool myIsRunning;
 };
+}
 }
 #pragma warning(pop)
