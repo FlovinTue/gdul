@@ -124,19 +124,22 @@ public:
 	inline bool compare_exchange_strong(shared_ptr<T, Allocator>& expected, const shared_ptr<T, Allocator>& desired, std::memory_order failOrder, std::memory_order successOrder) noexcept;
 	inline bool compare_exchange_strong(shared_ptr<T, Allocator>& expected, shared_ptr<T, Allocator>&& desired, std::memory_order failOrder, std::memory_order successOrder) noexcept;
 
+	// compare_exchange_weak may fail spuriously if another thread loads this value
 	inline bool compare_exchange_weak(raw_ptr<T, Allocator>& expected, const shared_ptr<T, Allocator>& desired, std::memory_order order = std::memory_order_seq_cst) noexcept;
+	// compare_exchange_weak may fail spuriously if another thread loads this value
 	inline bool compare_exchange_weak(raw_ptr<T, Allocator>& expected, shared_ptr<T, Allocator>&& desired, std::memory_order order = std::memory_order_seq_cst) noexcept;
-								 
+	// compare_exchange_weak may fail spuriously if another thread loads this value
 	inline bool compare_exchange_weak(raw_ptr<T, Allocator>& expected, const shared_ptr<T, Allocator>& desired, std::memory_order failOrder, std::memory_order successOrder) noexcept;
+	// compare_exchange_weak may fail spuriously if another thread loads this value
 	inline bool compare_exchange_weak(raw_ptr<T, Allocator>& expected, shared_ptr<T, Allocator>&& desired, std::memory_order failOrder, std::memory_order successOrder) noexcept;
-								 
+	// compare_exchange_weak may fail spuriously if another thread loads this value
 	inline bool compare_exchange_weak(shared_ptr<T, Allocator>& expected, const shared_ptr<T, Allocator>& desired, std::memory_order order = std::memory_order_seq_cst) noexcept;
+	// compare_exchange_weak may fail spuriously if another thread loads this value
 	inline bool compare_exchange_weak(shared_ptr<T, Allocator>& expected, shared_ptr<T, Allocator>&& desired, std::memory_order order = std::memory_order_seq_cst) noexcept;
-								 
+	// compare_exchange_weak may fail spuriously if another thread loads this value
 	inline bool compare_exchange_weak(shared_ptr<T, Allocator>& expected, const shared_ptr<T, Allocator>& desired, std::memory_order failOrder, std::memory_order successOrder) noexcept;
+	// compare_exchange_weak may fail spuriously if another thread loads this value
 	inline bool compare_exchange_weak(shared_ptr<T, Allocator>& expected, shared_ptr<T, Allocator>&& desired, std::memory_order failOrder, std::memory_order successOrder) noexcept;
-
-
 
 	inline shared_ptr<T, Allocator> load(std::memory_order order = std::memory_order_seq_cst) noexcept;
 
@@ -194,10 +197,11 @@ private:
 	template <class PtrType>
 	inline bool compare_exchange_weak(typename aspdetail::disable_deduction<PtrType>::type& expected, shared_ptr<T, Allocator>&& desired, std::memory_order failOrder, std::memory_order successOrder) noexcept;
 
-	inline bool try_help_increment_and_try_swap(compressed_storage& expected, compressed_storage desired, aspdetail::memory_orders orders) noexcept;
-
 	inline bool compare_exchange_weak_internal(compressed_storage& expected, compressed_storage desired, aspdetail::CAS_FLAG flags, aspdetail::memory_orders orders) noexcept;
+	inline bool compare_exchange_weak_internal_fast_swap(compressed_storage & expected, const compressed_storage & desired, aspdetail::CAS_FLAG flags, aspdetail::memory_orders orders) noexcept;
+	inline bool compare_exchange_weak_internal_helping_swap(compressed_storage & expected, const compressed_storage & desired, aspdetail::CAS_FLAG flags, aspdetail::memory_orders orders) noexcept;
 
+	inline bool try_help_increment_and_try_swap(compressed_storage& expected, compressed_storage desired, aspdetail::memory_orders orders) noexcept;
 	inline void try_help_increment(compressed_storage expected, std::memory_order order) noexcept;
 
 	inline constexpr aspdetail::control_block_base<T, Allocator>* to_control_block(compressed_storage from) const noexcept;
@@ -381,6 +385,8 @@ inline bool atomic_shared_ptr<T, Allocator>::compare_exchange_weak(typename aspd
 
 	const std::uint64_t postCompare(expected_.myU64 & aspdetail::Versioned_Ptr_Mask);
 
+	// Another thread altered copy request value, causing compare_exchange to fail, even 
+	// though held pointer remains the same.
 	if (preCompare == postCompare) {
 		return false;
 	}
@@ -575,7 +581,7 @@ inline bool atomic_shared_ptr<T, Allocator>::try_help_increment_and_try_swap(com
 		if (controlBlock)
 			controlBlock->incref(copyRequests);
 
-		if (myStorage.compare_exchange_weak(expected.myU64, desired_.myU64, orders.myFirst, orders.mySecond)) {
+		if (myStorage.compare_exchange_weak(expected.myU64, desired_.myU64, std::memory_order_relaxed, orders.mySecond)) {
 			return true;
 		}
 
@@ -583,6 +589,8 @@ inline bool atomic_shared_ptr<T, Allocator>::try_help_increment_and_try_swap(com
 			controlBlock->decref(copyRequests);
 
 	} while ((expected.myU64 & aspdetail::Versioned_Ptr_Mask) == initialPtrBlock.myU64);
+
+	std::atomic_thread_fence(orders.myFirst);
 
 	return false;
 }
@@ -613,6 +621,8 @@ inline void atomic_shared_ptr<T, Allocator>::try_help_increment(compressed_stora
 	} while (
 		(expected_.myU64 & aspdetail::Versioned_Ptr_Mask) == initialPtrBlock.myU64 &&
 		expected_.myU8[aspdetail::STORAGE_BYTE_COPYREQUEST]);
+
+	std::atomic_thread_fence(order);
 }
 template<class T, class Allocator>
 inline constexpr aspdetail::control_block_base<T, Allocator>* atomic_shared_ptr<T, Allocator>::to_control_block(compressed_storage from) const noexcept
@@ -622,10 +632,7 @@ inline constexpr aspdetail::control_block_base<T, Allocator>* atomic_shared_ptr<
 template<class T, class Allocator>
 inline bool atomic_shared_ptr<T, Allocator>::compare_exchange_weak_internal(compressed_storage & expected, compressed_storage desired, aspdetail::CAS_FLAG flags, aspdetail::memory_orders orders) noexcept
 {
-	bool success(false);
-
-	const bool captureOnFail(flags & aspdetail::CAS_FLAG_CAPTURE_ON_FAILURE);
-	const bool stealPrevious(flags & aspdetail::CAS_FLAG_STEAL_PREVIOUS);
+	bool result(false);
 
 	compressed_storage desired_(desired);
 	desired_.myU8[aspdetail::STORAGE_BYTE_VERSION] = expected.myU8[aspdetail::STORAGE_BYTE_VERSION] + 1;
@@ -633,49 +640,71 @@ inline bool atomic_shared_ptr<T, Allocator>::compare_exchange_weak_internal(comp
 
 	compressed_storage expected_(expected);
 
+	// There are no discernable copy requests, we can just try a fast swap
 	if (!expected_.myU8[aspdetail::STORAGE_BYTE_COPYREQUEST]) {
-		success = myStorage.compare_exchange_weak(expected_.myU64, desired_.myU64, orders.myFirst, orders.mySecond);
-
-		const bool decrementPrevious(success & !stealPrevious);
-
-		if (decrementPrevious) {
-			aspdetail::control_block_base<T, Allocator>* const controlBlock(to_control_block(expected_));
-			if (controlBlock) {
-				controlBlock->decref();
-			}
-		}
+		result = compare_exchange_weak_internal_fast_swap(expected_, desired_, flags, orders);
 	}
+
+	// There are copy requests, we must go through a incrementation helping process as we try to swap in
 	else {
-		expected_ = myStorage.fetch_add(aspdetail::Copy_Request_Step, std::memory_order_relaxed);
-		expected_.myU8[aspdetail::STORAGE_BYTE_COPYREQUEST] += 1;
-
-		aspdetail::control_block_base<T, Allocator>* const controlBlock(to_control_block(expected_));
-
-		const bool otherInterjection((expected_.myU64 ^ expected.myU64) & aspdetail::Versioned_Ptr_Mask);
-
-		if (!otherInterjection) {
-			success = try_help_increment_and_try_swap(expected_, desired_, orders);
-		}
-		else {
-			try_help_increment(expected_, captureOnFail ? std::memory_order_relaxed : orders.mySecond);
-		}
-
-		const bool decrementPrevious(success & !stealPrevious);
-
-		if (controlBlock) {
-			controlBlock->decref(1 + decrementPrevious);
-		}
+		result = compare_exchange_weak_internal_helping_swap(expected_, desired_, flags, orders);
 	}
 
 	const bool otherInterjection((expected_.myU64 ^ expected.myU64) & aspdetail::Versioned_Ptr_Mask);
 
 	expected = expected_;
 
-	if (otherInterjection & captureOnFail) {
-		expected = copy_internal(orders.mySecond);
+	if (otherInterjection & (flags & aspdetail::CAS_FLAG_CAPTURE_ON_FAILURE)) {
+		expected = copy_internal(orders.myFirst);
 	}
 
-	return success;
+	return result;
+}
+template<class T, class Allocator>
+inline bool atomic_shared_ptr<T, Allocator>::compare_exchange_weak_internal_fast_swap(compressed_storage & expected, const compressed_storage & desired, aspdetail::CAS_FLAG flags, aspdetail::memory_orders orders) noexcept
+{
+	const bool result = myStorage.compare_exchange_weak(expected.myU64, desired.myU64, std::memory_order_relaxed, orders.mySecond);
+
+	const bool decrementPrevious(result & !(flags & aspdetail::CAS_FLAG_STEAL_PREVIOUS));
+
+	if (decrementPrevious) {
+		aspdetail::control_block_base<T, Allocator>* const controlBlock(to_control_block(expected));
+		if (controlBlock) {
+			controlBlock->decref();
+		}
+	}
+	return result;
+}
+template<class T, class Allocator>
+inline bool atomic_shared_ptr<T, Allocator>::compare_exchange_weak_internal_helping_swap(compressed_storage & expected, const compressed_storage & desired, aspdetail::CAS_FLAG flags, aspdetail::memory_orders orders) noexcept
+{
+	bool result(false);
+
+	compressed_storage expected_(expected);
+
+	expected_ = myStorage.fetch_add(aspdetail::Copy_Request_Step, std::memory_order_relaxed);
+	expected_.myU8[aspdetail::STORAGE_BYTE_COPYREQUEST] += 1;
+
+	aspdetail::control_block_base<T, Allocator>* const controlBlock(to_control_block(expected_));
+
+	const bool otherInterjection((expected_.myU64 ^ expected.myU64) & aspdetail::Versioned_Ptr_Mask);
+
+	if (!otherInterjection) {
+		result = try_help_increment_and_try_swap(expected_, desired, orders);
+	}
+	else {
+		try_help_increment(expected_, (flags & aspdetail::CAS_FLAG_CAPTURE_ON_FAILURE) ? std::memory_order_relaxed : orders.myFirst);
+	}
+
+	const bool decrementPrevious(result & !(flags & aspdetail::CAS_FLAG_STEAL_PREVIOUS));
+
+	if (controlBlock) {
+		controlBlock->decref(1 + decrementPrevious);
+	}
+
+	expected = expected_;
+
+	return result;
 }
 template <class T, class Allocator>
 inline typename  aspdetail::compressed_storage atomic_shared_ptr<T, Allocator>::copy_internal(std::memory_order order) noexcept
