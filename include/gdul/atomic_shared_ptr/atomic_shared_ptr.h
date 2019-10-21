@@ -124,21 +124,21 @@ public:
 	inline bool compare_exchange_strong(shared_ptr<T, Allocator>& expected, const shared_ptr<T, Allocator>& desired, std::memory_order failOrder, std::memory_order successOrder) noexcept;
 	inline bool compare_exchange_strong(shared_ptr<T, Allocator>& expected, shared_ptr<T, Allocator>&& desired, std::memory_order failOrder, std::memory_order successOrder) noexcept;
 
-	// compare_exchange_weak may fail spuriously if another thread loads this value
+	// compare_exchange_weak may fail spuriously if another thread loads this value while attempting swap
 	inline bool compare_exchange_weak(raw_ptr<T, Allocator>& expected, const shared_ptr<T, Allocator>& desired, std::memory_order order = std::memory_order_seq_cst) noexcept;
-	// compare_exchange_weak may fail spuriously if another thread loads this value
+	// compare_exchange_weak may fail spuriously if another thread loads this value while attempting swap
 	inline bool compare_exchange_weak(raw_ptr<T, Allocator>& expected, shared_ptr<T, Allocator>&& desired, std::memory_order order = std::memory_order_seq_cst) noexcept;
-	// compare_exchange_weak may fail spuriously if another thread loads this value
+	// compare_exchange_weak may fail spuriously if another thread loads this value while attempting swap
 	inline bool compare_exchange_weak(raw_ptr<T, Allocator>& expected, const shared_ptr<T, Allocator>& desired, std::memory_order failOrder, std::memory_order successOrder) noexcept;
-	// compare_exchange_weak may fail spuriously if another thread loads this value
+	// compare_exchange_weak may fail spuriously if another thread loads this value while attempting swap
 	inline bool compare_exchange_weak(raw_ptr<T, Allocator>& expected, shared_ptr<T, Allocator>&& desired, std::memory_order failOrder, std::memory_order successOrder) noexcept;
-	// compare_exchange_weak may fail spuriously if another thread loads this value
+	// compare_exchange_weak may fail spuriously if another thread loads this value while attempting swap
 	inline bool compare_exchange_weak(shared_ptr<T, Allocator>& expected, const shared_ptr<T, Allocator>& desired, std::memory_order order = std::memory_order_seq_cst) noexcept;
-	// compare_exchange_weak may fail spuriously if another thread loads this value
+	// compare_exchange_weak may fail spuriously if another thread loads this value while attempting swap
 	inline bool compare_exchange_weak(shared_ptr<T, Allocator>& expected, shared_ptr<T, Allocator>&& desired, std::memory_order order = std::memory_order_seq_cst) noexcept;
-	// compare_exchange_weak may fail spuriously if another thread loads this value
+	// compare_exchange_weak may fail spuriously if another thread loads this value while attempting swap
 	inline bool compare_exchange_weak(shared_ptr<T, Allocator>& expected, const shared_ptr<T, Allocator>& desired, std::memory_order failOrder, std::memory_order successOrder) noexcept;
-	// compare_exchange_weak may fail spuriously if another thread loads this value
+	// compare_exchange_weak may fail spuriously if another thread loads this value while attempting swap
 	inline bool compare_exchange_weak(shared_ptr<T, Allocator>& expected, shared_ptr<T, Allocator>&& desired, std::memory_order failOrder, std::memory_order successOrder) noexcept;
 
 	inline shared_ptr<T, Allocator> load(std::memory_order order = std::memory_order_seq_cst) noexcept;
@@ -338,7 +338,7 @@ inline bool atomic_shared_ptr<T, Allocator>::compare_exchange_strong(typename as
 	const compressed_storage desired_(desired.myControlBlockStorage.myU64);
 	compressed_storage expected_(expected.myControlBlockStorage.myU64);
 
-	aspdetail::memory_orders orders{ failOrder, successOrder };
+	const aspdetail::memory_orders orders{ failOrder, successOrder };
 
 	typedef typename std::remove_reference<PtrType>::type raw_type;
 
@@ -367,7 +367,7 @@ inline bool atomic_shared_ptr<T, Allocator>::compare_exchange_weak(typename aspd
 	const compressed_storage desired_(desired.myControlBlockStorage.myU64);
 	compressed_storage expected_(expected.myControlBlockStorage.myU64);
 
-	aspdetail::memory_orders orders{ failOrder, successOrder };
+	const aspdetail::memory_orders orders{ failOrder, successOrder };
 
 	typedef typename std::remove_reference<PtrType>::type raw_type;
 
@@ -388,6 +388,7 @@ inline bool atomic_shared_ptr<T, Allocator>::compare_exchange_weak(typename aspd
 	// Another thread altered copy request value, causing compare_exchange to fail, even 
 	// though held pointer remains the same.
 	if (preCompare == postCompare) {
+		std::atomic_thread_fence(orders.mySecond);
 		return false;
 	}
 

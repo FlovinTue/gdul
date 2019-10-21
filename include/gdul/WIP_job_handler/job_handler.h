@@ -25,7 +25,6 @@
 #include <thread>
 #include <array>
 #include <vector>
-#include <chrono>
 #include <concurrent_vector.h>
 
 #include <gdul\concurrent_object_pool\concurrent_object_pool.h>
@@ -35,7 +34,7 @@
 #include <gdul\WIP_job_handler\job_handler_commons.h>
 #include <gdul\WIP_job_handler\job_impl.h>
 #include <gdul\WIP_job_handler\job_impl_allocator.h>
-#include <gdul\WIP_job_handler\worker.h>
+#include <gdul\WIP_job_handler\job_worker.h>
 
 namespace gdul {
 
@@ -50,6 +49,7 @@ namespace job_handler_detail {
 // Contains core affinity (automatic / manual)
 // Contains sleep threshHold
 // Also, implement this_worker
+// And maybe job_worker_impl.....
 
 class job_impl;
 }
@@ -61,6 +61,7 @@ public:
 	using job_impl_shared_ptr = job_handler_detail::job_impl::job_impl_shared_ptr;
 
 	static thread_local job this_job;
+	static thread_local job_worker* this_worker;
 
 	job_handler();
 	job_handler(allocator_type& allocator);
@@ -68,6 +69,8 @@ public:
 
 	void Init();
  	void reset();
+
+	job_worker& create_worker();
 
 	// Callable will allocate if size is above job_handler_detail::Callable_Max_Size_No_Heap_Alloc
 	// It needs to have operator() defined with signature void(void). 
@@ -80,6 +83,7 @@ public:
 	// It needs to have operator() defined with signature void(void). 
 	template <class Callable>
 	job make_job(Callable&& callable);
+
 
 private:
 	friend class job_handler_detail::job_impl;
@@ -100,12 +104,6 @@ private:
 
 	std::uint8_t generate_priority_index();
 
-	static thread_local std::chrono::high_resolution_clock ourSleepTimer;
-	static thread_local std::chrono::high_resolution_clock::time_point ourLastJobTimepoint;
-
-	static thread_local std::size_t ourLastJobSequence;
-	static thread_local std::size_t ourPriorityDistributionIteration;
-
 	allocator_type myMainAllocator;
 
 	concurrent_object_pool<job_handler_detail::job_impl_chunk_rep, job_handler_detail::allocator_type> myJobImplChunkPool;
@@ -114,7 +112,9 @@ private:
 	
 	job_handler_detail::job_impl_allocator<uint8_t> myJobImplAllocator;
 
-	std::array<worker, 32> myWorkers;
+	std::array<job_worker, job_handler_detail::Job_Handler_Max_Workers> myWorkers;
+
+	std::atomic<std::remove_const<decltype(job_handler_detail::Job_Handler_Max_Workers)>::type> myWorkerCount;
 
 	std::atomic<bool> myIsRunning;
 };

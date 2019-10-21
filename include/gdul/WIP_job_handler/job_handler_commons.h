@@ -34,6 +34,7 @@ constexpr std::uint16_t Job_Max_Dependencies = std::numeric_limits<std::uint16_t
 constexpr std::uint8_t Priority_Granularity = 4;
 constexpr std::uint8_t Default_Job_Priority = 0;
 constexpr std::uint8_t Callable_Max_Size_No_Heap_Alloc = 24;
+constexpr std::uint8_t Job_Handler_Max_Workers = 32;
 
 // The number of job chunks that the Job_Impl block allocator will allocate
 // when empty
