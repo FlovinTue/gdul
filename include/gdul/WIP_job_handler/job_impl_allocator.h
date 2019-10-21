@@ -20,16 +20,20 @@
 
 #pragma once
 
-#include <gdul\concurrent_object_pool\concurrent_object_pool.h>
+
 #include <gdul\WIP_job_handler\job_handler_commons.h>
 
 namespace gdul
 {
+template <class Object, class Allocator>
+class concurrent_object_pool;
+
 namespace job_handler_detail
 {
 // Defined in job_impl.h
 struct alignas(log2align(Callable_Max_Size_No_Heap_Alloc)) job_impl_chunk_rep;
 
+// Wrapper to get / recycle chunks from object pool
 template <class Dummy>
 class job_impl_allocator
 {
@@ -52,7 +56,6 @@ inline job_impl_allocator<Dummy>::job_impl_allocator(concurrent_object_pool<job_
 	: myChunkSrc(chunkSrc)
 {
 }
-
 template<class Dummy>
 inline uint8_t * job_impl_allocator<Dummy>::allocate(std::size_t)
 {

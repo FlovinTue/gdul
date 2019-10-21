@@ -20,7 +20,11 @@
 
 #pragma once
 
+// defines gdul::shared_ptr
+#include <gdul\atomic_shared_ptr\atomic_shared_ptr.h>
+
 #include <gdul\WIP_job_handler\job_impl.h>
+
 
 namespace gdul {
 

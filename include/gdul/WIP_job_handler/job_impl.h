@@ -25,6 +25,8 @@
 #include <gdul\WIP_job_handler\job_handler_commons.h>
 #include <gdul\WIP_job_handler\callable.h>
 #include <gdul\WIP_job_handler\job_impl_allocator.h>
+#include <gdul\atomic_shared_ptr\atomic_shared_ptr.h>
+
 
 namespace gdul{
 

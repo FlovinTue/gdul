@@ -20,6 +20,7 @@
 
 #include <gdul\WIP_job_handler\job_impl.h>
 #include <gdul\WIP_job_handler\job_handler.h>
+#include <gdul\concurrent_object_pool\concurrent_object_pool.h>
 
 namespace gdul
 {

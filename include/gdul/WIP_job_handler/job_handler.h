@@ -24,8 +24,6 @@
 
 #include <thread>
 #include <array>
-#include <vector>
-#include <concurrent_vector.h>
 
 #include <gdul\concurrent_object_pool\concurrent_object_pool.h>
 #include <gdul\concurrent_queue\concurrent_queue.h>
@@ -34,22 +32,12 @@
 #include <gdul\WIP_job_handler\job_handler_commons.h>
 #include <gdul\WIP_job_handler\job_impl.h>
 #include <gdul\WIP_job_handler\job_impl_allocator.h>
-#include <gdul\WIP_job_handler\job_worker.h>
+#include <gdul\WIP_job_handler\worker_impl.h>
+#include <gdul\WIP_job_handler\worker.h>
 
 namespace gdul {
 
 namespace job_handler_detail {
-
-
-
-
-// Implement worker class
-// Contains queue affinity (static / dynamic)
-// Contains (OS) thread priority
-// Contains core affinity (automatic / manual)
-// Contains sleep threshHold
-// Also, implement this_worker
-// And maybe job_worker_impl.....
 
 class job_impl;
 }
@@ -61,16 +49,15 @@ public:
 	using job_impl_shared_ptr = job_handler_detail::job_impl::job_impl_shared_ptr;
 
 	static thread_local job this_job;
-	static thread_local job_worker* this_worker;
+	static thread_local worker this_worker;
 
 	job_handler();
 	job_handler(allocator_type& allocator);
 	~job_handler();
 
-	void Init();
- 	void reset();
+ 	void retire_workers();
 
-	job_worker& create_worker();
+	worker create_worker();
 
 	// Callable will allocate if size is above job_handler_detail::Callable_Max_Size_No_Heap_Alloc
 	// It needs to have operator() defined with signature void(void). 
@@ -84,25 +71,22 @@ public:
 	template <class Callable>
 	job make_job(Callable&& callable);
 
-
 private:
+	static thread_local worker_impl* this_worker_impl;
+
 	friend class job_handler_detail::job_impl;
 	friend class job;
 
 	template <class Callable>
 	job_impl_shared_ptr make_job_impl(Callable&& callable, std::uint8_t priority);
 
-
 	void enqueue_job(job_impl_shared_ptr job);
 
-	void launch_worker(std::uint32_t workerIndex);
+	void launch_worker(std::uint16_t index);
 
 	void work();
-	void idle();
 
 	job_impl_shared_ptr fetch_job();
-
-	std::uint8_t generate_priority_index();
 
 	allocator_type myMainAllocator;
 
@@ -110,13 +94,11 @@ private:
 
 	concurrent_queue<job_impl_shared_ptr, allocator_type> myJobQueues[job_handler_detail::Priority_Granularity];
 	
-	job_handler_detail::job_impl_allocator<uint8_t> myJobImplAllocator;
+	job_handler_detail::job_impl_allocator<std::uint8_t> myJobImplAllocator;
 
-	std::array<job_worker, job_handler_detail::Job_Handler_Max_Workers> myWorkers;
+	std::array<worker_impl, job_handler_detail::Job_Handler_Max_Workers> myWorkers;
 
-	std::atomic<std::remove_const<decltype(job_handler_detail::Job_Handler_Max_Workers)>::type> myWorkerCount;
-
-	std::atomic<bool> myIsRunning;
+	std::atomic<std::uint16_t> myWorkerCount;
 };
 
 template<class Callable>
@@ -151,22 +133,6 @@ inline job_handler::job_impl_shared_ptr job_handler::make_job_impl(Callable&& ca
 }
 #pragma warning(pop)
 
-// Usage ideas / functionality
-// Asynchronous submission of delegates with priorities
-// Synchronous submission of delegates with posibility of parallel execution
-
-// Submission of delegates from within current job, suspending current job until completed? ? 
-// -- would be practical. Run on current worker, farming out 'some' jobs to other workers?
-
-// Use some form of fiber system for execution? (Allowing suspension in the middle of a job, 
-// only to be resumed by the first avaliable thread)
-
-// Change design to each thread having a native sequence? Hmm. May harm modularity and simplicity..
-
-// Use externally supplied threads or internal ones?
-
-// Optimize for throughput or latency? Or both?
-
 // .. Array scatter-gather helper?
 // Needs Source array.. oor.. begin -> end iterator. Probably better.
 // Needs operation to perform... Hmm generalize more.. hmmm
@@ -174,10 +140,3 @@ inline job_handler::job_impl_shared_ptr job_handler::make_job_impl(Callable&& ca
 // Use cases? Hmm. Need to generalize for more use cases?
 // For example sort? How would that work?
 // Culling? Output arrays would not match input.
-// 
-// Fundamental rebuild:
-// A choice of number of queues, each next one with a lower priority
-// Support multiple dependancies
-// Job dependancies structured in a graph
-// Jobs submitted to their queues by post job examination of children
-// Consumption from queues with a log2 relationship to lower priority?

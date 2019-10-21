@@ -20,12 +20,13 @@
 
 #pragma once
 
-#include <thread>
 #include <cstdint>
 #include <limits>
 
 namespace gdul
 {
+typedef void* HANDLE;
+
 namespace job_handler_detail
 {
 constexpr std::uint16_t Job_Max_Dependencies = std::numeric_limits<std::uint16_t>::max() / 2;
@@ -34,7 +35,9 @@ constexpr std::uint16_t Job_Max_Dependencies = std::numeric_limits<std::uint16_t
 constexpr std::uint8_t Priority_Granularity = 4;
 constexpr std::uint8_t Default_Job_Priority = 0;
 constexpr std::uint8_t Callable_Max_Size_No_Heap_Alloc = 24;
-constexpr std::uint8_t Job_Handler_Max_Workers = 32;
+constexpr std::uint16_t Job_Handler_Max_Workers = 32;
+
+constexpr std::uint8_t Worker_Auto_Affinity = std::numeric_limits<std::uint8_t>::max();
 
 // The number of job chunks that the Job_Impl block allocator will allocate
 // when empty
@@ -76,7 +79,9 @@ constexpr std::size_t log2align(std::size_t value)
 	return std::size_t(1) << sum;
 }
 
-void set_thread_name(const char* name);
+void set_thread_name(const char* name, HANDLE handle);
+void set_thread_priority(std::uint32_t priority, HANDLE handle);
+void set_thread_core_affinity(std::uint8_t core, HANDLE handle);
 
 }
 }

@@ -13,49 +13,49 @@ namespace gdul
 #undef max
 
 thread_local job job_handler::this_job(nullptr);
-thread_local std::chrono::high_resolution_clock job_handler::ourSleepTimer;
-thread_local std::chrono::high_resolution_clock::time_point job_handler::ourLastJobTimepoint;
-thread_local std::size_t job_handler::ourPriorityDistributionIteration(0);
-thread_local size_t job_handler::ourLastJobSequence(0);
+thread_local worker job_handler::this_worker(nullptr);
+thread_local worker_impl* job_handler::this_worker_impl(nullptr);
 
 job_handler::job_handler()
 	: myJobImplChunkPool(job_handler_detail::Job_Impl_Allocator_Block_Size, myMainAllocator)
 	, myJobImplAllocator(&myJobImplChunkPool)
-	, myIsRunning(false)
+	, myWorkerCount(0)
 {
 }
 
 job_handler::job_handler(allocator_type & allocator)
 	: myMainAllocator(allocator)
-	, myJobImplChunkPool(128, myMainAllocator)
+	, myJobImplChunkPool(job_handler_detail::Job_Impl_Allocator_Block_Size, myMainAllocator)
 	, myJobImplAllocator(&myJobImplChunkPool)
-	, myIsRunning(false)
+	, myWorkerCount(0)
 {
 }
 
 
 job_handler::~job_handler()
 {
-	reset();
+	retire_workers();
 }
 
-void job_handler::Init()
+void job_handler::retire_workers()
 {
-	myIsRunning.store(true, std::memory_order_relaxed);
+	const std::uint16_t workers(myWorkerCount.exchange(0, std::memory_order_seq_cst));
+
+	for (size_t i = 0; i < workers; ++i) {
+		myWorkers[i].retire();
+	}
 }
 
-void job_handler::reset()
+worker job_handler::create_worker()
 {
-	bool exp(true);
-	if (!myIsRunning.compare_exchange_strong(exp, false, std::memory_order_relaxed)) {
-		return;
-	}
+	const std::uint16_t index(myWorkerCount.fetch_add(1, std::memory_order_relaxed));
+	const std::uint8_t coreAffinity(static_cast<std::uint8_t>(index % std::thread::hardware_concurrency()));
 
-	for (size_t i = 0; i < myInitInfo.myMaxWorkers; ++i) {
-		if (myWorkers[i].joinable()) {
-			myWorkers[i].join();
-		}
-	}
+	worker_impl impl(std::thread(&job_handler::launch_worker, this, index), coreAffinity);
+
+	myWorkers[index] = std::move(impl);
+
+	return worker(&myWorkers[index]);
 }
 
 void job_handler::enqueue_job(job_impl_shared_ptr job)
@@ -65,17 +65,13 @@ void job_handler::enqueue_job(job_impl_shared_ptr job)
 	myJobQueues[priority].push(std::move(job));
 }
 
-void job_handler::launch_worker(std::uint32_t workerIndex)
+void job_handler::launch_worker(std::uint16_t index)
 {
-	job_handler_detail::set_thread_name(std::string("job_handler_thread# " + std::to_string(workerIndex)).c_str());
-	SetThreadPriority(GetCurrentThread(), myInitInfo.myWorkerPriorities);
-
-	ourLastJobTimepoint = ourSleepTimer.now();
+	this_worker_impl = &myWorkers[index];
+	this_worker = worker(this_worker_impl);
+	this_worker_impl->refresh_sleep_timer();
 
 	//myInitInfo.myOnThreadLaunch();
-
-	const uint64_t affinityMask(1ULL << workerIndex);
-	while (!SetThreadAffinityMask(GetCurrentThread(), affinityMask));
 
 	work();
 
@@ -83,35 +79,25 @@ void job_handler::launch_worker(std::uint32_t workerIndex)
 }
 void job_handler::work()
 {
-	while (myIsRunning.load(std::memory_order_relaxed)) {
+	while (!this_worker_impl->is_retired()) {
 
 		this_job = job(fetch_job());
 
 		if (this_job.myImpl) {
 			(*this_job.myImpl)();
 
-			ourLastJobTimepoint = ourSleepTimer.now();
-		}
-		else {
-			idle();
-		}
-	}
-}
-void job_handler::idle()
-{
-	const std::chrono::high_resolution_clock::time_point current(ourSleepTimer.now());
-	const std::chrono::high_resolution_clock::time_point delta(current - ourLastJobTimepoint);
+			this_worker_impl->refresh_sleep_timer();
 
-	if (std::chrono::duration_cast<std::chrono::milliseconds>(current - delta).count() < myInitInfo.mySleepThreshhold) {
-		std::this_thread::yield();
-	}
-	else {
-		std::this_thread::sleep_for(std::chrono::microseconds(10));
+			continue;
+		}
+
+		this_worker_impl->idle();
 	}
 }
+
 job_handler::job_impl_shared_ptr job_handler::fetch_job()
 {
-	const uint8_t queueIndex(generate_priority_index());
+	const uint8_t queueIndex(this_worker_impl->get_queue_affinity());
 
 	job_handler::job_impl_shared_ptr out(nullptr);
 
@@ -125,33 +111,6 @@ job_handler::job_impl_shared_ptr job_handler::fetch_job()
 	}
 
 	return out;
-}
-
-// Maybe find some way to stick around at an index for a while? Better for cache...
-// Also, maybe avoid retrying at a failed index twice in a row.
-uint8_t job_handler::generate_priority_index()
-{
-	constexpr std::size_t totalDistributionChunks(job_handler_detail::pow2summation(1, job_handler_detail::Priority_Granularity));
-
-	const std::size_t iteration(++ourPriorityDistributionIteration);
-
-	uint8_t index(0);
-
-
-	// Find way to remove loop.
-	// Maybe find the highest mod in one check somehow?
-	for (uint8_t i = 1; i < job_handler_detail::Priority_Granularity; ++i) {
-		const std::uint8_t power(((job_handler_detail::Priority_Granularity) - (i + 1)));
-		const float fdesiredSlice(std::powf((float)2, (float)power));
-		const std::size_t desiredSlice((std::size_t)fdesiredSlice);
-		const std::size_t awardedSlice((totalDistributionChunks) / desiredSlice);
-		const uint8_t prev(index);
-		const uint8_t eval(iteration % awardedSlice == 0);
-		index += eval * i;
-		index -= prev * eval;
-	}
-
-	return index;
 }
 
 

@@ -813,7 +813,7 @@ public:
 	inline size_type size() const;
 	inline size_type get_capacity() const;
 
-	// Makes sure that it is entierly safe to replace this buffer with a successor
+	// Makes sure that it is entirely safe to replace this buffer with a successor
 	template <class U = T, std::enable_if_t<CQ_BUFFER_NOTHROW_POP_MOVE(U) || CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>* = nullptr>
 	inline bool verify_successor(const shared_ptr_slot_type&);
 	template <class U = T, std::enable_if_t<!CQ_BUFFER_NOTHROW_POP_MOVE(U) && !CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>* = nullptr>
