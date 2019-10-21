@@ -313,7 +313,7 @@ inline void concurrent_queue<T, Allocator>::push_internal(Arg&& ...in)
 template<class T, class Allocator>
 bool concurrent_queue<T, Allocator>::try_pop(T & out)
 {
-	const std::uint16_t producers(myProducerCount.load(std::memory_order_acquire));
+	const std::uint16_t producers(myProducerCount.load(std::memory_order_relaxed));
 
 	if (!this_consumer_cached()->try_pop(out)) {
 		std::uint16_t retry(0);
@@ -355,8 +355,8 @@ inline void concurrent_queue<T, Allocator>::unsafe_clear()
 {
 	std::atomic_thread_fence(std::memory_order_acquire);
 
-	shared_ptr_array_type producerArray(myProducerSlots.unsafe_load());
-	for (std::uint16_t i = 0; i < myProducerCount.load(std::memory_order_acquire); ++i) {
+	shared_ptr_array_type producerArray(myProducerSlots.unsafe_load(std::memory_order_relaxed));
+	for (std::uint16_t i = 0; i < myProducerCount.load(std::memory_order_relaxed); ++i) {
 		producerArray[i].unsafe_get_owned()->unsafe_clear();
 	}
 
@@ -367,7 +367,7 @@ inline void concurrent_queue<T, Allocator>::unsafe_reset()
 {
 	std::atomic_thread_fence(std::memory_order_acquire);
 
-	const std::uint16_t producerCount(myProducerCount.load(std::memory_order_acquire));
+	const std::uint16_t producerCount(myProducerCount.load(std::memory_order_relaxed));
 	const std::uint16_t slots(cqdetail::to_store_array_slot<void>(producerCount - static_cast<bool>(producerCount)) + static_cast<bool>(producerCount));
 
 	kill_store_array_below(slots, true);
@@ -379,7 +379,7 @@ inline void concurrent_queue<T, Allocator>::unsafe_reset()
 	myProducerSlotReservation.store(0, std::memory_order_relaxed);
 
 	for (std::uint16_t i = 0; i < producerCount; ++i) {
-		myProducerSlots.unsafe_get_owned()[i].unsafe_store(nullptr);
+		myProducerSlots.unsafe_get_owned()[i].unsafe_store(nullptr, std::memory_order_relaxed);
 	}
 
 	std::atomic_thread_fence(std::memory_order_release);
@@ -389,11 +389,11 @@ inline typename concurrent_queue<T, Allocator>::size_type concurrent_queue<T, Al
 {
 	const std::uint16_t producerCount(myProducerCount.load(std::memory_order_acquire));
 
-	shared_ptr_array_type producerArray(myProducerSlots.load());
+	shared_ptr_array_type producerArray(myProducerSlots.load(std::memory_order_relaxed));
 
 	size_type accumulatedSize(0);
 	for (std::uint16_t i = 0; i < producerCount; ++i) {
-		shared_ptr_slot_type slot(producerArray[i].load());
+		shared_ptr_slot_type slot(producerArray[i].load(std::memory_order_relaxed));
 		accumulatedSize += slot->size();
 	}
 	return accumulatedSize;
@@ -403,7 +403,7 @@ inline typename concurrent_queue<T, Allocator>::size_type concurrent_queue<T, Al
 {
 	const std::uint16_t producerCount(myProducerCount.load(std::memory_order_acquire));
 
-	atomic_shared_ptr_slot_type* const producerArray(myProducerSlots.unsafe_get_owned());
+	atomic_shared_ptr_slot_type* const producerArray(myProducerSlots.unsafe_get_owned(std::memory_order_relaxed));
 
 	size_type accumulatedSize(0);
 	for (std::uint16_t i = 0; i < producerCount; ++i) {
@@ -430,20 +430,20 @@ inline bool concurrent_queue<T, Allocator>::relocate_consumer()
 		}
 	}
 
-	const std::uint16_t relocation(myRelocationIndex.fetch_add(1, std::memory_order_acq_rel));
+	const std::uint16_t relocation(myRelocationIndex.fetch_add(1, std::memory_order_relaxed));
 	const std::uint16_t maxVisited(producers - static_cast<bool>(producers) + !(producers - static_cast<bool>(producers)));
 
 	cqdetail::consumer_wrapper<shared_ptr_slot_type, shared_ptr_array_type>& consumer(this_consumer());
 	if (consumer.myLastKnownArray != myProducerSlots) {
-		consumer.myLastKnownArray = myProducerSlots.load();
+		consumer.myLastKnownArray = myProducerSlots.load(std::memory_order_relaxed);
 	}
 
 	for (std::uint16_t i = 0, j = relocation; i < maxVisited; ++i, ++j) {
 		const std::uint16_t entry(j % producers);
-		shared_ptr_slot_type producerBuffer(consumer.myLastKnownArray[entry].load());
+		shared_ptr_slot_type producerBuffer(consumer.myLastKnownArray[entry].load(std::memory_order_relaxed));
 
 		if (!producerBuffer) {
-			consumer.myLastKnownArray = myProducerSlots.load();
+			consumer.myLastKnownArray = myProducerSlots.load(std::memory_order_relaxed);
 			--i; --j;
 			continue;
 		}
@@ -458,7 +458,7 @@ inline bool concurrent_queue<T, Allocator>::relocate_consumer()
 			if (successor) {
 				if (producerBuffer->verify_successor(successor)) {
 					producerBuffer = std::move(successor);
-					consumer.myLastKnownArray[entry].store(producerBuffer);
+					consumer.myLastKnownArray[entry].store(producerBuffer, std::memory_order_relaxed);
 				}
 			}
 		}
@@ -547,8 +547,8 @@ inline void concurrent_queue<T, Allocator>::push_producer_buffer(shared_ptr_slot
 #endif
 	insert_to_store(std::move(buffer), bufferSlot, cqdetail::to_store_array_slot<void>(bufferSlot));
 
-	const std::uint16_t postIterator(myProducerSlotPostIterator.fetch_add(1, std::memory_order_acq_rel) + 1);
-	const std::uint16_t numReserved(myProducerSlotReservation.load(std::memory_order_acquire));
+	const std::uint16_t postIterator(myProducerSlotPostIterator.fetch_add(1, std::memory_order_seq_cst) + 1);
+	const std::uint16_t numReserved(myProducerSlotReservation.load(std::memory_order_seq_cst));
 
 	// If postIterator and numReserved match, that means all indices below postIterator have been properly inserted
 	if (postIterator == numReserved) {
@@ -586,22 +586,22 @@ inline void concurrent_queue<T, Allocator>::try_alloc_produer_store_slot(std::ui
 
 	shared_ptr_array_type expected(nullptr, myProducerArrayStore[storeArraySlot].get_version());
 
-	myProducerArrayStore[storeArraySlot].compare_exchange_strong(expected, std::move(desired));
+	myProducerArrayStore[storeArraySlot].compare_exchange_strong(expected, std::move(desired), std::memory_order_relaxed, std::memory_order_acq_rel);
 }
 // Try swapping the current producer array for one from the store, and follow up
 // with an attempt to swap the capacity value for the one corresponding to the slot
 template<class T, class Allocator>
 inline void concurrent_queue<T, Allocator>::try_swap_producer_array(std::uint8_t fromStoreArraySlot)
 {
-	shared_ptr_array_type expectedProducerArray(myProducerSlots.load());
+	shared_ptr_array_type expectedProducerArray(myProducerSlots.load(std::memory_order_acquire));
 	for (;;) {
 		if (has_producer_array_been_superceeded(fromStoreArraySlot)) {
 			break;
 		}
 
-		shared_ptr_array_type desired(myProducerArrayStore[fromStoreArraySlot].load());
+		shared_ptr_array_type desired(myProducerArrayStore[fromStoreArraySlot].load(std::memory_order_relaxed));
 
-		if (myProducerSlots.compare_exchange_strong(expectedProducerArray, desired)) {
+		if (myProducerSlots.compare_exchange_strong(expectedProducerArray, desired, std::memory_order_relaxed, std::memory_order_release)) {
 			try_swap_producer_array_capacity(cqdetail::to_store_array_capacity<void>(fromStoreArraySlot));
 			break;
 		}
@@ -613,10 +613,10 @@ template<class T, class Allocator>
 inline void concurrent_queue<T, Allocator>::try_swap_producer_count(std::uint16_t toValue)
 {
 	const std::uint16_t desired(toValue);
-	for (std::uint16_t i = myProducerCount.load(std::memory_order_acquire); i < desired;) {
+	for (std::uint16_t i = myProducerCount.load(std::memory_order_relaxed); i < desired;) {
 
 		std::uint16_t& expected(i);
-		if (myProducerCount.compare_exchange_strong(expected, desired, std::memory_order_release)) {
+		if (myProducerCount.compare_exchange_strong(expected, desired, std::memory_order_relaxed, std::memory_order_release)) {
 			break;
 		}
 	}
@@ -625,10 +625,10 @@ template<class T, class Allocator>
 inline void concurrent_queue<T, Allocator>::try_swap_producer_array_capacity(std::uint16_t toCapacity)
 {
 	const std::uint16_t desiredCapacity(toCapacity);
-	std::uint16_t expectedCapacity(myProducerCapacity.load(std::memory_order_acquire));
+	std::uint16_t expectedCapacity(myProducerCapacity.load(std::memory_order_relaxed));
 
 	for (; expectedCapacity < desiredCapacity;) {
-		if (myProducerCapacity.compare_exchange_strong(expectedCapacity, desiredCapacity, std::memory_order_acq_rel, std::memory_order_acquire)) {
+		if (myProducerCapacity.compare_exchange_strong(expectedCapacity, desiredCapacity, std::memory_order_relaxed, std::memory_order_release)) {
 			break;
 		}
 	}
@@ -636,14 +636,14 @@ inline void concurrent_queue<T, Allocator>::try_swap_producer_array_capacity(std
 template<class T, class Allocator>
 inline bool concurrent_queue<T, Allocator>::has_producer_array_been_superceeded(std::uint16_t arraySlot)
 {
-	shared_ptr_array_type activeArray(myProducerSlots.load());
+	shared_ptr_array_type activeArray(myProducerSlots.load(std::memory_order_relaxed));
 
 	if (!activeArray) {
 		return false;
 	}
 
 	for (std::uint8_t higherStoreSlot = arraySlot + 1; higherStoreSlot < cqdetail::Producer_Slots_Max_Growth_Count; ++higherStoreSlot) {
-		if (myProducerArrayStore[higherStoreSlot].load().get_owned() == activeArray.get_owned()) {
+		if (myProducerArrayStore[higherStoreSlot].load(std::memory_order_relaxed).get_owned() == activeArray.get_owned()) {
 			return true;
 		}
 	}
@@ -656,7 +656,7 @@ inline std::uint16_t concurrent_queue<T, Allocator>::claim_store_slot()
 	std::uint16_t reservedSlot(std::numeric_limits<std::uint16_t>::max());
 #ifdef CQ_ENABLE_EXCEPTIONHANDLING
 	for (bool foundSlot(false); !foundSlot;) {
-		std::uint16_t expectedSlot(myProducerSlotReservation.load(std::memory_order_acquire));
+		std::uint16_t expectedSlot(myProducerSlotReservation.load(std::memory_order_relaxed));
 		const std::uint8_t storeArraySlot(cqdetail::to_store_array_slot<void>(expectedSlot));
 		try_alloc_produer_store_slot(storeArraySlot);
 		do {
@@ -668,7 +668,7 @@ inline std::uint16_t concurrent_queue<T, Allocator>::claim_store_slot()
 		} while (cqdetail::to_store_array_slot<void>(expectedSlot) == storeArraySlot);
 	}
 #else
-	reservedSlot = myProducerSlotReservation.fetch_add(1, std::memory_order_acq_rel);
+	reservedSlot = myProducerSlotReservation.fetch_add(1, std::memory_order_relaxed);
 	const std::uint8_t storeArraySlot(cqdetail::to_store_array_slot<void>(reservedSlot));
 	if (!myProducerArrayStore[storeArraySlot]) {
 		try_alloc_produer_store_slot(storeArraySlot);
@@ -687,12 +687,12 @@ inline typename concurrent_queue<T, Allocator>::shared_ptr_slot_type concurrent_
 			continue;
 		}
 
-		producerArray = myProducerArrayStore[i].load();
+		producerArray = myProducerArrayStore[i].load(std::memory_order_relaxed);
 
 		if (!producerArray) {
 			continue;
 		}
-		shared_ptr_slot_type buffer(producerArray[bufferSlot].load());
+		shared_ptr_slot_type buffer(producerArray[bufferSlot].load(std::memory_order_relaxed));
 		if (!buffer) {
 			continue;
 		}
@@ -706,12 +706,12 @@ inline typename concurrent_queue<T, Allocator>::shared_ptr_slot_type concurrent_
 template<class T, class Allocator>
 inline bool concurrent_queue<T, Allocator>::insert_to_store(shared_ptr_slot_type buffer, std::uint16_t bufferSlot, std::uint16_t storeSlot)
 {
-	shared_ptr_array_type producerArray(myProducerArrayStore[storeSlot].load());
+	shared_ptr_array_type producerArray(myProducerArrayStore[storeSlot].load(std::memory_order_relaxed));
 
 	if (!producerArray) {
 		return false;
 	}
-	producerArray[bufferSlot].store(std::move(buffer));
+	producerArray[bufferSlot].store(std::move(buffer), std::memory_order_relaxed);
 
 	return true;
 }
@@ -721,7 +721,7 @@ inline void concurrent_queue<T, Allocator>::kill_store_array_below(std::uint16_t
 {
 	for (std::uint16_t i = 0; i < belowSlot; ++i) {
 		const std::uint16_t slotSize(static_cast<std::uint16_t>(std::pow(2, i + 1)));
-		shared_ptr_array_type storeSlot(myProducerArrayStore[i].exchange(nullptr));
+		shared_ptr_array_type storeSlot(myProducerArrayStore[i].exchange(nullptr, std::memory_order_release));
 		if (!storeSlot) {
 			continue;
 		}
@@ -919,7 +919,7 @@ inline producer_buffer<T, Allocator>::~producer_buffer()
 template<class T, class Allocator>
 inline bool producer_buffer<T, Allocator>::is_active() const
 {
-	return (!myNext || (myReadSlot.load(std::memory_order_acquire) != myPostWriteIterator.load(std::memory_order_acquire)));
+	return (!myNext || (myReadSlot.load(std::memory_order_relaxed) != myPostWriteIterator.load(std::memory_order_relaxed)));
 }
 template<class T, class Allocator>
 inline bool producer_buffer<T, Allocator>::is_valid() const
@@ -937,17 +937,17 @@ inline void producer_buffer<T, Allocator>::invalidate()
 template<class T, class Allocator>
 inline typename producer_buffer<T, Allocator>::shared_ptr_slot_type producer_buffer<T, Allocator>::find_back()
 {
-	bool nextState(myNextState.load(std::memory_order_acquire));
+	bool nextState(myNextState.load(std::memory_order_seq_cst));
 	shared_ptr_slot_type back(nullptr);
 	producer_buffer<T, allocator_type>* inspect(this);
 
 	while (nextState) {
-		const size_type readSlot(inspect->myReadSlot.load(std::memory_order_acquire));
-		const size_type postWrite(inspect->myPostWriteIterator.load(std::memory_order_acquire));
+		const size_type readSlot(inspect->myReadSlot.load(std::memory_order_relaxed));
+		const size_type postWrite(inspect->myPostWriteIterator.load(std::memory_order_relaxed));
 
 		const bool thisBufferEmpty(readSlot == postWrite);
 #ifdef CQ_ENABLE_EXCEPTIONHANDLING
-		const bool veto(inspect->myFailiureCount.load(std::memory_order_acquire) != inspect->myFailiureIndex.load(std::memory_order_acquire));
+		const bool veto(inspect->myFailiureCount.load(std::memory_order_relaxed) != inspect->myFailiureIndex.load(std::memory_order_relaxed));
 		const bool valid(!thisBufferEmpty | veto);
 #else
 		const bool valid(!thisBufferEmpty);
@@ -955,9 +955,11 @@ inline typename producer_buffer<T, Allocator>::shared_ptr_slot_type producer_buf
 		if (valid) {
 			break;
 		}
+		std::atomic_thread_fence(std::memory_order_seq_cst);
+
 		back = inspect->myNext;
 		inspect = back.get_owned();
-		nextState = back->myNextState.load(std::memory_order_acquire);
+		nextState = back->myNextState.load(std::memory_order_release);
 	}
 	return back;
 }
@@ -965,11 +967,11 @@ inline typename producer_buffer<T, Allocator>::shared_ptr_slot_type producer_buf
 template<class T, class Allocator>
 inline typename producer_buffer<T, Allocator>::size_type producer_buffer<T, Allocator>::size() const
 {
-	const size_type readSlot(myReadSlot.load(std::memory_order_acquire));
-	size_type accumulatedSize(myPostWriteIterator.load(std::memory_order_acquire));
+	const size_type readSlot(myReadSlot.load(std::memory_order_relaxed));
+	size_type accumulatedSize(myPostWriteIterator.load(std::memory_order_relaxed));
 	accumulatedSize -= readSlot;
 
-	if (myNextState.load(std::memory_order_acquire))
+	if (myNextState.load(std::memory_order_seq_cst))
 		accumulatedSize += myNext->size();
 
 	return accumulatedSize;
@@ -990,7 +992,7 @@ template<class T, class Allocator>
 template <class U, std::enable_if_t<!CQ_BUFFER_NOTHROW_POP_MOVE(U) && !CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>*>
 inline bool producer_buffer<T, Allocator>::verify_successor(const shared_ptr_slot_type& successor)
 {
-	if (!myNextState.load(std::memory_order_acquire)) {
+	if (!myNextState.load(std::memory_order_seq_cst)) {
 		return false;
 	}
 
@@ -998,7 +1000,7 @@ inline bool producer_buffer<T, Allocator>::verify_successor(const shared_ptr_slo
 	producer_buffer<T, Allocator>* inspect(this);
 
 	do {
-		const size_type preRead(inspect->myPreReadIterator.load(std::memory_order_acquire));
+		const size_type preRead(inspect->myPreReadIterator.load(std::memory_order_relaxed));
 		for (size_type i = 0; i < inspect->myCapacity; ++i) {
 			const size_type index((preRead - i) % inspect->myCapacity);
 
@@ -1006,13 +1008,16 @@ inline bool producer_buffer<T, Allocator>::verify_successor(const shared_ptr_slo
 				return false;
 			}
 		}
+
+		std::atomic_thread_fence(std::memory_order_seq_cst);
+
 		next = inspect->myNext;
 		inspect = next.get_owned();
 
 		if (inspect == successor.get_owned()) {
 			break;
 		}
-	} while (next->myNextState.load(std::memory_order_acquire));
+	} while (next->myNextState.load(std::memory_order_relaxed));
 
 	return true;
 }
@@ -1026,14 +1031,14 @@ template <class U, std::enable_if_t<!CQ_BUFFER_NOTHROW_POP_MOVE(U) && !CQ_BUFFER
 inline void producer_buffer<T, Allocator>::check_for_damage()
 {
 #ifdef CQ_ENABLE_EXCEPTIONHANDLING
-	const size_type preRead(myPreReadIterator.load(std::memory_order_acquire));
+	const size_type preRead(myPreReadIterator.load(std::memory_order_relaxed));
 	const size_type preReadLockOffset(preRead - Buffer_Lock_Offset);
-	if (preReadLockOffset != myPostReadIterator.load(std::memory_order_acquire)) {
+	if (preReadLockOffset != myPostReadIterator.load(std::memory_order_relaxed)) {
 		return;
 	}
 
-	const std::uint16_t failiureIndex(myFailiureIndex.load(std::memory_order_acquire));
-	const std::uint16_t failiureCount(myFailiureCount.load(std::memory_order_acquire));
+	const std::uint16_t failiureIndex(myFailiureIndex.load(std::memory_order_relaxed));
+	const std::uint16_t failiureCount(myFailiureCount.load(std::memory_order_relaxed));
 	const std::uint16_t difference(failiureCount - failiureIndex);
 
 	const bool failCheckA(0 == difference);
@@ -1046,7 +1051,7 @@ inline void producer_buffer<T, Allocator>::check_for_damage()
 
 	std::uint16_t expected(failiureIndex);
 	const std::uint16_t desired(failiureCount);
-	if (myFailiureIndex.compare_exchange_strong(expected, desired, std::memory_order_acq_rel, std::memory_order_acquire)) {
+	if (myFailiureIndex.compare_exchange_strong(expected, desired, std::memory_order_relaxed, std::memory_order_relaxed)) {
 		reintegrate_failed_entries(toReintegrate);
 
 		myPostReadIterator.fetch_sub(toReintegrate);
@@ -1066,12 +1071,13 @@ inline void producer_buffer<T, Allocator>::push_front(shared_ptr_slot_type newBu
 		last = verLast.get_owned();
 	}
 	last->myNext = std::move(newBuffer);
-	last->myNextState.store(true, std::memory_order_release);
+
+	last->myNextState.store(true, std::memory_order_seq_cst);
 }
 template<class T, class Allocator>
 inline void producer_buffer<T, Allocator>::unsafe_clear()
 {
-	const size_type postWrite(myPostWriteIterator.load(std::memory_order_acquire));
+	const size_type postWrite(myPostWriteIterator.load(std::memory_order_relaxed));
 	myPreReadIterator.store(postWrite, std::memory_order_relaxed);
 	myReadSlot.store(postWrite, std::memory_order_relaxed);
 
@@ -1114,18 +1120,18 @@ inline bool producer_buffer<T, Allocator>::try_push(Arg && ...in)
 template<class T, class Allocator>
 inline bool producer_buffer<T, Allocator>::try_pop(T & out)
 {
-	const size_type lastWritten(myPostWriteIterator.load(std::memory_order_acquire));
-	const size_type slotReserved(myPreReadIterator.fetch_add(1, std::memory_order_acq_rel) + 1);
+	const size_type lastWritten(myPostWriteIterator.load(std::memory_order_relaxed));
+	const size_type slotReserved(myPreReadIterator.fetch_add(1, std::memory_order_relaxed) + 1);
 	const size_type avaliable(lastWritten - slotReserved);
 
 	if (myCapacity < avaliable) {
-		myPreReadIterator.fetch_sub(1, std::memory_order_release);
+		myPreReadIterator.fetch_sub(1, std::memory_order_relaxed);
 #ifdef CQ_ENABLE_EXCEPTIONHANDLING
 		check_for_damage();
 #endif
 		return false;
 	}
-	const size_type readSlotTotal(myReadSlot.fetch_add(1, std::memory_order_acq_rel));
+	const size_type readSlotTotal(myReadSlot.fetch_add(1, std::memory_order_relaxed));
 	const size_type readSlot(readSlotTotal % myCapacity);
 
 	write_out(readSlot, out);
@@ -1212,7 +1218,7 @@ inline void producer_buffer<T, Allocator>::write_out(typename producer_buffer<T,
 #ifdef CQ_ENABLE_EXCEPTIONHANDLING
 	}
 	catch (...) {
-		if (myFailiureCount.fetch_add(1, std::memory_order_acq_rel) == myFailiureIndex.load(std::memory_order_acquire)) {
+		if (myFailiureCount.fetch_add(1, std::memory_order_relaxed) == myFailiureIndex.load(std::memory_order_relaxed)) {
 			myPreReadIterator.fetch_add(Buffer_Lock_Offset, std::memory_order_release);
 		}
 		myDataBlock[slot].set_state(item_state::Failed);
@@ -1225,7 +1231,7 @@ template<class T, class Allocator>
 inline void producer_buffer<T, Allocator>::reintegrate_failed_entries(typename producer_buffer<T, Allocator>::size_type failCount)
 {
 #ifdef CQ_ENABLE_EXCEPTIONHANDLING
-	const size_type readSlotTotal(myReadSlot.load(std::memory_order_acquire));
+	const size_type readSlotTotal(myReadSlot.load(std::memory_order_relaxed));
 	const size_type readSlotTotalOffset(readSlotTotal + myCapacity);
 
 	const size_type startIndex(readSlotTotalOffset - 1);
