@@ -440,7 +440,7 @@ inline shared_ptr<T, Allocator> atomic_shared_ptr<T, Allocator>::exchange(shared
 template<class T, class Allocator>
 inline std::uint8_t atomic_shared_ptr<T, Allocator>::get_version() const noexcept
 {
-	const compressed_storage storage(myStorage.load(std::memory_order_acquire));
+	const compressed_storage storage(myStorage.load(std::memory_order_relaxed));
 	return storage.myU8[aspdetail::STORAGE_BYTE_VERSION];
 }
 template<class T, class Allocator>
@@ -509,7 +509,7 @@ inline const T * atomic_shared_ptr<T, Allocator>::unsafe_get_owned() const
 template<class T, class Allocator>
 inline constexpr const aspdetail::control_block_base<T, Allocator>* atomic_shared_ptr<T, Allocator>::get_control_block() const noexcept
 {
-	return to_control_block(myStorage.load(std::memory_order_acquire));;
+	return to_control_block(myStorage.load(std::memory_order_acquire));
 }
 template<class T, class Allocator>
 inline constexpr aspdetail::control_block_base<T, Allocator>* atomic_shared_ptr<T, Allocator>::get_control_block() noexcept
@@ -520,7 +520,7 @@ inline constexpr aspdetail::control_block_base<T, Allocator>* atomic_shared_ptr<
 template<class T, class Allocator>
 inline atomic_shared_ptr<T, Allocator>::operator bool() const noexcept
 {
-	return static_cast<bool>(myStorage.load(std::memory_order_acquire) & aspdetail::Ptr_Mask);
+	return static_cast<bool>(myStorage.load(std::memory_order_relaxed) & aspdetail::Ptr_Mask);
 }
 // cheap hint to see if this object holds a value
 template <class T, class Allocator>
@@ -550,7 +550,7 @@ inline constexpr bool operator!=(const atomic_shared_ptr<T, Allocator>& ptr, std
 template<class T, class Allocator>
 inline bool atomic_shared_ptr<T, Allocator>::operator==(const aspdetail::ptr_base<T, Allocator>& other) const noexcept
 {
-	return !((myStorage.load(std::memory_order_acquire) ^ other.myControlBlockStorage.myU64) & aspdetail::Versioned_Ptr_Mask);
+	return !((myStorage.load(std::memory_order_relaxed) ^ other.myControlBlockStorage.myU64) & aspdetail::Versioned_Ptr_Mask);
 }
 // cheap hint comparison to ptr_base derivatives
 template<class T, class Allocator>
@@ -835,7 +835,7 @@ inline const T* control_block_base<T, Allocator>::get_owned() const noexcept
 template <class T, class Allocator>
 inline typename control_block_base<T, Allocator>::size_type control_block_base<T, Allocator>::use_count() const noexcept
 {
-	return myUseCount.load(std::memory_order_acquire);
+	return myUseCount.load(std::memory_order_relaxed);
 }
 template <class T, class Allocator>
 class control_block_make_shared : public control_block_base<T, Allocator>
