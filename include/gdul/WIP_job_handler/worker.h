@@ -32,7 +32,9 @@ public:
 	// Thread name
 	void set_name(const char* name);
 
-	bool retire();
+	void enable();
+
+	bool disable();
 
 	bool is_retired() const;
 

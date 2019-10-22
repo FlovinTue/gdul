@@ -6,12 +6,17 @@
 			<CustomListItems>
 				<Variable Name = "sizeAccumulator" InitialValue = "0"/>
 				<Variable Name = "producerIndex" InitialValue = "0" />
-				<Variable Name = "producerSlotsRaw" InitialValue="(*(atomic_shared_ptr_slot_type**)(+8
+				<Variable Name = "producerSlotsRaw" InitialValue="(atomic_shared_ptr_slot_type*)0"/>
+				<Variable Name = "pBuffer" InitialValue = "(buffer_type*)(0)" />
+
+				<Exec Condition="producerIndex != myProducerCount._My_val">
+					producerSlotsRaw = 
+					(*(atomic_shared_ptr_slot_type**)(+8
 					+ ((myProducerSlots.myDebugView.myU64 >> 1) * 2)
 					- ((uint64_t)myProducerSlots.myDebugView.myU8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
 					- ((uint64_t)myProducerSlots.myDebugView.myU8[aspdetail::STORAGE_BYTE_COPYREQUEST] * (aspdetail::Ptr_Mask + 1))
-					))"/>
-				<Variable Name = "pBuffer" InitialValue = "(buffer_type*)(0)" />
+					))
+				</Exec>
 				
 				<Loop>
 					<Break Condition = "producerIndex == myProducerCount._My_val" />

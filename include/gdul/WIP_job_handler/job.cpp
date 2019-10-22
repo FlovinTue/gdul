@@ -67,7 +67,8 @@ void job::wait_for_finish()
 	assert(myImpl && "Job not set");
 
 	while (!is_finished()) {
-		myImpl->get_handler()->idle();
+		job_handler::this_worker_impl->refresh_sleep_timer();
+		job_handler::this_worker_impl->idle();
 	}
 }
 job::operator bool() const

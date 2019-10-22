@@ -1,12 +1,15 @@
 #include <gdul\WIP_job_handler\worker_impl.h>
 #include <cassert>
 
+#if defined(_WIN64) | defined(_WIN32)
+#define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
+#endif
 
 namespace gdul
 {
-namespace job_handle_detail
+namespace job_handler_detail
 {
 
 worker_impl::worker_impl()
@@ -15,32 +18,35 @@ worker_impl::worker_impl()
 	, myIsRunning(false)
 	, myPriorityDistributionIteration(0)
 	, myQueueAffinity(0)
-	, mySleepThreshhold(0)
+	, mySleepThreshhold(std::numeric_limits<std::uint16_t>::max())
 	, myThreadHandle(nullptr)
 {
 	myThreadHandle = get_thread_handle();
 }
-worker_impl::worker_impl(std::thread&& thread, std::uint8_t coreAffinity)
+worker_impl::worker_impl(std::uint8_t coreAffinity)
 	: myAutoCoreAffinity(coreAffinity)
-	, myThread(std::move(thread))
 	, myCoreAffinity(0)
-	, myIsRunning(true)
+	, myIsRunning(false)
 	, myPriorityDistributionIteration(0)
 	, myQueueAffinity(job_handler_detail::Worker_Auto_Affinity)
 	, mySleepThreshhold(250)
 	, myThreadHandle(nullptr)
 {
-	set_core_affinity(coreAffinity);
 }
 
 worker_impl::~worker_impl()
 {
 }
 
+void worker_impl::set_thread(std::thread && thread)
+{
+	myThread = std::move(thread);
+}
+
 worker_impl & worker_impl::operator=(worker_impl && other)
 {
 	myAutoCoreAffinity = other.myAutoCoreAffinity;
-	myThread = std::move(other.myThread);
+	myThread.swap(other.myThread);
 	myCoreAffinity = other.myCoreAffinity;
 	myIsRunning.store(other.myIsRunning.load(std::memory_order_relaxed), std::memory_order_relaxed);
 	myThreadHandle = other.myThreadHandle;
@@ -55,15 +61,15 @@ worker_impl & worker_impl::operator=(worker_impl && other)
 
 void worker_impl::set_core_affinity(std::uint8_t core)
 {
-	assert(!is_retired() && "Cannot set affinity to inactive worker");
+	assert(is_active() && "Cannot set affinity to inactive worker");
 
 	if (core == job_handler_detail::Worker_Auto_Affinity) {
 		myCoreAffinity = myAutoCoreAffinity;
 	}
 
-	const uint8_t core_(core % std::thread::hardware_concurrency());
+	const uint8_t core_(myCoreAffinity % std::thread::hardware_concurrency());
 
-	job_handler_detail::set_thread_core_affinity(core, myThreadHandle);
+	job_handler_detail::set_thread_core_affinity(core_, myThreadHandle);
 }
 void worker_impl::set_queue_affinity(std::uint8_t queue)
 {
@@ -71,7 +77,7 @@ void worker_impl::set_queue_affinity(std::uint8_t queue)
 }
 void worker_impl::set_execution_priority(std::uint32_t priority)
 {
-	assert(!is_retired() && "Cannot set execution priority to inactive worker");
+	assert(is_active() && "Cannot set execution priority to inactive worker");
 
 	job_handler_detail::set_thread_priority(priority, myThreadHandle);
 }
@@ -83,8 +89,17 @@ void worker_impl::set_thread_handle(HANDLE handle)
 {
 	myThreadHandle = handle;
 }
-bool worker_impl::retire()
+void worker_impl::enable()
 {
+	myIsRunning.store(true, std::memory_order_relaxed);
+}
+bool worker_impl::disable()
+{
+	assert(is_active() && "Cannot disable inactive worker");
+
+	myThread.detach();
+	myThread = std::thread();
+
 	return myIsRunning.exchange(false, std::memory_order_relaxed);
 }
 void worker_impl::refresh_sleep_timer()
@@ -98,7 +113,11 @@ bool worker_impl::is_sleepy() const
 
 	return !(std::chrono::duration_cast<std::chrono::milliseconds>(current - delta).count() < mySleepThreshhold);
 }
-bool worker_impl::is_retired() const
+bool worker_impl::is_active() const
+{
+	return myThread.get_id() != std::thread().get_id();
+}
+bool worker_impl::is_enabled() const
 {
 	return myIsRunning.load(std::memory_order_relaxed);
 }
@@ -113,7 +132,7 @@ void worker_impl::idle()
 }
 // Maybe find some way to stick around at an index for a while? Better for cache...
 // Also, maybe avoid retrying at a failed index twice in a row.
-std::uint8_t worker_impl::get_queue_affinity()
+std::uint8_t worker_impl::get_queue_target()
 {
 	if (myQueueAffinity == job_handler_detail::Worker_Auto_Affinity) {
 		return myQueueAffinity;
@@ -143,7 +162,7 @@ std::uint8_t worker_impl::get_queue_affinity()
 }
 void worker_impl::set_name(const char * name)
 {
-	assert(!is_retired() && "Cannot set name to inactive worker");
+	assert(is_active() && "Cannot set name to inactive worker");
 
 	job_handler_detail::set_thread_name(name, myThreadHandle);
 }

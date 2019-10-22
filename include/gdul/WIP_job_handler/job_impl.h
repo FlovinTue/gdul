@@ -143,6 +143,7 @@ inline job_impl::job_impl(job_handler* handler, Callable && callable, std::uint8
 // Memory chunk representation of job_impl
 struct alignas(log2align(Callable_Max_Size_No_Heap_Alloc)) job_impl_chunk_rep
 {
+	job_impl_chunk_rep() : dummy{} {}
 	operator uint8_t*()
 	{
 		return reinterpret_cast<uint8_t*>(this);

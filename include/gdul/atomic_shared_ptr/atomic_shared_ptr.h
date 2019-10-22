@@ -115,31 +115,31 @@ public:
 	inline bool compare_exchange_strong(raw_ptr<T, Allocator>& expected, const shared_ptr<T, Allocator>& desired, std::memory_order order = std::memory_order_seq_cst) noexcept;
 	inline bool compare_exchange_strong(raw_ptr<T, Allocator>& expected, shared_ptr<T, Allocator>&& desired, std::memory_order order = std::memory_order_seq_cst) noexcept;
 
-	inline bool compare_exchange_strong(raw_ptr<T, Allocator>& expected, const shared_ptr<T, Allocator>& desired, std::memory_order failOrder, std::memory_order successOrder) noexcept;
-	inline bool compare_exchange_strong(raw_ptr<T, Allocator>& expected, shared_ptr<T, Allocator>&& desired, std::memory_order failOrder, std::memory_order successOrder) noexcept;
+	inline bool compare_exchange_strong(raw_ptr<T, Allocator>& expected, const shared_ptr<T, Allocator>& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept;
+	inline bool compare_exchange_strong(raw_ptr<T, Allocator>& expected, shared_ptr<T, Allocator>&& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept;
 
 	inline bool compare_exchange_strong(shared_ptr<T, Allocator>& expected, const shared_ptr<T, Allocator>& desired, std::memory_order order = std::memory_order_seq_cst) noexcept;
 	inline bool compare_exchange_strong(shared_ptr<T, Allocator>& expected, shared_ptr<T, Allocator>&& desired, std::memory_order order = std::memory_order_seq_cst) noexcept;
 
-	inline bool compare_exchange_strong(shared_ptr<T, Allocator>& expected, const shared_ptr<T, Allocator>& desired, std::memory_order failOrder, std::memory_order successOrder) noexcept;
-	inline bool compare_exchange_strong(shared_ptr<T, Allocator>& expected, shared_ptr<T, Allocator>&& desired, std::memory_order failOrder, std::memory_order successOrder) noexcept;
+	inline bool compare_exchange_strong(shared_ptr<T, Allocator>& expected, const shared_ptr<T, Allocator>& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept;
+	inline bool compare_exchange_strong(shared_ptr<T, Allocator>& expected, shared_ptr<T, Allocator>&& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept;
 
 	// compare_exchange_weak may fail spuriously if another thread loads this value while attempting swap
 	inline bool compare_exchange_weak(raw_ptr<T, Allocator>& expected, const shared_ptr<T, Allocator>& desired, std::memory_order order = std::memory_order_seq_cst) noexcept;
 	// compare_exchange_weak may fail spuriously if another thread loads this value while attempting swap
 	inline bool compare_exchange_weak(raw_ptr<T, Allocator>& expected, shared_ptr<T, Allocator>&& desired, std::memory_order order = std::memory_order_seq_cst) noexcept;
 	// compare_exchange_weak may fail spuriously if another thread loads this value while attempting swap
-	inline bool compare_exchange_weak(raw_ptr<T, Allocator>& expected, const shared_ptr<T, Allocator>& desired, std::memory_order failOrder, std::memory_order successOrder) noexcept;
+	inline bool compare_exchange_weak(raw_ptr<T, Allocator>& expected, const shared_ptr<T, Allocator>& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept;
 	// compare_exchange_weak may fail spuriously if another thread loads this value while attempting swap
-	inline bool compare_exchange_weak(raw_ptr<T, Allocator>& expected, shared_ptr<T, Allocator>&& desired, std::memory_order failOrder, std::memory_order successOrder) noexcept;
+	inline bool compare_exchange_weak(raw_ptr<T, Allocator>& expected, shared_ptr<T, Allocator>&& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept;
 	// compare_exchange_weak may fail spuriously if another thread loads this value while attempting swap
 	inline bool compare_exchange_weak(shared_ptr<T, Allocator>& expected, const shared_ptr<T, Allocator>& desired, std::memory_order order = std::memory_order_seq_cst) noexcept;
 	// compare_exchange_weak may fail spuriously if another thread loads this value while attempting swap
 	inline bool compare_exchange_weak(shared_ptr<T, Allocator>& expected, shared_ptr<T, Allocator>&& desired, std::memory_order order = std::memory_order_seq_cst) noexcept;
 	// compare_exchange_weak may fail spuriously if another thread loads this value while attempting swap
-	inline bool compare_exchange_weak(shared_ptr<T, Allocator>& expected, const shared_ptr<T, Allocator>& desired, std::memory_order failOrder, std::memory_order successOrder) noexcept;
+	inline bool compare_exchange_weak(shared_ptr<T, Allocator>& expected, const shared_ptr<T, Allocator>& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept;
 	// compare_exchange_weak may fail spuriously if another thread loads this value while attempting swap
-	inline bool compare_exchange_weak(shared_ptr<T, Allocator>& expected, shared_ptr<T, Allocator>&& desired, std::memory_order failOrder, std::memory_order successOrder) noexcept;
+	inline bool compare_exchange_weak(shared_ptr<T, Allocator>& expected, shared_ptr<T, Allocator>&& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept;
 
 	inline shared_ptr<T, Allocator> load(std::memory_order order = std::memory_order_seq_cst) noexcept;
 
@@ -192,10 +192,10 @@ private:
 	inline compressed_storage exchange_internal(compressed_storage to, aspdetail::CAS_FLAG flags, std::memory_order order) noexcept;
 
 	template <class PtrType>
-	inline bool compare_exchange_strong(typename aspdetail::disable_deduction<PtrType>::type& expected, shared_ptr<T, Allocator>&& desired, std::memory_order failOrder, std::memory_order successOrder) noexcept;
+	inline bool compare_exchange_strong(typename aspdetail::disable_deduction<PtrType>::type& expected, shared_ptr<T, Allocator>&& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept;
 
 	template <class PtrType>
-	inline bool compare_exchange_weak(typename aspdetail::disable_deduction<PtrType>::type& expected, shared_ptr<T, Allocator>&& desired, std::memory_order failOrder, std::memory_order successOrder) noexcept;
+	inline bool compare_exchange_weak(typename aspdetail::disable_deduction<PtrType>::type& expected, shared_ptr<T, Allocator>&& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept;
 
 	inline bool compare_exchange_weak_internal(compressed_storage& expected, compressed_storage desired, aspdetail::CAS_FLAG flags, aspdetail::memory_orders orders) noexcept;
 	inline bool compare_exchange_weak_internal_fast_swap(compressed_storage & expected, const compressed_storage & desired, aspdetail::CAS_FLAG flags, aspdetail::memory_orders orders) noexcept;
@@ -261,14 +261,14 @@ inline bool atomic_shared_ptr<T, Allocator>::compare_exchange_strong(raw_ptr<T, 
 	return compare_exchange_strong(expected, std::move(desired), order, order);
 }
 template<class T, class Allocator>
-inline bool atomic_shared_ptr<T, Allocator>::compare_exchange_strong(raw_ptr<T, Allocator>& expected, const shared_ptr<T, Allocator>& desired, std::memory_order failOrder, std::memory_order successOrder) noexcept
+inline bool atomic_shared_ptr<T, Allocator>::compare_exchange_strong(raw_ptr<T, Allocator>& expected, const shared_ptr<T, Allocator>& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept
 {
-	return compare_exchange_strong(expected, shared_ptr<T, Allocator>(desired), failOrder, successOrder);
+	return compare_exchange_strong(expected, shared_ptr<T, Allocator>(desired), successOrder, failOrder);
 }
 template<class T, class Allocator>
-inline bool atomic_shared_ptr<T, Allocator>::compare_exchange_strong(raw_ptr<T, Allocator>& expected, shared_ptr<T, Allocator>&& desired, std::memory_order failOrder, std::memory_order successOrder) noexcept
+inline bool atomic_shared_ptr<T, Allocator>::compare_exchange_strong(raw_ptr<T, Allocator>& expected, shared_ptr<T, Allocator>&& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept
 {
-	return compare_exchange_strong<decltype(expected)>(expected, std::move(desired), failOrder, successOrder);
+	return compare_exchange_strong<decltype(expected)>(expected, std::move(desired), successOrder, failOrder);
 }
 template<class T, class Allocator>
 inline bool atomic_shared_ptr<T, Allocator>::compare_exchange_strong(shared_ptr<T, Allocator>& expected, const shared_ptr<T, Allocator>& desired, std::memory_order order) noexcept
@@ -281,14 +281,14 @@ inline bool atomic_shared_ptr<T, Allocator>::compare_exchange_strong(shared_ptr<
 	return compare_exchange_strong(expected, std::move(desired), order, order);
 }
 template<class T, class Allocator>
-inline bool atomic_shared_ptr<T, Allocator>::compare_exchange_strong(shared_ptr<T, Allocator>& expected, const shared_ptr<T, Allocator>& desired, std::memory_order failOrder, std::memory_order successOrder) noexcept
+inline bool atomic_shared_ptr<T, Allocator>::compare_exchange_strong(shared_ptr<T, Allocator>& expected, const shared_ptr<T, Allocator>& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept
 {
-	return compare_exchange_strong(expected, shared_ptr<T, Allocator>(desired), failOrder, successOrder);
+	return compare_exchange_strong(expected, shared_ptr<T, Allocator>(desired), successOrder, failOrder);
 }
 template<class T, class Allocator>
-inline bool atomic_shared_ptr<T, Allocator>::compare_exchange_strong(shared_ptr<T, Allocator>& expected, shared_ptr<T, Allocator>&& desired, std::memory_order failOrder, std::memory_order successOrder) noexcept
+inline bool atomic_shared_ptr<T, Allocator>::compare_exchange_strong(shared_ptr<T, Allocator>& expected, shared_ptr<T, Allocator>&& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept
 {
-	return compare_exchange_strong<decltype(expected)>(expected, std::move(desired), failOrder, successOrder);
+	return compare_exchange_strong<decltype(expected)>(expected, std::move(desired), successOrder, failOrder);
 }
 
 template<class T, class Allocator>
@@ -302,14 +302,14 @@ inline bool atomic_shared_ptr<T, Allocator>::compare_exchange_weak(raw_ptr<T, Al
 	return compare_exchange_weak(expected, std::move(desired), order, order);
 }
 template<class T, class Allocator>
-inline bool atomic_shared_ptr<T, Allocator>::compare_exchange_weak(raw_ptr<T, Allocator>& expected, const shared_ptr<T, Allocator>& desired, std::memory_order failOrder, std::memory_order successOrder) noexcept
+inline bool atomic_shared_ptr<T, Allocator>::compare_exchange_weak(raw_ptr<T, Allocator>& expected, const shared_ptr<T, Allocator>& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept
 {
-	return compare_exchange_weak(expected, shared_ptr<T, Allocator>(desired), failOrder, successOrder);
+	return compare_exchange_weak(expected, shared_ptr<T, Allocator>(desired), successOrder, failOrder);
 }
 template<class T, class Allocator>
-inline bool atomic_shared_ptr<T, Allocator>::compare_exchange_weak(raw_ptr<T, Allocator>& expected, shared_ptr<T, Allocator>&& desired, std::memory_order failOrder, std::memory_order successOrder) noexcept
+inline bool atomic_shared_ptr<T, Allocator>::compare_exchange_weak(raw_ptr<T, Allocator>& expected, shared_ptr<T, Allocator>&& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept
 {
-	return compare_exchange_weak<decltype(expected)>(expected, std::move(desired), failOrder, successOrder);
+	return compare_exchange_weak<decltype(expected)>(expected, std::move(desired), successOrder, failOrder);
 }
 template<class T, class Allocator>
 inline bool atomic_shared_ptr<T, Allocator>::compare_exchange_weak(shared_ptr<T, Allocator>& expected, const shared_ptr<T, Allocator>& desired, std::memory_order order) noexcept
@@ -322,23 +322,23 @@ inline bool atomic_shared_ptr<T, Allocator>::compare_exchange_weak(shared_ptr<T,
 	return compare_exchange_weak(expected, std::move(desired), order, order);
 }
 template<class T, class Allocator>
-inline bool atomic_shared_ptr<T, Allocator>::compare_exchange_weak(shared_ptr<T, Allocator>& expected, const shared_ptr<T, Allocator>& desired, std::memory_order failOrder, std::memory_order successOrder) noexcept
+inline bool atomic_shared_ptr<T, Allocator>::compare_exchange_weak(shared_ptr<T, Allocator>& expected, const shared_ptr<T, Allocator>& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept
 {
-	return compare_exchange_weak(expected, shared_ptr<T, Allocator>(desired), failOrder, successOrder);
+	return compare_exchange_weak(expected, shared_ptr<T, Allocator>(desired), successOrder, failOrder);
 }
 template<class T, class Allocator>
-inline bool atomic_shared_ptr<T, Allocator>::compare_exchange_weak(shared_ptr<T, Allocator>& expected, shared_ptr<T, Allocator>&& desired, std::memory_order failOrder, std::memory_order successOrder) noexcept
+inline bool atomic_shared_ptr<T, Allocator>::compare_exchange_weak(shared_ptr<T, Allocator>& expected, shared_ptr<T, Allocator>&& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept
 {
-	return compare_exchange_weak<decltype(expected)>(expected, std::move(desired), failOrder, successOrder);
+	return compare_exchange_weak<decltype(expected)>(expected, std::move(desired), successOrder, failOrder);
 }
 template<class T, class Allocator>
 template<class PtrType>
-inline bool atomic_shared_ptr<T, Allocator>::compare_exchange_strong(typename aspdetail::disable_deduction<PtrType>::type & expected, shared_ptr<T, Allocator>&& desired, std::memory_order failOrder, std::memory_order successOrder) noexcept
+inline bool atomic_shared_ptr<T, Allocator>::compare_exchange_strong(typename aspdetail::disable_deduction<PtrType>::type & expected, shared_ptr<T, Allocator>&& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept
 {
 	const compressed_storage desired_(desired.myControlBlockStorage.myU64);
 	compressed_storage expected_(expected.myControlBlockStorage.myU64);
 
-	const aspdetail::memory_orders orders{ failOrder, successOrder };
+	const aspdetail::memory_orders orders{ successOrder, failOrder };
 
 	typedef typename std::remove_reference<PtrType>::type raw_type;
 
@@ -362,12 +362,12 @@ inline bool atomic_shared_ptr<T, Allocator>::compare_exchange_strong(typename as
 }
 template<class T, class Allocator>
 template<class PtrType>
-inline bool atomic_shared_ptr<T, Allocator>::compare_exchange_weak(typename aspdetail::disable_deduction<PtrType>::type & expected, shared_ptr<T, Allocator>&& desired, std::memory_order failOrder, std::memory_order successOrder) noexcept
+inline bool atomic_shared_ptr<T, Allocator>::compare_exchange_weak(typename aspdetail::disable_deduction<PtrType>::type & expected, shared_ptr<T, Allocator>&& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept
 {
 	const compressed_storage desired_(desired.myControlBlockStorage.myU64);
 	compressed_storage expected_(expected.myControlBlockStorage.myU64);
 
-	const aspdetail::memory_orders orders{ failOrder, successOrder };
+	const aspdetail::memory_orders orders{ successOrder, failOrder };
 
 	typedef typename std::remove_reference<PtrType>::type raw_type;
 
@@ -582,7 +582,7 @@ inline bool atomic_shared_ptr<T, Allocator>::try_help_increment_and_try_swap(com
 		if (controlBlock)
 			controlBlock->incref(copyRequests);
 
-		if (myStorage.compare_exchange_weak(expected.myU64, desired_.myU64, std::memory_order_relaxed, orders.mySecond)) {
+		if (myStorage.compare_exchange_weak(expected.myU64, desired_.myU64, orders.myFirst, std::memory_order_relaxed)) {
 			return true;
 		}
 
@@ -591,7 +591,7 @@ inline bool atomic_shared_ptr<T, Allocator>::try_help_increment_and_try_swap(com
 
 	} while ((expected.myU64 & aspdetail::Versioned_Ptr_Mask) == initialPtrBlock.myU64);
 
-	std::atomic_thread_fence(orders.myFirst);
+	std::atomic_thread_fence(orders.mySecond);
 
 	return false;
 }
@@ -656,7 +656,7 @@ inline bool atomic_shared_ptr<T, Allocator>::compare_exchange_weak_internal(comp
 	expected = expected_;
 
 	if (otherInterjection & (flags & aspdetail::CAS_FLAG_CAPTURE_ON_FAILURE)) {
-		expected = copy_internal(orders.myFirst);
+		expected = copy_internal(orders.mySecond);
 	}
 
 	return result;
@@ -664,7 +664,7 @@ inline bool atomic_shared_ptr<T, Allocator>::compare_exchange_weak_internal(comp
 template<class T, class Allocator>
 inline bool atomic_shared_ptr<T, Allocator>::compare_exchange_weak_internal_fast_swap(compressed_storage & expected, const compressed_storage & desired, aspdetail::CAS_FLAG flags, aspdetail::memory_orders orders) noexcept
 {
-	const bool result = myStorage.compare_exchange_weak(expected.myU64, desired.myU64, std::memory_order_relaxed, orders.mySecond);
+	const bool result = myStorage.compare_exchange_weak(expected.myU64, desired.myU64, orders.myFirst, std::memory_order_relaxed);
 
 	const bool decrementPrevious(result & !(flags & aspdetail::CAS_FLAG_STEAL_PREVIOUS));
 
@@ -694,7 +694,7 @@ inline bool atomic_shared_ptr<T, Allocator>::compare_exchange_weak_internal_help
 		result = try_help_increment_and_try_swap(expected_, desired, orders);
 	}
 	else {
-		try_help_increment(expected_, (flags & aspdetail::CAS_FLAG_CAPTURE_ON_FAILURE) ? std::memory_order_relaxed : orders.myFirst);
+		try_help_increment(expected_, (flags & aspdetail::CAS_FLAG_CAPTURE_ON_FAILURE) ? std::memory_order_relaxed : orders.mySecond);
 	}
 
 	const bool decrementPrevious(result & !(flags & aspdetail::CAS_FLAG_STEAL_PREVIOUS));

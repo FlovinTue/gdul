@@ -10,15 +10,19 @@
 #include <gdul\WIP_job_handler\job_handler_commons.h>
 
 namespace gdul {
+
+class job_handler;
+
 namespace job_handler_detail
 {
-class job_handler;
 class alignas(64) worker_impl
 {
 public:
 	worker_impl();
-	worker_impl(std::thread&& thread, std::uint8_t coreAffinity);
+	worker_impl(std::uint8_t coreAffinity);
 	~worker_impl();
+
+	void set_thread(std::thread&& thread);
 
 	worker_impl& operator=(worker_impl&& other);
 
@@ -36,18 +40,20 @@ public:
 
 	void set_thread_handle(HANDLE handle);
 
-	bool retire();
+	void enable();
+	bool disable();
 
 	void refresh_sleep_timer();
 
 	bool is_sleepy() const;
-	bool is_retired() const;
+	bool is_active() const;
+	bool is_enabled() const;
 
 	void set_name(const char* name);
 
 	void idle();
 
-	std::uint8_t get_queue_affinity();
+	std::uint8_t get_queue_target();
 
 private:
 	std::thread myThread;

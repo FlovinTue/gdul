@@ -586,7 +586,7 @@ inline void concurrent_queue<T, Allocator>::try_alloc_produer_store_slot(std::ui
 
 	shared_ptr_array_type expected(nullptr, myProducerArrayStore[storeArraySlot].get_version());
 
-	myProducerArrayStore[storeArraySlot].compare_exchange_strong(expected, std::move(desired), std::memory_order_relaxed, std::memory_order_acq_rel);
+	myProducerArrayStore[storeArraySlot].compare_exchange_strong(expected, std::move(desired), std::memory_order_acq_rel, std::memory_order_relaxed);
 }
 // Try swapping the current producer array for one from the store, and follow up
 // with an attempt to swap the capacity value for the one corresponding to the slot
@@ -601,7 +601,7 @@ inline void concurrent_queue<T, Allocator>::try_swap_producer_array(std::uint8_t
 
 		shared_ptr_array_type desired(myProducerArrayStore[fromStoreArraySlot].load(std::memory_order_relaxed));
 
-		if (myProducerSlots.compare_exchange_strong(expectedProducerArray, desired, std::memory_order_relaxed, std::memory_order_release)) {
+		if (myProducerSlots.compare_exchange_strong(expectedProducerArray, desired, std::memory_order_release, std::memory_order_relaxed)) {
 			try_swap_producer_array_capacity(cqdetail::to_store_array_capacity<void>(fromStoreArraySlot));
 			break;
 		}
@@ -616,7 +616,7 @@ inline void concurrent_queue<T, Allocator>::try_swap_producer_count(std::uint16_
 	for (std::uint16_t i = myProducerCount.load(std::memory_order_relaxed); i < desired;) {
 
 		std::uint16_t& expected(i);
-		if (myProducerCount.compare_exchange_strong(expected, desired, std::memory_order_relaxed, std::memory_order_release)) {
+		if (myProducerCount.compare_exchange_strong(expected, desired, std::memory_order_release, std::memory_order_relaxed)) {
 			break;
 		}
 	}
@@ -628,7 +628,7 @@ inline void concurrent_queue<T, Allocator>::try_swap_producer_array_capacity(std
 	std::uint16_t expectedCapacity(myProducerCapacity.load(std::memory_order_relaxed));
 
 	for (; expectedCapacity < desiredCapacity;) {
-		if (myProducerCapacity.compare_exchange_strong(expectedCapacity, desiredCapacity, std::memory_order_relaxed, std::memory_order_release)) {
+		if (myProducerCapacity.compare_exchange_strong(expectedCapacity, desiredCapacity, std::memory_order_release, std::memory_order_relaxed)) {
 			break;
 		}
 	}
@@ -660,7 +660,7 @@ inline std::uint16_t concurrent_queue<T, Allocator>::claim_store_slot()
 		const std::uint8_t storeArraySlot(cqdetail::to_store_array_slot<void>(expectedSlot));
 		try_alloc_produer_store_slot(storeArraySlot);
 		do {
-			if (myProducerSlotReservation.compare_exchange_strong(expectedSlot, expectedSlot + 1, std::memory_order_release)) {
+			if (myProducerSlotReservation.compare_exchange_strong(expectedSlot, expectedSlot + 1, std::memory_order_release, std::memory_order_relaxed)) {
 				reservedSlot = expectedSlot;
 				foundSlot = true;
 				break;
@@ -959,7 +959,7 @@ inline typename producer_buffer<T, Allocator>::shared_ptr_slot_type producer_buf
 
 		back = inspect->myNext;
 		inspect = back.get_owned();
-		nextState = back->myNextState.load(std::memory_order_release);
+		nextState = back->myNextState.load(std::memory_order_relaxed);
 	}
 	return back;
 }

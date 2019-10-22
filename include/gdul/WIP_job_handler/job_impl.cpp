@@ -63,7 +63,7 @@ bool job_impl::try_attach_child(job_impl_shared_ptr child)
 			return false;
 		}
 
-	} while (!myFirstChild.compare_exchange_strong(rawRep, std::move(child)));
+	} while (!myFirstChild.compare_exchange_strong(rawRep, std::move(child), std::memory_order_relaxed, std::memory_order_relaxed));
 
 	return true;
 }

@@ -31,12 +31,16 @@ void worker::set_name(const char * name)
 {
 	myImpl->set_name(name);
 }
-bool worker::retire()
+void worker::enable()
 {
-	return myImpl->retire();
+	myImpl->enable();
+}
+bool worker::disable()
+{
+	return myImpl->disable();
 }
 bool worker::is_retired() const
 {
-	return myImpl->is_retired();
+	return myImpl->is_active();
 }
 }

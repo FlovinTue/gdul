@@ -13,7 +13,7 @@ job_handler_tester::~job_handler_tester()
 
 void job_handler_tester::init()
 {
-	myHandler.Init();
+	
 }
 
 float job_handler_tester::run_all_tests(std::size_t numInserts)

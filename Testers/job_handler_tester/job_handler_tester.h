@@ -26,4 +26,3 @@ public:
 
 	gdul::job_handler myHandler;
 };
-

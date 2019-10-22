@@ -4,14 +4,16 @@
 #include <string>
 #include <thread>
 
+#if defined(_WIN64) | defined(_WIN32)
+#define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
+#endif
 
 namespace gdul
 {
 
 #undef GetObject
-#undef max
 
 thread_local job job_handler::this_job(nullptr);
 thread_local worker job_handler::this_worker(&job_handler::ourImplicitWorker);
@@ -44,7 +46,7 @@ void job_handler::retire_workers()
 	const std::uint16_t workers(myWorkerCount.exchange(0, std::memory_order_seq_cst));
 
 	for (size_t i = 0; i < workers; ++i) {
-		myWorkers[i].retire();
+		myWorkers[i].disable();
 	}
 }
 
@@ -53,9 +55,8 @@ worker job_handler::create_worker()
 	const std::uint16_t index(myWorkerCount.fetch_add(1, std::memory_order_relaxed));
 	const std::uint8_t coreAffinity(static_cast<std::uint8_t>(index % std::thread::hardware_concurrency()));
 
-	worker_impl impl(std::thread(&job_handler::launch_worker, this, index), coreAffinity);
-
-	myWorkers[index] = std::move(impl);
+	myWorkers[index] = job_handler_detail::worker_impl(coreAffinity);
+	myWorkers[index].set_thread(std::thread(&job_handler::launch_worker, this, index));
 
 	return worker(&myWorkers[index]);
 }
@@ -71,6 +72,13 @@ void job_handler::launch_worker(std::uint16_t index)
 {
 	this_worker_impl = &myWorkers[index];
 	this_worker = worker(this_worker_impl);
+	this_worker_impl->set_thread_handle(job_handler_detail::get_thread_handle());
+
+	while (!this_worker_impl->is_enabled()) {
+		this_worker_impl->idle();
+	}
+
+	this_worker_impl->set_core_affinity(job_handler_detail::Worker_Auto_Affinity);
 	this_worker_impl->refresh_sleep_timer();
 
 	//myInitInfo.myOnThreadLaunch();
@@ -81,7 +89,7 @@ void job_handler::launch_worker(std::uint16_t index)
 }
 void job_handler::work()
 {
-	while (!this_worker_impl->is_retired()) {
+	while (!this_worker_impl->is_active()) {
 
 		this_job = job(fetch_job());
 
@@ -99,7 +107,7 @@ void job_handler::work()
 
 job_handler::job_impl_shared_ptr job_handler::fetch_job()
 {
-	const uint8_t queueIndex(this_worker_impl->get_queue_affinity());
+	const uint8_t queueIndex(this_worker_impl->get_queue_target());
 
 	job_handler::job_impl_shared_ptr out(nullptr);
 

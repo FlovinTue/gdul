@@ -22,6 +22,7 @@
 #include "job_handler_commons.h"
 
 #if defined(_WIN64) | defined(_WIN32)
+#define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #endif
