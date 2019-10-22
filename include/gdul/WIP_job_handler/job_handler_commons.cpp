@@ -18,6 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#include <thread>
 
 #include "job_handler_commons.h"
 
@@ -47,7 +48,7 @@ typedef struct tagTHREADNAME_INFO
 #endif
 
 #if defined(_WIN64) | defined(_WIN32)
-void set_thread_name(const char * name, HANDLE handle)
+void set_thread_name(const char * name, thread_handle handle)
 {
 	thread_naming::THREADNAME_INFO info;
 	info.dwType = 0x1000;
@@ -62,30 +63,26 @@ void set_thread_name(const char * name, HANDLE handle)
 	{
 	}
 }
-void set_thread_priority(std::uint32_t priority, HANDLE handle)
+void set_thread_priority(std::uint32_t priority, thread_handle handle)
 {
 	SetThreadPriority(handle, priority);
 }
-void set_thread_core_affinity(std::uint8_t core, HANDLE handle)
+void set_thread_core_affinity(std::uint8_t core, thread_handle handle)
 {
 	const uint64_t affinityMask(1ULL << core);
 	while (!SetThreadAffinityMask(handle, affinityMask));
-}
-HANDLE get_thread_handle()
-{
-	return GetCurrentThread();
 }
 #else
 void set_thread_name(const char * /*name*/)
 {
 }
-void set_thread_priority(std::uint8_t, HANDLE)
+void set_thread_priority(std::uint8_t, thread_handle)
 {
 }
-void set_thread_core_affinity(std::uint8_t, HANDLE)
+void set_thread_core_affinity(std::uint8_t, thread_handle)
 {
 }
-HANDLE get_thread_handle()
+thread_handle get_thread_handle()
 {
 	return nullptr;
 }

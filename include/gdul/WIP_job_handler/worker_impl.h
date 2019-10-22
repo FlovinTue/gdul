@@ -19,7 +19,7 @@ class alignas(64) worker_impl
 {
 public:
 	worker_impl();
-	worker_impl(std::uint8_t coreAffinity);
+	worker_impl(std::thread&& thread, std::uint8_t coreAffinity);
 	~worker_impl();
 
 	worker_impl& operator=(worker_impl&& other);
@@ -48,7 +48,7 @@ public:
 private:
 	std::thread myThread;
 
-	HANDLE myThreadHandle;
+	thread_handle myThreadHandle;
 
 	std::size_t myPriorityDistributionIteration;
 

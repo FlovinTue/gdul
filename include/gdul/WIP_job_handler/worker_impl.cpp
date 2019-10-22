@@ -13,24 +13,25 @@ namespace job_handler_detail
 {
 
 worker_impl::worker_impl()
-	: myAutoCoreAffinity(0)
-	, myCoreAffinity(0)
+	: myAutoCoreAffinity(Worker_Auto_Affinity)
+	, myCoreAffinity(Worker_Auto_Affinity)
 	, myIsRunning(false)
 	, myPriorityDistributionIteration(0)
-	, myQueueAffinity(0)
+	, myQueueAffinity(Worker_Auto_Affinity)
 	, mySleepThreshhold(std::numeric_limits<std::uint16_t>::max())
-	, myThreadHandle(get_thread_handle())
+	, myThreadHandle(nullptr)
 	, myIsActive(false)
 {
 }
-worker_impl::worker_impl(std::uint8_t coreAffinity)
+worker_impl::worker_impl(std::thread&& thread, std::uint8_t coreAffinity)
 	: myAutoCoreAffinity(coreAffinity)
+	, myThread(std::move(thread))
 	, myCoreAffinity(Worker_Auto_Affinity)
 	, myIsRunning(false)
 	, myPriorityDistributionIteration(0)
 	, myQueueAffinity(Worker_Auto_Affinity)
 	, mySleepThreshhold(250)
-	, myThreadHandle(get_thread_handle())
+	, myThreadHandle(myThread.native_handle())
 	, myIsActive(false)
 {
 	job_handler_detail::set_thread_core_affinity(coreAffinity, myThreadHandle);
@@ -62,7 +63,9 @@ void worker_impl::set_core_affinity(std::uint8_t core)
 {
 	assert(is_active() && "Cannot set affinity to inactive worker");
 
-	if (core == job_handler_detail::Worker_Auto_Affinity) {
+	myCoreAffinity = core;
+
+	if (myCoreAffinity == job_handler_detail::Worker_Auto_Affinity) {
 		myCoreAffinity = myAutoCoreAffinity;
 	}
 

@@ -56,11 +56,14 @@ worker job_handler::create_worker()
 
 	std::thread(&job_handler::launch_worker, this, index).detach();
 
-	while (!myWorkers[index].is_active()) {
-		this_worker_impl->idle();
-	}
+	const std::uint8_t coreAffinity(static_cast<std::uint8_t>(index % std::thread::hardware_concurrency()));
+	
+	std::thread thread(&job_handler::launch_worker, this, index);
+	job_handler_detail::worker_impl impl(std::move(thread), coreAffinity);
 
-	return worker(&myWorkers[index]);
+	myWorkers[index] = std::move(impl);
+
+	return worker(&impl);
 }
 
 void job_handler::enqueue_job(job_impl_shared_ptr job)
@@ -72,12 +75,8 @@ void job_handler::enqueue_job(job_impl_shared_ptr job)
 
 void job_handler::launch_worker(std::uint16_t index)
 {
-	const std::uint8_t coreAffinity(static_cast<std::uint8_t>(index % std::thread::hardware_concurrency()));
-
 	this_worker_impl = &myWorkers[index];
 	this_worker = worker(this_worker_impl);
-
-	myWorkers[(std::uint8_t)(index)] = job_handler_detail::worker_impl(coreAffinity);
 
 	while (!this_worker_impl->is_enabled()) {
 		this_worker_impl->idle();

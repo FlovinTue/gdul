@@ -26,7 +26,7 @@
 
 namespace gdul
 {
-typedef void* HANDLE;
+typedef void* thread_handle;
 
 namespace job_handler_detail
 {
@@ -80,10 +80,9 @@ constexpr std::size_t log2align(std::size_t value)
 	return std::size_t(1) << sum;
 }
 
-void set_thread_name(const char* name, HANDLE handle);
-void set_thread_priority(std::uint32_t priority, HANDLE handle);
-void set_thread_core_affinity(std::uint8_t core, HANDLE handle);
-HANDLE get_thread_handle();
+void set_thread_name(const char* name, thread_handle handle);
+void set_thread_priority(std::uint32_t priority, thread_handle handle);
+void set_thread_core_affinity(std::uint8_t core, thread_handle handle);
 
 }
 }
