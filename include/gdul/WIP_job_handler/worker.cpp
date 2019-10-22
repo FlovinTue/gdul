@@ -35,9 +35,9 @@ void worker::enable()
 {
 	myImpl->enable();
 }
-bool worker::disable()
+bool worker::deactivate()
 {
-	return myImpl->disable();
+	return myImpl->deactivate();
 }
 bool worker::is_retired() const
 {

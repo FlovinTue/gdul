@@ -22,26 +22,17 @@ public:
 	worker_impl(std::uint8_t coreAffinity);
 	~worker_impl();
 
-	void set_thread(std::thread&& thread);
-
 	worker_impl& operator=(worker_impl&& other);
 
-	// Sets core affinity. job_handler_detail::Worker_Auto_Affinity represents automatic setting
 	void set_core_affinity(std::uint8_t core);
-
-	// Sets which job queue to consume from. job_handler_detail::Worker_Auto_Affinity represents
-	// dynamic runtime selection
 	void set_queue_affinity(std::uint8_t queue);
-
-	// Thread priority as defined in WinBase.h
 	void set_execution_priority(std::uint32_t priority);
-
 	void set_sleep_threshhold(std::uint16_t ms);
-
-	void set_thread_handle(HANDLE handle);
+	void set_name(const char* name);
 
 	void enable();
-	bool disable();
+
+	bool deactivate();
 
 	void refresh_sleep_timer();
 
@@ -49,7 +40,6 @@ public:
 	bool is_active() const;
 	bool is_enabled() const;
 
-	void set_name(const char* name);
 
 	void idle();
 
@@ -73,6 +63,7 @@ private:
 	std::uint8_t myQueueAffinity;
 
 	std::atomic_bool myIsRunning;
+	std::atomic_bool myIsActive;
 };
 }
 }

@@ -34,7 +34,7 @@ public:
 
 	void enable();
 
-	bool disable();
+	bool deactivate();
 
 	bool is_retired() const;
 

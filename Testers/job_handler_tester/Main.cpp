@@ -15,7 +15,7 @@ int main()
 	worker.set_execution_priority(4);
 	worker.set_queue_affinity(1);
 	worker.set_name("Hard second queue worker");
-	//worker.enable();
+	worker.enable();
 	
 	bool retired(worker.is_retired());
 	retired;

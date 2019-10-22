@@ -19,30 +19,28 @@ worker_impl::worker_impl()
 	, myPriorityDistributionIteration(0)
 	, myQueueAffinity(0)
 	, mySleepThreshhold(std::numeric_limits<std::uint16_t>::max())
-	, myThreadHandle(nullptr)
+	, myThreadHandle(get_thread_handle())
+	, myIsActive(false)
 {
-	myThreadHandle = get_thread_handle();
 }
 worker_impl::worker_impl(std::uint8_t coreAffinity)
 	: myAutoCoreAffinity(coreAffinity)
-	, myCoreAffinity(0)
+	, myCoreAffinity(Worker_Auto_Affinity)
 	, myIsRunning(false)
 	, myPriorityDistributionIteration(0)
-	, myQueueAffinity(job_handler_detail::Worker_Auto_Affinity)
+	, myQueueAffinity(Worker_Auto_Affinity)
 	, mySleepThreshhold(250)
-	, myThreadHandle(nullptr)
+	, myThreadHandle(get_thread_handle())
+	, myIsActive(false)
 {
+	job_handler_detail::set_thread_core_affinity(coreAffinity, myThreadHandle);
+
+	myIsActive.store(true, std::memory_order_release);
 }
 
 worker_impl::~worker_impl()
 {
 }
-
-void worker_impl::set_thread(std::thread && thread)
-{
-	myThread = std::move(thread);
-}
-
 worker_impl & worker_impl::operator=(worker_impl && other)
 {
 	myAutoCoreAffinity = other.myAutoCoreAffinity;
@@ -55,6 +53,7 @@ worker_impl & worker_impl::operator=(worker_impl && other)
 	myPriorityDistributionIteration = other.myPriorityDistributionIteration;
 	myQueueAffinity = other.myQueueAffinity;
 	myLastJobTimepoint = other.myLastJobTimepoint;
+	myIsActive.store(other.myIsActive.load(std::memory_order_relaxed), std::memory_order_release);
 
 	return *this;
 }
@@ -85,22 +84,13 @@ void worker_impl::set_sleep_threshhold(std::uint16_t ms)
 {
 	mySleepThreshhold = ms;
 }
-void worker_impl::set_thread_handle(HANDLE handle)
-{
-	myThreadHandle = handle;
-}
 void worker_impl::enable()
 {
-	myIsRunning.store(true, std::memory_order_relaxed);
+	myIsRunning.store(true, std::memory_order_release);
 }
-bool worker_impl::disable()
+bool worker_impl::deactivate()
 {
-	assert(is_active() && "Cannot disable inactive worker");
-
-	myThread.detach();
-	myThread = std::thread();
-
-	return myIsRunning.exchange(false, std::memory_order_relaxed);
+	return myIsRunning.exchange(false, std::memory_order_release);
 }
 void worker_impl::refresh_sleep_timer()
 {
@@ -115,7 +105,7 @@ bool worker_impl::is_sleepy() const
 }
 bool worker_impl::is_active() const
 {
-	return myThread.get_id() != std::thread().get_id();
+	return myIsActive.load(std::memory_order_acquire);
 }
 bool worker_impl::is_enabled() const
 {

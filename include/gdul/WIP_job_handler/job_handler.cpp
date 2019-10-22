@@ -46,17 +46,19 @@ void job_handler::retire_workers()
 	const std::uint16_t workers(myWorkerCount.exchange(0, std::memory_order_seq_cst));
 
 	for (size_t i = 0; i < workers; ++i) {
-		myWorkers[i].disable();
+		myWorkers[i].deactivate();
 	}
 }
 
 worker job_handler::create_worker()
 {
 	const std::uint16_t index(myWorkerCount.fetch_add(1, std::memory_order_relaxed));
-	const std::uint8_t coreAffinity(static_cast<std::uint8_t>(index % std::thread::hardware_concurrency()));
 
-	myWorkers[index] = job_handler_detail::worker_impl(coreAffinity);
-	myWorkers[index].set_thread(std::thread(&job_handler::launch_worker, this, index));
+	std::thread(&job_handler::launch_worker, this, index).detach();
+
+	while (!myWorkers[index].is_active()) {
+		this_worker_impl->idle();
+	}
 
 	return worker(&myWorkers[index]);
 }
@@ -70,15 +72,17 @@ void job_handler::enqueue_job(job_impl_shared_ptr job)
 
 void job_handler::launch_worker(std::uint16_t index)
 {
+	const std::uint8_t coreAffinity(static_cast<std::uint8_t>(index % std::thread::hardware_concurrency()));
+
 	this_worker_impl = &myWorkers[index];
 	this_worker = worker(this_worker_impl);
-	this_worker_impl->set_thread_handle(job_handler_detail::get_thread_handle());
+
+	myWorkers[(std::uint8_t)(index)] = job_handler_detail::worker_impl(coreAffinity);
 
 	while (!this_worker_impl->is_enabled()) {
 		this_worker_impl->idle();
 	}
 
-	this_worker_impl->set_core_affinity(job_handler_detail::Worker_Auto_Affinity);
 	this_worker_impl->refresh_sleep_timer();
 
 	//myInitInfo.myOnThreadLaunch();
