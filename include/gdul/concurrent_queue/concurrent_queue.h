@@ -37,15 +37,25 @@
 // pop operation before reintegration efforts are started.
 
 #ifdef CQ_ENABLE_EXCEPTIONHANDLING 
-#define CQ_BUFFER_NOTHROW_POP_MOVE(type) (std::is_nothrow_move_assignable<type>::value)
-#define CQ_BUFFER_NOTHROW_POP_ASSIGN(type) (!CQ_BUFFER_NOTHROW_POP_MOVE(type) && (std::is_nothrow_assignable<type&, type>::value))
-#define CQ_BUFFER_NOTHROW_PUSH_MOVE(type) (std::is_nothrow_move_assignable<type>::value)
-#define CQ_BUFFER_NOTHROW_PUSH_ASSIGN(type) (std::is_nothrow_assignable<type&, type>::value)
+#define GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(type) (std::is_nothrow_move_assignable<type>::value)
+#define GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(type) (!GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(type) && (std::is_nothrow_assignable<type&, type>::value))
+#define GDUL_CQ_BUFFER_NOTHROW_PUSH_MOVE(type) (std::is_nothrow_move_assignable<type>::value)
+#define GDUL_CQ_BUFFER_NOTHROW_PUSH_ASSIGN(type) (std::is_nothrow_assignable<type&, type>::value)
 #else
-#define CQ_BUFFER_NOTHROW_POP_MOVE(type) (std::is_move_assignable<type>::value)
-#define CQ_BUFFER_NOTHROW_POP_ASSIGN(type) (!CQ_BUFFER_NOTHROW_POP_MOVE(type))
-#define CQ_BUFFER_NOTHROW_PUSH_ASSIGN(type) (std::is_same<type, type>::value)
-#define CQ_BUFFER_NOTHROW_PUSH_MOVE(type) (std::is_same<type, type>::value)
+#define GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(type) (std::is_move_assignable<type>::value)
+#define GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(type) (!GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(type))
+#define GDUL_CQ_BUFFER_NOTHROW_PUSH_ASSIGN(type) (std::is_same<type, type>::value)
+#define GDUL_CQ_BUFFER_NOTHROW_PUSH_MOVE(type) (std::is_same<type, type>::value)
+#endif
+
+#if !defined(GDUL_DISABLE_VIEWABLE_ATOMICS)
+#ifndef GDUL_ATOMIC_WITH_VIEW
+#define GDUL_ATOMIC_WITH_VIEW(type, name) union{std::atomic<type> name; type _##name;}
+#endif
+#else
+#ifndef GDUL_ATOMIC_WITH_VIEW
+#define GDUL_ATOMIC_WITH_VIEW(type, name) std::atomic<type> name
+#endif
 #endif
 
 #ifndef MAKE_UNIQUE_NAME 
@@ -54,8 +64,8 @@
 #define MAKE_UNIQUE_NAME(prefix) EXPAND_AND_CONCAT(prefix, __COUNTER__)
 #endif
 
-#define CQ_PADDING(bytes) const std::uint8_t MAKE_UNIQUE_NAME(trash)[bytes] {}
-#define CQ_CACHELINE_SIZE 64u
+#define GDUL_CQ_PADDING(bytes) const std::uint8_t MAKE_UNIQUE_NAME(trash)[bytes] {}
+#define GDUL_CACHELINE_SIZE 64u
 
 // For anonymous struct and alignas 
 #pragma warning(push, 2)
@@ -233,9 +243,10 @@ private:
 	atomic_shared_ptr_array_type myProducerArrayStore[cqdetail::Producer_Slots_Max_Growth_Count];
 	atomic_shared_ptr_array_type myProducerSlots;
 
+	GDUL_ATOMIC_WITH_VIEW(std::uint16_t, myProducerCount);
+	GDUL_ATOMIC_WITH_VIEW(std::uint16_t, myProducerCapacity);
+
 	std::atomic<std::uint16_t> myRelocationIndex;
-	std::atomic<std::uint16_t> myProducerCount;
-	std::atomic<std::uint16_t> myProducerCapacity;
 	std::atomic<std::uint16_t> myProducerSlotReservation;
 	std::atomic<std::uint16_t> myProducerSlotPostIterator;
 
@@ -814,9 +825,9 @@ public:
 	inline size_type get_capacity() const;
 
 	// Makes sure that it is entirely safe to replace this buffer with a successor
-	template <class U = T, std::enable_if_t<CQ_BUFFER_NOTHROW_POP_MOVE(U) || CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>* = nullptr>
+	template <class U = T, std::enable_if_t<GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) || GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>* = nullptr>
 	inline bool verify_successor(const shared_ptr_slot_type&);
-	template <class U = T, std::enable_if_t<!CQ_BUFFER_NOTHROW_POP_MOVE(U) && !CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>* = nullptr>
+	template <class U = T, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) && !GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>* = nullptr>
 	inline bool verify_successor(const shared_ptr_slot_type& successor);
 
 	// Contains entries and / or has no next buffer
@@ -839,30 +850,30 @@ public:
 
 private:
 
-	template <class U = T, std::enable_if_t<CQ_BUFFER_NOTHROW_PUSH_MOVE(U)>* = nullptr>
+	template <class U = T, std::enable_if_t<GDUL_CQ_BUFFER_NOTHROW_PUSH_MOVE(U)>* = nullptr>
 	inline void write_in(size_type slot, U&& in);
-	template <class U = T, std::enable_if_t<!CQ_BUFFER_NOTHROW_PUSH_MOVE(U)>* = nullptr>
+	template <class U = T, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_PUSH_MOVE(U)>* = nullptr>
 	inline void write_in(size_type slot, U&& in);
-	template <class U = T, std::enable_if_t<CQ_BUFFER_NOTHROW_PUSH_ASSIGN(U)>* = nullptr>
+	template <class U = T, std::enable_if_t<GDUL_CQ_BUFFER_NOTHROW_PUSH_ASSIGN(U)>* = nullptr>
 	inline void write_in(size_type slot, const U& in);
-	template <class U = T, std::enable_if_t<!CQ_BUFFER_NOTHROW_PUSH_ASSIGN(U)>* = nullptr>
+	template <class U = T, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_PUSH_ASSIGN(U)>* = nullptr>
 	inline void write_in(size_type slot, const U& in);
 
-	template <class U = T, std::enable_if_t<CQ_BUFFER_NOTHROW_POP_MOVE(U)>* = nullptr>
+	template <class U = T, std::enable_if_t<GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U)>* = nullptr>
 	inline void write_out(size_type slot, U& out);
-	template <class U = T, std::enable_if_t<CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>* = nullptr>
+	template <class U = T, std::enable_if_t<GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>* = nullptr>
 	inline void write_out(size_type slot, U& out);
-	template <class U = T, std::enable_if_t<!CQ_BUFFER_NOTHROW_POP_MOVE(U) && !CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>* = nullptr>
+	template <class U = T, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) && !GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>* = nullptr>
 	inline void write_out(size_type slot, U& out);
 
-	template <class U = T, std::enable_if_t<CQ_BUFFER_NOTHROW_POP_MOVE(U) || CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>* = nullptr>
+	template <class U = T, std::enable_if_t<GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) || GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>* = nullptr>
 	inline void post_pop_cleanup(size_type readSlot);
-	template <class U = T, std::enable_if_t<!CQ_BUFFER_NOTHROW_POP_MOVE(U) && !CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>* = nullptr>
+	template <class U = T, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) && !GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>* = nullptr>
 	inline void post_pop_cleanup(size_type readSlot);
 
-	template <class U = T, std::enable_if_t<CQ_BUFFER_NOTHROW_POP_MOVE(U) || CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>* = nullptr>
+	template <class U = T, std::enable_if_t<GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) || GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>* = nullptr>
 	inline void check_for_damage();
-	template <class U = T, std::enable_if_t<!CQ_BUFFER_NOTHROW_POP_MOVE(U) && !CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>* = nullptr>
+	template <class U = T, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) && !GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>* = nullptr>
 	inline void check_for_damage();
 
 	inline void reintegrate_failed_entries(size_type failCount);
@@ -870,20 +881,20 @@ private:
 	static constexpr size_type Buffer_Lock_Offset = cqdetail::Buffer_Capacity_Max + Max_Producers;
 
 	std::atomic<size_type> myPreReadIterator;
-	std::atomic<size_type> myReadSlot;
+	GDUL_ATOMIC_WITH_VIEW(size_type, myReadSlot);
 
 #ifdef CQ_ENABLE_EXCEPTIONHANDLING
 	std::atomic<size_type> myPostReadIterator;
 	std::atomic<std::uint16_t> myFailiureCount;
 	std::atomic<std::uint16_t> myFailiureIndex;
-	CQ_PADDING((CQ_CACHELINE_SIZE * 2) - ((sizeof(size_type) * 3) + (sizeof(std::uint16_t) * 2)));
+	GDUL_CQ_PADDING((GDUL_CACHELINE_SIZE * 2) - ((sizeof(size_type) * 3) + (sizeof(std::uint16_t) * 2)));
 
 #else
-	CQ_PADDING((CQ_CACHELINE_SIZE * 2) - sizeof(size_type) * 2);
+	GDUL_CQ_PADDING((GDUL_CACHELINE_SIZE * 2) - sizeof(size_type) * 2);
 #endif
 	size_type myWriteSlot;
-	std::atomic<size_type> myPostWriteIterator;
-	CQ_PADDING(CQ_CACHELINE_SIZE - sizeof(size_type) * 2);
+	GDUL_ATOMIC_WITH_VIEW(size_type, myPostWriteIterator);
+	GDUL_CQ_PADDING(GDUL_CACHELINE_SIZE - sizeof(size_type) * 2);
 	shared_ptr_slot_type myNext;
 
 	const size_type myCapacity;
@@ -983,13 +994,13 @@ inline typename producer_buffer<T, Allocator>::size_type producer_buffer<T, Allo
 	return myCapacity;
 }
 template<class T, class Allocator>
-template <class U, std::enable_if_t<CQ_BUFFER_NOTHROW_POP_MOVE(U) || CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>*>
+template <class U, std::enable_if_t<GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) || GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>*>
 inline bool producer_buffer<T, Allocator>::verify_successor(const shared_ptr_slot_type&)
 {
 	return true;
 }
 template<class T, class Allocator>
-template <class U, std::enable_if_t<!CQ_BUFFER_NOTHROW_POP_MOVE(U) && !CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>*>
+template <class U, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) && !GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>*>
 inline bool producer_buffer<T, Allocator>::verify_successor(const shared_ptr_slot_type& successor)
 {
 	if (!myNextState.load(std::memory_order_seq_cst)) {
@@ -1022,12 +1033,12 @@ inline bool producer_buffer<T, Allocator>::verify_successor(const shared_ptr_slo
 	return true;
 }
 template<class T, class Allocator>
-template <class U, std::enable_if_t<CQ_BUFFER_NOTHROW_POP_MOVE(U) || CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>*>
+template <class U, std::enable_if_t<GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) || GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>*>
 inline void producer_buffer<T, Allocator>::check_for_damage()
 {
 }
 template<class T, class Allocator>
-template <class U, std::enable_if_t<!CQ_BUFFER_NOTHROW_POP_MOVE(U) && !CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>*>
+template <class U, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) && !GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>*>
 inline void producer_buffer<T, Allocator>::check_for_damage()
 {
 #ifdef CQ_ENABLE_EXCEPTIONHANDLING
@@ -1141,13 +1152,13 @@ inline bool producer_buffer<T, Allocator>::try_pop(T & out)
 	return true;
 }
 template <class T, class Allocator>
-template <class U, std::enable_if_t<CQ_BUFFER_NOTHROW_PUSH_MOVE(U)>*>
+template <class U, std::enable_if_t<GDUL_CQ_BUFFER_NOTHROW_PUSH_MOVE(U)>*>
 inline void producer_buffer<T, Allocator>::write_in(typename producer_buffer<T, Allocator>::size_type slot, U&& in)
 {
 	myDataBlock[slot].store(std::move(in));
 }
 template <class T, class Allocator>
-template <class U, std::enable_if_t<!CQ_BUFFER_NOTHROW_PUSH_MOVE(U)>*>
+template <class U, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_PUSH_MOVE(U)>*>
 inline void producer_buffer<T, Allocator>::write_in(typename producer_buffer<T, Allocator>::size_type slot, U&& in)
 {
 	try {
@@ -1159,13 +1170,13 @@ inline void producer_buffer<T, Allocator>::write_in(typename producer_buffer<T, 
 	}
 }
 template <class T, class Allocator>
-template <class U, std::enable_if_t<CQ_BUFFER_NOTHROW_PUSH_ASSIGN(U)>*>
+template <class U, std::enable_if_t<GDUL_CQ_BUFFER_NOTHROW_PUSH_ASSIGN(U)>*>
 inline void producer_buffer<T, Allocator>::write_in(typename producer_buffer<T, Allocator>::size_type slot, const U& in)
 {
 	myDataBlock[slot].store(in);
 }
 template <class T, class Allocator>
-template <class U, std::enable_if_t<!CQ_BUFFER_NOTHROW_PUSH_ASSIGN(U)>*>
+template <class U, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_PUSH_ASSIGN(U)>*>
 inline void producer_buffer<T, Allocator>::write_in(typename producer_buffer<T, Allocator>::size_type slot, const U& in)
 {
 	try {
@@ -1177,20 +1188,20 @@ inline void producer_buffer<T, Allocator>::write_in(typename producer_buffer<T, 
 	}
 }
 template <class T, class Allocator>
-template <class U, std::enable_if_t<CQ_BUFFER_NOTHROW_POP_MOVE(U)>*>
+template <class U, std::enable_if_t<GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U)>*>
 inline void producer_buffer<T, Allocator>::write_out(typename producer_buffer<T, Allocator>::size_type slot, U& out)
 {
 	myDataBlock[slot].move(out);
 }
 template<class T, class Allocator>
-template <class U, std::enable_if_t<CQ_BUFFER_NOTHROW_POP_MOVE(U) || CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>*>
+template <class U, std::enable_if_t<GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) || GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>*>
 inline void producer_buffer<T, Allocator>::post_pop_cleanup(typename producer_buffer<T, Allocator>::size_type readSlot)
 {
 	myDataBlock[readSlot].set_state(item_state::Empty);
 	std::atomic_thread_fence(std::memory_order_release);
 }
 template<class T, class Allocator>
-template <class U, std::enable_if_t<!CQ_BUFFER_NOTHROW_POP_MOVE(U) && !CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>*>
+template <class U, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) && !GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>*>
 inline void producer_buffer<T, Allocator>::post_pop_cleanup(typename producer_buffer<T, Allocator>::size_type readSlot)
 {
 	myDataBlock[readSlot].set_state(item_state::Empty);
@@ -1202,13 +1213,13 @@ inline void producer_buffer<T, Allocator>::post_pop_cleanup(typename producer_bu
 #endif
 }
 template <class T, class Allocator>
-template <class U, std::enable_if_t<CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>*>
+template <class U, std::enable_if_t<GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>*>
 inline void producer_buffer<T, Allocator>::write_out(typename producer_buffer<T, Allocator>::size_type slot, U& out)
 {
 	myDataBlock[slot].assign(out);
 }
 template <class T, class Allocator>
-template <class U, std::enable_if_t<!CQ_BUFFER_NOTHROW_POP_MOVE(U) && !CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>*>
+template <class U, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) && !GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>*>
 inline void producer_buffer<T, Allocator>::write_out(typename producer_buffer<T, Allocator>::size_type slot, U& out)
 {
 #ifdef CQ_ENABLE_EXCEPTIONHANDLING

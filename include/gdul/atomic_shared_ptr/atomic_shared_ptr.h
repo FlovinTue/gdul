@@ -30,15 +30,6 @@
 #pragma warning(disable : 4201)
 
 namespace gdul {
-
-#if defined(_MSC_VER) && !defined(__INTEL_COMPILER) 
-#ifndef GDUL_NOVTABLE
-#define GDUL_NOVTABLE __declspec(novtable)
-#endif
-#else
-#define GDUL_NOVTABLE
-#endif
-
 namespace aspdetail {
 
 typedef std::allocator<std::uint8_t> default_allocator;
@@ -124,21 +115,21 @@ public:
 	inline bool compare_exchange_strong(shared_ptr<T, Allocator>& expected, const shared_ptr<T, Allocator>& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept;
 	inline bool compare_exchange_strong(shared_ptr<T, Allocator>& expected, shared_ptr<T, Allocator>&& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept;
 
-	// compare_exchange_weak may fail spuriously if another thread loads this value while attempting swap
+	// compare_exchange_weak may fail if another thread loads this value while attempting swap
 	inline bool compare_exchange_weak(raw_ptr<T, Allocator>& expected, const shared_ptr<T, Allocator>& desired, std::memory_order order = std::memory_order_seq_cst) noexcept;
-	// compare_exchange_weak may fail spuriously if another thread loads this value while attempting swap
+	// compare_exchange_weak may fail if another thread loads this value while attempting swap
 	inline bool compare_exchange_weak(raw_ptr<T, Allocator>& expected, shared_ptr<T, Allocator>&& desired, std::memory_order order = std::memory_order_seq_cst) noexcept;
-	// compare_exchange_weak may fail spuriously if another thread loads this value while attempting swap
+	// compare_exchange_weak may fail if another thread loads this value while attempting swap
 	inline bool compare_exchange_weak(raw_ptr<T, Allocator>& expected, const shared_ptr<T, Allocator>& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept;
-	// compare_exchange_weak may fail spuriously if another thread loads this value while attempting swap
+	// compare_exchange_weak may fail if another thread loads this value while attempting swap
 	inline bool compare_exchange_weak(raw_ptr<T, Allocator>& expected, shared_ptr<T, Allocator>&& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept;
-	// compare_exchange_weak may fail spuriously if another thread loads this value while attempting swap
+	// compare_exchange_weak may fail if another thread loads this value while attempting swap
 	inline bool compare_exchange_weak(shared_ptr<T, Allocator>& expected, const shared_ptr<T, Allocator>& desired, std::memory_order order = std::memory_order_seq_cst) noexcept;
-	// compare_exchange_weak may fail spuriously if another thread loads this value while attempting swap
+	// compare_exchange_weak may fail if another thread loads this value while attempting swap
 	inline bool compare_exchange_weak(shared_ptr<T, Allocator>& expected, shared_ptr<T, Allocator>&& desired, std::memory_order order = std::memory_order_seq_cst) noexcept;
-	// compare_exchange_weak may fail spuriously if another thread loads this value while attempting swap
+	// compare_exchange_weak may fail if another thread loads this value while attempting swap
 	inline bool compare_exchange_weak(shared_ptr<T, Allocator>& expected, const shared_ptr<T, Allocator>& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept;
-	// compare_exchange_weak may fail spuriously if another thread loads this value while attempting swap
+	// compare_exchange_weak may fail if another thread loads this value while attempting swap
 	inline bool compare_exchange_weak(shared_ptr<T, Allocator>& expected, shared_ptr<T, Allocator>&& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept;
 
 	inline shared_ptr<T, Allocator> load(std::memory_order order = std::memory_order_seq_cst) noexcept;
@@ -776,7 +767,7 @@ inline typename aspdetail::compressed_storage atomic_shared_ptr<T, Allocator>::e
 }
 namespace aspdetail {
 template <class T, class Allocator>
-class GDUL_NOVTABLE control_block_base
+class control_block_base
 {
 public:
 	typedef typename atomic_shared_ptr<T>::size_type size_type;
