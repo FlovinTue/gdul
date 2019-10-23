@@ -24,13 +24,17 @@
 
 namespace gdul
 {
+job::job()
+	: myEnabled(false)
+{
+}
 job::job(job && other)
 {
 	operator=(std::move(other));
 }
 job & job::operator=(job && other)
 {
-	myEnabled._My_flag = other.myEnabled._My_flag;
+	myEnabled.store(other.myEnabled.load(std::memory_order_relaxed), std::memory_order_relaxed);
 	myImpl = std::move(other.myImpl);
 
 	return *this;
@@ -46,7 +50,7 @@ void job::add_dependency(job & dependency)
 }
 void job::enable()
 {
-	if (myEnabled.test_and_set(std::memory_order_relaxed)) {
+	if (myEnabled.exchange(false ,std::memory_order_relaxed)) {
 		return;
 	}
 

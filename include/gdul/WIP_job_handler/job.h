@@ -33,7 +33,7 @@ class job
 {
 public:
 	using job_impl_shared_ptr = job_handler_detail::job_impl::job_impl_shared_ptr;
-
+	job();
 	job(job&& other);
 	job& operator=(job&& other);
 
@@ -60,6 +60,6 @@ private:
 	job(job_impl_shared_ptr impl);
 
 	job_impl_shared_ptr myImpl;
-	std::atomic_flag myEnabled;
+	std::atomic_bool myEnabled;
 };
 }

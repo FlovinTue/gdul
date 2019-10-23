@@ -39,11 +39,11 @@ void ThreadPool::Decommission()
 
 bool ThreadPool::HasUnfinishedTasks() const
 {
-	return 0 < myTaskCounter._My_val;
+	return 0 < myTaskCounter.load(std::memory_order_relaxed);
 }
 uint32_t ThreadPool::GetUnfinishedTasks() const
 {
-	return myTaskCounter._My_val;
+	return myTaskCounter.load(std::memory_order_relaxed);
 }
 void ThreadPool::Idle()
 {
@@ -52,7 +52,7 @@ void ThreadPool::Idle()
 
 	Timer sleepTimer;
 
-	while (myIsInCommission._My_val | (0 < myTaskCounter._My_val))
+	while (myIsInCommission.load(std::memory_order_relaxed) | (0 < myTaskCounter.load(std::memory_order_relaxed)))
 	{
 		std::function<void()> task;
 		if (myTaskQueue.try_pop(task))

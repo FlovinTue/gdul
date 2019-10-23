@@ -120,7 +120,7 @@ inline job_handler::job_impl_shared_ptr job_handler::make_job_impl(Callable&& ca
 {
 	assert(priority < job_handler_detail::Priority_Granularity && "Priority value out of bounds");
 
-	const uint8_t _priority(std::clamp<std::uint8_t>(priority, 0, job_handler_detail::Priority_Granularity - 1));
+	const uint8_t _priority(priority < job_handler_detail::Priority_Granularity ? priority : job_handler_detail::Priority_Granularity - 1);
 
 	return make_shared<job_handler_detail::job_impl, job_handler_detail::job_impl_allocator<std::uint8_t>>
 		(

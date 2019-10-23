@@ -1,5 +1,6 @@
 #include <gdul\WIP_job_handler\worker_impl.h>
 #include <cassert>
+#include <cmath>
 
 #if defined(_WIN64) | defined(_WIN32)
 #define NOMINMAX

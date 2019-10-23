@@ -18,14 +18,14 @@ int main()
 	worker.enable();
 
 	gdul::worker worker1(handler.create_worker());
-	worker.set_core_affinity(1);
+	worker1.set_core_affinity(1);
 	worker1.set_execution_priority(0);
 	worker1.set_queue_affinity(1);
 	worker1.set_name("Hard second queue worker");
 	worker1.enable();
 
 	gdul::worker worker2(handler.create_worker());
-	worker.set_core_affinity(gdul::job_handler_detail::Worker_Auto_Affinity);
+	worker2.set_core_affinity(gdul::job_handler_detail::Worker_Auto_Affinity);
 	worker2.set_execution_priority(-2);
 	worker2.set_queue_affinity(gdul::job_handler_detail::Worker_Auto_Affinity);
 	worker2.set_name("Hard third queue worker");

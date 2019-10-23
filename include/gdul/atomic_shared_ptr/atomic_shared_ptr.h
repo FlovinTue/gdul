@@ -727,26 +727,26 @@ inline typename aspdetail::compressed_storage atomic_shared_ptr<T, Allocator>::u
 {
 	std::atomic_thread_fence(std::memory_order_acquire);
 
-	aspdetail::control_block_base<T, Allocator>* const cb(to_control_block(compressed_storage(myStorage._My_val)));
+	aspdetail::control_block_base<T, Allocator>* const cb(to_control_block(compressed_storage(myStorage.load(std::memory_order_relaxed))));
 	if (cb) {
 		cb->incref();
 	}
 
 	std::atomic_thread_fence(order);
 
-	return compressed_storage(myStorage._My_val);
+	return compressed_storage(myStorage.load(std::memory_order_relaxed));
 }
 template<class T, class Allocator>
 inline typename aspdetail::compressed_storage atomic_shared_ptr<T, Allocator>::unsafe_exchange_internal(compressed_storage with, std::memory_order order)
 {
 	std::atomic_thread_fence(std::memory_order_acquire);
 
-	const compressed_storage old(myStorage._My_val);
+	const compressed_storage old(myStorage.load(std::memory_order_relaxed));
 
 	compressed_storage replacement(with.myU64);
 	replacement.myU8[aspdetail::STORAGE_BYTE_VERSION] = old.myU8[aspdetail::STORAGE_BYTE_VERSION] + 1;
 
-	myStorage._My_val = replacement.myU64;
+	myStorage.load(std::memory_order_relaxed) = replacement.myU64;
 
 	std::atomic_thread_fence(order);
 
@@ -757,8 +757,8 @@ inline void atomic_shared_ptr<T, Allocator>::unsafe_store_internal(compressed_st
 {
 	std::atomic_thread_fence(std::memory_order_acquire);
 
-	const compressed_storage previous(myStorage._My_val);
-	myStorage._My_val = from.myU64;
+	const compressed_storage previous(myStorage.load(std::memory_order_relaxed));
+	myStorage.store(from.myU64, std::memory_order_relaxed);
 
 	aspdetail::control_block_base<T, Allocator>* const prevCb(to_control_block(previous));
 	if (prevCb) {
@@ -770,7 +770,7 @@ inline void atomic_shared_ptr<T, Allocator>::unsafe_store_internal(compressed_st
 template<class T, class Allocator>
 inline typename aspdetail::compressed_storage atomic_shared_ptr<T, Allocator>::exchange_internal(compressed_storage to, aspdetail::CAS_FLAG flags, std::memory_order order) noexcept
 {
-	compressed_storage expected(myStorage._My_val);
+	compressed_storage expected(myStorage.load(std::memory_order_relaxed));
 	while (!compare_exchange_weak_internal(expected, to, flags, { std::memory_order_relaxed, order }));
 	return expected;
 }

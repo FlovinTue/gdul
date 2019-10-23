@@ -135,7 +135,7 @@ inline job_impl::job_impl(job_handler* handler, Callable && callable, std::uint8
 	, myPriority(priority)
 	, myDependencies(Job_Max_Dependencies)
 {
-	myCallable = new (&myStorage[0]) gdul::job_handler_detail::callable(std::forward<Callable&&>(callable));
+	myCallable = new (&myStorage[0]) gdul::job_handler_detail::callable<Callable>(std::forward<Callable&&>(callable));
 }
 
 

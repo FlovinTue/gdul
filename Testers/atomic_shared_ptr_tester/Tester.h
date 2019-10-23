@@ -107,7 +107,7 @@ public:
 	atomic_shared_ptr<T> myTestArray[ArraySize];
 	ReferenceComparison<T> myReferenceComparison[ArraySize];
 #endif
-	std::atomic_flag myWorkBlock;
+	std::atomic_bool myWorkBlock;
 
 	std::atomic<size_t> mySummary;
 
@@ -149,7 +149,7 @@ inline Tester<T, ArraySize, NumThreads>::~Tester()
 template<class T, std::uint32_t ArraySize, std::uint32_t NumThreads>
 inline float Tester<T, ArraySize, NumThreads>::Execute(std::uint32_t aArrayPasses, bool aDoAssign, bool aDoReassign, bool aDoCASTest, bool aDoReferenceTest)
 {
-	myWorkBlock.clear();
+	myWorkBlock.store(false);
 
 	for (std::uint32_t thread = 0; thread < NumThreads; ++thread) {
 		if (aDoAssign) {
@@ -168,7 +168,7 @@ inline float Tester<T, ArraySize, NumThreads>::Execute(std::uint32_t aArrayPasse
 
 	Timer timer;
 
-	myWorkBlock.test_and_set();
+	myWorkBlock.store(true);
 
 	while (myWorker.HasUnfinishedTasks()) {
 		std::this_thread::yield();
@@ -184,7 +184,7 @@ inline float Tester<T, ArraySize, NumThreads>::Execute(std::uint32_t aArrayPasse
 template<class T, std::uint32_t ArraySize, std::uint32_t NumThreads>
 inline void Tester<T, ArraySize, NumThreads>::WorkAssign(std::uint32_t aArrayPasses)
 {
-	while (!myWorkBlock._My_flag) {
+	while (!myWorkBlock) {
 		std::this_thread::yield();
 	}
 
@@ -203,7 +203,7 @@ inline void Tester<T, ArraySize, NumThreads>::WorkAssign(std::uint32_t aArrayPas
 template<class T, std::uint32_t ArraySize, std::uint32_t NumThreads>
 inline void Tester<T, ArraySize, NumThreads>::WorkReassign(std::uint32_t aArrayPasses)
 {
-	while (!myWorkBlock._My_flag) {
+	while (!myWorkBlock) {
 		std::this_thread::yield();
 	}
 
@@ -222,7 +222,7 @@ template<class T, std::uint32_t ArraySize, std::uint32_t NumThreads>
 inline void Tester<T, ArraySize, NumThreads>::WorkReferenceTest(std::uint32_t aArrayPasses)
 {
 #ifndef ASP_MUTEX_COMPARE
-	while (!myWorkBlock._My_flag) {
+	while (!myWorkBlock) {
 		std::this_thread::yield();
 	}
 
@@ -244,7 +244,7 @@ template<class T, std::uint32_t ArraySize, std::uint32_t NumThreads>
 inline void Tester<T, ArraySize, NumThreads>::WorkCAS(std::uint32_t aArrayPasses)
 {
 
-	while (!myWorkBlock._My_flag) {
+	while (!myWorkBlock) {
 		std::this_thread::yield();
 	}
 

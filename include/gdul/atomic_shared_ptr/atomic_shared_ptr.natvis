@@ -6,15 +6,15 @@
 			{*myPtr}
 		</DisplayString>
     <DisplayString Condition="(myPtr == nullptr)">
-      nullptr
-    </DisplayString>
+			{(void*)0}
+		</DisplayString>
     <Expand >
       <ExpandedItem Condition="(myPtr != nullptr)">
 				myPtr
 			</ExpandedItem>
       <Item Name="[object]" Condition="(myPtr == nullptr)">
-        nullptr
-      </Item>
+				(void*)0
+			</Item>
       <Item Name="[**ptr_use_count]" Condition="(
 				+ ((myControlBlockStorage.myU64 >> 1) * 2)
 				- ((uint64_t)myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
@@ -59,7 +59,7 @@
 				- ((uint64_t)myDebugView.myU8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
 				- ((uint64_t)myDebugView.myU8[aspdetail::STORAGE_BYTE_COPYREQUEST] * (aspdetail::Versioned_Ptr_Mask + 1))
 						== 0)">
-			nullptr
+			{(void*)0}
 		</DisplayString>
 		<Expand >
 			<ExpandedItem Condition="(
@@ -80,7 +80,7 @@
 				- ((uint64_t)myDebugView.myU8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
 				- ((uint64_t)myDebugView.myU8[aspdetail::STORAGE_BYTE_COPYREQUEST] * (aspdetail::Versioned_Ptr_Mask + 1))
 						== 0)">
-				nullptr
+				(void*)0
 			</Item>
 			<Item Name="[**ptr_use_count]" Condition="(
 				+ ((myDebugView.myU64 >> 1) * 2)
