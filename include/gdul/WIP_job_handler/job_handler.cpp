@@ -54,16 +54,15 @@ worker job_handler::create_worker()
 {
 	const std::uint16_t index(myWorkerCount.fetch_add(1, std::memory_order_relaxed));
 
-	std::thread(&job_handler::launch_worker, this, index).detach();
-
 	const std::uint8_t coreAffinity(static_cast<std::uint8_t>(index % std::thread::hardware_concurrency()));
 	
 	std::thread thread(&job_handler::launch_worker, this, index);
+
 	job_handler_detail::worker_impl impl(std::move(thread), coreAffinity);
 
 	myWorkers[index] = std::move(impl);
 
-	return worker(&impl);
+	return worker(&myWorkers[index]);
 }
 
 void job_handler::enqueue_job(job_impl_shared_ptr job)
@@ -92,7 +91,7 @@ void job_handler::launch_worker(std::uint16_t index)
 }
 void job_handler::work()
 {
-	while (!this_worker_impl->is_active()) {
+	while (this_worker_impl->is_active()) {
 
 		this_job = job(fetch_job());
 
@@ -114,7 +113,7 @@ job_handler::job_impl_shared_ptr job_handler::fetch_job()
 
 	job_handler::job_impl_shared_ptr out(nullptr);
 
-	for (uint8_t i = 0; i < job_handler_detail::Priority_Granularity; ++i) {
+	for (uint8_t i = 0; i < this_worker_impl->get_fetch_retries(); ++i) {
 
 		const uint8_t index((queueIndex + i) % job_handler_detail::Priority_Granularity);
 

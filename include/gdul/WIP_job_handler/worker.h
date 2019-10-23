@@ -27,7 +27,7 @@ public:
 	void set_queue_affinity(std::uint8_t queue = job_handler_detail::Worker_Auto_Affinity);
 
 	// Thread priority as defined in WinBase.h
-	void set_execution_priority(std::uint32_t priority);
+	void set_execution_priority(std::int32_t priority);
 
 	// Thread name
 	void set_name(const char* name);

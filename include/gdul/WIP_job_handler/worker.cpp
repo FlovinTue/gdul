@@ -22,7 +22,7 @@ void worker::set_queue_affinity(std::uint8_t queue)
 	myImpl->set_queue_affinity(queue);
 }
 
-void worker::set_execution_priority(std::uint32_t priority)
+void worker::set_execution_priority(std::int32_t priority)
 {
 	myImpl->set_execution_priority(priority);
 }

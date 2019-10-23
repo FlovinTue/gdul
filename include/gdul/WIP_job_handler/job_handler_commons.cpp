@@ -63,7 +63,7 @@ void set_thread_name(const char * name, thread_handle handle)
 	{
 	}
 }
-void set_thread_priority(std::uint32_t priority, thread_handle handle)
+void set_thread_priority(std::int32_t priority, thread_handle handle)
 {
 	SetThreadPriority(handle, priority);
 }
@@ -71,6 +71,19 @@ void set_thread_core_affinity(std::uint8_t core, thread_handle handle)
 {
 	const uint64_t affinityMask(1ULL << core);
 	while (!SetThreadAffinityMask(handle, affinityMask));
+}
+thread_handle create_thread_handle()
+{
+	thread_handle handle = 0;
+	DuplicateHandle(GetCurrentProcess(),
+		GetCurrentThread(),
+		GetCurrentProcess(),
+		&handle,
+		0,
+		TRUE,
+		DUPLICATE_SAME_ACCESS);
+
+	return handle;
 }
 #else
 void set_thread_name(const char * /*name*/)
@@ -82,7 +95,7 @@ void set_thread_priority(std::uint8_t, thread_handle)
 void set_thread_core_affinity(std::uint8_t, thread_handle)
 {
 }
-thread_handle get_thread_handle()
+thread_handle create_thread_handle()
 {
 	return nullptr;
 }

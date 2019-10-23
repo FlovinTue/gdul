@@ -19,7 +19,7 @@ worker_impl::worker_impl()
 	, myPriorityDistributionIteration(0)
 	, myQueueAffinity(Worker_Auto_Affinity)
 	, mySleepThreshhold(std::numeric_limits<std::uint16_t>::max())
-	, myThreadHandle(nullptr)
+	, myThreadHandle(job_handler_detail::create_thread_handle())
 	, myIsActive(false)
 {
 }
@@ -41,6 +41,16 @@ worker_impl::worker_impl(std::thread&& thread, std::uint8_t coreAffinity)
 
 worker_impl::~worker_impl()
 {
+	if (myThread.get_id() == std::thread().get_id()) {
+		CloseHandle(myThreadHandle);
+		myThreadHandle = nullptr;
+	}
+
+	deactivate();
+
+	if (myThread.joinable()) {
+		myThread.join();
+	}
 }
 worker_impl & worker_impl::operator=(worker_impl && other)
 {
@@ -48,7 +58,7 @@ worker_impl & worker_impl::operator=(worker_impl && other)
 	myThread.swap(other.myThread);
 	myCoreAffinity = other.myCoreAffinity;
 	myIsRunning.store(other.myIsRunning.load(std::memory_order_relaxed), std::memory_order_relaxed);
-	myThreadHandle = other.myThreadHandle;
+	std::swap(myThreadHandle, other.myThreadHandle);
 	mySleepThreshhold = other.mySleepThreshhold;
 	mySleepTimer = other.mySleepTimer;
 	myPriorityDistributionIteration = other.myPriorityDistributionIteration;
@@ -93,7 +103,7 @@ void worker_impl::enable()
 }
 bool worker_impl::deactivate()
 {
-	return myIsRunning.exchange(false, std::memory_order_release);
+	return myIsActive.exchange(false, std::memory_order_release);
 }
 void worker_impl::refresh_sleep_timer()
 {
@@ -127,7 +137,7 @@ void worker_impl::idle()
 // Also, maybe avoid retrying at a failed index twice in a row.
 std::uint8_t worker_impl::get_queue_target()
 {
-	if (myQueueAffinity == job_handler_detail::Worker_Auto_Affinity) {
+	if (myQueueAffinity != job_handler_detail::Worker_Auto_Affinity) {
 		return myQueueAffinity;
 	}
 
@@ -152,6 +162,10 @@ std::uint8_t worker_impl::get_queue_target()
 	}
 
 	return index;
+}
+std::uint8_t worker_impl::get_fetch_retries() const
+{
+	return myQueueAffinity == job_handler_detail::Worker_Auto_Affinity ? job_handler_detail::Priority_Granularity : 1;
 }
 void worker_impl::set_name(const char * name)
 {

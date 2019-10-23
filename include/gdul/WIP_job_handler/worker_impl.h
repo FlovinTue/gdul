@@ -40,15 +40,17 @@ public:
 	bool is_active() const;
 	bool is_enabled() const;
 
-
 	void idle();
 
 	std::uint8_t get_queue_target();
+	std::uint8_t get_fetch_retries() const;
 
 private:
 	std::thread myThread;
 
 	thread_handle myThreadHandle;
+
+	uint32_t myNativeThreadId;
 
 	std::size_t myPriorityDistributionIteration;
 
