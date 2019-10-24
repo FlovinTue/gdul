@@ -93,6 +93,8 @@ float job_handler_tester::run_consumption_parallel_test(std::size_t numInserts, 
 float job_handler_tester::run_construction_parallel_test(std::size_t numInserts, void(*workfunc)(void))
 {
 	numInserts; workfunc;
+
+	// Hmm still something about concurrency when depending on other job during possible moving operation... Argh. Needs ASP ?
 	// Reset
 	// Init ( 1 threads )
 
