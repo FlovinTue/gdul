@@ -26,8 +26,11 @@
 
 #undef max
 
-#pragma warning(push)
+#pragma warning(push, 2)
+// Anonymous union
 #pragma warning(disable : 4201)
+// Non-class enums 
+#pragma warning(disable : 26812)
 
 namespace gdul {
 namespace aspdetail {
@@ -1292,7 +1295,7 @@ inline typename aspdetail::compressed_storage shared_ptr<T, Allocator>::create_c
 {
 	aspdetail::control_block_claim_custom_delete<T, Allocator, Deleter>* controlBlock(nullptr);
 
-	const std::size_t blockSize(alloc_size_claim_custom_delete<Deleter>());
+	constexpr std::size_t blockSize(alloc_size_claim_custom_delete<Deleter>());
 
 	void* block(nullptr);
 

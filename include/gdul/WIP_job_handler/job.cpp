@@ -50,7 +50,7 @@ void job::add_dependency(job & dependency)
 }
 void job::enable()
 {
-	if (myEnabled.exchange(false ,std::memory_order_relaxed)) {
+	if (myEnabled.exchange(true ,std::memory_order_relaxed)) {
 		return;
 	}
 

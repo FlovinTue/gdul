@@ -492,10 +492,10 @@ inline typename concurrent_queue<T, Allocator>::shared_ptr_slot_type concurrent_
 
 	const std::size_t bufferByteSize(sizeof(buffer_type));
 	const std::size_t dataBlockByteSize(sizeof(cqdetail::item_container<T>) * log2size);
-	const std::size_t controlBlockByteSize(shared_ptr_slot_type::alloc_size_claim());
+	constexpr std::size_t controlBlockByteSize(shared_ptr_slot_type::alloc_size_claim());
 
-	const std::size_t controlBlockSize(cqdetail::aligned_size<void>(controlBlockByteSize, 8));
-	const std::size_t bufferSize(cqdetail::aligned_size<void>(bufferByteSize, 8));
+	constexpr std::size_t controlBlockSize(cqdetail::aligned_size<void>(controlBlockByteSize, 8));
+	constexpr std::size_t bufferSize(cqdetail::aligned_size<void>(bufferByteSize, 8));
 	const std::size_t dataBlockSize(dataBlockByteSize);
 
 	const std::size_t totalBlockSize(controlBlockSize + bufferSize + dataBlockSize + alignOfData);
@@ -1332,7 +1332,8 @@ inline item_container<T>::item_container()
 }
 template<class T>
 inline item_container<T>::item_container(item_state state)
-	: myState(state)
+	: myData()
+	, myState(state)
 {
 }
 template<class T>
@@ -1633,7 +1634,7 @@ class store_array_deleter
 {
 public:
 	store_array_deleter(std::uint16_t capacity);
-	store_array_deleter(store_array_deleter<T, Allocator>&& other);
+	store_array_deleter(store_array_deleter<T, Allocator>&& other) noexcept;
 	void operator()(T* obj, Allocator& alloc);
 
 private:
@@ -1645,7 +1646,7 @@ inline store_array_deleter<T, Allocator>::store_array_deleter(std::uint16_t capa
 {
 }
 template<class T, class Allocator>
-inline store_array_deleter<T, Allocator>::store_array_deleter(store_array_deleter<T, Allocator>&& other)
+inline store_array_deleter<T, Allocator>::store_array_deleter(store_array_deleter<T, Allocator>&& other) noexcept
 	: myCapacity(other.myCapacity)
 {
 }

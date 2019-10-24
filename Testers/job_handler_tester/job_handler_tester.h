@@ -5,10 +5,6 @@
 
 namespace gdul
 {
-typedef job_handler tested_handler;
-typedef job tested_work_unit;
-typedef worker tested_worker;
-
 
 enum JOB_HANDLER_TESTER_WORKER_AFFINITY
 {
@@ -38,8 +34,6 @@ public:
 	job_handler_tester_info myInfo;
 
 	gdul::job_handler myHandler;
-
-	timer<float> myTimer;
 };
 
 }

@@ -5,6 +5,7 @@ namespace gdul
 {
 
 job_handler_tester::job_handler_tester()
+	: myInfo()
 {
 }
 
@@ -57,27 +58,41 @@ void job_handler_tester::setup_workers()
 
 float job_handler_tester::run_consumption_parallel_test(std::size_t numInserts, void(*workfunc)(void))
 {
-	numInserts;
+	job root(myHandler.make_job(workfunc, 0));	
+	job next(myHandler.make_job(workfunc, 0));
+	next.add_dependency(root);
+	next.enable();
 
-	// Reset
-	// Init ( max threads )
+	for (std::size_t i = 0; i < numInserts; ++i) {
 
-	// Create root
+		uint8_t children(rand() % 8);
+		for (std::uint8_t j = 0; j < children; ++j, ++i) {
+			job sibling(myHandler.make_job(workfunc, (j + i) % job_handler_detail::Priority_Granularity));
+			sibling.add_dependency(next);
+			sibling.enable();
+		}
 
-	// LOOP
-	// Create 1 - 8 children
-	// ------
-	// Create end
+		job intermediate(std::move(next));
+		next = myHandler.make_job(workfunc, i % job_handler_detail::Priority_Granularity);
+		next.add_dependency(intermediate);
+		next.enable();
+	}
 
-	// Enable root
-	// Wait for end
+	job end(myHandler.make_job(workfunc));
+	end.add_dependency(next);
+	end.enable();
 
-	return 0.0f;
+	timer<float> timer;
+
+	root.enable();
+	end.wait_for_finish();
+
+	return timer.get();
 }
 
 float job_handler_tester::run_construction_parallel_test(std::size_t numInserts, void(*workfunc)(void))
 {
-	numInserts;
+	numInserts; workfunc;
 	// Reset
 	// Init ( 1 threads )
 
@@ -94,7 +109,7 @@ float job_handler_tester::run_construction_parallel_test(std::size_t numInserts,
 
 float job_handler_tester::run_mixed_parallel_test(std::size_t numInserts, void(*workfunc)(void))
 {
-	numInserts;
+	numInserts; workfunc;
 
 	// Reset
 	// Init ( max threads )
@@ -114,7 +129,7 @@ float job_handler_tester::run_mixed_parallel_test(std::size_t numInserts, void(*
 
 float job_handler_tester::run_consumption_strand_test(std::size_t numInserts, void(*workfunc)(void))
 {
-	numInserts;
+	numInserts; workfunc;
 
 	// Reset
 	// Init ( max threads )

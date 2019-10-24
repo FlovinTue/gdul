@@ -24,7 +24,7 @@ inline timer<T>::timer()
 template<class T>
 inline T timer<T>::get() const
 {
-	std::chrono::duration_cast<std::chrono::duration<T>>(myClock.now() - myFromTime);
+	return std::chrono::duration_cast<std::chrono::duration<T>>(myClock.now() - myFromTime).count();
 }
 template<class T>
 inline void timer<T>::reset()

@@ -26,7 +26,12 @@ int main()
 
 	gdul::job_handler_tester_info info;
 	info.affinity = gdul::JOB_HANDLER_TESTER_WORKER_AFFINITY_MIXED;
-	info.workFunc = workFunc;
+
+	tester.init(info);
+
+	for (uint32_t i = 0; i < 500; ++i) {
+		tester.run_consumption_parallel_test(5000, workFunc);
+	}
 
 	std::cout << "Hello World!\n";
 }
