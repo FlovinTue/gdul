@@ -58,7 +58,7 @@ public:
 
  	void retire_workers();
 
-	worker create_worker();
+	worker make_worker();
 
 	// Callable will allocate if size is above job_handler_detail::Callable_Max_Size_No_Heap_Alloc
 	// It needs to have operator() defined with signature void(void). 

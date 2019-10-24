@@ -50,7 +50,7 @@ void job_handler::retire_workers()
 	}
 }
 
-worker job_handler::create_worker()
+worker job_handler::make_worker()
 {
 	const std::uint16_t index(myWorkerCount.fetch_add(1, std::memory_order_relaxed));
 

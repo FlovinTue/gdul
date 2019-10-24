@@ -53,13 +53,13 @@ bool job_impl::try_attach_child(job_impl_shared_ptr child)
 	job_impl_shared_ptr firstChild(nullptr);
 	job_impl_raw_ptr rawRep(nullptr);
 	do {
-		firstChild = myFirstChild.load();
+		firstChild = myFirstChild.load(std::memory_order_relaxed);
 		rawRep = firstChild;
 
 		child->set_sibling(std::move(firstChild));
 
 		if (myFinished.load(std::memory_order_seq_cst)) {
-			child->myFirstSibling.unsafe_store(nullptr);
+			child->myFirstSibling.unsafe_store(nullptr, std::memory_order_relaxed);
 			return false;
 		}
 
@@ -98,13 +98,14 @@ void job_impl::set_sibling(job_impl_shared_ptr sibling)
 }
 void job_impl::enqueue_children()
 {
-	job_impl_shared_ptr child(myFirstChild.exchange(nullptr));
+	job_impl_shared_ptr child(myFirstChild.exchange(nullptr, std::memory_order_relaxed));
 
 	while (child) {
-		job_impl_shared_ptr next(child->myFirstSibling.unsafe_load());
+		job_impl_shared_ptr next(child->myFirstSibling.unsafe_load(std::memory_order_relaxed));
 
 		if (!child->remove_dependencies(1)) {
-			child->get_handler()->enqueue_job(std::move(child));
+			job_handler* const nativeHandler(child->get_handler());
+			nativeHandler->enqueue_job(std::move(child));
 		}
 
 		child = std::move(next);

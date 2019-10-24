@@ -81,7 +81,7 @@ job::operator bool() const
 }
 job::job(job_impl_shared_ptr impl)
 	: myImpl(std::move(impl))
-	, myEnabled{ATOMIC_FLAG_INIT}
+	, myEnabled(false)
 {
 }
 }
