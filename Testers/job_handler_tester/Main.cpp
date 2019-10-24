@@ -12,8 +12,12 @@ void workFunc()
 {
 	std::size_t random((std::size_t)(rand() % 20) + 100ull);
 
-	for (std::size_t i = 0; i < random; ++i) {
-		gdul::testSum += std::sqrt(gdul::testSum);
+	for (std::size_t i = 0; i < random;) {
+		double toAdd(std::sqrt(gdul::testSum));
+		gdul::testSum += toAdd;
+		if (gdul::testSum) {
+			++i;
+		}
 	}
 }
 int main()
