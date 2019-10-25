@@ -14,7 +14,7 @@
     <VCProjectVersion>15.0</VCProjectVersion>
     <ProjectGuid>{38AC6E3A-729D-4527-83C6-3805A7274AA8}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>JobSystem</RootNamespace>
+    <RootNamespace>gdul</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />

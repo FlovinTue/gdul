@@ -14,7 +14,7 @@
     <VCProjectVersion>15.0</VCProjectVersion>
     <ProjectGuid>{C91C184D-C939-46AB-BA9C-7A8DE363194A}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>ConcurrentObjectPool</RootNamespace>
+    <RootNamespace>gdul</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />

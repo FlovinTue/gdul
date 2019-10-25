@@ -14,7 +14,7 @@
     <VCProjectVersion>15.0</VCProjectVersion>
     <ProjectGuid>{F2B36960-1C2E-402A-91BE-CD8C1539E38B}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>ConcurrentSharedPtr</RootNamespace>
+    <RootNamespace>gdul</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
     <ProjectName>atomic_uint128</ProjectName>
   </PropertyGroup>

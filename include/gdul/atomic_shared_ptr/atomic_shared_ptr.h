@@ -196,7 +196,8 @@ private:
 	inline bool compare_exchange_weak_internal_helping_swap(compressed_storage & expected, const compressed_storage & desired, aspdetail::CAS_FLAG flags, aspdetail::memory_orders orders) noexcept;
 
 	inline bool try_help_increment_and_try_swap(compressed_storage& expected, compressed_storage desired, aspdetail::memory_orders orders) noexcept;
-	inline void try_help_increment(compressed_storage expected, std::memory_order order) noexcept;
+	inline void try_help_increment(compressed_storage expected, std::memory_order failOrder) noexcept;
+	inline bool try_fast_decrement(compressed_storage expected, std::memory_order failOrder);
 
 	inline constexpr aspdetail::control_block_base<T, Allocator>* to_control_block(compressed_storage from) const noexcept;
 
@@ -567,30 +568,28 @@ inline bool atomic_shared_ptr<T, Allocator>::try_help_increment_and_try_swap(com
 {
 	const compressed_storage initialPtrBlock(expected.myU64 & aspdetail::Versioned_Ptr_Mask);
 
-	aspdetail::control_block_base<T, Allocator>* const controlBlock(to_control_block(expected));
+	aspdetail::control_block_base<T, Allocator>* const cb(to_control_block(expected));
 
 	compressed_storage desired_(desired);
 	do {
 		const std::uint8_t copyRequests(expected.myU8[aspdetail::STORAGE_BYTE_COPYREQUEST]);
 
-		if (controlBlock)
-			controlBlock->incref(copyRequests);
+		if (cb)
+			cb->incref(copyRequests);
 
-		if (myStorage.compare_exchange_weak(expected.myU64, desired_.myU64, orders.myFirst, std::memory_order_relaxed)) {
+		if (myStorage.compare_exchange_weak(expected.myU64, desired_.myU64, orders.myFirst, orders.mySecond)) {
 			return true;
 		}
 
-		if (controlBlock)
-			controlBlock->decref(copyRequests);
+		if (cb)
+			cb->decref(copyRequests);
 
 	} while ((expected.myU64 & aspdetail::Versioned_Ptr_Mask) == initialPtrBlock.myU64);
-
-	std::atomic_thread_fence(orders.mySecond);
 
 	return false;
 }
 template<class T, class Allocator>
-inline void atomic_shared_ptr<T, Allocator>::try_help_increment(compressed_storage expected, std::memory_order order) noexcept
+inline void atomic_shared_ptr<T, Allocator>::try_help_increment(compressed_storage expected, std::memory_order failOrder) noexcept
 {
 	const compressed_storage initialPtrBlock(expected.myU64 & aspdetail::Versioned_Ptr_Mask);
 
@@ -608,7 +607,7 @@ inline void atomic_shared_ptr<T, Allocator>::try_help_increment(compressed_stora
 
 		controlBlock->incref(copyRequests);
 
-		if (myStorage.compare_exchange_weak(expected_.myU64, desired.myU64, std::memory_order_relaxed, order)) {
+		if (myStorage.compare_exchange_weak(expected_.myU64, desired.myU64, failOrder)) {
 			return;
 		}
 		controlBlock->decref(copyRequests);
@@ -616,8 +615,27 @@ inline void atomic_shared_ptr<T, Allocator>::try_help_increment(compressed_stora
 	} while (
 		(expected_.myU64 & aspdetail::Versioned_Ptr_Mask) == initialPtrBlock.myU64 &&
 		expected_.myU8[aspdetail::STORAGE_BYTE_COPYREQUEST]);
+}
+template<class T, class Allocator>
+inline bool atomic_shared_ptr<T, Allocator>::try_fast_decrement(compressed_storage expected, std::memory_order failOrder)
+{
+	const compressed_storage initialPtrBlock(expected.myU64 & aspdetail::Versioned_Ptr_Mask);
 
-	std::atomic_thread_fence(order);
+	aspdetail::control_block_base<T, Allocator>* const controlBlock(to_control_block(expected));
+
+	if (!controlBlock) {
+		return true;
+	}
+
+	compressed_storage desired(expected);
+	desired.myU8[aspdetail::STORAGE_BYTE_COPYREQUEST] = expected.myU8[aspdetail::STORAGE_BYTE_COPYREQUEST] - 1;
+	compressed_storage expected_(expected);
+
+	if (myStorage.compare_exchange_weak(expected_.myU64, desired.myU64, failOrder)) {
+		return true;
+	}
+
+	return false;
 }
 template<class T, class Allocator>
 inline constexpr aspdetail::control_block_base<T, Allocator>* atomic_shared_ptr<T, Allocator>::to_control_block(compressed_storage from) const noexcept
@@ -652,20 +670,19 @@ inline bool atomic_shared_ptr<T, Allocator>::compare_exchange_weak_internal(comp
 	if (otherInterjection & (flags & aspdetail::CAS_FLAG_CAPTURE_ON_FAILURE)) {
 		expected = copy_internal(orders.mySecond);
 	}
-
+	
 	return result;
 }
 template<class T, class Allocator>
 inline bool atomic_shared_ptr<T, Allocator>::compare_exchange_weak_internal_fast_swap(compressed_storage & expected, const compressed_storage & desired, aspdetail::CAS_FLAG flags, aspdetail::memory_orders orders) noexcept
 {
-	const bool result = myStorage.compare_exchange_weak(expected.myU64, desired.myU64, orders.myFirst, std::memory_order_relaxed);
+	const bool result = myStorage.compare_exchange_weak(expected.myU64, desired.myU64, orders.myFirst, orders.mySecond);
 
 	const bool decrementPrevious(result & !(flags & aspdetail::CAS_FLAG_STEAL_PREVIOUS));
 
 	if (decrementPrevious) {
-		aspdetail::control_block_base<T, Allocator>* const controlBlock(to_control_block(expected));
-		if (controlBlock) {
-			controlBlock->decref();
+		if (aspdetail::control_block_base<T, Allocator>* const cb = to_control_block(expected)) {
+			cb->decref();
 		}
 	}
 	return result;
@@ -680,21 +697,25 @@ inline bool atomic_shared_ptr<T, Allocator>::compare_exchange_weak_internal_help
 	expected_ = myStorage.fetch_add(aspdetail::Copy_Request_Step, std::memory_order_relaxed);
 	expected_.myU8[aspdetail::STORAGE_BYTE_COPYREQUEST] += 1;
 
-	aspdetail::control_block_base<T, Allocator>* const controlBlock(to_control_block(expected_));
+	aspdetail::control_block_base<T, Allocator>* const cb(to_control_block(expected_));
 
 	const bool otherInterjection((expected_.myU64 ^ expected.myU64) & aspdetail::Versioned_Ptr_Mask);
 
+	bool decrementPrevious(false);
+	bool fastDecrement(true);
 	if (!otherInterjection) {
 		result = try_help_increment_and_try_swap(expected_, desired, orders);
+
+		decrementPrevious = result & !(flags & aspdetail::CAS_FLAG_STEAL_PREVIOUS);
 	}
 	else {
-		try_help_increment(expected_, (flags & aspdetail::CAS_FLAG_CAPTURE_ON_FAILURE) ? std::memory_order_relaxed : orders.mySecond);
+		// Maybe we can just decrement copy requests quick, avoiding external decrementation
+		fastDecrement = !try_fast_decrement(expected_, orders.mySecond);
+		//try_help_increment(expected_, orders.mySecond);
 	}
 
-	const bool decrementPrevious(result & !(flags & aspdetail::CAS_FLAG_STEAL_PREVIOUS));
-
-	if (controlBlock) {
-		controlBlock->decref(1 + decrementPrevious);
+	if ((bool)cb & (decrementPrevious | fastDecrement)) {
+		cb->decref(fastDecrement + decrementPrevious);
 	}
 
 	expected = expected_;
@@ -719,28 +740,26 @@ inline typename  aspdetail::compressed_storage atomic_shared_ptr<T, Allocator>::
 template <class T, class Allocator>
 inline typename aspdetail::compressed_storage atomic_shared_ptr<T, Allocator>::unsafe_copy_internal(std::memory_order order)
 {
-	std::atomic_thread_fence(std::memory_order_acquire);
+	const compressed_storage storage(myStorage.load(std::memory_order_relaxed));
 
-	aspdetail::control_block_base<T, Allocator>* const cb(to_control_block(compressed_storage(myStorage.load(std::memory_order_relaxed))));
+	aspdetail::control_block_base<T, Allocator>* const cb(to_control_block(compressed_storage(storage)));
 	if (cb) {
 		cb->incref();
 	}
 
 	std::atomic_thread_fence(order);
 
-	return compressed_storage(myStorage.load(std::memory_order_relaxed));
+	return storage;
 }
 template<class T, class Allocator>
 inline typename aspdetail::compressed_storage atomic_shared_ptr<T, Allocator>::unsafe_exchange_internal(compressed_storage with, std::memory_order order)
 {
-	std::atomic_thread_fence(std::memory_order_acquire);
-
 	const compressed_storage old(myStorage.load(std::memory_order_relaxed));
 
 	compressed_storage replacement(with.myU64);
 	replacement.myU8[aspdetail::STORAGE_BYTE_VERSION] = old.myU8[aspdetail::STORAGE_BYTE_VERSION] + 1;
 
-	myStorage.load(std::memory_order_relaxed) = replacement.myU64;
+	myStorage.store(replacement.myU64, std::memory_order_relaxed);
 
 	std::atomic_thread_fence(order);
 
@@ -749,8 +768,6 @@ inline typename aspdetail::compressed_storage atomic_shared_ptr<T, Allocator>::u
 template <class T, class Allocator>
 inline void atomic_shared_ptr<T, Allocator>::unsafe_store_internal(compressed_storage from, std::memory_order order)
 {
-	std::atomic_thread_fence(std::memory_order_acquire);
-
 	const compressed_storage previous(myStorage.load(std::memory_order_relaxed));
 	myStorage.store(from.myU64, std::memory_order_relaxed);
 
@@ -765,7 +782,7 @@ template<class T, class Allocator>
 inline typename aspdetail::compressed_storage atomic_shared_ptr<T, Allocator>::exchange_internal(compressed_storage to, aspdetail::CAS_FLAG flags, std::memory_order order) noexcept
 {
 	compressed_storage expected(myStorage.load(std::memory_order_relaxed));
-	while (!compare_exchange_weak_internal(expected, to, flags, { std::memory_order_relaxed, order }));
+	while (!compare_exchange_weak_internal(expected, to, flags, { order, std::memory_order_relaxed }));
 	return expected;
 }
 namespace aspdetail {
