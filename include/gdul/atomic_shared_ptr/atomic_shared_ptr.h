@@ -23,6 +23,7 @@
 #include <atomic>
 #include <cstdint>
 #include <limits>
+#include <cassert>
 
 #undef max
 
@@ -170,6 +171,12 @@ public:
 	const T* unsafe_get_owned() const;
 
 private:
+	template <class PtrType>
+	inline bool compare_exchange_strong(typename aspdetail::disable_deduction<PtrType>::type& expected, shared_ptr<T, Allocator>&& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept;
+
+	template <class PtrType>
+	inline bool compare_exchange_weak(typename aspdetail::disable_deduction<PtrType>::type& expected, shared_ptr<T, Allocator>&& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept;
+
 	inline constexpr aspdetail::control_block_base<T, Allocator>* get_control_block() noexcept;
 	inline constexpr const aspdetail::control_block_base<T, Allocator>* get_control_block() const noexcept;
 
@@ -185,17 +192,11 @@ private:
 
 	inline compressed_storage exchange_internal(compressed_storage to, aspdetail::CAS_FLAG flags, std::memory_order order) noexcept;
 
-	template <class PtrType>
-	inline bool compare_exchange_strong(typename aspdetail::disable_deduction<PtrType>::type& expected, shared_ptr<T, Allocator>&& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept;
-
-	template <class PtrType>
-	inline bool compare_exchange_weak(typename aspdetail::disable_deduction<PtrType>::type& expected, shared_ptr<T, Allocator>&& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept;
-
 	inline bool compare_exchange_weak_internal(compressed_storage& expected, compressed_storage desired, aspdetail::CAS_FLAG flags, aspdetail::memory_orders orders) noexcept;
 	inline bool compare_exchange_weak_internal_fast_swap(compressed_storage & expected, const compressed_storage & desired, aspdetail::CAS_FLAG flags, aspdetail::memory_orders orders) noexcept;
 	inline bool compare_exchange_weak_internal_helping_swap(compressed_storage & expected, const compressed_storage & desired, aspdetail::CAS_FLAG flags, aspdetail::memory_orders orders) noexcept;
 
-	inline bool try_help_increment_and_try_swap(compressed_storage& expected, compressed_storage desired, aspdetail::memory_orders orders) noexcept;
+	inline bool try_help_increment_and_swap(compressed_storage& expected, compressed_storage desired, aspdetail::memory_orders orders) noexcept;
 	inline void try_help_increment(compressed_storage& expected, std::memory_order failOrder) noexcept;
 	inline bool try_fast_decrement(compressed_storage& expected, std::memory_order failOrder) noexcept;
 
@@ -564,7 +565,7 @@ inline void atomic_shared_ptr<T, Allocator>::store_internal(compressed_storage f
 	exchange_internal(from, aspdetail::CAS_FLAG_NONE, order);
 }
 template <class T, class Allocator>
-inline bool atomic_shared_ptr<T, Allocator>::try_help_increment_and_try_swap(compressed_storage & expected, compressed_storage desired, aspdetail::memory_orders orders) noexcept
+inline bool atomic_shared_ptr<T, Allocator>::try_help_increment_and_swap(compressed_storage & expected, compressed_storage desired, aspdetail::memory_orders orders) noexcept
 {
 	const compressed_storage initialPtrBlock(expected.myU64 & aspdetail::Versioned_Ptr_Mask);
 
@@ -618,13 +619,13 @@ inline void atomic_shared_ptr<T, Allocator>::try_help_increment(compressed_stora
 template<class T, class Allocator>
 inline bool atomic_shared_ptr<T, Allocator>::try_fast_decrement(compressed_storage& expected, std::memory_order failOrder) noexcept
 {
-	const compressed_storage initialPtrBlock(expected.myU64 & aspdetail::Versioned_Ptr_Mask);
+	assert(expected.myU8[aspdetail::STORAGE_BYTE_COPYREQUEST] && "try_fast_decrement expects atleast one copyrequest");
 
-	aspdetail::control_block_base<T, Allocator>* const controlBlock(to_control_block(expected));
-
-	if (!controlBlock) {
+	if (!(expected.myU64 & aspdetail::Ptr_Mask)) {
 		return true;
 	}
+
+	const compressed_storage initialPtrBlock(expected.myU64 & aspdetail::Versioned_Ptr_Mask);
 
 	do {
 		compressed_storage desired(expected);
@@ -636,7 +637,6 @@ inline bool atomic_shared_ptr<T, Allocator>::try_fast_decrement(compressed_stora
 	} while (
 		(expected.myU64 & aspdetail::Versioned_Ptr_Mask) == initialPtrBlock.myU64 &&
 		expected.myU8[aspdetail::STORAGE_BYTE_COPYREQUEST]);
-
 
 	return false;
 }
@@ -707,7 +707,7 @@ inline bool atomic_shared_ptr<T, Allocator>::compare_exchange_weak_internal_help
 	bool decrementPreviousRef(false);
 	bool decrementHelperRef(true);
 	if (!otherInterjection) {
-		result = try_help_increment_and_try_swap(expected_, desired, orders);
+		result = try_help_increment_and_swap(expected_, desired, orders);
 
 		decrementPreviousRef = result & !(flags & aspdetail::CAS_FLAG_STEAL_PREVIOUS);
 	}
