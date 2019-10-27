@@ -18,21 +18,24 @@
       <Item Name="[**ptr_use_count]" Condition="(
 				+ ((myControlBlockStorage.myU64 >> 1) * 2)
 				- ((uint64_t)myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
-				- ((uint64_t)myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_COPYREQUEST] * (aspdetail::Versioned_Ptr_Mask + 1))
+				- ((uint64_t)myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] * (aspdetail::Versioned_Ptr_Mask + 1))
 						!= 0)">
 				*((size_type*)(
 				+ 16
 				+ ((myControlBlockStorage.myU64 >> 1) * 2)
 				- ((uint64_t)myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
-				- ((uint64_t)myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_COPYREQUEST] * (aspdetail::Versioned_Ptr_Mask + 1))
+				- ((uint64_t)myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] * (aspdetail::Versioned_Ptr_Mask + 1))
 				))
 			</Item>
       <Item Name="[**ptr_use_count]" Condition="(
 				+ ((myControlBlockStorage.myU64 >> 1) * 2)
 				- ((uint64_t)myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
-				- ((uint64_t)myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_COPYREQUEST] * (aspdetail::Versioned_Ptr_Mask + 1))
+				- ((uint64_t)myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] * (aspdetail::Versioned_Ptr_Mask + 1))
 						== 0)">
         0UL
+      </Item>
+      <Item Name="[**ptr_local_refs]">
+        (size_type)myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF]
       </Item>
       <Item Name="[**ptr_version]">
 				(size_type)myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_VERSION]
@@ -44,20 +47,20 @@
 		<DisplayString Condition="(
 				+ ((myDebugView.myU64 >> 1) * 2)
 				- ((uint64_t)myDebugView.myU8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
-				- ((uint64_t)myDebugView.myU8[aspdetail::STORAGE_BYTE_COPYREQUEST] * (aspdetail::Versioned_Ptr_Mask + 1))
+				- ((uint64_t)myDebugView.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] * (aspdetail::Versioned_Ptr_Mask + 1))
 						!= 0)">
 			{**(($T1**)
 			(
 			+ 8
 			+ ((myDebugView.myU64 >> 1) * 2)
 			- ((uint64_t)myDebugView.myU8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
-			- ((uint64_t)myDebugView.myU8[aspdetail::STORAGE_BYTE_COPYREQUEST] * (aspdetail::Versioned_Ptr_Mask + 1)))
+			- ((uint64_t)myDebugView.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] * (aspdetail::Versioned_Ptr_Mask + 1)))
 			)}
 		</DisplayString>
 		<DisplayString Condition="(
 				+ ((myDebugView.myU64 >> 1) * 2)
 				- ((uint64_t)myDebugView.myU8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
-				- ((uint64_t)myDebugView.myU8[aspdetail::STORAGE_BYTE_COPYREQUEST] * (aspdetail::Versioned_Ptr_Mask + 1))
+				- ((uint64_t)myDebugView.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] * (aspdetail::Versioned_Ptr_Mask + 1))
 						== 0)">
 			{(void*)0}
 		</DisplayString>
@@ -65,42 +68,45 @@
 			<ExpandedItem Condition="(
 				+ ((myDebugView.myU64 >> 1) * 2)
 				- ((uint64_t)myDebugView.myU8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
-				- ((uint64_t)myDebugView.myU8[aspdetail::STORAGE_BYTE_COPYREQUEST] * (aspdetail::Versioned_Ptr_Mask + 1))
+				- ((uint64_t)myDebugView.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] * (aspdetail::Versioned_Ptr_Mask + 1))
 						!= 0)">
 				(*(($T1**)
 				(
 				+8
 				+ ((myDebugView.myU64 >> 1) * 2)
 				- ((uint64_t)myDebugView.myU8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
-				- ((uint64_t)myDebugView.myU8[aspdetail::STORAGE_BYTE_COPYREQUEST] * (aspdetail::Versioned_Ptr_Mask + 1)))
+				- ((uint64_t)myDebugView.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] * (aspdetail::Versioned_Ptr_Mask + 1)))
 				))
 			</ExpandedItem>
 			<Item Name="[object]" Condition="(
 				+ ((myDebugView.myU64 >> 1) * 2)
 				- ((uint64_t)myDebugView.myU8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
-				- ((uint64_t)myDebugView.myU8[aspdetail::STORAGE_BYTE_COPYREQUEST] * (aspdetail::Versioned_Ptr_Mask + 1))
+				- ((uint64_t)myDebugView.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] * (aspdetail::Versioned_Ptr_Mask + 1))
 						== 0)">
 				(void*)0
 			</Item>
 			<Item Name="[**ptr_use_count]" Condition="(
 				+ ((myDebugView.myU64 >> 1) * 2)
 				- ((uint64_t)myDebugView.myU8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
-				- ((uint64_t)myDebugView.myU8[aspdetail::STORAGE_BYTE_COPYREQUEST] * (aspdetail::Versioned_Ptr_Mask + 1))
+				- ((uint64_t)myDebugView.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] * (aspdetail::Versioned_Ptr_Mask + 1))
 						!= 0)">
 				*((size_type*)(
 				+ 16
 				+ ((myDebugView.myU64 >> 1) * 2)
 				- ((uint64_t)myDebugView.myU8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
-				- ((uint64_t)myDebugView.myU8[aspdetail::STORAGE_BYTE_COPYREQUEST] * (aspdetail::Versioned_Ptr_Mask + 1))
+				- ((uint64_t)myDebugView.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] * (aspdetail::Versioned_Ptr_Mask + 1))
 				))
 			</Item>
 			<Item Name="[**ptr_use_count]" Condition="(
 				+ ((myDebugView.myU64 >> 1) * 2)
 				- ((uint64_t)myDebugView.myU8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
-				- ((uint64_t)myDebugView.myU8[aspdetail::STORAGE_BYTE_COPYREQUEST] * (aspdetail::Versioned_Ptr_Mask + 1))
+				- ((uint64_t)myDebugView.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] * (aspdetail::Versioned_Ptr_Mask + 1))
 						== 0)">
 				0UL
 			</Item>
+      <Item Name="[**ptr_local_refs]">
+        (size_type)myDebugView.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF]
+      </Item>
 			<Item Name="[**ptr_version]">
 				(size_type)myDebugView.myU8[aspdetail::STORAGE_BYTE_VERSION]
 			</Item>

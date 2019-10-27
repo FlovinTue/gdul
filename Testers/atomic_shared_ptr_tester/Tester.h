@@ -259,15 +259,6 @@ inline void Tester<T, ArraySize, NumThreads>::WorkCAS(std::uint32_t aArrayPasses
 			raw_ptr<T> check(expected);
 			const bool resulta = myTestArray[i].compare_exchange_strong(expected, std::move(desired), std::memory_order_relaxed);
 
-			//static std::atomic<uint32_t> spurious = 0;
-			//static std::atomic<uint32_t> succeeded = 0;
-			//if (!(resulta == (expected == check))) {
-			//	++spurious;
-			//}
-			//else{
-			//	++succeeded;
-			//}
-
 			//shared_ptr<T> desired_(make_shared<T>());
 			//shared_ptr<T> expected_(myTestArray[i].load(std::memory_order_relaxed));
 			//raw_ptr<T> rawExpected(expected_);

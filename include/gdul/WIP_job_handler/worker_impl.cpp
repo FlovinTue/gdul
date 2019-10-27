@@ -16,7 +16,7 @@ namespace job_handler_detail
 worker_impl::worker_impl()
 	: myAutoCoreAffinity(Worker_Auto_Affinity)
 	, myCoreAffinity(Worker_Auto_Affinity)
-	, myIsRunning(false)
+	, myIsEnabled(false)
 	, myPriorityDistributionIteration(0)
 	, myQueueAffinity(Worker_Auto_Affinity)
 	, mySleepThreshhold(std::numeric_limits<std::uint16_t>::max())
@@ -28,7 +28,7 @@ worker_impl::worker_impl(std::thread&& thread, std::uint8_t coreAffinity)
 	: myAutoCoreAffinity(coreAffinity)
 	, myThread(std::move(thread))
 	, myCoreAffinity(Worker_Auto_Affinity)
-	, myIsRunning(false)
+	, myIsEnabled(false)
 	, myPriorityDistributionIteration(0)
 	, myQueueAffinity(Worker_Auto_Affinity)
 	, mySleepThreshhold(250)
@@ -58,7 +58,7 @@ worker_impl & worker_impl::operator=(worker_impl && other)
 	myAutoCoreAffinity = other.myAutoCoreAffinity;
 	myThread.swap(other.myThread);
 	myCoreAffinity = other.myCoreAffinity;
-	myIsRunning.store(other.myIsRunning.load(std::memory_order_relaxed), std::memory_order_relaxed);
+	myIsEnabled.store(other.myIsEnabled.load(std::memory_order_relaxed), std::memory_order_relaxed);
 	std::swap(myThreadHandle, other.myThreadHandle);
 	mySleepThreshhold = other.mySleepThreshhold;
 	mySleepTimer = other.mySleepTimer;
@@ -98,9 +98,9 @@ void worker_impl::set_sleep_threshhold(std::uint16_t ms)
 {
 	mySleepThreshhold = ms;
 }
-void worker_impl::enable()
+void worker_impl::activate()
 {
-	myIsRunning.store(true, std::memory_order_release);
+	myIsEnabled.store(true, std::memory_order_release);
 }
 bool worker_impl::deactivate()
 {
@@ -119,11 +119,11 @@ bool worker_impl::is_sleepy() const
 }
 bool worker_impl::is_active() const
 {
-	return myIsActive.load(std::memory_order_acquire);
+	return myIsActive.load(std::memory_order_relaxed) & myIsEnabled.load(std::memory_order_relaxed);
 }
 bool worker_impl::is_enabled() const
 {
-	return myIsRunning.load(std::memory_order_relaxed);
+	return myIsEnabled.load(std::memory_order_relaxed);
 }
 void worker_impl::idle()
 {

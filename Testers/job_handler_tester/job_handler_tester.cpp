@@ -44,7 +44,7 @@ void job_handler_tester::setup_workers()
 		wrk.set_queue_affinity(job_handler_detail::Worker_Auto_Affinity);
 		wrk.set_execution_priority(4);
 		wrk.set_name(std::string(std::string("DynamicWorker#") + std::to_string(i + 1)).c_str());
-		wrk.enable();
+		wrk.activate();
 	}
 	for (std::size_t i = 0; i < staticWorkers; ++i) {
 		worker wrk(myHandler.make_worker());
@@ -52,7 +52,7 @@ void job_handler_tester::setup_workers()
 		wrk.set_queue_affinity(i % job_handler_detail::Priority_Granularity);
 		wrk.set_execution_priority(4);
 		wrk.set_name(std::string(std::string("StaticWorker#") + std::to_string(i + 1)).c_str());
-		wrk.enable();
+		wrk.activate();
 	}
 }
 

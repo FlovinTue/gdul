@@ -23,7 +23,6 @@
 #pragma warning(push)
 #pragma warning(disable : 4324)
 
-#include <thread>
 #include <array>
 
 #include <gdul\concurrent_object_pool\concurrent_object_pool.h>

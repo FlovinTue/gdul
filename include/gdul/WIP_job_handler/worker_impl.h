@@ -30,7 +30,7 @@ public:
 	void set_sleep_threshhold(std::uint16_t ms);
 	void set_name(const char* name);
 
-	void enable();
+	void activate();
 
 	bool deactivate();
 
@@ -64,7 +64,7 @@ private:
 	std::uint8_t myCoreAffinity;
 	std::uint8_t myQueueAffinity;
 
-	std::atomic_bool myIsRunning;
+	std::atomic_bool myIsEnabled;
 	std::atomic_bool myIsActive;
 };
 }

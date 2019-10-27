@@ -32,11 +32,10 @@ public:
 	// Thread name
 	void set_name(const char* name);
 
-	void enable();
-
+	void activate();
 	bool deactivate();
 
-	bool is_retired() const;
+	bool is_active() const;
 
 private:
 	friend class job_handler;
