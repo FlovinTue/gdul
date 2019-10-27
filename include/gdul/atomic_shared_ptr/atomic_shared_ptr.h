@@ -330,7 +330,10 @@ inline bool atomic_shared_ptr<T, Allocator>::compare_exchange_strong(typename as
 	desired.fill_local_refs();
 
 	const compressed_storage desired_(desired.myControlBlockStorage.myU64);
-	compressed_storage expected_(expected.myControlBlockStorage.myU64);
+
+	compressed_storage expected_(myStorage.load(std::memory_order_relaxed));
+	expected_.myU64 &= ~aspdetail::Versioned_Ptr_Mask;
+	expected_.myU64 |= expected.myControlBlockStorage.myU64 & aspdetail::Versioned_Ptr_Mask;
 
 	const aspdetail::memory_orders orders{ successOrder, failOrder };
 
@@ -358,8 +361,12 @@ template<class T, class Allocator>
 template<class PtrType>
 inline bool atomic_shared_ptr<T, Allocator>::compare_exchange_weak(typename aspdetail::disable_deduction<PtrType>::type & expected, shared_ptr<T, Allocator>&& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept
 {
+	desired.fill_local_refs();
+
 	const compressed_storage desired_(desired.myControlBlockStorage.myU64);
-	compressed_storage expected_(expected.myControlBlockStorage.myU64);
+	compressed_storage expected_(myStorage.load(std::memory_order_relaxed));
+	expected_.myU64 &= ~aspdetail::Versioned_Ptr_Mask;
+	expected_.myU64 |= expected.myControlBlockStorage.myU64 & aspdetail::Versioned_Ptr_Mask;
 
 	const aspdetail::memory_orders orders{ successOrder, failOrder };
 
@@ -569,9 +576,7 @@ inline bool atomic_shared_ptr<T, Allocator>::compare_exchange_weak_internal(comp
 
 	result = myStorage.compare_exchange_weak(expected_.myU64, desired_.myU64, orders.myFirst, orders.mySecond);
 
-	const bool decrementPreviousRef(result & !(flags & aspdetail::CAS_FLAG_STEAL_PREVIOUS));
-
-	if (decrementPreviousRef) {
+	if (result & !(flags & aspdetail::CAS_FLAG_STEAL_PREVIOUS)) {
 		if (aspdetail::control_block_base<T, Allocator>* const cb = to_control_block(expected)) {
 			cb->decref(expected.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF]);
 		}
