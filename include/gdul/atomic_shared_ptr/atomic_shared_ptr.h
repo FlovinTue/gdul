@@ -52,6 +52,9 @@ union compressed_storage
 	std::uint8_t myU8[8];
 };
 
+template <class Dummy = void>
+void assert_alignment(std::uint8_t* block, std::size_t alignment);
+
 template <class T>
 struct disable_deduction;
 
@@ -901,7 +904,21 @@ enum CAS_FLAG : std::uint8_t
 	CAS_FLAG_CAPTURE_ON_FAILURE,
 	CAS_FLAG_STEAL_PREVIOUS,
 };
+template<class Dummy>
+void assert_alignment(std::uint8_t* block, std::size_t alignment)
+{
+#ifndef _HAS_CXX17
+	static_assert(!(std::numeric_limits<std::uint8_t>::max() < align), "make_shared supports only supports up to std::numeric_limits<std::uint8_t>::max() byte aligned types");
 
+	if ((std::uintptr_t)block % alignof(std::max_align_t) != 0) {
+		throw std::exception("make_shared expects at least alignof(max_align_t) allocates");
+	}
+#else
+	if ((std::uintptr_t)block % alignment != 0) {
+		throw std::exception("conforming with C++17 make_shared expects alignof(T) allocates");
+	}
+#endif
+}
 template <class T>
 class ptr_base
 {
@@ -1171,6 +1188,8 @@ public:
 
 	// The amount of memory requested from the allocator when calling
 	// make_shared
+	
+
 	template <class Allocator>
 	static constexpr std::size_t alloc_size_make_shared() noexcept;
 
@@ -1370,6 +1389,14 @@ inline shared_ptr<T>& shared_ptr<T>::operator=(shared_ptr<T>&& other) noexcept
 	std::swap(this->myPtr, other.myPtr);
 	return *this;
 }
+#if defined(_HAS_CXX17)
+template<class T>
+template <class Allocator>
+inline constexpr std::size_t shared_ptr<T>::alloc_size_make_shared() noexcept
+{
+	return sizeof(aspdetail::control_block_make_shared<T, Allocator>);
+}
+#else
 template<class T>
 template <class Allocator>
 inline constexpr std::size_t shared_ptr<T>::alloc_size_make_shared() noexcept
@@ -1378,6 +1405,7 @@ inline constexpr std::size_t shared_ptr<T>::alloc_size_make_shared() noexcept
 	constexpr std::size_t maxOffset(align - alignof(std::max_align_t));
 	return sizeof(aspdetail::control_block_make_shared<T, Allocator>) + (alignof(std::max_align_t) < align ? maxOffset : 0);
 }
+#endif
 template<class T>
 template <class Allocator>
 inline constexpr std::size_t shared_ptr<T>::alloc_size_claim() noexcept
@@ -1492,29 +1520,30 @@ inline shared_ptr<T> make_shared(Args&& ...args)
 template<class T, class Allocator, class ...Args>
 inline shared_ptr<T> make_shared(Allocator& allocator, Args&& ...args)
 {
-	std::uint8_t* const block(allocator.allocate(shared_ptr<T>::template alloc_size_make_shared<Allocator>()));
+	using block_type = struct alignas(alignof(T)) { std::uint8_t dummy[shared_ptr<T>::template alloc_size_make_shared<Allocator>()]{}; };
+	using rebound_alloc = typename std::allocator_traits<Allocator>::template rebind_alloc<block_type>;
 
-	if ((std::uintptr_t)block % alignof(std::max_align_t) != 0) {
-		throw std::exception("make_shared expects at least alignof(max_align_t) allocates");
-	}
+	rebound_alloc rebound(allocator);
+
+	std::uint8_t* const block((std::uint8_t*)rebound.allocate(1));
 
 	constexpr std::uintptr_t align(alignof(aspdetail::control_block_make_shared<T, Allocator>));
-
-	static_assert(!(std::numeric_limits<std::uint8_t>::max() < align), "make_shared supports only supports up to std::numeric_limits<std::uint8_t>::max() byte aligned types");
 
 	const std::uintptr_t mod((std::uintptr_t)block % align);
 	const std::uintptr_t offset(mod ? align - mod : 0);
 
 	aspdetail::control_block_make_shared<T, Allocator>* controlBlock(nullptr);
 	try {
+		aspdetail::assert_alignment(block, align);
+
 		controlBlock = new (reinterpret_cast<std::uint8_t*>(block + offset)) aspdetail::control_block_make_shared<T, Allocator>(allocator, (std::uint8_t)offset, std::forward<Args&&>(args)...);
 	}
 	catch (...) {
 		if (controlBlock) {
 			(*controlBlock).~control_block_make_shared<T, Allocator>();
 		}
-		allocator.deallocate(block, shared_ptr<T>::template alloc_size_make_shared<Allocator>());
 		throw;
+		allocator.deallocate(block, shared_ptr<T>::template alloc_size_make_shared<Allocator>());
 	}
 
 	aspdetail::compressed_storage storage(reinterpret_cast<std::uint64_t>(controlBlock));
