@@ -26,10 +26,10 @@ int main()
 		shared_ptr<int> sixth(new int(6));
 		shared_ptr<int> seventh(new int(7), [](int* arg, decltype(alloc)&) {delete arg; });	
 		shared_ptr<int> eighth(new int(8), [](int* arg, decltype(alloc)& alloc) { delete arg; alloc; }, alloc);
-		shared_ptr<int, std::allocator<std::uint8_t>> ninth(make_shared<int, std::allocator<std::uint8_t>>(alloc, 8));
-		shared_ptr<int, std::allocator<std::uint8_t>> tenth;
+		shared_ptr<int> ninth(make_shared<int, std::allocator<std::uint8_t>>(alloc, 8));
+		shared_ptr<int> tenth;
 		tenth = ninth;
-		shared_ptr<int, std::allocator<std::uint8_t>> eleventh;
+		shared_ptr<int> eleventh;
 		eleventh = std::move(ninth);
 		
 		atomic_shared_ptr<int> afirst;

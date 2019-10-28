@@ -71,6 +71,8 @@ class ptr_base;
 
 struct memory_orders{std::memory_order myFirst, mySecond;};
 
+using size_type = std::uint32_t;
+
 enum STORAGE_BYTE : std::uint8_t;
 enum CAS_FLAG : std::uint8_t;
 
@@ -96,7 +98,7 @@ template <class T>
 class atomic_shared_ptr
 {
 public:
-	using size_type = aspdetail::ptr_base<T>::size_type;
+	using size_type = aspdetail::size_type;
 
 	inline constexpr atomic_shared_ptr() noexcept;
 	inline constexpr atomic_shared_ptr(std::nullptr_t) noexcept;
@@ -181,8 +183,8 @@ private:
 	inline constexpr aspdetail::control_block_base_interface<T>* get_control_block() noexcept;
 	inline constexpr const aspdetail::control_block_base_interface<T>* get_control_block() const noexcept;
 
-	typedef typename aspdetail::compressed_storage compressed_storage;
-	typedef typename aspdetail::ptr_base<T>::size_type size_type;
+	using compressed_storage = aspdetail::compressed_storage;
+	using size_type = aspdetail::size_type;
 
 	inline compressed_storage unsafe_copy_internal(std::memory_order order);
 	inline compressed_storage copy_internal(std::memory_order order) noexcept;
@@ -718,7 +720,8 @@ namespace aspdetail {
 template <class T>
 class control_block_base_interface
 {
-	using size_type = atomic_shared_ptr<void>::size_type;
+public:
+	using size_type = aspdetail::size_type;
 
 	virtual T* get_owned() noexcept = 0;
 	virtual const T* get_owned() const noexcept = 0;
@@ -729,14 +732,14 @@ class control_block_base_interface
 	virtual void decref(size_type count) noexcept = 0;
 
 protected:
-	virtual ~control_block_base_members() = default;
+	virtual ~control_block_base_interface() = default;
 	virtual void destroy() = 0;
 };
 template <class T, class Allocator>
 class control_block_base_members : public control_block_base_interface<T>
 {
 public:
-	using size_type = atomic_shared_ptr<T>::size_type;
+	using size_type = aspdetail::size_type;
 
 	control_block_base_members(T* object, Allocator& allocator, std::uint8_t blockOffset = 0);
 
@@ -829,7 +832,7 @@ inline void control_block_make_shared<T, Allocator>::destroy() noexcept
 
 	(*this).~control_block_make_shared<T, Allocator>();
 
-	alloc.deallocate(beginPtr, shared_ptr<T>::alloc_size_make_shared());
+	alloc.deallocate(beginPtr, shared_ptr<T>::template alloc_size_make_shared<Allocator>());
 }
 template <class T, class Allocator>
 class control_block_claim : public control_block_base_members<T, Allocator>
@@ -903,7 +906,7 @@ template <class T>
 class ptr_base
 {
 public:
-	using size_type = std::uint32_t;
+	using size_type = aspdetail::size_type;
 	using value_type = T;
 
 	inline constexpr ptr_base(std::nullptr_t) noexcept;
@@ -1184,7 +1187,7 @@ public:
 private:
 	inline void fill_local_refs() noexcept;
 
-	typedef aspdetail::compressed_storage compressed_storage;
+	using compressed_storage = aspdetail::compressed_storage;
 
 	shared_ptr(compressed_storage from) noexcept;
 
@@ -1241,7 +1244,7 @@ template<class Deleter>
 inline shared_ptr<T>::shared_ptr(T* object, Deleter && deleter)
 	: shared_ptr<T>()
 {
-	Allocator alloc;
+	aspdetail::default_allocator alloc;
 	this->myControlBlockStorage = create_control_block(object, std::forward<Deleter&&>(deleter), alloc);
 	this->myPtr = this->to_object(this->myControlBlockStorage);
 }
@@ -1278,7 +1281,7 @@ inline typename aspdetail::compressed_storage shared_ptr<T>::create_control_bloc
 {
 	aspdetail::control_block_claim_custom_delete<T, Allocator, Deleter>* controlBlock(nullptr);
 
-	constexpr std::size_t blockSize(alloc_size_claim_custom_delete<Deleter>());
+	constexpr std::size_t blockSize(alloc_size_claim_custom_delete<Allocator, Deleter>());
 
 	void* block(nullptr);
 
@@ -1307,7 +1310,7 @@ inline typename aspdetail::compressed_storage shared_ptr<T>::create_control_bloc
 {
 	aspdetail::control_block_claim<T, Allocator>* controlBlock(nullptr);
 
-	constexpr std::size_t blockSize(alloc_size_claim());
+	constexpr std::size_t blockSize(alloc_size_claim<Allocator>());
 
 	void* block(nullptr);
 
@@ -1489,7 +1492,7 @@ inline shared_ptr<T> make_shared(Args&& ...args)
 template<class T, class Allocator, class ...Args>
 inline shared_ptr<T> make_shared(Allocator& allocator, Args&& ...args)
 {
-	std::uint8_t* const block(allocator.allocate(shared_ptr<T>::alloc_size_make_shared()));
+	std::uint8_t* const block(allocator.allocate(shared_ptr<T>::template alloc_size_make_shared<Allocator>()));
 
 	if ((std::uintptr_t)block % alignof(std::max_align_t) != 0) {
 		throw std::exception("make_shared expects at least alignof(max_align_t) allocates");
@@ -1510,7 +1513,7 @@ inline shared_ptr<T> make_shared(Allocator& allocator, Args&& ...args)
 		if (controlBlock) {
 			(*controlBlock).~control_block_make_shared<T, Allocator>();
 		}
-		allocator.deallocate(block, shared_ptr<T>::alloc_size_make_shared());
+		allocator.deallocate(block, shared_ptr<T>::template alloc_size_make_shared<Allocator>());
 		throw;
 	}
 

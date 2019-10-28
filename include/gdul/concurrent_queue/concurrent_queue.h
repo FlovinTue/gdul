@@ -190,12 +190,12 @@ private:
 	friend class cqdetail::producer_buffer<T, allocator_type>;
 	friend class cqdetail::dummy_container<T, allocator_type>;
 
-	typedef cqdetail::producer_buffer<T, allocator_type> buffer_type;
-	typedef cqdetail::shared_ptr_allocator_adaptor<std::uint8_t, allocator_type> allocator_adapter_type;
-	typedef shared_ptr<buffer_type, allocator_adapter_type> shared_ptr_slot_type;
-	typedef atomic_shared_ptr<buffer_type, allocator_adapter_type> atomic_shared_ptr_slot_type;
-	typedef atomic_shared_ptr<atomic_shared_ptr_slot_type, allocator_type> atomic_shared_ptr_array_type;
-	typedef shared_ptr<atomic_shared_ptr_slot_type, allocator_type> shared_ptr_array_type;
+	using buffer_type = cqdetail::producer_buffer<T, allocator_type>;
+	using allocator_adapter_type = cqdetail::shared_ptr_allocator_adaptor<std::uint8_t, allocator_type>;
+	using shared_ptr_slot_type = shared_ptr<buffer_type>;
+	using atomic_shared_ptr_slot_type = atomic_shared_ptr<buffer_type>;
+	using atomic_shared_ptr_array_type = atomic_shared_ptr<atomic_shared_ptr_slot_type>;
+	using shared_ptr_array_type = shared_ptr<atomic_shared_ptr_slot_type>;
 
 	using consumer_vector_allocator = typename std::allocator_traits<allocator_type>::template rebind_alloc<cqdetail::consumer_wrapper<shared_ptr_slot_type, shared_ptr_array_type>>;
 	using producer_vector_allocator = typename std::allocator_traits<allocator_type>::template rebind_alloc<shared_ptr_slot_type>;
@@ -492,7 +492,8 @@ inline typename concurrent_queue<T, Allocator>::shared_ptr_slot_type concurrent_
 
 	const std::size_t bufferByteSize(sizeof(buffer_type));
 	const std::size_t dataBlockByteSize(sizeof(cqdetail::item_container<T>) * log2size);
-	constexpr std::size_t controlBlockByteSize(shared_ptr_slot_type::alloc_size_claim());
+
+	constexpr std::size_t controlBlockByteSize(shared_ptr_slot_type::template alloc_size_make_shared<allocator_adapter_type>());
 
 	constexpr std::size_t controlBlockSize(cqdetail::aligned_size<void>(controlBlockByteSize, 8));
 	constexpr std::size_t bufferSize(cqdetail::aligned_size<void>(bufferByteSize, 8));
@@ -538,7 +539,6 @@ inline typename concurrent_queue<T, Allocator>::shared_ptr_slot_type concurrent_
 #endif
 
 	allocator_adapter_type allocAdaptor(totalBlock, totalBlockSize);
-
 
 	shared_ptr_slot_type returnValue(buffer, cqdetail::buffer_deleter<buffer_type, allocator_adapter_type>(), allocAdaptor);
 
@@ -1075,7 +1075,7 @@ template<class T, class Allocator>
 inline void producer_buffer<T, Allocator>::push_front(shared_ptr_slot_type newBuffer)
 {
 	producer_buffer<T, allocator_type>* last(this);
-	raw_ptr<typename shared_ptr_slot_type::value_type, typename shared_ptr_slot_type::allocator_type> verLast(nullptr);
+	raw_ptr<typename shared_ptr_slot_type::value_type> verLast(nullptr);
 
 	while (last->myNext) {
 		verLast = last->myNext;
@@ -1583,16 +1583,23 @@ class dummy_container
 {
 public:
 	dummy_container();
-	typedef typename concurrent_queue<T, Allocator>::shared_ptr_slot_type  dummy_type;
-	typedef typename concurrent_queue<T, Allocator>::allocator_adapter_type allocator_adapter_type;
-	typedef typename concurrent_queue<T, Allocator>::buffer_type buffer_type;
-	typedef typename concurrent_queue<T, Allocator>::allocator_type allocator_type;
+	using shared_ptr_slot_type = typename concurrent_queue<T, Allocator>::shared_ptr_slot_type;
+	using allocator_adapter_type = typename concurrent_queue<T, Allocator>::allocator_adapter_type;
+	using buffer_type = typename concurrent_queue<T, Allocator>::buffer_type;
+	using allocator_type = typename concurrent_queue<T, Allocator>::allocator_type;
 
 
-	dummy_type myDummyBuffer;
+	shared_ptr_slot_type myDummyBuffer;
 	item_container<T> myDummyItem;
-	producer_buffer<T, allocator_type> myDummyRawBuffer;
+	buffer_type myDummyRawBuffer;
 };
+template<class T, class Allocator>
+inline dummy_container<T, Allocator>::dummy_container()
+	: myDummyItem(item_state::Dummy)
+	, myDummyRawBuffer(1, &myDummyItem)
+{
+	myDummyBuffer = shared_ptr_slot_type( &myDummyRawBuffer, [](buffer_type*, Allocator&) {} );
+}
 template <class IndexType, class Allocator>
 class index_pool
 {
@@ -1605,15 +1612,15 @@ public:
 
 	struct node
 	{
-		node(IndexType index, shared_ptr<node, Allocator> next)
+		node(IndexType index, shared_ptr<node> next)
 			: myIndex(index)
 			, myNext(std::move(next))
 		{
 		}
 		IndexType myIndex;
-		atomic_shared_ptr<node, Allocator> myNext;
+		atomic_shared_ptr<node> myNext;
 	};
-	atomic_shared_ptr<node, Allocator> myTop;
+	atomic_shared_ptr<node> myTop;
 
 private:
 	std::atomic<IndexType> myIterator;
@@ -1667,9 +1674,9 @@ inline index_pool<IndexType, Allocator>::index_pool()
 template<class IndexType, class Allocator>
 inline index_pool<IndexType, Allocator>::~index_pool()
 {
-	shared_ptr<node, Allocator> top(myTop.unsafe_load());
+	shared_ptr<node> top(myTop.unsafe_load());
 	while (top) {
-		shared_ptr<node, Allocator> next(top->myNext.unsafe_load());
+		shared_ptr<node> next(top->myNext.unsafe_load());
 		myTop.unsafe_store(next);
 		top = std::move(next);
 	}
@@ -1677,9 +1684,9 @@ inline index_pool<IndexType, Allocator>::~index_pool()
 template<class IndexType, class Allocator>
 inline IndexType index_pool<IndexType, Allocator>::get()
 {
-	shared_ptr<node, Allocator> top(myTop.load());
+	shared_ptr<node> top(myTop.load());
 	while (top) {
-		raw_ptr<node, Allocator> expected(top);
+		raw_ptr<node> expected(top);
 		if (myTop.compare_exchange_strong(expected, top->myNext.load())) {
 			return top->myIndex;
 		}
@@ -1690,21 +1697,14 @@ inline IndexType index_pool<IndexType, Allocator>::get()
 template<class IndexType, class Allocator>
 inline void index_pool<IndexType, Allocator>::add(IndexType index)
 {
-	shared_ptr<node, Allocator> entry(make_shared<node, Allocator>(index, nullptr));
+	shared_ptr<node> entry(make_shared<node, Allocator>(index, nullptr));
 
-	raw_ptr<node, Allocator> expected;
+	raw_ptr<node> expected;
 	do {
-		shared_ptr<node, Allocator> top(myTop.load());
+		shared_ptr<node> top(myTop.load());
 		expected = top.get_raw_ptr();
 		entry->myNext = std::move(top);
 	} while (!myTop.compare_exchange_strong(expected, std::move(entry)));
-}
-template<class T, class Allocator>
-inline dummy_container<T, Allocator>::dummy_container()
-	: myDummyItem(item_state::Dummy)
-	, myDummyRawBuffer(1, &myDummyItem)
-{
-	myDummyBuffer = dummy_type{ &myDummyRawBuffer, [](buffer_type*, allocator_adapter_type&) {} };
 }
 }
 template <class T, class Allocator>

@@ -39,9 +39,9 @@ class alignas(log2align(Callable_Max_Size_No_Heap_Alloc)) job_impl
 public:
 	using allocator_type = gdul::job_handler_detail::allocator_type; 
 
-	using job_impl_shared_ptr = shared_ptr<job_impl, job_impl_allocator<std::uint8_t>>;
-	using job_impl_atomic_shared_ptr = atomic_shared_ptr<job_impl, job_impl_allocator<std::uint8_t>>;
-	using job_impl_raw_ptr = raw_ptr<job_impl, job_impl_allocator<std::uint8_t>>;
+	using job_impl_shared_ptr = shared_ptr<job_impl>;
+	using job_impl_atomic_shared_ptr = atomic_shared_ptr<job_impl>;
+	using job_impl_raw_ptr = raw_ptr<job_impl>;
 
 	job_impl() = default;
 
@@ -148,7 +148,7 @@ struct alignas(log2align(Callable_Max_Size_No_Heap_Alloc)) job_impl_chunk_rep
 	{
 		return reinterpret_cast<uint8_t*>(this);
 	}
-	uint8_t dummy[shared_ptr<gdul::job_handler_detail::job_impl, allocator_type>::alloc_size_make_shared()];
+	uint8_t dummy[shared_ptr<gdul::job_handler_detail::job_impl>::alloc_size_make_shared<allocator_type>()];
 };
 }
 }
