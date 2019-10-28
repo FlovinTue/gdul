@@ -22,7 +22,7 @@ public:
 	worker_impl(std::thread&& thread, std::uint8_t coreAffinity);
 	~worker_impl();
 
-	worker_impl& operator=(worker_impl&& other);
+	worker_impl& operator=(worker_impl&& other) noexcept;
 
 	void set_core_affinity(std::uint8_t core);
 	void set_queue_affinity(std::uint8_t queue);
@@ -49,9 +49,7 @@ private:
 	std::thread myThread;
 
 	thread_handle myThreadHandle;
-
-	uint32_t myNativeThreadId;
-
+	
 	std::size_t myPriorityDistributionIteration;
 
 	std::chrono::high_resolution_clock::time_point myLastJobTimepoint;

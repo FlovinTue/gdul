@@ -53,7 +53,7 @@ worker_impl::~worker_impl()
 		myThread.join();
 	}
 }
-worker_impl & worker_impl::operator=(worker_impl && other)
+worker_impl & worker_impl::operator=(worker_impl && other) noexcept
 {
 	myAutoCoreAffinity = other.myAutoCoreAffinity;
 	myThread.swap(other.myThread);

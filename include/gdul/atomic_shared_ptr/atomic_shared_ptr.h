@@ -481,7 +481,7 @@ inline void atomic_shared_ptr<T>::unsafe_store(shared_ptr<T>&& from, std::memory
 template<class T>
 inline raw_ptr<T> atomic_shared_ptr<T>::unsafe_get_raw_ptr() const
 {
-	compressed_storage storage(myStorage.load(std::memory_order_acquire));
+	compressed_storage storage(myStorage.load(std::memory_order_relaxed));
 	return raw_ptr<T>(storage);
 }
 template<class T>
@@ -601,13 +601,17 @@ inline bool atomic_shared_ptr<T>::compare_exchange_weak_internal(compressed_stor
 template<class T>
 inline void atomic_shared_ptr<T>::try_fill_local_ref(compressed_storage& expected) noexcept
 {
-	const compressed_storage initialPtrBlock(expected.myU64 & aspdetail::Versioned_Ptr_Mask);
+	if (!(expected.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] < aspdetail::Local_Ref_Fill_Boundary)) {
+		return;
+	}
 
 	aspdetail::control_block_base_interface<T>* const cb(to_control_block(expected));
 
 	if (!cb) {
 		return;
 	}
+
+	const compressed_storage initialPtrBlock(expected.myU64 & aspdetail::Versioned_Ptr_Mask);
 
 	do {
 		const std::uint8_t localRefs(expected.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF]);
@@ -635,10 +639,8 @@ inline typename  aspdetail::compressed_storage atomic_shared_ptr<T>::copy_intern
 	compressed_storage initial(myStorage.fetch_sub(aspdetail::Local_Ref_Step, std::memory_order_relaxed));
 	initial.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] -= 1;
 
-	if (to_control_block(initial) && initial.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] < aspdetail::Local_Ref_Fill_Boundary) {
-		compressed_storage expected(initial);
-		try_fill_local_ref(expected);
-	}
+	compressed_storage expected(initial);
+	try_fill_local_ref(expected);
 
 	initial.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] = 1;
 
@@ -854,12 +856,10 @@ inline void control_block_claim<T, Allocator>::destroy() noexcept
 {
 	Allocator alloc(this->myAllocator);
 
-	T* const ptrAddr(this->myPtr);
-	ptrAddr->~T();
+	delete this->myPtr;
 	(*this).~control_block_claim<T, Allocator>();
 
-	alloc.deallocate(reinterpret_cast<std::uint8_t*>(this), sizeof(decltype(*this)));
-	alloc.deallocate(reinterpret_cast<std::uint8_t*>(ptrAddr), sizeof(T));
+	alloc.deallocate(reinterpret_cast<std::uint8_t*>(this), shared_ptr<T>::template alloc_size_claim<Allocator>());
 }
 template <class T, class Allocator, class Deleter>
 class control_block_claim_custom_delete : public control_block_base_members<T, Allocator>
@@ -886,7 +886,7 @@ inline void control_block_claim_custom_delete<T, Allocator, Deleter>::destroy() 
 	myDeleter(ptrAddr, alloc);
 	(*this).~control_block_claim_custom_delete<T, Allocator, Deleter>();
 
-	alloc.deallocate(reinterpret_cast<std::uint8_t*>(this), sizeof(decltype(*this)));
+	alloc.deallocate(reinterpret_cast<std::uint8_t*>(this), shared_ptr<T>::template alloc_size_claim_custom_delete<Allocator, Deleter>());
 }
 template <class T>
 struct disable_deduction
@@ -1188,8 +1188,6 @@ public:
 
 	// The amount of memory requested from the allocator when calling
 	// make_shared
-	
-
 	template <class Allocator>
 	static constexpr std::size_t alloc_size_make_shared() noexcept;
 
@@ -1344,8 +1342,7 @@ inline typename aspdetail::compressed_storage shared_ptr<T>::create_control_bloc
 	}
 	catch (...) {
 		allocator.deallocate(static_cast<std::uint8_t*>(block), blockSize);
-		object->~T();
-		allocator.deallocate(reinterpret_cast<std::uint8_t*>(object), sizeof(T));
+		delete object;
 		throw;
 	}
 
@@ -1357,28 +1354,48 @@ inline typename aspdetail::compressed_storage shared_ptr<T>::create_control_bloc
 template<class T>
 inline shared_ptr<T>& shared_ptr<T>::operator=(const shared_ptr<T>& other) noexcept
 {
-	const compressed_storage otherValue(other.myControlBlockStorage);
-	const std::uint8_t refsToSteal(otherValue.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] / 2);
-
-	other.myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] -= refsToSteal;
-
-	const std::uint8_t newRefs(refsToSteal ? 0 : std::numeric_limits<std::uint8_t>::max());
-
-	aspdetail::control_block_base_interface<T>* const otherCb(this->to_control_block(otherValue));
-	if (otherCb && newRefs) {
-		otherCb->incref(newRefs);
+	if (&other == this) {
+		return *this;
 	}
 
-	aspdetail::control_block_base_interface<T>* const cb(this->get_control_block());
-	if (cb) {
-		cb->decref(this->myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF]);
+	if (this->get_control_block()) {
+		this->get_control_block()->decref(this->myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF]);
 	}
 
-	compressed_storage newCb(otherValue);
-	newCb.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] = refsToSteal + newRefs;
-
-	this->myControlBlockStorage = newCb;
 	this->myPtr = other.myPtr;
+	this->myControlBlockStorage = other.myControlBlockStorage;
+
+	if (other.myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] < 1) {
+		this->myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] = 0;
+		fill_local_refs();
+	}
+	else {
+		this->myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] = 1;
+		other.myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] -= 1;
+	}
+
+	//const compressed_storage otherValue(other.myControlBlockStorage);
+	//const std::uint8_t refsToSteal(otherValue.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] / 2);
+
+	//other.myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] -= refsToSteal;
+
+	//const std::uint8_t newRefs(refsToSteal ? 0 : std::numeric_limits<std::uint8_t>::max());
+
+	//aspdetail::control_block_base_interface<T>* const otherCb(this->to_control_block(otherValue));
+	//if (otherCb && newRefs) {
+	//	otherCb->incref(newRefs);
+	//}
+
+	//aspdetail::control_block_base_interface<T>* const cb(this->get_control_block());
+	//if (cb) {
+	//	cb->decref(this->myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF]);
+	//}
+
+	//compressed_storage newCb(otherValue);
+	//newCb.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] = refsToSteal + newRefs;
+
+	//this->myControlBlockStorage = newCb;
+	//this->myPtr = other.myPtr;
 
 	return *this;
 }

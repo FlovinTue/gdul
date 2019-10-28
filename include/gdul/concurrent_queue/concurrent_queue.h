@@ -1598,7 +1598,8 @@ inline dummy_container<T, Allocator>::dummy_container()
 	: myDummyItem(item_state::Dummy)
 	, myDummyRawBuffer(1, &myDummyItem)
 {
-	myDummyBuffer = shared_ptr_slot_type( &myDummyRawBuffer, [](buffer_type*, Allocator&) {} );
+	Allocator alloc;
+	myDummyBuffer = shared_ptr_slot_type( &myDummyRawBuffer, [](buffer_type*, Allocator&) {}, alloc);
 }
 template <class IndexType, class Allocator>
 class index_pool
