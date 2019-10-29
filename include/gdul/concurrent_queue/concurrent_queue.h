@@ -186,6 +186,7 @@ public:
 	// reset the structure to its initial state
 	void unsafe_reset();
 
+
 private:
 	friend class cqdetail::producer_buffer<T, allocator_type>;
 	friend class cqdetail::dummy_container<T, allocator_type>;
@@ -808,7 +809,8 @@ template <class T, class Allocator>
 class producer_buffer
 {
 private:
-	typedef typename concurrent_queue<T, Allocator>::shared_ptr_slot_type shared_ptr_slot_type;
+	using atomic_shared_ptr_slot_type = typename concurrent_queue<T, Allocator>::atomic_shared_ptr_slot_type;
+	using shared_ptr_slot_type = typename concurrent_queue<T, Allocator>::shared_ptr_slot_type;
 
 public:
 	typedef typename concurrent_queue<T, Allocator>::size_type size_type;
@@ -895,13 +897,12 @@ private:
 	size_type myWriteSlot;
 	GDUL_ATOMIC_WITH_VIEW(size_type, myPostWriteIterator);
 	GDUL_CQ_PADDING(GDUL_CACHELINE_SIZE - sizeof(size_type) * 2);
-	shared_ptr_slot_type myNext;
+	atomic_shared_ptr_slot_type myNext;
 
 	const size_type myCapacity;
 	item_container<T>* const myDataBlock;
-
-	std::atomic<bool> myNextState;
 };
+
 template<class T, class Allocator>
 inline producer_buffer<T, Allocator>::producer_buffer(typename producer_buffer<T, Allocator>::size_type capacity, item_container<T>* dataBlock)
 	: myNext(nullptr)
@@ -911,7 +912,6 @@ inline producer_buffer<T, Allocator>::producer_buffer(typename producer_buffer<T
 	, myPreReadIterator(0)
 	, myWriteSlot(0)
 	, myPostWriteIterator(0)
-	, myNextState(false)
 #ifdef CQ_ENABLE_EXCEPTIONHANDLING
 	, myFailiureIndex(0)
 	, myFailiureCount(0)
@@ -942,17 +942,16 @@ inline void producer_buffer<T, Allocator>::invalidate()
 {
 	myDataBlock[myWriteSlot % myCapacity].set_state(item_state::Dummy);
 	if (myNext) {
-		myNext->invalidate();
+		myNext.unsafe_get_owned()->invalidate();
 	}
 }
 template<class T, class Allocator>
 inline typename producer_buffer<T, Allocator>::shared_ptr_slot_type producer_buffer<T, Allocator>::find_back()
 {
-	bool nextState(myNextState.load(std::memory_order_seq_cst));
 	shared_ptr_slot_type back(nullptr);
 	producer_buffer<T, allocator_type>* inspect(this);
 
-	while (nextState) {
+	while (inspect) {
 		const size_type readSlot(inspect->myReadSlot.load(std::memory_order_relaxed));
 		const size_type postWrite(inspect->myPostWriteIterator.load(std::memory_order_relaxed));
 
@@ -966,11 +965,9 @@ inline typename producer_buffer<T, Allocator>::shared_ptr_slot_type producer_buf
 		if (valid) {
 			break;
 		}
-		std::atomic_thread_fence(std::memory_order_seq_cst);
 
-		back = inspect->myNext;
+		back = inspect->myNext.load(std::memory_order_seq_cst);
 		inspect = back.get_owned();
-		nextState = back->myNextState.load(std::memory_order_relaxed);
 	}
 	return back;
 }
@@ -982,8 +979,8 @@ inline typename producer_buffer<T, Allocator>::size_type producer_buffer<T, Allo
 	size_type accumulatedSize(myPostWriteIterator.load(std::memory_order_relaxed));
 	accumulatedSize -= readSlot;
 
-	if (myNextState.load(std::memory_order_seq_cst))
-		accumulatedSize += myNext->size();
+	if (myNext)
+		accumulatedSize += myNext.unsafe_get_owned()->size();
 
 	return accumulatedSize;
 }
@@ -1003,7 +1000,7 @@ template<class T, class Allocator>
 template <class U, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) && !GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>*>
 inline bool producer_buffer<T, Allocator>::verify_successor(const shared_ptr_slot_type& successor)
 {
-	if (!myNextState.load(std::memory_order_seq_cst)) {
+	if (!myNext) {
 		return false;
 	}
 
@@ -1020,15 +1017,13 @@ inline bool producer_buffer<T, Allocator>::verify_successor(const shared_ptr_slo
 			}
 		}
 
-		std::atomic_thread_fence(std::memory_order_seq_cst);
-
-		next = inspect->myNext;
+		next = inspect->myNext.load(std::memory_order_seq_cst);
 		inspect = next.get_owned();
 
 		if (inspect == successor.get_owned()) {
 			break;
 		}
-	} while (next->myNextState.load(std::memory_order_relaxed));
+	} while (inspect->myNext);
 
 	return true;
 }
@@ -1078,12 +1073,11 @@ inline void producer_buffer<T, Allocator>::push_front(shared_ptr_slot_type newBu
 	raw_ptr<typename shared_ptr_slot_type::value_type> verLast(nullptr);
 
 	while (last->myNext) {
-		verLast = last->myNext;
+		verLast = last->myNext.unsafe_get_raw_ptr();
 		last = verLast.get_owned();
 	}
-	last->myNext = std::move(newBuffer);
 
-	last->myNextState.store(true, std::memory_order_seq_cst);
+	last->myNext.store(std::move(newBuffer), std::memory_order_seq_cst);
 }
 template<class T, class Allocator>
 inline void producer_buffer<T, Allocator>::unsafe_clear()
@@ -1103,7 +1097,7 @@ inline void producer_buffer<T, Allocator>::unsafe_clear()
 	myPostReadIterator.store(postWrite, std::memory_order_relaxed);
 #endif
 	if (myNext) {
-		myNext->unsafe_clear();
+		myNext.unsafe_get_owned()->unsafe_clear();
 	}
 }
 template<class T, class Allocator>

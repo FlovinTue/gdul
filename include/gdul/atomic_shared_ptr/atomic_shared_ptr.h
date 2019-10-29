@@ -496,7 +496,7 @@ inline T * atomic_shared_ptr<T>::unsafe_get_owned()
 template<class T>
 inline const T * atomic_shared_ptr<T>::unsafe_get_owned() const
 {
-	aspdetail::control_block_base_interface<T>* const cb(get_control_block());
+	const aspdetail::control_block_base_interface<T>* const cb(get_control_block());
 	if (cb)
 	{
 		return cb->get_owned();
@@ -1124,7 +1124,7 @@ inline constexpr const control_block_base_interface<T>* ptr_base<T>::to_control_
 template <class T>
 inline constexpr const T* ptr_base<T>::to_object(compressed_storage from) const noexcept
 {
-	control_block_base_interface<T>* const cb(to_control_block(from));
+	const control_block_base_interface<T>* const cb(to_control_block(from));
 	if (cb)
 	{
 		return cb->get_owned();
@@ -1365,14 +1365,14 @@ inline shared_ptr<T>& shared_ptr<T>::operator=(const shared_ptr<T>& other) noexc
 	this->myPtr = other.myPtr;
 	this->myControlBlockStorage = other.myControlBlockStorage;
 
-	if (other.myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] < 1) {
+	//if (other.myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] < 1) {
 		this->myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] = 0;
 		fill_local_refs();
-	}
-	else {
-		this->myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] = 1;
-		other.myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] -= 1;
-	}
+	//}
+	//else {
+	//	this->myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] = 1;
+	//	other.myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] -= 1;
+	//}
 
 	//const compressed_storage otherValue(other.myControlBlockStorage);
 	//const std::uint8_t refsToSteal(otherValue.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] / 2);
