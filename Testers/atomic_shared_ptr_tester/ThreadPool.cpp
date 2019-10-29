@@ -1,15 +1,17 @@
 #include "pch.h"
-#include <mutex>
 #include "ThreadPool.h"
-#include "Timer.h"
+#include <Windows.h>
 
-ThreadPool::ThreadPool(std::uint32_t aThreads, float aSleepThreshhold) :
+ThreadPool::ThreadPool(std::uint32_t aThreads, std::uint32_t affinityBegin) :
 	myIsInCommission(true),
-	myTaskCounter(0),
-	mySleepThreshhold(aSleepThreshhold)
+	myTaskCounter(0)
 {
-	for (std::uint32_t i = 0; i < aThreads; ++i)
-		myThreads.push_back(std::thread(&ThreadPool::Idle, this));
+	const std::size_t numThreads(std::thread::hardware_concurrency());
+	for (std::uint32_t i = 0; i < aThreads; ++i) {
+		const std::uint64_t affinity(((affinityBegin + i) % numThreads));
+		const std::uint64_t affinityMask((std::size_t(1) << affinity));
+		myThreads.push_back(std::thread(&ThreadPool::Idle, this, affinityMask));
+	}
 }
 
 
@@ -18,20 +20,17 @@ ThreadPool::~ThreadPool()
 	Decommission();
 }
 
-void ThreadPool::AddTask(const std::function<void()>& aWorkFunction)
+void ThreadPool::AddTask(std::function<void()> aWorkFunction)
 {
 	++myTaskCounter;
 	myTaskQueue.push(aWorkFunction);
-	myWaitCondition.notify_one();
 }
 
 void ThreadPool::Decommission()
 {
 	myIsInCommission = false;
 
-	myWaitCondition.notify_all();
-
-	for (std::uint16_t i = 0; i < myThreads.size(); ++i)
+	for (size_t i = 0; i < myThreads.size(); ++i)
 		myThreads[i].join();
 
 	myThreads.clear();
@@ -39,37 +38,27 @@ void ThreadPool::Decommission()
 
 bool ThreadPool::HasUnfinishedTasks() const
 {
-	return 0 < myTaskCounter.load(std::memory_order_relaxed);
+	return 0 < myTaskCounter.load(std::memory_order_acquire);
 }
-uint32_t ThreadPool::GetUnfinishedTasks() const
+void ThreadPool::Idle(std::uint64_t affinityMask)
 {
-	return myTaskCounter.load(std::memory_order_relaxed);
-}
-void ThreadPool::Idle()
-{
-	std::mutex mutex;
-	std::unique_lock<std::mutex> lock(mutex);
+	uint64_t result(0);
 
-	Timer sleepTimer;
+	do {
+		result = SetThreadAffinityMask(GetCurrentThread(), affinityMask);
+	} while (!result);
+	
 
-	while (myIsInCommission.load(std::memory_order_relaxed) | (0 < myTaskCounter.load(std::memory_order_relaxed)))
+	while (myIsInCommission.load(std::memory_order_relaxed) | (0 < myTaskCounter.load(std::memory_order_acquire)))
 	{
 		std::function<void()> task;
 		if (myTaskQueue.try_pop(task))
 		{
 			task();
 			--myTaskCounter;
-			sleepTimer.Reset();
 		}
-		else
-		{
-			if (mySleepThreshhold < sleepTimer.GetTotalTime())
-			{
-				myWaitCondition.wait_until(lock, std::chrono::high_resolution_clock::now() + std::chrono::duration<float, std::milli>(500));
-			}
-			else
-				std::this_thread::yield();
+		else {
+			std::this_thread::yield();
 		}
-
 	}
 }

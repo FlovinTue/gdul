@@ -199,6 +199,7 @@ inline double Tester<T, Allocator>::ExecuteSingleProducerSingleConsumer(std::uin
 	double result(0.0);
 
 	for (std::uint32_t i = 0; i < runs; ++i) {
+
 		myWrittenSum = 0;
 		myReadSum = 0;
 		myThrown = 0;
@@ -287,7 +288,8 @@ inline double Tester<T, Allocator>::ExecuteWrite(std::uint32_t runs)
 			std::this_thread::yield();
 
 #ifdef GDUL
-		myQueue.unsafe_clear();
+		//myQueue.unsafe_clear();
+		myQueue.unsafe_reset();
 #elif defined(MSC_RUNTIME)
 		myQueue.clear();
 #elif defined(MOODYCAMEL)
@@ -361,7 +363,7 @@ template<class T, class Allocator>
 inline void Tester<T, Allocator>::Read(std::uint32_t reads)
 {
 	while (!myIsRunning);
-
+	
 	uint32_t sum(0);
 
 	T out{ 0 };

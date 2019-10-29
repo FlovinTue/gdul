@@ -2,26 +2,25 @@
 
 #include <functional>
 #include <thread>
+#include <atomic>
 #include <concurrent_queue.h>
 #include <vector>
-#include <atomic>
-#include <condition_variable>
-
 
 class ThreadPool
 {
 public:
-	ThreadPool(std::uint32_t aThreads = std::thread::hardware_concurrency(), float aSleepThreshHold = .25f);
+	ThreadPool(std::uint32_t aThreads = std::thread::hardware_concurrency(), std::uint32_t affinityBegin = 0);
 	~ThreadPool();
 
-	void AddTask(const std::function<void()>& aWorkFunction);
+	void AddTask(std::function<void()> aWorkFunction);
 	void Decommission();
 
 	bool HasUnfinishedTasks() const;
-	uint32_t GetUnfinishedTasks() const;
-
 private:
-	void Idle();
+	void Idle(std::uint64_t affinityMask);
+
+	uint32_t spin();
+	void release();
 
 	std::vector<std::thread> myThreads;
 
@@ -29,9 +28,6 @@ private:
 
 	std::atomic<bool> myIsInCommission;
 
-	const float mySleepThreshhold;
-
-	std::condition_variable myWaitCondition;
 	std::atomic<std::uint32_t> myTaskCounter;
 };
 

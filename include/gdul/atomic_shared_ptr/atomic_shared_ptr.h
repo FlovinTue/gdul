@@ -24,6 +24,8 @@
 #include <cstdint>
 #include <limits>
 #include <cassert>
+#include <mutex>
+
 
 #undef max
 
@@ -34,6 +36,7 @@
 #pragma warning(disable : 26812)
 
 namespace gdul {
+
 namespace aspdetail {
 
 typedef std::allocator<std::uint8_t> default_allocator;
@@ -201,7 +204,7 @@ private:
 	inline bool compare_exchange_weak_internal(compressed_storage& expected, compressed_storage desired, aspdetail::CAS_FLAG flags, aspdetail::memory_orders orders) noexcept;
 
 	inline void unsafe_fill_local_ref();
-	inline void try_fill_local_ref(compressed_storage& expected) noexcept;
+	inline void try_fill_local_refs(compressed_storage& expected) noexcept;
 
 	inline constexpr aspdetail::control_block_base_interface<T>* to_control_block(compressed_storage from) const noexcept;
 
@@ -416,8 +419,7 @@ inline atomic_shared_ptr<T>& atomic_shared_ptr<T>::operator=(shared_ptr<T>&& fro
 template<class T>
 inline shared_ptr<T> atomic_shared_ptr<T>::load(std::memory_order order) noexcept
 {
-	compressed_storage copy(copy_internal(order));
-	return shared_ptr<T>(copy);
+	return shared_ptr<T>(copy_internal(order));
 }
 template<class T>
 inline void atomic_shared_ptr<T>::store(const shared_ptr<T>& from, std::memory_order order) noexcept
@@ -599,7 +601,7 @@ inline bool atomic_shared_ptr<T>::compare_exchange_weak_internal(compressed_stor
 	return result;
 }
 template<class T>
-inline void atomic_shared_ptr<T>::try_fill_local_ref(compressed_storage& expected) noexcept
+inline void atomic_shared_ptr<T>::try_fill_local_refs(compressed_storage& expected) noexcept
 {
 	if (!(expected.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] < aspdetail::Local_Ref_Fill_Boundary)) {
 		return;
@@ -619,6 +621,7 @@ inline void atomic_shared_ptr<T>::try_fill_local_ref(compressed_storage& expecte
 
 		compressed_storage desired(expected);
 		desired.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] = desiredRefs;
+		desired.myU8[aspdetail::STORAGE_BYTE_VERSION] += 1; // ?
 
 		cb->incref(desiredRefs);
 
@@ -640,7 +643,7 @@ inline typename  aspdetail::compressed_storage atomic_shared_ptr<T>::copy_intern
 	initial.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] -= 1;
 
 	compressed_storage expected(initial);
-	try_fill_local_ref(expected);
+	try_fill_local_refs(expected);
 
 	initial.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] = 1;
 
@@ -1001,6 +1004,7 @@ inline constexpr ptr_base<T>::ptr_base(compressed_storage from) noexcept
 {
 	myControlBlockStorage = from;
 	myPtr = to_object(from);
+	myControlBlockStorage.myU8[STORAGE_BYTE_LOCAL_REF] *= (bool)myPtr;
 }
 template<class T>
 inline void ptr_base<T>::reset() noexcept
@@ -1468,7 +1472,6 @@ template<class T>
 inline constexpr raw_ptr<T>::raw_ptr() noexcept
 	: aspdetail::ptr_base<T>()
 {
-	this->myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] = 0;
 }
 template<class T>
 inline constexpr raw_ptr<T>::raw_ptr(raw_ptr<T>&& other) noexcept
@@ -1486,11 +1489,13 @@ template<class T>
 inline constexpr raw_ptr<T>::raw_ptr(const shared_ptr<T>& from) noexcept
 	: aspdetail::ptr_base<T>(from.myControlBlockStorage)
 {
+	this->myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] = 0;
 }
 template<class T>
 inline raw_ptr<T>::raw_ptr(const atomic_shared_ptr<T>& from) noexcept
-	: aspdetail::ptr_base<T>(from.myStorage.load())
+	: aspdetail::ptr_base<T>(from.myStorage.load(std::memory_order_relaxed))
 {
+	this->myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] = 0;
 }
 template<class T>
 inline constexpr raw_ptr<T>& raw_ptr<T>::operator=(const raw_ptr<T>& other)  noexcept{

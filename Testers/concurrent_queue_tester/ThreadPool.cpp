@@ -56,8 +56,7 @@ void ThreadPool::Idle(std::uint64_t affinityMask)
 			task();
 			--myTaskCounter;
 		}
-		else
-		{
+		else {
 			std::this_thread::yield();
 		}
 	}

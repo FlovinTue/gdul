@@ -19,6 +19,9 @@ public:
 private:
 	void Idle(std::uint64_t affinityMask);
 
+	uint32_t spin();
+	void release();
+
 	std::vector<std::thread> myThreads;
 
 	concurrency::concurrent_queue<std::function<void()>> myTaskQueue;
