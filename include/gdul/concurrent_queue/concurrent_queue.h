@@ -484,6 +484,7 @@ inline bool concurrent_queue<T, Allocator>::relocate_consumer()
 	}
 	return false;
 }
+
 template<class T, class Allocator>
 inline typename concurrent_queue<T, Allocator>::shared_ptr_slot_type concurrent_queue<T, Allocator>::create_producer_buffer(std::size_t withSize)
 {
@@ -494,13 +495,13 @@ inline typename concurrent_queue<T, Allocator>::shared_ptr_slot_type concurrent_
 	const std::size_t bufferByteSize(sizeof(buffer_type));
 	const std::size_t dataBlockByteSize(sizeof(cqdetail::item_container<T>) * log2size);
 
-	constexpr std::size_t controlBlockByteSize(shared_ptr_slot_type::template alloc_size_make_shared<allocator_adapter_type>());
+	constexpr std::size_t controlBlockByteSize(shared_ptr_slot_type::template alloc_size_claim_custom_delete<allocator_adapter_type, cqdetail::buffer_deleter<buffer_type, allocator_adapter_type>>());
 
 	constexpr std::size_t controlBlockSize(cqdetail::aligned_size<void>(controlBlockByteSize, 8));
 	constexpr std::size_t bufferSize(cqdetail::aligned_size<void>(bufferByteSize, 8));
 	const std::size_t dataBlockSize(dataBlockByteSize);
 
-	const std::size_t totalBlockSize(controlBlockSize + bufferSize + dataBlockSize + alignOfData);
+	const std::size_t totalBlockSize(controlBlockSize + bufferSize + dataBlockSize + (8 < alignOfData ? alignOfData : 0));
 
 	std::uint8_t* totalBlock(nullptr);
 
