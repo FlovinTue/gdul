@@ -288,8 +288,7 @@ inline double Tester<T, Allocator>::ExecuteWrite(std::uint32_t runs)
 			std::this_thread::yield();
 
 #ifdef GDUL
-		//myQueue.unsafe_clear();
-		myQueue.unsafe_reset();
+		myQueue.unsafe_clear();
 #elif defined(MSC_RUNTIME)
 		myQueue.clear();
 #elif defined(MOODYCAMEL)

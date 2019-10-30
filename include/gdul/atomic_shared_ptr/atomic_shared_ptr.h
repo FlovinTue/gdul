@@ -291,7 +291,6 @@ inline bool atomic_shared_ptr<T>::compare_exchange_strong(shared_ptr<T>& expecte
 {
 	return compare_exchange_strong<decltype(expected)>(expected, std::move(desired), successOrder, failOrder);
 }
-
 template<class T>
 inline bool atomic_shared_ptr<T>::compare_exchange_weak(raw_ptr<T>& expected, const shared_ptr<T>& desired, std::memory_order order) noexcept
 {
@@ -617,20 +616,19 @@ inline void atomic_shared_ptr<T>::try_fill_local_refs(compressed_storage& expect
 
 	do {
 		const std::uint8_t localRefs(expected.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF]);
-		const std::uint8_t desiredRefs(std::numeric_limits<std::uint8_t>::max() - localRefs);
+		const std::uint8_t newRefs(std::numeric_limits<std::uint8_t>::max() - localRefs);
 
 		compressed_storage desired(expected);
-		desired.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] = desiredRefs;
-		desired.myU8[aspdetail::STORAGE_BYTE_VERSION] += 1; // ?
+		desired.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] = std::numeric_limits<std::uint8_t>::max();
 
-		cb->incref(desiredRefs);
+		cb->incref(newRefs);
 
 		if (myStorage.compare_exchange_weak(expected.myU64, desired.myU64, std::memory_order_relaxed)) {
 			expected.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] = std::numeric_limits<std::uint8_t>::max();
 			return;
 		}
 
-		cb->decref(desiredRefs);
+		cb->decref(newRefs);
 
 	} while (
 		(expected.myU64 & aspdetail::Versioned_Ptr_Mask) == initialPtrBlock.myU64 &&
@@ -707,9 +705,9 @@ inline void atomic_shared_ptr<T>::unsafe_fill_local_ref()
 	aspdetail::control_block_base_interface<T>* const cb(to_control_block(current));
 
 	if (cb && current.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] < aspdetail::Local_Ref_Fill_Boundary) {
-		const std::uint8_t desiredRefs(std::numeric_limits<std::uint8_t>::max() - current.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF]);
+		const std::uint8_t newRefs(std::numeric_limits<std::uint8_t>::max() - current.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF]);
 
-		cb->incref(desiredRefs);
+		cb->incref(newRefs);
 
 		compressed_storage newStorage(current);
 		newStorage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] = std::numeric_limits<std::uint8_t>::max();
