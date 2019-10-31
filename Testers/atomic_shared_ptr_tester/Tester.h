@@ -256,7 +256,7 @@ inline void Tester<T, ArraySize, NumThreads>::WorkCAS(std::uint32_t aArrayPasses
 #ifndef ASP_MUTEX_COMPARE
 			shared_ptr<T> desired(make_shared<T>());
 			shared_ptr<T> expected(myTestArray[i].load(std::memory_order_relaxed));
-			raw_ptr<T> check(expected);
+			//raw_ptr<T> check(expected);
 			const bool resulta = myTestArray[i].compare_exchange_strong(expected, std::move(desired), std::memory_order_relaxed);
 
 			//shared_ptr<T> desired_(make_shared<T>());

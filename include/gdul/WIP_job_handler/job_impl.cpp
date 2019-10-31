@@ -50,20 +50,17 @@ void job_impl::operator()()
 }
 bool job_impl::try_attach_child(job_impl_shared_ptr child)
 {
-	job_impl_shared_ptr firstChild(nullptr);
-	job_impl_raw_ptr rawRep(nullptr);
-	do {
-		firstChild = myFirstChild.load(std::memory_order_relaxed);
-		rawRep = firstChild;
+	job_impl_shared_ptr firstChild(myFirstChild.load(std::memory_order_relaxed));
 
-		child->set_sibling(std::move(firstChild));
+	do {
+		child->set_sibling(firstChild);
 
 		if (myFinished.load(std::memory_order_seq_cst)) {
 			child->myFirstSibling.unsafe_store(nullptr, std::memory_order_relaxed);
 			return false;
 		}
 
-	} while (!myFirstChild.compare_exchange_strong(rawRep, std::move(child), std::memory_order_relaxed, std::memory_order_relaxed));
+	} while (!myFirstChild.compare_exchange_strong(firstChild, std::move(child), std::memory_order_relaxed, std::memory_order_relaxed));
 
 	return true;
 }
