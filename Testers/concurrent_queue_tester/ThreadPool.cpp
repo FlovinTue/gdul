@@ -7,7 +7,7 @@ ThreadPool::ThreadPool(std::uint32_t aThreads, std::uint32_t affinityBegin) :
 {
 	const std::size_t numThreads(std::thread::hardware_concurrency());
 	for (std::uint32_t i = 0; i < aThreads; ++i) {
-		const std::uint64_t affinity(((affinityBegin + i) % numThreads));
+		const std::uint64_t affinity((((std::uint64_t)affinityBegin + i) % numThreads));
 		const std::uint64_t affinityMask((std::size_t(1) << affinity));
 		myThreads.push_back(std::thread(&ThreadPool::Idle, this, affinityMask));
 	}
