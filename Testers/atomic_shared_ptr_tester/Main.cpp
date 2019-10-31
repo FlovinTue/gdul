@@ -16,7 +16,7 @@ int main()
 {
 		using namespace gdul;
 
-		std::allocator<std::uint8_t> alloc;
+		std::allocator<uint8_t> alloc;
 
 		shared_ptr<int> first;
 		shared_ptr<int> second(nullptr);
@@ -98,8 +98,10 @@ int main()
 		struct alignas(64) over_aligned {
 		};
 
-		shared_ptr<over_aligned> seventeen(make_shared<over_aligned>());
-		seventeen = nullptr;
+		{
+			shared_ptr<over_aligned> seventeen(make_shared<over_aligned>());
+			seventeen = nullptr;
+		}
 
 		shared_ptr<int> nulla(nullptr, std::uint8_t(5));
 		raw_ptr<int> nullb(nullptr, 10);
@@ -149,7 +151,7 @@ int main()
 			doreferencetest(false);
 
 		uint32_t arraySweeps(10000);
-		uint32_t runs(64);
+		uint32_t runs(32);
 		float time(0.f);
 		for (std::uint32_t i = 0; i < runs; ++i) {
 			time += tester.Execute(arraySweeps, doassign, doreassign, doCAStest, doreferencetest);

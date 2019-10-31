@@ -37,17 +37,23 @@ template <class Dummy>
 class job_impl_allocator
 {
 public:
-	using value_type = std::uint8_t;
+	using value_type = Dummy;
 	using allocator_type = job_handler_detail::allocator_type;
+
+	template <typename U>
+	struct rebind
+	{
+		using other = job_impl_allocator<U>;
+	};
 
 
 	job_impl_allocator(concurrent_object_pool<job_impl_chunk_rep, allocator_type>* chunkSrc);
 
 	template <class Dummy_>
-	job_impl_allocator(job_impl_allocator<Dummy_>& other);
+	job_impl_allocator(const job_impl_allocator<Dummy_>& other);
 
-	uint8_t* allocate(std::size_t);
-	void deallocate(uint8_t* block, std::size_t);
+	value_type* allocate(std::size_t);
+	void deallocate(value_type* chunk, std::size_t);
 
 	concurrent_object_pool<job_impl_chunk_rep, allocator_type>* myChunkSrc;
 };
@@ -58,18 +64,18 @@ inline job_impl_allocator<Dummy>::job_impl_allocator(concurrent_object_pool<job_
 {
 }
 template<class Dummy>
-inline uint8_t * job_impl_allocator<Dummy>::allocate(std::size_t)
+inline typename job_impl_allocator<Dummy>::value_type* job_impl_allocator<Dummy>::allocate(std::size_t)
 {
-	return reinterpret_cast<uint8_t*>(myChunkSrc->get_object());
+	return (value_type*)myChunkSrc->get_object();
 }
 template<class Dummy>
-inline void job_impl_allocator<Dummy>::deallocate(uint8_t * block, std::size_t)
+inline void job_impl_allocator<Dummy>::deallocate(value_type* chunk, std::size_t)
 {
-	myChunkSrc->recycle_object(reinterpret_cast<job_impl_chunk_rep*>(block));
+	myChunkSrc->recycle_object((job_impl_chunk_rep*)chunk);
 }
 template<class Dummy>
 template<class Dummy_>
-inline job_impl_allocator<Dummy>::job_impl_allocator(job_impl_allocator<Dummy_>& other)
+inline job_impl_allocator<Dummy>::job_impl_allocator(const job_impl_allocator<Dummy_>& other)
 	: myChunkSrc(other.myChunkSrc)
 {
 }

@@ -56,6 +56,7 @@ private:
 	using node_allocator = typename std::allocator_traits<Allocator>::template rebind_alloc<block_node>;
 
 	Allocator myAllocator;
+	node_allocator myNodeAllocator;
 
 	concurrent_queue<Object*, Allocator> myUnusedObjects;
 
@@ -75,6 +76,7 @@ inline concurrent_object_pool<Object, Allocator>::concurrent_object_pool(std::si
 template<class Object, class Allocator>
 inline concurrent_object_pool<Object, Allocator>::concurrent_object_pool(std::size_t blockSize, Allocator & allocator)
 	: myAllocator(allocator)
+	, myNodeAllocator(allocator)
 	, myBlockSize(blockSize)
 	, myUnusedObjects(blockSize, allocator)
 	, myLastBlock(nullptr)
@@ -119,7 +121,7 @@ inline void concurrent_object_pool<Object, Allocator>::unsafe_destroy()
 		myAllocator.deallocate(reinterpret_cast<std::uint8_t*>(blockNode->myBlock), myBlockSize * sizeof(Object));
 
 		blockNode->~block_node();
-		myAllocator.deallocate(reinterpret_cast<std::uint8_t*>(blockNode), sizeof(block_node));
+		myNodeAllocator.deallocate(blockNode, 1);
 
 		blockNode = previous;
 	}
@@ -142,7 +144,7 @@ inline void concurrent_object_pool<Object, Allocator>::try_alloc_block()
 		new (&block[i]) (Object);
 	}
 
-	block_node* const desired(reinterpret_cast<block_node*>(myAllocator.allocate(sizeof(block_node))));
+	block_node* const desired(reinterpret_cast<block_node*>(myNodeAllocator.allocate(1)));
 	new (desired)(block_node);
 	desired->myPrevious = expected;
 	desired->myBlock = block;
@@ -154,7 +156,7 @@ inline void concurrent_object_pool<Object, Allocator>::try_alloc_block()
 		myAllocator.deallocate(reinterpret_cast<std::uint8_t*>(block), myBlockSize * sizeof(Object));
 
 		desired->~block_node();
-		myAllocator.deallocate(reinterpret_cast<std::uint8_t*>(desired), sizeof(block_node));
+		myNodeAllocator.deallocate(desired, 1);
 
 		return;
 	}

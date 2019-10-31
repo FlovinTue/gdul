@@ -68,6 +68,9 @@ void assert_alignment(std::uint8_t* block, std::size_t alignment);
 template <class T>
 struct disable_deduction;
 
+template <std::uint8_t Align, std::size_t Size>
+struct aligned_storage;
+
 template <class T>
 class control_block_base_interface;
 template <class T, class Allocator>
@@ -840,11 +843,21 @@ template<class T, class Allocator>
 inline void control_block_make_shared<T, Allocator>::destroy() noexcept
 {
 	Allocator alloc(this->myAllocator);
-	uint8_t* beginPtr(reinterpret_cast<std::uint8_t*>(this) - this->myBlockOffset);
 
 	(*this).~control_block_make_shared<T, Allocator>();
 
-	alloc.deallocate(beginPtr, shared_ptr<T>::template alloc_size_make_shared<Allocator>());
+	constexpr std::size_t blockSize(shared_ptr<T>::template alloc_size_make_shared<Allocator>());
+	constexpr std::size_t blockAlign(alignof(T));
+
+	using block_type = aspdetail::aligned_storage<blockAlign, blockSize>;
+	using rebound_alloc = typename std::allocator_traits<Allocator>::template rebind_alloc<block_type>;
+
+	rebound_alloc rebound(alloc);
+
+	uint8_t* beginPtr((std::uint8_t*)this - this->myBlockOffset);
+	block_type* const typedBlock((block_type*)beginPtr);
+
+	rebound.deallocate(typedBlock, 1);
 }
 template <class T, class Allocator>
 class control_block_claim : public control_block_base_members<T, Allocator>
@@ -866,7 +879,11 @@ inline void control_block_claim<T, Allocator>::destroy() noexcept
 	delete this->myPtr;
 	(*this).~control_block_claim<T, Allocator>();
 
-	alloc.deallocate(reinterpret_cast<std::uint8_t*>(this), shared_ptr<T>::template alloc_size_claim<Allocator>());
+	using rebound_alloc = typename std::allocator_traits<Allocator>::template rebind_alloc<std::uint8_t>;
+
+	rebound_alloc rebound(alloc);
+
+	rebound.deallocate(reinterpret_cast<std::uint8_t*>(this), shared_ptr<T>::template alloc_size_claim<Allocator>());
 }
 template <class T, class Allocator, class Deleter>
 class control_block_claim_custom_delete : public control_block_base_members<T, Allocator>
@@ -893,12 +910,21 @@ inline void control_block_claim_custom_delete<T, Allocator, Deleter>::destroy() 
 	myDeleter(ptrAddr, alloc);
 	(*this).~control_block_claim_custom_delete<T, Allocator, Deleter>();
 
-	alloc.deallocate(reinterpret_cast<std::uint8_t*>(this), shared_ptr<T>::template alloc_size_claim_custom_delete<Allocator, Deleter>());
+	using rebound_alloc = typename std::allocator_traits<Allocator>::template rebind_alloc<std::uint8_t>;
+
+	rebound_alloc rebound(alloc);
+
+	rebound.deallocate(reinterpret_cast<std::uint8_t*>(this), shared_ptr<T>::template alloc_size_claim_custom_delete<Allocator, Deleter>());
 }
 template <class T>
 struct disable_deduction
 {
 	using type = T;
+};
+template <std::uint8_t Align, std::size_t Size>
+struct alignas(Align) aligned_storage
+{
+	std::uint8_t dummy[Size]{};
 };
 enum STORAGE_BYTE : std::uint8_t
 {
@@ -1305,6 +1331,10 @@ inline typename aspdetail::compressed_storage shared_ptr<T>::create_control_bloc
 {
 	static_assert(!(8 < alignof(Deleter)), "No support for custom aligned deleter objects");
 
+	using rebound_alloc = typename std::allocator_traits<Allocator>::template rebind_alloc<std::uint8_t>;
+
+	rebound_alloc rebound(allocator);
+
 	aspdetail::control_block_claim_custom_delete<T, Allocator, Deleter>* controlBlock(nullptr);
 
 	constexpr std::size_t blockSize(alloc_size_claim_custom_delete<Allocator, Deleter>());
@@ -1312,7 +1342,7 @@ inline typename aspdetail::compressed_storage shared_ptr<T>::create_control_bloc
 	void* block(nullptr);
 
 	try {
-		block = allocator.allocate(blockSize);
+		block = rebound.allocate(blockSize);
 
 		if ((std::uintptr_t)block % alignof(std::max_align_t) != 0) {
 			throw std::exception("make_shared expects at least alignof(max_align_t) allocates");
@@ -1321,7 +1351,7 @@ inline typename aspdetail::compressed_storage shared_ptr<T>::create_control_bloc
 		controlBlock = new (block) aspdetail::control_block_claim_custom_delete<T, Allocator, Deleter>(object, allocator, std::forward<Deleter&&>(deleter));
 	}
 	catch (...) {
-		allocator.deallocate(static_cast<std::uint8_t*>(block), blockSize);
+		rebound.deallocate(static_cast<std::uint8_t*>(block), blockSize);
 		deleter(object, allocator);
 		throw;
 	}
@@ -1334,6 +1364,10 @@ template<class T>
 template <class Allocator>
 inline typename aspdetail::compressed_storage shared_ptr<T>::create_control_block(T* object, Allocator& allocator)
 {
+	using rebound_alloc = typename std::allocator_traits<Allocator>::template rebind_alloc<std::uint8_t>;
+
+	rebound_alloc rebound(allocator);
+
 	aspdetail::control_block_claim<T, Allocator>* controlBlock(nullptr);
 
 	constexpr std::size_t blockSize(alloc_size_claim<Allocator>());
@@ -1341,16 +1375,16 @@ inline typename aspdetail::compressed_storage shared_ptr<T>::create_control_bloc
 	void* block(nullptr);
 
 	try {
-		block = allocator.allocate(blockSize);
+		block = rebound.allocate(blockSize);
 
 		if ((std::uintptr_t)block % alignof(std::max_align_t) != 0) {
 			throw std::exception("make_shared expects at least alignof(max_align_t) allocates");
 		}
 
-		controlBlock = new (block) aspdetail::control_block_claim<T, Allocator>(object, allocator);
+		controlBlock = new (block) aspdetail::control_block_claim<T, Allocator>(object, rebound);
 	}
 	catch (...) {
-		allocator.deallocate(static_cast<std::uint8_t*>(block), blockSize);
+		rebound.deallocate(static_cast<std::uint8_t*>(block), blockSize);
 		delete object;
 		throw;
 	}
@@ -1368,8 +1402,8 @@ inline shared_ptr<T>& shared_ptr<T>::operator=(const shared_ptr<T>& other) noexc
 
 	if (aspdetail::control_block_base_interface<T>* const copyCb = this->to_control_block(copy)) {
 #ifndef GDUL_ASP_SAFE_SP_COPY
-		const std::uint8_t refsToSteal(copy.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] / 2);
-		if (!refsToSteal) 
+		copy.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] = copy.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] / 2;
+		if (!copy.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF])
 #endif
 		{
 			copy.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] = std::numeric_limits<std::uint8_t>::max();
@@ -1377,8 +1411,7 @@ inline shared_ptr<T>& shared_ptr<T>::operator=(const shared_ptr<T>& other) noexc
 		}
 #ifndef GDUL_ASP_SAFE_SP_COPY
 		else {
-			other.myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] -= refsToSteal;
-			copy.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] = refsToSteal;
+			other.myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] -= copy.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF];
 		}
 #endif
 	}
@@ -1533,21 +1566,23 @@ inline shared_ptr<T> make_shared(Args&& ...args)
 template<class T, class Allocator, class ...Args>
 inline shared_ptr<T> make_shared(Allocator& allocator, Args&& ...args)
 {
-	using block_type = struct alignas(alignof(T)) { std::uint8_t dummy[shared_ptr<T>::template alloc_size_make_shared<Allocator>()]{}; };
+	constexpr std::size_t blockSize(shared_ptr<T>::template alloc_size_make_shared<Allocator>());
+	constexpr std::size_t blockAlign(alignof(T));
+
+	using block_type = aspdetail::aligned_storage<blockAlign, blockSize>;
 	using rebound_alloc = typename std::allocator_traits<Allocator>::template rebind_alloc<block_type>;
 
 	rebound_alloc rebound(allocator);
 
-	std::uint8_t* const block((std::uint8_t*)rebound.allocate(1));
+	block_type* typedBlock(rebound.allocate(1));
+	std::uint8_t* const block((std::uint8_t*)typedBlock);
 
-	constexpr std::uintptr_t align(alignof(aspdetail::control_block_make_shared<T, Allocator>));
-
-	const std::uintptr_t mod((std::uintptr_t)block % align);
-	const std::uintptr_t offset(mod ? align - mod : 0);
+	const std::uintptr_t mod((std::uintptr_t)block % blockAlign);
+	const std::uintptr_t offset(mod ? blockAlign - mod : 0);
 
 	aspdetail::control_block_make_shared<T, Allocator>* controlBlock(nullptr);
 	try {
-		aspdetail::assert_alignment(block, align);
+		aspdetail::assert_alignment(block, blockAlign);
 
 		controlBlock = new (reinterpret_cast<std::uint8_t*>(block + offset)) aspdetail::control_block_make_shared<T, Allocator>(allocator, (std::uint8_t)offset, std::forward<Args&&>(args)...);
 	}
@@ -1556,7 +1591,7 @@ inline shared_ptr<T> make_shared(Allocator& allocator, Args&& ...args)
 			(*controlBlock).~control_block_make_shared<T, Allocator>();
 		}
 		throw;
-		allocator.deallocate(block, shared_ptr<T>::template alloc_size_make_shared<Allocator>());
+		rebound.deallocate(typedBlock, 1);
 	}
 
 	aspdetail::compressed_storage storage(reinterpret_cast<std::uint64_t>(controlBlock));
