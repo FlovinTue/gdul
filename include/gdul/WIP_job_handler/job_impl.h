@@ -41,6 +41,7 @@ public:
 
 	using job_impl_shared_ptr = shared_ptr<job_impl>;
 	using job_impl_atomic_shared_ptr = atomic_shared_ptr<job_impl>;
+	using job_impl_raw_ptr = raw_ptr<job_impl>;
 
 	job_impl() = default;
 
