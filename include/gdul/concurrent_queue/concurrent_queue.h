@@ -30,17 +30,17 @@
 // a slight performance decrease
 
 
- /* #define CQ_ENABLE_EXCEPTIONHANDLING */
+ /* #define GDUL_CQ_ENABLE_EXCEPTIONHANDLING */
 
 // In the event an exception is thrown during a pop operation, some entries may
 // be dequeued out-of-order as some consumers may already be halfway through a 
 // pop operation before reintegration efforts are started.
 
-#ifdef CQ_ENABLE_EXCEPTIONHANDLING 
+#ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING 
 #define GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(type) (std::is_nothrow_move_assignable<type>::value)
-#define GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(type) (!GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(type) && (std::is_nothrow_assignable<type&, type>::value))
+#define GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(type) (!GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(type) && (std::is_nothrow_assignable<type, type&>::value))
 #define GDUL_CQ_BUFFER_NOTHROW_PUSH_MOVE(type) (std::is_nothrow_move_assignable<type>::value)
-#define GDUL_CQ_BUFFER_NOTHROW_PUSH_ASSIGN(type) (std::is_nothrow_assignable<type&, type>::value)
+#define GDUL_CQ_BUFFER_NOTHROW_PUSH_ASSIGN(type) (std::is_nothrow_assignable<type, type&>::value)
 #else
 #define GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(type) (std::is_move_assignable<type>::value)
 #define GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(type) (!GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(type))
@@ -150,7 +150,7 @@ static constexpr size_type Buffer_Capacity_Max = ~(std::numeric_limits<size_type
 }
 // The WizardLoaf MPMC unbounded lock-free queue.
 // FIFO is respected within the context of single producers. 
-// Basic exception safety may be enabled via define CQ_ENABLE_EXCEPTIONHANDLING 
+// Basic exception safety may be enabled via define GDUL_CQ_ENABLE_EXCEPTIONHANDLING 
 // at the price of a slight performance decrease.
 template <class T, class Allocator = std::allocator<std::uint8_t>>
 class concurrent_queue
@@ -508,7 +508,7 @@ inline typename concurrent_queue<T, Allocator>::shared_ptr_slot_type concurrent_
 	buffer_type* buffer(nullptr);
 	cqdetail::item_container<T>* data(nullptr);
 
-#ifdef CQ_ENABLE_EXCEPTIONHANDLING
+#ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
 	try {
 #endif
 		totalBlock = myAllocator.allocate(totalBlockSize);
@@ -532,7 +532,7 @@ inline typename concurrent_queue<T, Allocator>::shared_ptr_slot_type concurrent_
 		}
 
 		buffer = new(totalBlock + bufferOffset) buffer_type(static_cast<size_type>(log2size), data);
-#ifdef CQ_ENABLE_EXCEPTIONHANDLING
+#ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
 	}
 	catch (...) {
 		myAllocator.deallocate(totalBlock, totalBlockSize);
@@ -553,7 +553,7 @@ template<class T, class Allocator>
 inline void concurrent_queue<T, Allocator>::push_producer_buffer(shared_ptr_slot_type buffer)
 {
 	const std::uint16_t bufferSlot(claim_store_slot());
-#ifdef CQ_ENABLE_EXCEPTIONHANDLING
+#ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
 	if (!(bufferSlot < cqdetail::Max_Producers)) {
 		throw cqdetail::producer_overflow("Max producers exceeded");
 	}
@@ -667,7 +667,7 @@ template<class T, class Allocator>
 inline std::uint16_t concurrent_queue<T, Allocator>::claim_store_slot()
 {
 	std::uint16_t reservedSlot(std::numeric_limits<std::uint16_t>::max());
-#ifdef CQ_ENABLE_EXCEPTIONHANDLING
+#ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
 	for (bool foundSlot(false); !foundSlot;) {
 		std::uint16_t expectedSlot(myProducerSlotReservation.load(std::memory_order_relaxed));
 		const std::uint8_t storeArraySlot(cqdetail::to_store_array_slot<void>(expectedSlot));
@@ -898,7 +898,7 @@ private:
 	std::atomic<size_type> myPreReadIterator;
 	GDUL_ATOMIC_WITH_VIEW(size_type, myReadSlot);
 
-#ifdef CQ_ENABLE_EXCEPTIONHANDLING
+#ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
 	std::atomic<size_type> myPostReadIterator;
 	std::atomic<std::uint16_t> myFailiureCount;
 	std::atomic<std::uint16_t> myFailiureIndex;
@@ -925,7 +925,7 @@ inline producer_buffer<T, Allocator>::producer_buffer(typename producer_buffer<T
 	, myPreReadIterator(0)
 	, myWriteSlot(0)
 	, myPostWriteIterator(0)
-#ifdef CQ_ENABLE_EXCEPTIONHANDLING
+#ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
 	, myFailiureIndex(0)
 	, myFailiureCount(0)
 	, myPostReadIterator(0)
@@ -969,7 +969,7 @@ inline typename producer_buffer<T, Allocator>::shared_ptr_slot_type producer_buf
 		const size_type postWrite(inspect->myPostWriteIterator.load(std::memory_order_relaxed));
 
 		const bool thisBufferEmpty(readSlot == postWrite);
-#ifdef CQ_ENABLE_EXCEPTIONHANDLING
+#ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
 		const bool veto(inspect->myFailiureCount.load(std::memory_order_relaxed) != inspect->myFailiureIndex.load(std::memory_order_relaxed));
 		const bool valid(!thisBufferEmpty | veto);
 #else
@@ -1049,7 +1049,7 @@ template<class T, class Allocator>
 template <class U, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) && !GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>*>
 inline void producer_buffer<T, Allocator>::check_for_damage()
 {
-#ifdef CQ_ENABLE_EXCEPTIONHANDLING
+#ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
 	const size_type preRead(myPreReadIterator.load(std::memory_order_relaxed));
 	const size_type preReadLockOffset(preRead - Buffer_Lock_Offset);
 	if (preReadLockOffset != myPostReadIterator.load(std::memory_order_relaxed)) {
@@ -1103,7 +1103,7 @@ inline void producer_buffer<T, Allocator>::unsafe_clear()
 		myDataBlock[i].set_state_local(item_state::Empty);
 	}
 
-#ifdef CQ_ENABLE_EXCEPTIONHANDLING
+#ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
 	myFailiureCount.store(0, std::memory_order_relaxed);
 	myFailiureIndex.store(0, std::memory_order_relaxed);
 
@@ -1144,7 +1144,7 @@ inline bool producer_buffer<T, Allocator>::try_pop(T & out)
 
 	if (myCapacity < avaliable) {
 		myPreReadIterator.fetch_sub(1, std::memory_order_relaxed);
-#ifdef CQ_ENABLE_EXCEPTIONHANDLING
+#ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
 		check_for_damage();
 #endif
 		return false;
@@ -1212,7 +1212,7 @@ template <class U, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) && !GDUL
 inline void producer_buffer<T, Allocator>::post_pop_cleanup(typename producer_buffer<T, Allocator>::size_type readSlot)
 {
 	myDataBlock[readSlot].set_state(item_state::Empty);
-#ifdef CQ_ENABLE_EXCEPTIONHANDLING
+#ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
 	myDataBlock[readSlot].reset_ref();
 	myPostReadIterator.fetch_add(1, std::memory_order_release);
 #else
@@ -1229,11 +1229,11 @@ template <class T, class Allocator>
 template <class U, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) && !GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>*>
 inline void producer_buffer<T, Allocator>::write_out(typename producer_buffer<T, Allocator>::size_type slot, U& out)
 {
-#ifdef CQ_ENABLE_EXCEPTIONHANDLING
+#ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
 	try {
 #endif
 		myDataBlock[slot].try_move(out);
-#ifdef CQ_ENABLE_EXCEPTIONHANDLING
+#ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
 	}
 	catch (...) {
 		if (myFailiureCount.fetch_add(1, std::memory_order_relaxed) == myFailiureIndex.load(std::memory_order_relaxed)) {
@@ -1248,7 +1248,7 @@ inline void producer_buffer<T, Allocator>::write_out(typename producer_buffer<T,
 template<class T, class Allocator>
 inline void producer_buffer<T, Allocator>::reintegrate_failed_entries(typename producer_buffer<T, Allocator>::size_type failCount)
 {
-#ifdef CQ_ENABLE_EXCEPTIONHANDLING
+#ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
 	const size_type readSlotTotal(myReadSlot.load(std::memory_order_relaxed));
 	const size_type readSlotTotalOffset(readSlotTotal + myCapacity);
 
@@ -1288,7 +1288,7 @@ public:
 
 	inline void store(const T& in);
 	inline void store(T&& in);
-#ifdef CQ_ENABLE_EXCEPTIONHANDLING
+#ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
 	inline void redirect(item_container<T>& to);
 #endif
 	template<class U = T, std::enable_if_t<std::is_move_assignable<U>::value>* = nullptr>
@@ -1306,13 +1306,13 @@ public:
 	inline void reset_ref();
 
 private:
-#ifdef CQ_ENABLE_EXCEPTIONHANDLING
+#ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
 	// May or may not reference this continer
 	inline item_container<T>& reference() const;
 
 #endif
 	T myData;
-#ifdef CQ_ENABLE_EXCEPTIONHANDLING
+#ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
 	union
 	{
 		std::uint64_t myStateBlock;
@@ -1330,7 +1330,7 @@ private:
 template<class T>
 inline item_container<T>::item_container()
 	: myData()
-#ifdef CQ_ENABLE_EXCEPTIONHANDLING
+#ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
 	, myReference(this)
 #else
 	, myState(item_state::Empty)
@@ -1355,7 +1355,7 @@ inline void item_container<T>::store(T && in)
 	myData = std::move(in);
 	reset_ref();
 }
-#ifdef CQ_ENABLE_EXCEPTIONHANDLING
+#ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
 template<class T>
 inline void item_container<T>::redirect(item_container<T>& to)
 {
@@ -1367,7 +1367,7 @@ inline void item_container<T>::redirect(item_container<T>& to)
 template<class T>
 inline void item_container<T>::assign(T & out)
 {
-#ifdef CQ_ENABLE_EXCEPTIONHANDLING
+#ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
 	out = reference().myData;
 #else
 	out = myData;
@@ -1376,7 +1376,7 @@ inline void item_container<T>::assign(T & out)
 template<class T>
 inline void item_container<T>::move(T & out)
 {
-#ifdef CQ_ENABLE_EXCEPTIONHANDLING
+#ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
 	out = std::move(reference().myData);
 #else
 	out = std::move(myData);
@@ -1385,7 +1385,7 @@ inline void item_container<T>::move(T & out)
 template<class T>
 inline void item_container<T>::set_state(item_state state)
 {
-#ifdef CQ_ENABLE_EXCEPTIONHANDLING
+#ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
 	reference().myState = state;
 #else
 	myState = state;
@@ -1400,7 +1400,7 @@ inline void item_container<T>::set_state_local(item_state state)
 template<class T>
 inline void item_container<T>::reset_ref()
 {
-#ifdef CQ_ENABLE_EXCEPTIONHANDLING
+#ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
 	myReference = this;
 #endif
 }
@@ -1409,7 +1409,7 @@ inline item_state item_container<T>::get_state_local() const
 {
 	return myState;
 }
-#ifdef CQ_ENABLE_EXCEPTIONHANDLING
+#ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
 template<class T>
 inline item_container<T>& item_container<T>::reference() const
 {
@@ -1420,7 +1420,7 @@ template<class T>
 template<class U, std::enable_if_t<std::is_move_assignable<U>::value>*>
 inline void item_container<T>::try_move(U& out)
 {
-#ifdef CQ_ENABLE_EXCEPTIONHANDLING
+#ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
 	out = std::move(reference().myData);
 #else
 	out = std::move(myData);
@@ -1430,7 +1430,7 @@ template<class T>
 template<class U, std::enable_if_t<!std::is_move_assignable<U>::value>*>
 inline void item_container<T>::try_move(U& out)
 {
-#ifdef CQ_ENABLE_EXCEPTIONHANDLING
+#ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
 	out = reference().myData;
 #else
 	out = myData;
@@ -1535,16 +1535,26 @@ template <class T, class Allocator>
 class shared_ptr_allocator_adaptor : public Allocator
 {
 public:
+	template <typename U>
+	struct rebind
+	{
+		using other = shared_ptr_allocator_adaptor<U, Allocator>;
+	};
+
+	template <class U>
+	shared_ptr_allocator_adaptor(const shared_ptr_allocator_adaptor<U, Allocator>& other)
+		: myAddress(other.myAddress)
+		, mySize(other.mySize)
+	{};
+
 	shared_ptr_allocator_adaptor()
 		: myAddress(nullptr)
 		, mySize(0)
-	{
-	};
+	{};
 	shared_ptr_allocator_adaptor(T* retAddr, std::size_t size)
 		: myAddress(retAddr)
 		, mySize(size)
-	{
-	};
+	{};
 
 	T* allocate(std::size_t count)
 	{

@@ -121,6 +121,9 @@ inline double Tester<T, Allocator>::ExecuteConcurrent(std::uint32_t runs)
 #endif
 
 	double result(0.0);
+	myThrown = 0;
+	myWrittenSum = 0;
+	myReadSum = 0;
 
 	for (std::uint32_t i = 0; i < runs; ++i) {
 
@@ -128,10 +131,6 @@ inline double Tester<T, Allocator>::ExecuteConcurrent(std::uint32_t runs)
 			myWriter.AddTask(std::bind(&Tester::Write, this, WritesPerThread));
 		for (std::uint32_t j = 0; j < Readers; ++j)
 			myReader.AddTask(std::bind(&Tester::Read, this, ReadsPerThread));
-
-		myWrittenSum = 0;
-		myReadSum = 0;
-		myThrown = 0;
 
 		Timer timer;
 		myIsRunning = true;
@@ -151,7 +150,7 @@ inline double Tester<T, Allocator>::ExecuteConcurrent(std::uint32_t runs)
 		myIsRunning = false;
 	}
 
-	std::cout << "Threw " << myThrown;
+	std::cout << "ExecuteConcurrent Threw " << myThrown;
 	if (!CheckResults()) {
 		std::cout << " and failed check";
 	}
@@ -166,11 +165,11 @@ inline double Tester<T, Allocator>::ExecuteSingleThread(std::uint32_t runs)
 	myQueue.unsafe_reset();
 #endif
 	double result(0.0);
+	myThrown = 0;
+	myWrittenSum = 0;
+	myReadSum = 0;
 
 	for (std::uint32_t i = 0; i < runs; ++i) {
-		myWrittenSum = 0;
-		myReadSum = 0;
-		myThrown = 0;
 		myWaiting = Readers + Writers;
 
 		myIsRunning = true;
@@ -187,6 +186,12 @@ inline double Tester<T, Allocator>::ExecuteSingleThread(std::uint32_t runs)
 		myIsRunning = false;
 	}
 
+	std::cout << "ExecuteSingleThread Threw " << myThrown;
+	if (!CheckResults()) {
+		std::cout << " and failed check";
+	}
+
+	std::cout << std::endl;
 	return result;
 }
 template<class T, class Allocator>
@@ -197,14 +202,13 @@ inline double Tester<T, Allocator>::ExecuteSingleProducerSingleConsumer(std::uin
 #endif
 
 	double result(0.0);
+	myThrown = 0;
+	myWrittenSum = 0;
+	myReadSum = 0;
 
 	for (std::uint32_t i = 0; i < runs; ++i) {
 
-		myWrittenSum = 0;
-		myReadSum = 0;
-		myThrown = 0;
 		myWaiting = Readers + Writers;
-
 
 		myWriter.AddTask(std::bind(&Tester::Write, this, Writes));
 		myReader.AddTask(std::bind(&Tester::Read, this, Writes));
@@ -223,6 +227,12 @@ inline double Tester<T, Allocator>::ExecuteSingleProducerSingleConsumer(std::uin
 		myIsRunning = false;
 	}
 
+	std::cout << "ExecuteSingleProducerSingleConsumer Threw " << myThrown;
+	if (!CheckResults()) {
+		std::cout << " and failed check";
+	}
+	std::cout << std::endl;
+
 	return result;
 }
 template<class T, class Allocator>
@@ -233,20 +243,20 @@ inline double Tester<T, Allocator>::ExecuteRead(std::uint32_t runs)
 #endif
 
 	double result(0.0);
+	myThrown = 0;
+	myWrittenSum = 0;
+	myReadSum = 0;
 
 	for (std::uint32_t i = 0; i < runs; ++i) {
 
 		myWaiting = Readers + Writers;
 
-		for (std::uint32_t j = 0; j < Writes; ++j) {
-			T in;
-			in.count = j;
-#ifndef MOODYCAMEL
-			myQueue.push(in);
-#else
-			myQueue.enqueue(in);
-#endif
-		}
+		myIsRunning = true;
+
+		Write(ReadsPerThread * Readers);
+
+		myIsRunning = false;
+
 		for (std::uint32_t j = 0; j < Readers; ++j)
 			myReader.AddTask(std::bind(&Tester::Read, this, ReadsPerThread));
 
@@ -263,6 +273,12 @@ inline double Tester<T, Allocator>::ExecuteRead(std::uint32_t runs)
 		myIsRunning = false;
 	}
 
+	std::cout << "ExecuteRead Threw " << myThrown;
+	if (!CheckResults()) {
+		std::cout << " and failed check";
+	}
+
+	std::cout << std::endl;
 	return result;
 }
 template<class T, class Allocator>
@@ -273,6 +289,9 @@ inline double Tester<T, Allocator>::ExecuteWrite(std::uint32_t runs)
 #endif
 
 	double result(0.0);
+	myThrown = 0;
+	myWrittenSum = 0;
+	myReadSum = 0;
 
 	for (std::uint32_t i = 0; i < runs; ++i) {
 
@@ -287,8 +306,10 @@ inline double Tester<T, Allocator>::ExecuteWrite(std::uint32_t runs)
 		while (myWriter.HasUnfinishedTasks())
 			std::this_thread::yield();
 
+		result += timer.GetTotalTime();
+
 #ifdef GDUL
-		myQueue.unsafe_clear();
+		Read(WritesPerThread * Writers);
 #elif defined(MSC_RUNTIME)
 		myQueue.clear();
 #elif defined(MOODYCAMEL)
@@ -296,12 +317,16 @@ inline double Tester<T, Allocator>::ExecuteWrite(std::uint32_t runs)
 		while (myQueue.try_dequeue(out));
 #endif
 
-		result += timer.GetTotalTime();
-
 		myWaiting = 0;
 
 		myIsRunning = false;
 	}
+
+	std::cout << "ExecuteWrite Threw " << myThrown;
+	if (!CheckResults()) {
+		std::cout << " and failed check";
+	}
+	std::cout << std::endl;
 
 	return result;
 }
@@ -324,11 +349,13 @@ inline void Tester<T, Allocator>::Write(std::uint32_t writes)
 
 	uint32_t sum(0);
 
-#ifdef CQ_ENABLE_EXCEPTIONHANDLING
+	uint32_t seed(gdul::rng());
+
+#ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
 	for (std::uint32_t j = 0; j < writes; ) {
-		T in(1);
+		T in(seed % (j + 1));
 		try {
-			myQueue.push(std::move(in));
+			myQueue.push(in);
 			++j;
 			sum += in.count;
 		}
@@ -338,7 +365,7 @@ inline void Tester<T, Allocator>::Write(std::uint32_t writes)
 	}
 #else
 	for (std::uint32_t j = 0; j < writes; ++j) {
-		T in;
+		T in(seed % (j + 1));
 		in.count = j;
 		sum += in.count;
 #ifndef MOODYCAMEL
@@ -366,7 +393,7 @@ inline void Tester<T, Allocator>::Read(std::uint32_t reads)
 	uint32_t sum(0);
 
 	T out{ 0 };
-#ifdef CQ_ENABLE_EXCEPTIONHANDLING
+#ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
 	for (std::uint32_t j = 0; j < reads;) {
 		while (true) {
 			try {
