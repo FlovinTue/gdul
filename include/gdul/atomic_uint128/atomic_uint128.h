@@ -283,7 +283,7 @@ bool atomic_uint128::cas_internal(std::int64_t* const expected, const std::int64
 {
 	return _InterlockedCompareExchange128(reinterpret_cast<volatile std::int64_t*>(&myStorage.myS64[0]), desired[1], desired[0], expected);
 }
-#elif defined(__GNUC__)
+#elif defined(__GNUC__) || defined(__clang__)
 bool atomic_int128::cas_internal(std::int64_t* const expected, const std::int64_t* desired)
 {
 	bool result;
