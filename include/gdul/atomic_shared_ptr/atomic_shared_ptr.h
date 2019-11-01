@@ -62,8 +62,8 @@ union compressed_storage
 	std::uint8_t myU8[8];
 };
 
-template <class Dummy = void>
-void assert_alignment(std::uint8_t* block, std::size_t alignment);
+template <class T>
+constexpr void assert_alignment(std::uint8_t* block);
 
 template <class T>
 struct disable_deduction;
@@ -937,18 +937,18 @@ enum CAS_FLAG : std::uint8_t
 	CAS_FLAG_CAPTURE_ON_FAILURE,
 	CAS_FLAG_STEAL_PREVIOUS,
 };
-template<class Dummy>
-void assert_alignment(std::uint8_t* block, std::size_t alignment)
+template<class T>
+constexpr void assert_alignment(std::uint8_t* block)
 {
-#ifndef _HAS_CXX17
-	static_assert(!(std::numeric_limits<std::uint8_t>::max() < align), "make_shared supports only supports up to std::numeric_limits<std::uint8_t>::max() byte aligned types");
+#if _HAS_CXX17
+	if ((std::uintptr_t)block % alignof(T) != 0) {
+		throw std::exception("conforming with C++17 make_shared expects alignof(T) allocates");
+	}
+#else
+	static_assert(!(std::numeric_limits<std::uint8_t>::max() < alignof(T)), "make_shared supports only supports up to std::numeric_limits<std::uint8_t>::max() byte aligned types");
 
 	if ((std::uintptr_t)block % alignof(std::max_align_t) != 0) {
 		throw std::exception("make_shared expects at least alignof(max_align_t) allocates");
-	}
-#else
-	if ((std::uintptr_t)block % alignment != 0) {
-		throw std::exception("conforming with C++17 make_shared expects alignof(T) allocates");
 	}
 #endif
 }
@@ -970,26 +970,9 @@ public:
 	inline bool operator==(const atomic_shared_ptr<T>& other) const noexcept;
 	inline bool operator!=(const atomic_shared_ptr<T>& other) const noexcept;
 
-	inline constexpr explicit operator T* () noexcept;
-	inline constexpr explicit operator const T* () const noexcept;
-
-	inline constexpr const T* get_owned() const noexcept;
-	inline constexpr T* get_owned() noexcept;
-
-	inline constexpr raw_ptr<T> get_raw_ptr() const noexcept;
-
 	inline constexpr std::uint8_t get_version() const noexcept;
 
 	inline size_type use_count() const noexcept;
-
-	inline constexpr T* operator->();
-	inline constexpr T& operator*();
-
-	inline constexpr const T* operator->() const;
-	inline constexpr const T& operator*() const;
-
-	inline const T& operator[](size_type index) const;
-	inline T& operator[](size_type index);
 
 protected:
 	inline constexpr const control_block_base_interface<T>* get_control_block() const noexcept;
@@ -1010,11 +993,10 @@ protected:
 
 	// mutable for altering local refs
 	mutable compressed_storage myControlBlockStorage;
-	T* myPtr;
 };
 template <class T>
 inline constexpr ptr_base<T>::ptr_base() noexcept
-	: myPtr(nullptr)
+	: myControlBlockStorage()
 {
 }
 template<class T>
@@ -1024,8 +1006,7 @@ inline constexpr ptr_base<T>::ptr_base(std::nullptr_t) noexcept
 }
 template<class T>
 inline constexpr ptr_base<T>::ptr_base(std::nullptr_t, std::uint8_t version) noexcept
-	: myPtr(nullptr)
-	, myControlBlockStorage(0ULL | (std::uint64_t(version) << (STORAGE_BYTE_VERSION * 8)))
+	: myControlBlockStorage(0ULL | (std::uint64_t(version) << (STORAGE_BYTE_VERSION * 8)))
 {
 }
 template <class T>
@@ -1033,14 +1014,12 @@ inline constexpr ptr_base<T>::ptr_base(compressed_storage from) noexcept
 	: ptr_base<T>()
 {
 	myControlBlockStorage = from;
-	myPtr = to_object(from);
-	myControlBlockStorage.myU8[STORAGE_BYTE_LOCAL_REF] *= (bool)myPtr;
+	myControlBlockStorage.myU8[STORAGE_BYTE_LOCAL_REF] *= operator bool();
 }
 template<class T>
 inline void ptr_base<T>::reset() noexcept
 {
 	myControlBlockStorage = compressed_storage();
-	myPtr = nullptr;
 }
 template <class T>
 inline constexpr ptr_base<T>::operator bool() const noexcept
@@ -1076,46 +1055,7 @@ inline typename ptr_base<T>::size_type ptr_base<T>::use_count() const noexcept
 
 	return get_control_block()->use_count();
 }
-template <class T>
-inline constexpr ptr_base<T>::operator T* () noexcept
-{
-	return get_owned();
-}
-template <class T>
-inline constexpr ptr_base<T>::operator const T* () const noexcept
-{
-	return get_owned();
-}
-template <class T>
-inline constexpr T* ptr_base<T>::operator->()
-{
-	return get_owned();
-}
-template <class T>
-inline constexpr T& ptr_base<T>::operator*()
-{
-	return *get_owned();
-}
-template <class T>
-inline constexpr const T* ptr_base<T>::operator->() const
-{
-	return get_owned();
-}
-template <class T>
-inline constexpr const T& ptr_base<T>::operator*() const
-{
-	return *get_owned();
-}
-template <class T>
-inline const T& ptr_base<T>::operator[](size_type index) const
-{
-	return get_owned()[index];
-}
-template <class T>
-inline T& ptr_base<T>::operator[](size_type index)
-{
-	return get_owned()[index];
-}
+
 template <class T>
 inline constexpr bool operator==(std::nullptr_t /*aNullptr*/, const ptr_base<T>& ptr) noexcept
 {
@@ -1142,6 +1082,11 @@ inline constexpr control_block_base_interface<T>* ptr_base<T>::to_control_block(
 	return reinterpret_cast<control_block_base_interface<T>*>(from.myU64 & Ptr_Mask);
 }
 template <class T>
+inline constexpr const control_block_base_interface<T>* ptr_base<T>::to_control_block(compressed_storage from) const noexcept
+{
+	return reinterpret_cast<const control_block_base_interface<T>*>(from.myU64 & Ptr_Mask);
+}
+template <class T>
 inline constexpr T* ptr_base<T>::to_object(compressed_storage from) noexcept
 {
 	control_block_base_interface<T>* const cb(to_control_block(from));
@@ -1149,11 +1094,6 @@ inline constexpr T* ptr_base<T>::to_object(compressed_storage from) noexcept
 		return cb->get_owned();
 	}
 	return nullptr;
-}
-template <class T>
-inline constexpr const control_block_base_interface<T>* ptr_base<T>::to_control_block(compressed_storage from) const noexcept
-{
-	return reinterpret_cast<const control_block_base_interface<T>*>(from.myU64 & Ptr_Mask);
 }
 template <class T>
 inline constexpr const T* ptr_base<T>::to_object(compressed_storage from) const noexcept
@@ -1170,36 +1110,24 @@ inline constexpr const control_block_base_interface<T>* ptr_base<T>::get_control
 	return to_control_block(myControlBlockStorage);
 }
 template <class T>
-inline constexpr const T* ptr_base<T>::get_owned() const noexcept
-{
-	return myPtr;
-}
-template <class T>
 inline constexpr control_block_base_interface<T>* ptr_base<T>::get_control_block() noexcept
 {
 	return to_control_block(myControlBlockStorage);
-}
-template <class T>
-inline constexpr T* ptr_base<T>::get_owned() noexcept
-{
-	return myPtr;
 }
 template<class T>
 inline constexpr std::uint8_t ptr_base<T>::get_version() const noexcept
 {
 	return myControlBlockStorage.myU8[STORAGE_BYTE_VERSION];
 }
-template<class T>
-inline constexpr raw_ptr<T> ptr_base<T>::get_raw_ptr() const noexcept
-{
-	return raw_ptr<T>(myControlBlockStorage);
-}
 };
 template <class T>
 class shared_ptr : public aspdetail::ptr_base<T>
 {
 public:
-	inline constexpr shared_ptr() = default;
+	inline constexpr shared_ptr() noexcept;
+
+	inline constexpr shared_ptr(std::nullptr_t) noexcept;
+	inline constexpr shared_ptr(std::nullptr_t, std::uint8_t version) noexcept;
 
 	using aspdetail::ptr_base<T>::ptr_base;
 
@@ -1215,6 +1143,23 @@ public:
 	inline explicit shared_ptr(T* object, Deleter&& deleter, Allocator& allocator);
 
 	~shared_ptr() noexcept;
+
+	inline constexpr explicit operator T* () noexcept; // redefine
+	inline constexpr explicit operator const T* () const noexcept; // redefine
+
+	inline constexpr const T* get_owned() const noexcept; // redefine
+	inline constexpr T* get_owned() noexcept; // redefine
+
+	inline constexpr T* operator->(); // redefine
+	inline constexpr T& operator*(); // redefine
+
+	inline constexpr const T* operator->() const; // redefine
+	inline constexpr const T& operator*() const; // redefine
+
+	inline const T& operator[](aspdetail::size_type index) const; // redefine
+	inline T& operator[](aspdetail::size_type index); // redefine
+
+	inline constexpr raw_ptr<T> get_raw_ptr() const noexcept;
 
 	shared_ptr<T>& operator=(const shared_ptr<T>& other) noexcept;
 	shared_ptr<T>& operator=(shared_ptr<T>&& other) noexcept;
@@ -1234,12 +1179,15 @@ public:
 	template <class Allocator, class Deleter>
 	static constexpr std::size_t alloc_size_claim_custom_delete() noexcept;
 
+
 private:
 	inline void fill_local_refs() noexcept;
 
+	constexpr void reset() noexcept;
+
 	using compressed_storage = aspdetail::compressed_storage;
 
-	shared_ptr(compressed_storage from) noexcept;
+	inline constexpr shared_ptr(compressed_storage from) noexcept;
 
 	template<class Deleter, class Allocator>
 	inline compressed_storage create_control_block(T* object, Deleter&& deleter, Allocator& allocator);
@@ -1251,7 +1199,30 @@ private:
 
 	template <class T, class Allocator, class ...Args>
 	friend shared_ptr<T> make_shared<T, Allocator>(Allocator&, Args&&...);
+
+	T* myPtr;
 };
+template <class T>
+inline constexpr shared_ptr<T>::shared_ptr() noexcept
+	: aspdetail::ptr_base<T>()
+	, myPtr(nullptr)
+{
+
+}
+template <class T>
+inline constexpr shared_ptr<T>::shared_ptr(std::nullptr_t) noexcept
+	: aspdetail::ptr_base<T>(nullptr)
+	, myPtr(nullptr)
+{
+
+}
+template <class T>
+inline constexpr shared_ptr<T>::shared_ptr(std::nullptr_t, std::uint8_t version) noexcept
+	: aspdetail::ptr_base<T>(nullptr, version)
+	, myPtr(nullptr)
+{
+
+}
 template<class T>
 inline shared_ptr<T>::~shared_ptr()
 {
@@ -1308,6 +1279,12 @@ inline shared_ptr<T>::shared_ptr(T* object, Deleter&& deleter, Allocator& alloca
 	this->myPtr = this->to_object(this->myControlBlockStorage);
 }
 template<class T>
+inline constexpr void shared_ptr<T>::reset() noexcept
+{
+	myPtr = nullptr;
+	aspdetail::ptr_base<T>::reset();
+}
+template<class T>
 inline void shared_ptr<T>::fill_local_refs() noexcept
 {
 	aspdetail::control_block_base_interface<T>* const cb(this->get_control_block());
@@ -1320,11 +1297,66 @@ inline void shared_ptr<T>::fill_local_refs() noexcept
 	}
 }
 template<class T>
-inline shared_ptr<T>::shared_ptr(compressed_storage from) noexcept
+inline constexpr shared_ptr<T>::shared_ptr(compressed_storage from) noexcept
 	: aspdetail::ptr_base<T>(from)
+	, myPtr(this->to_object(from))
 {
 }
-
+template<class T>
+inline constexpr raw_ptr<T> shared_ptr<T>::get_raw_ptr() const noexcept
+{
+	return raw_ptr<T>(this->myControlBlockStorage);
+}
+template <class T>
+inline constexpr shared_ptr<T>::operator T* () noexcept
+{
+	return get_owned();
+}
+template <class T>
+inline constexpr shared_ptr<T>::operator const T* () const noexcept
+{
+	return get_owned();
+}
+template <class T>
+inline constexpr T* shared_ptr<T>::operator->()
+{
+	return get_owned();
+}
+template <class T>
+inline constexpr T& shared_ptr<T>::operator*()
+{
+	return *get_owned();
+}
+template <class T>
+inline constexpr const T* shared_ptr<T>::operator->() const
+{
+	return get_owned();
+}
+template <class T>
+inline constexpr const T& shared_ptr<T>::operator*() const
+{
+	return *get_owned();
+}
+template <class T>
+inline const T& shared_ptr<T>::operator[](aspdetail::size_type index) const
+{
+	return get_owned()[index];
+}
+template <class T>
+inline T& shared_ptr<T>::operator[](aspdetail::size_type index)
+{
+	return get_owned()[index];
+}
+template <class T>
+inline constexpr const T* shared_ptr<T>::get_owned() const noexcept
+{
+	return myPtr;
+}
+template <class T>
+inline constexpr T* shared_ptr<T>::get_owned() noexcept
+{
+	return myPtr;
+}
 template <class T>
 template<class Deleter, class Allocator>
 inline typename aspdetail::compressed_storage shared_ptr<T>::create_control_block(T* object, Deleter&& deleter, Allocator& allocator)
@@ -1432,7 +1464,7 @@ inline shared_ptr<T>& shared_ptr<T>::operator=(shared_ptr<T>&& other) noexcept
 	std::swap(this->myPtr, other.myPtr);
 	return *this;
 }
-#if defined(_HAS_CXX17)
+#if _HAS_CXX17
 template<class T>
 template <class Allocator>
 inline constexpr std::size_t shared_ptr<T>::alloc_size_make_shared() noexcept
@@ -1477,6 +1509,21 @@ public:
 
 	explicit raw_ptr(const atomic_shared_ptr<T>& from) noexcept;
 
+	inline constexpr explicit operator T* () noexcept;
+	inline constexpr explicit operator const T* () const noexcept;
+
+	inline constexpr const T* get_owned() const noexcept;
+	inline constexpr T* get_owned() noexcept;
+
+	inline constexpr T* operator->();
+	inline constexpr T& operator*();
+
+	inline constexpr const T* operator->() const;
+	inline constexpr const T& operator*() const;
+
+	inline const T& operator[](aspdetail::size_type index) const;
+	inline T& operator[](aspdetail::size_type index);
+
 	constexpr raw_ptr<T>& operator=(const raw_ptr<T>& other) noexcept;
 	constexpr raw_ptr<T>& operator=(raw_ptr<T>&& other) noexcept;
 	constexpr raw_ptr<T>& operator=(const shared_ptr<T>& from) noexcept;
@@ -1489,6 +1536,7 @@ private:
 
 	friend class aspdetail::ptr_base<T>;
 	friend class atomic_shared_ptr<T>;
+	friend class shared_ptr<T>;
 };
 template<class T>
 inline constexpr raw_ptr<T>::raw_ptr() noexcept
@@ -1531,7 +1579,6 @@ template<class T>
 inline constexpr raw_ptr<T>& raw_ptr<T>::operator=(raw_ptr<T>&& other) noexcept
 {
 	std::swap(this->myControlBlockStorage, other.myControlBlockStorage);
-	std::swap(this->myPtr, other.myPtr);
 	return *this;
 }
 template<class T>
@@ -1545,6 +1592,56 @@ inline constexpr raw_ptr<T>& raw_ptr<T>::operator=(const atomic_shared_ptr<T>& f
 {
 	*this = raw_ptr<T>(from);
 	return *this;
+}
+template <class T>
+inline constexpr raw_ptr<T>::operator T* () noexcept
+{
+	return get_owned();
+}
+template <class T>
+inline constexpr raw_ptr<T>::operator const T* () const noexcept
+{
+	return get_owned();
+}
+template <class T>
+inline constexpr const T* raw_ptr<T>::get_owned() const noexcept
+{
+	return this->to_object(this->myControlBlockStorage);
+}
+template <class T>
+inline constexpr T* raw_ptr<T>::get_owned() noexcept
+{
+	return this->to_object(this->myControlBlockStorage);
+}
+template <class T>
+inline constexpr T* raw_ptr<T>::operator->()
+{
+	return get_owned();
+}
+template <class T>
+inline constexpr T& raw_ptr<T>::operator*()
+{
+	return *get_owned();
+}
+template <class T>
+inline constexpr const T* raw_ptr<T>::operator->() const
+{
+	return get_owned();
+}
+template <class T>
+inline constexpr const T& raw_ptr<T>::operator*() const
+{
+	return *get_owned();
+}
+template <class T>
+inline const T& raw_ptr<T>::operator[](aspdetail::size_type index) const
+{
+	return get_owned()[index];
+}
+template <class T>
+inline T& raw_ptr<T>::operator[](aspdetail::size_type index)
+{
+	return get_owned()[index];
 }
 template<class T>
 inline constexpr raw_ptr<T>::raw_ptr(compressed_storage from) noexcept
@@ -1573,16 +1670,16 @@ inline shared_ptr<T> make_shared(Allocator& allocator, Args&& ...args)
 	using rebound_alloc = typename std::allocator_traits<Allocator>::template rebind_alloc<block_type>;
 
 	rebound_alloc rebound(allocator);
-
-	block_type* typedBlock(rebound.allocate(1));
-	std::uint8_t* const block((std::uint8_t*)typedBlock);
-
-	const std::uintptr_t mod((std::uintptr_t)block % blockAlign);
-	const std::uintptr_t offset(mod ? blockAlign - mod : 0);
-
+	block_type* typedBlock(nullptr);
 	aspdetail::control_block_make_shared<T, Allocator>* controlBlock(nullptr);
 	try {
-		aspdetail::assert_alignment(block, blockAlign);
+		typedBlock = rebound.allocate(1);
+		std::uint8_t* const block((std::uint8_t*)typedBlock);
+
+		const std::uintptr_t mod((std::uintptr_t)block % blockAlign);
+		const std::uintptr_t offset(mod ? blockAlign - mod : 0);
+
+		aspdetail::assert_alignment<T>(block);
 
 		controlBlock = new (reinterpret_cast<std::uint8_t*>(block + offset)) aspdetail::control_block_make_shared<T, Allocator>(allocator, (std::uint8_t)offset, std::forward<Args&&>(args)...);
 	}

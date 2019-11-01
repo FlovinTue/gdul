@@ -2,17 +2,45 @@
 <AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
 
   <Type Name="gdul::aspdetail::ptr_base&lt;*&gt;">
-    <DisplayString Condition="(myPtr != nullptr)">
-			{*myPtr}
+		<DisplayString Condition="(
+				+ ((myControlBlockStorage.myU64 >> 1) * 2)
+				- ((uint64_t)myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
+				- ((uint64_t)myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] * (aspdetail::Versioned_Ptr_Mask + 1))
+						!= 0)">
+			{**(($T1**)
+			(
+			+ 8
+			+ ((myControlBlockStorage.myU64 >> 1) * 2)
+			- ((uint64_t)myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
+			- ((uint64_t)myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] * (aspdetail::Versioned_Ptr_Mask + 1)))
+			)}
 		</DisplayString>
-    <DisplayString Condition="(myPtr == nullptr)">
+		<DisplayString Condition="(
+				+ ((myControlBlockStorage.myU64 >> 1) * 2)
+				- ((uint64_t)myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
+				- ((uint64_t)myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] * (aspdetail::Versioned_Ptr_Mask + 1))
+						== 0)">
 			{(void*)0}
 		</DisplayString>
-    <Expand >
-      <ExpandedItem Condition="(myPtr != nullptr)">
-				myPtr
+		<Expand >
+			<ExpandedItem Condition="(
+				+ ((myControlBlockStorage.myU64 >> 1) * 2)
+				- ((uint64_t)myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
+				- ((uint64_t)myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] * (aspdetail::Versioned_Ptr_Mask + 1))
+						!= 0)">
+				(*(($T1**)
+				(
+				+8
+				+ ((myControlBlockStorage.myU64 >> 1) * 2)
+				- ((uint64_t)myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
+				- ((uint64_t)myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] * (aspdetail::Versioned_Ptr_Mask + 1)))
+				))
 			</ExpandedItem>
-      <Item Name="[object]" Condition="(myPtr == nullptr)">
+			<Item Name="[object]" Condition="(
+				+ ((myControlBlockStorage.myU64 >> 1) * 2)
+				- ((uint64_t)myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
+				- ((uint64_t)myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] * (aspdetail::Versioned_Ptr_Mask + 1))
+						== 0)">
 				(void*)0
 			</Item>
       <Item Name="[**ptr_use_count]" Condition="(

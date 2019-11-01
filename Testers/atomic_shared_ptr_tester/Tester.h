@@ -259,15 +259,15 @@ inline void Tester<T, ArraySize, NumThreads>::WorkCAS(std::uint32_t aArrayPasses
 			raw_ptr<T> check(expected);
 			const bool resulta = myTestArray[i].compare_exchange_strong(expected, std::move(desired), std::memory_order_relaxed);
 
-			//shared_ptr<T> desired_(make_shared<T>());
-			//shared_ptr<T> expected_(myTestArray[i].load(std::memory_order_relaxed));
-			//raw_ptr<T> rawExpected(expected_);
-			//raw_ptr<T> check_(expected_);
-			//const bool resultb = myTestArray[i].compare_exchange_strong(rawExpected, std::move(desired_), std::memory_order_relaxed);
+			shared_ptr<T> desired_(make_shared<T>());
+			shared_ptr<T> expected_(myTestArray[i].load(std::memory_order_relaxed));
+			raw_ptr<T> rawExpected(expected_);
+			raw_ptr<T> check_(expected_);
+			const bool resultb = myTestArray[i].compare_exchange_strong(rawExpected, std::move(desired_), std::memory_order_relaxed);
 
-			//if (!(resultb == (rawExpected == check_))) {
-			//	throw std::runtime_error("output from expected do not correspond to CAS results");
-			//}
+			if (!(resultb == (rawExpected == check_))) {
+				throw std::runtime_error("output from expected do not correspond to CAS results");
+			}
 
 #else
 			std::shared_ptr<T> desired_(std::make_shared<T>());
