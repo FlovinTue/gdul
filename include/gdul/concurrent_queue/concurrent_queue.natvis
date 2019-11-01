@@ -10,31 +10,21 @@
 				<Variable Name = "pBuffer" InitialValue = "(buffer_type*)(0)" />
 
 				<Exec Condition="producerIndex != (uint64_t)_myProducerCount">
-					producerSlotsRaw = 
-					(*(atomic_shared_ptr_slot_type**)(+8
-					+ ((myProducerSlots.myDebugView.myU64 >> 1) * 2)
-					- ((uint64_t)myProducerSlots.myDebugView.myU8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
-					- ((uint64_t)myProducerSlots.myDebugView.myU8[aspdetail::STORAGE_BYTE_COPYREQUEST] * (aspdetail::Ptr_Mask + 1))
-					))
+					producerSlotsRaw = *(atomic_shared_ptr_slot_type**)(8 + (myProducerSlots.myDebugView.myU64 &amp; aspdetail::Ptr_Mask))
 				</Exec>
 				
 				<Loop>
 					<Break Condition = "producerIndex == (uint64_t)_myProducerCount" />
 					<Exec>
-						pBuffer =
-						(*(buffer_type**)(+8
-						+ ((producerSlotsRaw[producerIndex].myDebugView.myU64 >> 1) * 2)
-						- ((uint64_t)producerSlotsRaw[producerIndex].myDebugView.myU8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
-						- ((uint64_t)producerSlotsRaw[producerIndex].myDebugView.myU8[aspdetail::STORAGE_BYTE_COPYREQUEST] * (aspdetail::Ptr_Mask + 1))
-						))
+						pBuffer = *(buffer_type**)(8 + (producerSlotsRaw[producerIndex].myDebugView.myU64 &amp; aspdetail::Ptr_Mask))
 					</Exec>
 					<Loop>
 						<Exec>
 							sizeAccumulator += ((uint64_t)pBuffer->_myPostWriteIterator - (uint64_t)pBuffer->_myReadSlot)
 						</Exec>
-						<Break Condition = "pBuffer->myNext.myPtr == 0"/>
+						<Break Condition = "(pBuffer->myNext.myDebugView.myU64 &amp; aspdetail::Ptr_Mask) == 0"/>
 						<Exec>
-							pBuffer = pBuffer->myNext.myPtr
+							pBuffer = *(buffer_type**)(8 + (pBuffer->myNext.myDebugView.myU64 &amp; aspdetail::Ptr_Mask))
 						</Exec>
 					</Loop>
 					<Exec>
@@ -42,21 +32,13 @@
 					</Exec>
 				</Loop>
 
-				<Item Name = "[size]">sizeAccumulator</Item>
-				<Item Name = "[producer_count]">(uint64_t)_myProducerCount</Item>
-
 				<Exec>pBuffer = 0</Exec>
 				<Exec>producerIndex = 0</Exec>
 				
 				<Loop>
 					<Break Condition = "producerIndex == (uint64_t)_myProducerCount" />
 					<Exec>
-						pBuffer =
-						(*(buffer_type**)(+8
-						+ ((producerSlotsRaw[producerIndex].myDebugView.myU64 >> 1) * 2)
-						- ((uint64_t)producerSlotsRaw[producerIndex].myDebugView.myU8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
-						- ((uint64_t)producerSlotsRaw[producerIndex].myDebugView.myU8[aspdetail::STORAGE_BYTE_COPYREQUEST] * (aspdetail::Ptr_Mask + 1))
-						))
+						pBuffer = *(buffer_type**)(8 + (producerSlotsRaw[producerIndex].myDebugView.myU64 &amp; aspdetail::Ptr_Mask))
 					</Exec>
 					<Item Name='[producer_{producerIndex + 1}]'>*pBuffer</Item>
 					<Exec>
@@ -64,6 +46,9 @@
 					</Exec>
 				</Loop>
 				
+				<Item Name = "[size]">sizeAccumulator</Item>
+				<Item Name = "[producer_count]">(uint64_t)_myProducerCount</Item>
+
 				
 			</CustomListItems>
 		</Expand>
@@ -79,8 +64,8 @@
 
 				<Loop>
 					<Exec>sizeAccumulator += ((uint64_t)pBuffer->_myPostWriteIterator - (uint64_t)pBuffer->_myReadSlot)</Exec>
-					<Break Condition="(pBuffer->myNext.myPtr == nullptr)" />
-					<Exec>pBuffer = pBuffer->myNext.myPtr</Exec>
+					<Break Condition="((pBuffer->myNext.myDebugView.myU64 &amp; aspdetail::Ptr_Mask) == 0)" />
+					<Exec>pBuffer = (pBuffer->myNext.myDebugView.myU64 &amp; aspdetail::Ptr_Mask)</Exec>
 				</Loop>
 
 				<Item Name="[size]">sizeAccumulator</Item>
@@ -89,8 +74,8 @@
 
 				<Loop>
 					<If Condition="itemCount == ((uint64_t)pBuffer->_myPostWriteIterator - (uint64_t)pBuffer->_myReadSlot)">
-						<Break Condition="pBuffer->myNext.myPtr == nullptr" />
-						<Exec>pBuffer = pBuffer->myNext.myPtr</Exec>
+						<Break Condition="((pBuffer->myNext.myDebugView.myU64 &amp; aspdetail::Ptr_Mask) == 0)" />
+						<Exec>pBuffer = (pBuffer->myNext.myDebugView.myU64 &amp; aspdetail::Ptr_Mask)</Exec>
 						<Exec>pItem = pBuffer->myDataBlock + ((uint64_t)pBuffer->_myReadSlot - (((uint64_t)pBuffer->_myReadSlot / pBuffer->myCapacity) * pBuffer->myCapacity))</Exec>
 						<Exec>itemCount = 0</Exec>
 					</If>
