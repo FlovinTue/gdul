@@ -31,7 +31,7 @@
 // a slight performance decrease
 
 
- /* #define GDUL_CQ_ENABLE_EXCEPTIONHANDLING */
+  #define GDUL_CQ_ENABLE_EXCEPTIONHANDLING 
 
 // In the event an exception is thrown during a pop operation, some entries may
 // be dequeued out-of-order as some consumers may already be halfway through a 
@@ -82,13 +82,13 @@ namespace gdul
 namespace cqdetail
 {
 
+typedef std::size_t size_type;
+
 class producer_overflow : public std::runtime_error
 {
 public:
 	producer_overflow(const char* errorMessage) : runtime_error(errorMessage) {}
 };
-
-static constexpr std::uint64_t Ptr_Mask = (std::uint64_t(std::numeric_limits<std::uint32_t>::max()) << 16 | std::uint64_t(std::numeric_limits<std::uint16_t>::max()));
 
 template <class T, class Allocator>
 struct accessor_cache;
@@ -149,11 +149,13 @@ static constexpr std::uint8_t Producer_Slots_Max_Growth_Count = 15;
 
 static constexpr std::uint16_t Max_Producers = std::numeric_limits<int16_t>::max() - 1;
 
-typedef std::size_t size_type;
-
 // Not quite size_type max because we need some leaway in case we
 // need to throw consumers out of a buffer whilst repairing it
 static constexpr size_type Buffer_Capacity_Max = ~(std::numeric_limits<size_type>::max() >> 3) / 2;
+
+static constexpr std::uint64_t Ptr_Mask = (std::uint64_t(std::numeric_limits<std::uint32_t>::max()) << 16 | std::uint64_t(std::numeric_limits<std::uint16_t>::max()));
+static constexpr size_type Buffer_Lock_Offset = Buffer_Capacity_Max + Max_Producers;
+
 }
 // The WizardLoaf MPMC unbounded lock-free queue.
 // FIFO is respected within the context of single producers. 
@@ -422,7 +424,7 @@ inline typename concurrent_queue<T, Allocator>::size_type concurrent_queue<T, Al
 {
 	const std::uint16_t producerCount(myProducerCount.load(std::memory_order_acquire));
 
-	atomic_shared_ptr_slot_type* const producerArray(myProducerSlots.unsafe_get_owned(std::memory_order_relaxed));
+	atomic_shared_ptr_slot_type* const producerArray(myProducerSlots.unsafe_get_owned());
 
 	size_type accumulatedSize(0);
 	for (std::uint16_t i = 0; i < producerCount; ++i) {
@@ -764,12 +766,12 @@ template<class T, class Allocator>
 inline typename concurrent_queue<T, Allocator>::shared_ptr_slot_type& concurrent_queue<T, Allocator>::this_producer()
 {
 	if (!(myInstanceIndex < ourProducers.size())) {
-		// Make sure to propagate instances of our allocator everywhere
-		if (!ourProducers.capacity()) {
-			ourProducers = decltype(ourProducers)(myInitBufferCapacity + 1, ourDummyContainer.myDummyBuffer, myAllocator);
-		}
-		else {
+		if (ourProducers.capacity()) {
 			ourProducers.resize(myInstanceIndex + 1, ourDummyContainer.myDummyBuffer);
+		}
+		// Make sure to propagate instances of our allocator everywhere
+		else {
+			ourProducers = decltype(ourProducers)(myInitBufferCapacity + 1, ourDummyContainer.myDummyBuffer, myAllocator);
 		}
 	}
 	return ourProducers[myInstanceIndex];
@@ -778,12 +780,12 @@ template<class T, class Allocator>
 inline cqdetail::consumer_wrapper<typename concurrent_queue<T, Allocator>::shared_ptr_slot_type, typename concurrent_queue<T, Allocator>::shared_ptr_array_type>& concurrent_queue<T, Allocator>::this_consumer()
 {
 	if (!(myInstanceIndex < ourConsumers.size())) {
-		// Make sure to propagate instances of our allocator everywhere
-		if (!ourConsumers.capacity()) {
-			ourConsumers = decltype(ourConsumers)(myInstanceIndex + 1, cqdetail::consumer_wrapper<shared_ptr_slot_type, shared_ptr_array_type>(ourDummyContainer.myDummyBuffer), myAllocator);
-		}
-		else {
+		if (ourConsumers.capacity()) {
 			ourConsumers.resize(myInstanceIndex + 1, cqdetail::consumer_wrapper<shared_ptr_slot_type, shared_ptr_array_type>(ourDummyContainer.myDummyBuffer));
+		}
+		// Make sure to propagate instances of our allocator everywhere
+		else {
+			ourConsumers = decltype(ourConsumers)(myInstanceIndex + 1, cqdetail::consumer_wrapper<shared_ptr_slot_type, shared_ptr_array_type>(ourDummyContainer.myDummyBuffer), myAllocator);
 		}
 	}
 	return ourConsumers[myInstanceIndex];
@@ -899,8 +901,6 @@ private:
 	inline void check_for_damage();
 
 	inline void reintegrate_failed_entries(size_type failCount);
-
-	static constexpr size_type Buffer_Lock_Offset = cqdetail::Buffer_Capacity_Max + Max_Producers;
 
 	std::atomic<size_type> myPreReadIterator;
 	GDUL_ATOMIC_WITH_VIEW(size_type, myReadSlot);
@@ -1588,6 +1588,9 @@ inline dummy_container<T, Allocator>::dummy_container()
 {
 	Allocator alloc;
 	myDummyBuffer = shared_ptr_slot_type(&myDummyRawBuffer, [](buffer_type*, Allocator&) {}, alloc);
+
+	// Make copying the dummy (shared_ptr) buffer concurrency safe
+	myDummyBuffer.set_local_refs(1);
 }
 template <class IndexType, class Allocator>
 class index_pool

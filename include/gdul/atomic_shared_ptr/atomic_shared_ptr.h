@@ -221,7 +221,7 @@ private:
 
 	inline bool compare_exchange_weak_internal(compressed_storage& expected, compressed_storage desired, aspdetail::CAS_FLAG flags, aspdetail::memory_orders orders) noexcept;
 
-	inline void unsafe_fill_local_ref();
+	inline void unsafe_fill_local_refs();
 	inline void try_fill_local_refs(compressed_storage& expected) noexcept;
 
 	inline constexpr aspdetail::control_block_base_interface<T>* to_control_block(compressed_storage from) const noexcept;
@@ -353,7 +353,7 @@ template<class T>
 template<class PtrType>
 inline bool atomic_shared_ptr<T>::compare_exchange_strong(typename aspdetail::disable_deduction<PtrType>::type& expected, shared_ptr<T>&& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept
 {
-	desired.fill_local_refs();
+	desired.set_local_refs();
 
 	const compressed_storage desired_(desired.myControlBlockStorage.myU64);
 
@@ -387,7 +387,7 @@ template<class T>
 template<class PtrType>
 inline bool atomic_shared_ptr<T>::compare_exchange_weak(typename aspdetail::disable_deduction<PtrType>::type& expected, shared_ptr<T>&& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept
 {
-	desired.fill_local_refs();
+	desired.set_local_refs();
 
 	const compressed_storage desired_(desired.myControlBlockStorage.myU64);
 	compressed_storage expected_(myStorage.load(std::memory_order_relaxed));
@@ -446,7 +446,7 @@ inline void atomic_shared_ptr<T>::store(const shared_ptr<T>& from, std::memory_o
 template<class T>
 inline void atomic_shared_ptr<T>::store(shared_ptr<T>&& from, std::memory_order order) noexcept
 {
-	from.fill_local_refs();
+	from.set_local_refs();
 	store_internal(from.myControlBlockStorage.myU64, order);
 	from.reset();
 }
@@ -458,7 +458,7 @@ inline shared_ptr<T> atomic_shared_ptr<T>::exchange(const shared_ptr<T>& with, s
 template<class T>
 inline shared_ptr<T> atomic_shared_ptr<T>::exchange(shared_ptr<T>&& with, std::memory_order order) noexcept
 {
-	with.fill_local_refs();
+	with.set_local_refs();
 	compressed_storage previous(exchange_internal(with.myControlBlockStorage, aspdetail::CAS_FLAG_STEAL_PREVIOUS, order));
 	with.reset();
 	return shared_ptr<T>(previous);
@@ -675,7 +675,7 @@ inline union aspdetail::compressed_storage atomic_shared_ptr<T>::unsafe_copy_int
 
 	storage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] = 1;
 
-	unsafe_fill_local_ref();
+	unsafe_fill_local_refs();
 
 	std::atomic_thread_fence(order);
 
@@ -691,7 +691,7 @@ inline union aspdetail::compressed_storage atomic_shared_ptr<T>::unsafe_exchange
 
 	myStorage.store(replacement.myU64, std::memory_order_relaxed);
 
-	unsafe_fill_local_ref();
+	unsafe_fill_local_refs();
 
 	std::atomic_thread_fence(order);
 
@@ -711,12 +711,12 @@ inline void atomic_shared_ptr<T>::unsafe_store_internal(compressed_storage from,
 		prevCb->decref(previous.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF]);
 	}
 
-	unsafe_fill_local_ref();
+	unsafe_fill_local_refs();
 
 	std::atomic_thread_fence(order);
 }
 template<class T>
-inline void atomic_shared_ptr<T>::unsafe_fill_local_ref()
+inline void atomic_shared_ptr<T>::unsafe_fill_local_refs()
 {
 	const compressed_storage current(myStorage.load(std::memory_order_relaxed));
 	aspdetail::control_block_base_interface<T>* const cb(to_control_block(current));
@@ -1177,10 +1177,12 @@ public:
 	template <class Allocator, class Deleter>
 	static constexpr std::size_t alloc_size_claim_custom_delete() noexcept;
 
-
-
+	// Adjusts the amount of local refs kept for fast copies. Setting this to 1
+	// means a copy operation will not attempt to modify local state, and thus is
+	// concurrency safe. Use of local refs may be completely disabled via define 
+	// GDUL_ASP_SAFE_SP_COPY
+	inline void set_local_refs(std::uint8_t target = std::numeric_limits<std::uint8_t>::max()) noexcept;
 private:
-	inline void fill_local_refs() noexcept;
 
 	constexpr void reset() noexcept;
 
@@ -1283,16 +1285,26 @@ inline constexpr void shared_ptr<T>::reset() noexcept
 	aspdetail::ptr_base<T>::reset();
 }
 template<class T>
-inline void shared_ptr<T>::fill_local_refs() noexcept
+inline void shared_ptr<T>::set_local_refs(std::uint8_t target) noexcept
 {
+#ifdef GDUL_ASP_SAFE_SP_COPY
+	(void)target;
+#else
 	aspdetail::control_block_base_interface<T>* const cb(this->get_control_block());
 	const uint8_t localRefs(this->myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF]);
 
-	if (cb && localRefs < aspdetail::Local_Ref_Fill_Boundary) {
-		const uint8_t newRefs(std::numeric_limits<std::uint8_t>::max() - localRefs);
-		cb->incref(newRefs);
-		this->myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] = std::numeric_limits<std::uint8_t>::max();
+	if (cb) {
+		if (localRefs < target) {
+			cb->incref(target - localRefs);
+		}
+		else if (target < localRefs) {
+			cb->decref(localRefs - target);
+		}
+
+		this->myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] = target;
+		myPtr = (T*)((uint64_t)myPtr * (bool)target);
 	}
+#endif
 }
 template<class T>
 inline constexpr shared_ptr<T>::shared_ptr(union aspdetail::compressed_storage from) noexcept
@@ -1433,15 +1445,15 @@ inline shared_ptr<T>& shared_ptr<T>::operator=(const shared_ptr<T>& other) noexc
 	if (aspdetail::control_block_base_interface<T>* const copyCb = this->to_control_block(copy)) {
 #ifndef GDUL_ASP_SAFE_SP_COPY
 		copy.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] = copy.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] / 2;
-		if (!copy.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF])
+		if (copy.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF])
 #endif
 		{
-			copy.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] = std::numeric_limits<std::uint8_t>::max();
-			copyCb->incref(copy.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF]);
+			other.myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] -= copy.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF];
 		}
 #ifndef GDUL_ASP_SAFE_SP_COPY
 		else {
-			other.myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] -= copy.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF];
+			copy.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] = std::numeric_limits<std::uint8_t>::max();
+			copyCb->incref(copy.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF]);
 		}
 #endif
 	}
