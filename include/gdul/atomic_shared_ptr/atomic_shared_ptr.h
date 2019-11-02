@@ -24,7 +24,10 @@
 #include <cstdint>
 #include <limits>
 #include <cassert>
-#include <mutex>
+#include <stdexcept>
+#include <memory>
+#include <cstddef>
+
 
 #undef max
 
@@ -42,10 +45,8 @@
 
 namespace gdul
 {
-
 namespace aspdetail
 {
-
 typedef std::allocator<std::uint8_t> default_allocator;
 
 static constexpr std::uint64_t Ptr_Mask = (std::numeric_limits<std::uint64_t>::max() >> 16);
@@ -53,8 +54,8 @@ static constexpr std::uint64_t Versioned_Ptr_Mask = (std::numeric_limits<std::ui
 
 union compressed_storage
 {
-	compressed_storage()  noexcept : myU64(0ULL) {}
-	compressed_storage(std::uint64_t from) noexcept : myU64(from) {}
+	constexpr compressed_storage()  noexcept : myU64(0ULL) {}
+	constexpr compressed_storage(std::uint64_t from) noexcept : myU64(from) {}
 
 	std::uint64_t myU64;
 	std::uint32_t myU32[2];
@@ -89,13 +90,21 @@ struct memory_orders { std::memory_order myFirst, mySecond; };
 
 using size_type = std::uint32_t;
 
-enum STORAGE_BYTE : std::uint8_t;
-enum CAS_FLAG : std::uint8_t;
-
 static constexpr std::uint8_t Local_Ref_Index(7);
 static constexpr std::uint64_t Local_Ref_Step(1ULL << (Local_Ref_Index * 8));
 static constexpr std::uint8_t Local_Ref_Fill_Boundary(112);
 
+enum STORAGE_BYTE : std::uint8_t
+{
+	STORAGE_BYTE_VERSION = 6,
+	STORAGE_BYTE_LOCAL_REF = Local_Ref_Index,
+};
+enum CAS_FLAG : std::uint8_t
+{
+	CAS_FLAG_NONE = 0,
+	CAS_FLAG_CAPTURE_ON_FAILURE = 1 << 0,
+	CAS_FLAG_STEAL_PREVIOUS = 1 << 1,
+};
 }
 template <class T>
 class shared_ptr;
@@ -200,7 +209,6 @@ private:
 	inline constexpr const aspdetail::control_block_base_interface<T>* get_control_block() const noexcept;
 
 	using compressed_storage = aspdetail::compressed_storage;
-	using size_type = aspdetail::size_type;
 
 	inline compressed_storage unsafe_copy_internal(std::memory_order order);
 	inline compressed_storage copy_internal(std::memory_order order) noexcept;
@@ -644,7 +652,7 @@ inline void atomic_shared_ptr<T>::try_fill_local_refs(compressed_storage& expect
 		expected.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] < aspdetail::Local_Ref_Fill_Boundary);
 }
 template <class T>
-inline typename  aspdetail::compressed_storage atomic_shared_ptr<T>::copy_internal(std::memory_order order) noexcept
+inline union aspdetail::compressed_storage atomic_shared_ptr<T>::copy_internal(std::memory_order order) noexcept
 {
 	compressed_storage initial(myStorage.fetch_sub(aspdetail::Local_Ref_Step, std::memory_order_relaxed));
 	initial.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] -= 1;
@@ -657,7 +665,7 @@ inline typename  aspdetail::compressed_storage atomic_shared_ptr<T>::copy_intern
 	return initial;
 }
 template <class T>
-inline typename aspdetail::compressed_storage atomic_shared_ptr<T>::unsafe_copy_internal(std::memory_order order)
+inline union aspdetail::compressed_storage atomic_shared_ptr<T>::unsafe_copy_internal(std::memory_order order)
 {
 	compressed_storage storage(myStorage.load(std::memory_order_relaxed));
 
@@ -674,7 +682,7 @@ inline typename aspdetail::compressed_storage atomic_shared_ptr<T>::unsafe_copy_
 	return storage;
 }
 template<class T>
-inline typename aspdetail::compressed_storage atomic_shared_ptr<T>::unsafe_exchange_internal(compressed_storage with, std::memory_order order)
+inline union aspdetail::compressed_storage atomic_shared_ptr<T>::unsafe_exchange_internal(compressed_storage with, std::memory_order order)
 {
 	const compressed_storage old(myStorage.load(std::memory_order_relaxed));
 
@@ -725,7 +733,7 @@ inline void atomic_shared_ptr<T>::unsafe_fill_local_ref()
 	}
 }
 template<class T>
-inline typename aspdetail::compressed_storage atomic_shared_ptr<T>::exchange_internal(compressed_storage to, aspdetail::CAS_FLAG flags, std::memory_order order) noexcept
+inline union aspdetail::compressed_storage atomic_shared_ptr<T>::exchange_internal(compressed_storage to, aspdetail::CAS_FLAG flags, std::memory_order order) noexcept
 {
 	compressed_storage expected(myStorage.load(std::memory_order_relaxed));
 	while (!compare_exchange_weak_internal(expected, to, flags, { order, std::memory_order_relaxed }));
@@ -926,29 +934,19 @@ struct alignas(Align) aligned_storage
 {
 	std::uint8_t dummy[Size]{};
 };
-enum STORAGE_BYTE : std::uint8_t
-{
-	STORAGE_BYTE_VERSION = 6,
-	STORAGE_BYTE_LOCAL_REF = Local_Ref_Index,
-};
-enum CAS_FLAG : std::uint8_t
-{
-	CAS_FLAG_NONE = 0,
-	CAS_FLAG_CAPTURE_ON_FAILURE,
-	CAS_FLAG_STEAL_PREVIOUS,
-};
 template<class T>
 constexpr void assert_alignment(std::uint8_t* block)
 {
-#if _HAS_CXX17
+
+#if 201700 < __cplusplus || _HAS_CXX17
 	if ((std::uintptr_t)block % alignof(T) != 0) {
-		throw std::exception("conforming with C++17 make_shared expects alignof(T) allocates");
+		throw std::runtime_error("conforming with C++17 make_shared expects alignof(T) allocates");
 	}
 #else
 	static_assert(!(std::numeric_limits<std::uint8_t>::max() < alignof(T)), "make_shared supports only supports up to std::numeric_limits<std::uint8_t>::max() byte aligned types");
 
 	if ((std::uintptr_t)block % alignof(std::max_align_t) != 0) {
-		throw std::exception("make_shared expects at least alignof(max_align_t) allocates");
+		throw std::runtime_error("make_shared expects at least alignof(max_align_t) allocates");
 	}
 #endif
 }
@@ -1180,14 +1178,14 @@ public:
 	static constexpr std::size_t alloc_size_claim_custom_delete() noexcept;
 
 
+
 private:
 	inline void fill_local_refs() noexcept;
 
 	constexpr void reset() noexcept;
 
 	using compressed_storage = aspdetail::compressed_storage;
-
-	inline constexpr shared_ptr(compressed_storage from) noexcept;
+	inline constexpr shared_ptr(union aspdetail::compressed_storage from) noexcept;
 
 	template<class Deleter, class Allocator>
 	inline compressed_storage create_control_block(T* object, Deleter&& deleter, Allocator& allocator);
@@ -1197,8 +1195,8 @@ private:
 	friend class raw_ptr<T>;
 	friend class atomic_shared_ptr<T>;
 
-	template <class T, class Allocator, class ...Args>
-	friend shared_ptr<T> make_shared<T, Allocator>(Allocator&, Args&&...);
+	template <class U, class Allocator, class ...Args>
+	friend shared_ptr<U> make_shared(Allocator&, Args&&...);
 
 	T* myPtr;
 };
@@ -1224,7 +1222,7 @@ inline constexpr shared_ptr<T>::shared_ptr(std::nullptr_t, std::uint8_t version)
 
 }
 template<class T>
-inline shared_ptr<T>::~shared_ptr()
+inline shared_ptr<T>::~shared_ptr() noexcept
 {
 	aspdetail::control_block_base_interface<T>* const cb(this->get_control_block());
 	if (cb) {
@@ -1297,7 +1295,7 @@ inline void shared_ptr<T>::fill_local_refs() noexcept
 	}
 }
 template<class T>
-inline constexpr shared_ptr<T>::shared_ptr(compressed_storage from) noexcept
+inline constexpr shared_ptr<T>::shared_ptr(union aspdetail::compressed_storage from) noexcept
 	: aspdetail::ptr_base<T>(from)
 	, myPtr(this->to_object(from))
 {
@@ -1359,7 +1357,7 @@ inline constexpr T* shared_ptr<T>::get_owned() noexcept
 }
 template <class T>
 template<class Deleter, class Allocator>
-inline typename aspdetail::compressed_storage shared_ptr<T>::create_control_block(T* object, Deleter&& deleter, Allocator& allocator)
+inline union aspdetail::compressed_storage shared_ptr<T>::create_control_block(T* object, Deleter&& deleter, Allocator& allocator)
 {
 	static_assert(!(8 < alignof(Deleter)), "No support for custom aligned deleter objects");
 
@@ -1377,7 +1375,7 @@ inline typename aspdetail::compressed_storage shared_ptr<T>::create_control_bloc
 		block = rebound.allocate(blockSize);
 
 		if ((std::uintptr_t)block % alignof(std::max_align_t) != 0) {
-			throw std::exception("make_shared expects at least alignof(max_align_t) allocates");
+			throw std::runtime_error("make_shared expects at least alignof(max_align_t) allocates");
 		}
 
 		controlBlock = new (block) aspdetail::control_block_claim_custom_delete<T, Allocator, Deleter>(object, allocator, std::forward<Deleter&&>(deleter));
@@ -1394,7 +1392,7 @@ inline typename aspdetail::compressed_storage shared_ptr<T>::create_control_bloc
 }
 template<class T>
 template <class Allocator>
-inline typename aspdetail::compressed_storage shared_ptr<T>::create_control_block(T* object, Allocator& allocator)
+inline union aspdetail::compressed_storage shared_ptr<T>::create_control_block(T* object, Allocator& allocator)
 {
 	using rebound_alloc = typename std::allocator_traits<Allocator>::template rebind_alloc<std::uint8_t>;
 
@@ -1410,7 +1408,7 @@ inline typename aspdetail::compressed_storage shared_ptr<T>::create_control_bloc
 		block = rebound.allocate(blockSize);
 
 		if ((std::uintptr_t)block % alignof(std::max_align_t) != 0) {
-			throw std::exception("make_shared expects at least alignof(max_align_t) allocates");
+			throw std::runtime_error("make_shared expects at least alignof(max_align_t) allocates");
 		}
 
 		controlBlock = new (block) aspdetail::control_block_claim<T, Allocator>(object, rebound);
@@ -1464,7 +1462,7 @@ inline shared_ptr<T>& shared_ptr<T>::operator=(shared_ptr<T>&& other) noexcept
 	std::swap(this->myPtr, other.myPtr);
 	return *this;
 }
-#if _HAS_CXX17
+#if 201700 < __cplusplus || _HAS_CXX17
 template<class T>
 template <class Allocator>
 inline constexpr std::size_t shared_ptr<T>::alloc_size_make_shared() noexcept
@@ -1685,7 +1683,7 @@ inline shared_ptr<T> make_shared(Allocator& allocator, Args&& ...args)
 	}
 	catch (...) {
 		if (controlBlock) {
-			(*controlBlock).~control_block_make_shared<T, Allocator>();
+			(*controlBlock).~control_block_make_shared();
 		}
 		throw;
 		rebound.deallocate(typedBlock, 1);
