@@ -28,6 +28,12 @@
 #include <memory>
 #include <cstddef>
 
+// (not atomic_)shared_ptr uses local refs by default to speed up the copy process,
+// which means if the number of local refs kept is > 1, the copyee must modify local
+// state (not concurrency safe) when stealing refs. Define GDUL_SP_SAFE_COPY to disable this
+// behaviour. The number of local refs may also be adjusted using shared_ptr<T>::set_local_refs(n)
+
+/* #define GDUL_SP_SAFE_COPY */
 
 #undef max
 
@@ -36,12 +42,6 @@
 #pragma warning(disable : 4201)
 // Non-class enums 
 #pragma warning(disable : 26812)
-
-// shared_ptr uses local refs by default to speed up the copy process,
-// which means it cannot be copied in a concurrency safe manner (as it must modify
-// local state). Use this define to disable this behaviour.
-
-/* #define GDUL_ASP_SAFE_SP_COPY */
 
 namespace gdul
 {
@@ -93,6 +93,12 @@ using size_type = std::uint32_t;
 static constexpr std::uint8_t Local_Ref_Index(7);
 static constexpr std::uint64_t Local_Ref_Step(1ULL << (Local_Ref_Index * 8));
 static constexpr std::uint8_t Local_Ref_Fill_Boundary(112);
+static constexpr std::uint8_t Default_Local_Refs =
+#if defined (GDUL_SP_SAFE_COPY) 
+1;
+#else 
+std::numeric_limits<std::uint8_t>::max();
+#endif
 
 enum STORAGE_BYTE : std::uint8_t
 {
@@ -353,7 +359,8 @@ template<class T>
 template<class PtrType>
 inline bool atomic_shared_ptr<T>::compare_exchange_strong(typename aspdetail::disable_deduction<PtrType>::type& expected, shared_ptr<T>&& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept
 {
-	desired.set_local_refs();
+	if (desired.get_local_refs() < aspdetail::Local_Ref_Fill_Boundary)
+		desired.set_local_refs(std::numeric_limits<std::uint8_t>::max());
 
 	const compressed_storage desired_(desired.myControlBlockStorage.myU64);
 
@@ -387,7 +394,8 @@ template<class T>
 template<class PtrType>
 inline bool atomic_shared_ptr<T>::compare_exchange_weak(typename aspdetail::disable_deduction<PtrType>::type& expected, shared_ptr<T>&& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept
 {
-	desired.set_local_refs();
+	if (desired.get_local_refs() < aspdetail::Local_Ref_Fill_Boundary)
+		desired.set_local_refs();
 
 	const compressed_storage desired_(desired.myControlBlockStorage.myU64);
 	compressed_storage expected_(myStorage.load(std::memory_order_relaxed));
@@ -446,7 +454,9 @@ inline void atomic_shared_ptr<T>::store(const shared_ptr<T>& from, std::memory_o
 template<class T>
 inline void atomic_shared_ptr<T>::store(shared_ptr<T>&& from, std::memory_order order) noexcept
 {
-	from.set_local_refs();
+	if (from.get_local_refs() < aspdetail::Local_Ref_Fill_Boundary)
+		from.set_local_refs(std::numeric_limits<std::uint8_t>::max());
+
 	store_internal(from.myControlBlockStorage.myU64, order);
 	from.reset();
 }
@@ -458,7 +468,9 @@ inline shared_ptr<T> atomic_shared_ptr<T>::exchange(const shared_ptr<T>& with, s
 template<class T>
 inline shared_ptr<T> atomic_shared_ptr<T>::exchange(shared_ptr<T>&& with, std::memory_order order) noexcept
 {
-	with.set_local_refs();
+	if (with.get_local_refs() < aspdetail::Local_Ref_Fill_Boundary)
+		with.set_local_refs(std::numeric_limits<std::uint8_t>::max());
+
 	compressed_storage previous(exchange_internal(with.myControlBlockStorage, aspdetail::CAS_FLAG_STEAL_PREVIOUS, order));
 	with.reset();
 	return shared_ptr<T>(previous);
@@ -787,7 +799,7 @@ protected:
 
 template<class T, class Allocator>
 inline control_block_base_members<T, Allocator>::control_block_base_members(T* object, Allocator& allocator, std::uint8_t blockOffset)
-	: myUseCount(std::numeric_limits<std::uint8_t>::max())
+	: myUseCount(Default_Local_Refs)
 	, myPtr(object)
 	, myAllocator(allocator)
 	, myBlockOffset(blockOffset)
@@ -1180,8 +1192,10 @@ public:
 	// Adjusts the amount of local refs kept for fast copies. Setting this to 1
 	// means a copy operation will not attempt to modify local state, and thus is
 	// concurrency safe. Use of local refs may be completely disabled via define 
-	// GDUL_ASP_SAFE_SP_COPY
-	inline void set_local_refs(std::uint8_t target = std::numeric_limits<std::uint8_t>::max()) noexcept;
+	// GDUL_SP_SAFE_COPY
+	inline void set_local_refs(std::uint8_t target) noexcept;
+
+	inline constexpr std::uint8_t get_local_refs() const noexcept;
 private:
 
 	constexpr void reset() noexcept;
@@ -1287,13 +1301,9 @@ inline constexpr void shared_ptr<T>::reset() noexcept
 template<class T>
 inline void shared_ptr<T>::set_local_refs(std::uint8_t target) noexcept
 {
-#ifdef GDUL_ASP_SAFE_SP_COPY
-	(void)target;
-#else
-	aspdetail::control_block_base_interface<T>* const cb(this->get_control_block());
-	const uint8_t localRefs(this->myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF]);
+	if (aspdetail::control_block_base_interface<T>* const cb = this->get_control_block()) {
+		const uint8_t localRefs(this->myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF]);
 
-	if (cb) {
 		if (localRefs < target) {
 			cb->incref(target - localRefs);
 		}
@@ -1304,7 +1314,11 @@ inline void shared_ptr<T>::set_local_refs(std::uint8_t target) noexcept
 		this->myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] = target;
 		myPtr = (T*)((uint64_t)myPtr * (bool)target);
 	}
-#endif
+}
+template <class T>
+inline constexpr std::uint8_t shared_ptr<T>::get_local_refs() const noexcept
+{
+	return this->myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF];
 }
 template<class T>
 inline constexpr shared_ptr<T>::shared_ptr(union aspdetail::compressed_storage from) noexcept
@@ -1398,7 +1412,7 @@ inline union aspdetail::compressed_storage shared_ptr<T>::create_control_block(T
 		throw;
 	}
 	compressed_storage storage(reinterpret_cast<std::uint64_t>(controlBlock));
-	storage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] = std::numeric_limits<std::uint8_t>::max();
+	storage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] = aspdetail::Default_Local_Refs;
 
 	return storage;
 }
@@ -1432,7 +1446,7 @@ inline union aspdetail::compressed_storage shared_ptr<T>::create_control_block(T
 	}
 
 	compressed_storage storage(reinterpret_cast<std::uint64_t>(controlBlock));
-	storage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] = std::numeric_limits<std::uint8_t>::max();
+	storage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] = aspdetail::Default_Local_Refs;
 
 	return storage;
 }
@@ -1443,17 +1457,16 @@ inline shared_ptr<T>& shared_ptr<T>::operator=(const shared_ptr<T>& other) noexc
 	copy.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] = 0;
 
 	if (aspdetail::control_block_base_interface<T>* const copyCb = this->to_control_block(copy)) {
-#ifndef GDUL_ASP_SAFE_SP_COPY
+#ifndef GDUL_SP_SAFE_COPY
 		copy.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] = copy.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] / 2;
-		if (copy.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF])
-#endif
-		{
+		if (copy.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF]) {
 			other.myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] -= copy.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF];
 		}
-#ifndef GDUL_ASP_SAFE_SP_COPY
 		else {
-			copy.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] = std::numeric_limits<std::uint8_t>::max();
+#endif
+			copy.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] = aspdetail::Default_Local_Refs;
 			copyCb->incref(copy.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF]);
+#ifndef GDUL_SP_SAFE_COPY
 		}
 #endif
 	}
@@ -1702,7 +1715,7 @@ inline shared_ptr<T> make_shared(Allocator& allocator, Args&& ...args)
 	}
 
 	aspdetail::compressed_storage storage(reinterpret_cast<std::uint64_t>(controlBlock));
-	storage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] = std::numeric_limits<std::uint8_t>::max();
+	storage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] = aspdetail::Default_Local_Refs;
 
 	return shared_ptr<T>(storage);
 }
