@@ -119,7 +119,7 @@ bool worker_impl::is_sleepy() const
 }
 bool worker_impl::is_active() const
 {
-	return myIsActive.load(std::memory_order_relaxed) & myIsEnabled.load(std::memory_order_relaxed);
+	return myIsActive.load(std::memory_order_relaxed);
 }
 bool worker_impl::is_enabled() const
 {

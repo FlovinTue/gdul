@@ -65,7 +65,7 @@
 				<Loop>
 					<Exec>sizeAccumulator += ((uint64_t)pBuffer->_myPostWriteIterator - (uint64_t)pBuffer->_myReadSlot)</Exec>
 					<Break Condition="((pBuffer->myNext.myDebugView.myU64 &amp; aspdetail::Ptr_Mask) == 0)" />
-					<Exec>pBuffer = (pBuffer->myNext.myDebugView.myU64 &amp; aspdetail::Ptr_Mask)</Exec>
+					<Exec>pBuffer = *(buffer_type**)(8 + (pBuffer->myNext.myDebugView.myU64 &amp; aspdetail::Ptr_Mask))</Exec>
 				</Loop>
 
 				<Item Name="[size]">sizeAccumulator</Item>
@@ -75,7 +75,7 @@
 				<Loop>
 					<If Condition="itemCount == ((uint64_t)pBuffer->_myPostWriteIterator - (uint64_t)pBuffer->_myReadSlot)">
 						<Break Condition="((pBuffer->myNext.myDebugView.myU64 &amp; aspdetail::Ptr_Mask) == 0)" />
-						<Exec>pBuffer = (pBuffer->myNext.myDebugView.myU64 &amp; aspdetail::Ptr_Mask)</Exec>
+						<Exec>pBuffer = *(buffer_type**)(8 + (pBuffer->myNext.myDebugView.myU64 &amp; aspdetail::Ptr_Mask))</Exec>
 						<Exec>pItem = pBuffer->myDataBlock + ((uint64_t)pBuffer->_myReadSlot - (((uint64_t)pBuffer->_myReadSlot / pBuffer->myCapacity) * pBuffer->myCapacity))</Exec>
 						<Exec>itemCount = 0</Exec>
 					</If>

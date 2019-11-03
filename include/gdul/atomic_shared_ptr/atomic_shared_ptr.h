@@ -172,7 +172,7 @@ public:
 	// compare_exchange_weak may fail if another thread loads this value while attempting swap
 	inline bool compare_exchange_weak(shared_ptr<T>& expected, shared_ptr<T>&& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept;
 
-	inline shared_ptr<T> load(std::memory_order order = std::memory_order_seq_cst) noexcept;
+	inline shared_ptr<T> load(std::memory_order order = std::memory_order_seq_cst) const noexcept;
 
 	inline void store(const shared_ptr<T>& from, std::memory_order order = std::memory_order_seq_cst) noexcept;
 	inline void store(shared_ptr<T>&& from, std::memory_order order = std::memory_order_seq_cst) noexcept;
@@ -182,7 +182,7 @@ public:
 
 	inline std::uint8_t get_version() const noexcept;
 
-	inline shared_ptr<T> unsafe_load(std::memory_order order = std::memory_order_seq_cst);
+	inline shared_ptr<T> unsafe_load(std::memory_order order = std::memory_order_seq_cst) const;
 
 	inline shared_ptr<T> unsafe_exchange(const shared_ptr<T>& with, std::memory_order order = std::memory_order_seq_cst);
 	inline shared_ptr<T> unsafe_exchange(shared_ptr<T>&& with, std::memory_order order = std::memory_order_seq_cst);
@@ -199,7 +199,7 @@ public:
 	// cheap hint comparison to ptr_base derivatives
 	bool operator!=(const aspdetail::ptr_base<T>& other) const noexcept;
 
-	raw_ptr<T> unsafe_get_raw_ptr() const;
+	raw_ptr<T> get_raw_ptr() const noexcept;
 
 	T* unsafe_get_owned();
 	const T* unsafe_get_owned() const;
@@ -216,8 +216,8 @@ private:
 
 	using compressed_storage = aspdetail::compressed_storage;
 
-	inline compressed_storage unsafe_copy_internal(std::memory_order order);
-	inline compressed_storage copy_internal(std::memory_order order) noexcept;
+	inline compressed_storage unsafe_copy_internal(std::memory_order order) const;
+	inline compressed_storage copy_internal(std::memory_order order) const noexcept;
 
 	inline void unsafe_store_internal(compressed_storage from, std::memory_order order);
 	inline void store_internal(compressed_storage from, std::memory_order order) noexcept;
@@ -227,8 +227,8 @@ private:
 
 	inline bool compare_exchange_weak_internal(compressed_storage& expected, compressed_storage desired, aspdetail::CAS_FLAG flags, aspdetail::memory_orders orders) noexcept;
 
-	inline void unsafe_fill_local_refs();
-	inline void try_fill_local_refs(compressed_storage& expected) noexcept;
+	inline void unsafe_fill_local_refs() const noexcept;
+	inline void try_fill_local_refs(compressed_storage& expected) const noexcept;
 
 	inline constexpr aspdetail::control_block_base_interface<T>* to_control_block(compressed_storage from) const noexcept;
 
@@ -238,7 +238,8 @@ private:
 
 	union
 	{
-		std::atomic<std::uint64_t> myStorage;
+		// mutable for altering local refs
+		mutable std::atomic<std::uint64_t> myStorage;
 		const compressed_storage myDebugView;
 	};
 };
@@ -442,7 +443,7 @@ inline atomic_shared_ptr<T>& atomic_shared_ptr<T>::operator=(shared_ptr<T>&& fro
 	return *this;
 }
 template<class T>
-inline shared_ptr<T> atomic_shared_ptr<T>::load(std::memory_order order) noexcept
+inline shared_ptr<T> atomic_shared_ptr<T>::load(std::memory_order order) const noexcept
 {
 	return shared_ptr<T>(copy_internal(order));
 }
@@ -482,7 +483,7 @@ inline std::uint8_t atomic_shared_ptr<T>::get_version() const noexcept
 	return storage.myU8[aspdetail::STORAGE_BYTE_VERSION];
 }
 template<class T>
-inline shared_ptr<T> atomic_shared_ptr<T>::unsafe_load(std::memory_order order)
+inline shared_ptr<T> atomic_shared_ptr<T>::unsafe_load(std::memory_order order) const
 {
 	return shared_ptr<T>(unsafe_copy_internal(order));
 }
@@ -510,9 +511,9 @@ inline void atomic_shared_ptr<T>::unsafe_store(shared_ptr<T>&& from, std::memory
 	from.reset();
 }
 template<class T>
-inline raw_ptr<T> atomic_shared_ptr<T>::unsafe_get_raw_ptr() const
+inline raw_ptr<T> atomic_shared_ptr<T>::get_raw_ptr() const noexcept
 {
-	compressed_storage storage(myStorage.load(std::memory_order_relaxed));
+	const compressed_storage storage(myStorage.load(std::memory_order_relaxed));
 	return raw_ptr<T>(storage);
 }
 template<class T>
@@ -629,7 +630,7 @@ inline bool atomic_shared_ptr<T>::compare_exchange_weak_internal(compressed_stor
 	return result;
 }
 template<class T>
-inline void atomic_shared_ptr<T>::try_fill_local_refs(compressed_storage& expected) noexcept
+inline void atomic_shared_ptr<T>::try_fill_local_refs(compressed_storage& expected) const noexcept
 {
 	if (!(expected.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] < aspdetail::Local_Ref_Fill_Boundary)) {
 		return;
@@ -664,7 +665,7 @@ inline void atomic_shared_ptr<T>::try_fill_local_refs(compressed_storage& expect
 		expected.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] < aspdetail::Local_Ref_Fill_Boundary);
 }
 template <class T>
-inline union aspdetail::compressed_storage atomic_shared_ptr<T>::copy_internal(std::memory_order order) noexcept
+inline union aspdetail::compressed_storage atomic_shared_ptr<T>::copy_internal(std::memory_order order) const noexcept
 {
 	compressed_storage initial(myStorage.fetch_sub(aspdetail::Local_Ref_Step, std::memory_order_relaxed));
 	initial.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] -= 1;
@@ -677,7 +678,7 @@ inline union aspdetail::compressed_storage atomic_shared_ptr<T>::copy_internal(s
 	return initial;
 }
 template <class T>
-inline union aspdetail::compressed_storage atomic_shared_ptr<T>::unsafe_copy_internal(std::memory_order order)
+inline union aspdetail::compressed_storage atomic_shared_ptr<T>::unsafe_copy_internal(std::memory_order order) const
 {
 	compressed_storage storage(myStorage.load(std::memory_order_relaxed));
 
@@ -728,7 +729,7 @@ inline void atomic_shared_ptr<T>::unsafe_store_internal(compressed_storage from,
 	std::atomic_thread_fence(order);
 }
 template<class T>
-inline void atomic_shared_ptr<T>::unsafe_fill_local_refs()
+inline void atomic_shared_ptr<T>::unsafe_fill_local_refs() const noexcept
 {
 	const compressed_storage current(myStorage.load(std::memory_order_relaxed));
 	aspdetail::control_block_base_interface<T>* const cb(to_control_block(current));
@@ -1454,7 +1455,6 @@ template<class T>
 inline shared_ptr<T>& shared_ptr<T>::operator=(const shared_ptr<T>& other) noexcept
 {
 	compressed_storage copy(other.myControlBlockStorage);
-	copy.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] = 0;
 
 	if (aspdetail::control_block_base_interface<T>* const copyCb = this->to_control_block(copy)) {
 #ifndef GDUL_SP_SAFE_COPY

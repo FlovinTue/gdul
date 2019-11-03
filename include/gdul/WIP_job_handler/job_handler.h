@@ -71,6 +71,8 @@ public:
 	template <class Callable>
 	job make_job(Callable&& callable);
 
+
+	std::size_t num_enqueued() const;
 private:
 	static thread_local job_handler_detail::worker_impl* this_worker_impl;
 	static thread_local job_handler_detail::worker_impl ourImplicitWorker;
@@ -95,7 +97,7 @@ private:
 
 	concurrent_queue<job_impl_shared_ptr, allocator_type> myJobQueues[job_handler_detail::Priority_Granularity];
 	
-	job_handler_detail::job_impl_allocator<std::uint8_t> myJobImplAllocator;
+	job_handler_detail::job_impl_allocator<job_handler_detail::job_impl_chunk_rep> myJobImplAllocator;
 
 	std::array<job_handler_detail::worker_impl, job_handler_detail::Job_Handler_Max_Workers> myWorkers;
 

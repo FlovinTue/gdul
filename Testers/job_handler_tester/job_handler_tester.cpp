@@ -1,5 +1,7 @@
 #include "job_handler_tester.h"
 #include <string>
+#include <iostream>
+#include <algorithm>
 
 namespace gdul
 {
@@ -59,27 +61,34 @@ void job_handler_tester::setup_workers()
 float job_handler_tester::run_consumption_parallel_test(std::size_t numInserts, void(*workfunc)(void))
 {
 	job root(myHandler.make_job(workfunc, 0));	
-	job next(myHandler.make_job(workfunc, 0));
-	next.add_dependency(root);
-	next.enable();
+	job next[8]{};
+	next[0] = myHandler.make_job(workfunc, 0);
+
+	next[0].add_dependency(root);
+	next[0].enable();
+
+	std::uint8_t nextNum(1);
 
 	for (std::size_t i = 0; i < numInserts; ++i) {
 
 		uint8_t children(rand() % 8);
+		job intermediate[8]{};
 		for (std::uint8_t j = 0; j < children; ++j, ++i) {
-			job sibling(myHandler.make_job(workfunc, (j + i) % job_handler_detail::Priority_Granularity));
-			sibling.add_dependency(next);
-			sibling.enable();
+			intermediate[j] = myHandler.make_job(workfunc, (j + i) % job_handler_detail::Priority_Granularity);
+			
+			for (std::uint8_t dependencies = 0; dependencies < nextNum; ++dependencies) {
+				intermediate[j].add_dependency(next[dependencies]);
+			}
+			intermediate[j].enable();
 		}
 
-		job intermediate(std::move(next));
-		next = myHandler.make_job(workfunc, i % job_handler_detail::Priority_Granularity);
-		next.add_dependency(intermediate);
-		next.enable();
+		for (std::uint8_t j = 0; j < children; ++j) {
+			next[j] = std::move(intermediate[j]);
+		}
+		nextNum = children;
 	}
 
-	job end(myHandler.make_job(workfunc));
-	end.add_dependency(next);
+	job end(myHandler.make_job([this]() {std::cout << "Finished run_consumption_parallel_test. Numer of enqueued jobs: " << myHandler.num_enqueued() << std::endl; }));
 	end.enable();
 
 	timer<float> timer;

@@ -65,6 +65,17 @@ worker job_handler::make_worker()
 	return worker(&myWorkers[index]);
 }
 
+std::size_t job_handler::num_enqueued() const
+{
+	std::size_t accum(0);
+
+	for (std::uint8_t i = 0; i < job_handler_detail::Priority_Granularity; ++i) {
+		accum += myJobQueues[i].size();
+	}
+
+	return accum;
+}
+
 void job_handler::enqueue_job(job_impl_shared_ptr job)
 {
 	const std::uint8_t priority(job->get_priority());

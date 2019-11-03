@@ -3,7 +3,6 @@
 
 #include "job_handler_tester.h"
 #include <iostream>
-
 namespace gdul
 {
 thread_local double testSum = static_cast<double>(rand() % 100);
@@ -29,8 +28,8 @@ int main()
 
 	tester.init(info);
 
-	for (uint32_t i = 0; i < 500; ++i) {
-		tester.run_consumption_parallel_test(5000, workFunc);
+	for (uint32_t i = 0; i < 50; ++i) {
+		tester.run_consumption_parallel_test(500, workFunc);
 	}
 
 	std::cout << "Hello World!\n";

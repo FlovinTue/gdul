@@ -68,7 +68,7 @@ public:
 private:
 	void set_sibling(job_impl_shared_ptr sibling);
 
-	void enqueue_children();
+	void detach_children();
 
 	union
 	{
@@ -148,7 +148,7 @@ struct alignas(log2align(Callable_Max_Size_No_Heap_Alloc)) job_impl_chunk_rep
 	{
 		return reinterpret_cast<uint8_t*>(this);
 	}
-	uint8_t dummy[shared_ptr<gdul::job_handler_detail::job_impl>::alloc_size_make_shared<allocator_type>()];
+	uint8_t dummy[shared_ptr<gdul::job_handler_detail::job_impl>::alloc_size_make_shared<job_impl_allocator<job_handler_detail::job_impl_chunk_rep>>()];
 };
 }
 }

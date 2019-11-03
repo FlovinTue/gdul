@@ -49,10 +49,13 @@ private:
 
 	struct block_node
 	{
-		Object* myBlock;
+		std::uint8_t* myBlock;
+		Object* myObjects;
+		std::size_t myByteSize;
 		std::atomic<block_node*> myPrevious;
 	};
 
+	using object_allocator = typename std::allocator_traits<Allocator>::template rebind_alloc<uint8_t>;
 	using node_allocator = typename std::allocator_traits<Allocator>::template rebind_alloc<block_node>;
 
 	Allocator myAllocator;
@@ -106,7 +109,7 @@ inline void concurrent_object_pool<Object, Allocator>::recycle_object(Object * o
 template<class Object, class Allocator>
 inline std::size_t concurrent_object_pool<Object, Allocator>::avaliable()
 {
-	return static_cast<std::uint32_t>(myUnusedObjects.size());
+	return myUnusedObjects.size();
 }
 template<class Object, class Allocator>
 inline void concurrent_object_pool<Object, Allocator>::unsafe_destroy()
@@ -116,9 +119,9 @@ inline void concurrent_object_pool<Object, Allocator>::unsafe_destroy()
 		block_node* const previous(blockNode->myPrevious);
 
 		for (std::size_t i = 0; i < myBlockSize; ++i) {
-			blockNode->myBlock->~Object();
+			blockNode->myObjects[i].~Object();
 		}
-		myAllocator.deallocate(reinterpret_cast<std::uint8_t*>(blockNode->myBlock), myBlockSize * sizeof(Object));
+		myAllocator.deallocate(blockNode->myBlock, blockNode->myByteSize);
 
 		blockNode->~block_node();
 		myNodeAllocator.deallocate(blockNode, 1);
@@ -138,22 +141,33 @@ inline void concurrent_object_pool<Object, Allocator>::try_alloc_block()
 		return;
 	}
 
-	Object* const block(reinterpret_cast<Object*>(myAllocator.allocate(myBlockSize * sizeof(Object))));
+	const std::size_t allocSize(myBlockSize * sizeof(Object));
+	const std::size_t align(alignof(Object));
+	const std::size_t alignComp(!(8 < align) ? 0 : align);
+	const std::size_t totalAllocSize(allocSize + alignComp);
+
+	uint8_t* const block(myAllocator.allocate(totalAllocSize));
+
+	const std::size_t alignMod((uint64_t)block % align);
+	uint8_t* const objectBegin(block + (alignMod ? align - alignMod : 0));
+	Object* const objects((Object*)objectBegin);
 
 	for (std::size_t i = 0; i < myBlockSize; ++i) {
-		new (&block[i]) (Object);
+		new (&objects[i]) (Object);
 	}
 
-	block_node* const desired(reinterpret_cast<block_node*>(myNodeAllocator.allocate(1)));
+	block_node* const desired(myNodeAllocator.allocate(1));
 	new (desired)(block_node);
 	desired->myPrevious = expected;
 	desired->myBlock = block;
+	desired->myByteSize = totalAllocSize;
+	desired->myObjects = objects;
 
 	if (!myLastBlock.compare_exchange_strong(expected, desired)) {
 		for (std::size_t i = 0; i < myBlockSize; ++i) {
-			block->~Object();
+			objects[i].~Object();
 		}
-		myAllocator.deallocate(reinterpret_cast<std::uint8_t*>(block), myBlockSize * sizeof(Object));
+		myAllocator.deallocate(block, totalAllocSize);
 
 		desired->~block_node();
 		myNodeAllocator.deallocate(desired, 1);
@@ -162,7 +176,7 @@ inline void concurrent_object_pool<Object, Allocator>::try_alloc_block()
 	}
 
 	for (std::size_t i = 0; i < myBlockSize; ++i) {
-		myUnusedObjects.push(&block[i]);
+		myUnusedObjects.push(&objects[i]);
 	}
 }
 }

@@ -49,13 +49,12 @@ public:
 
 	bool is_finished() const;
 
-
 	void wait_for_finish();
+
+	operator bool() const noexcept;
 
 private:
 	friend class job_handler;
-
-	operator bool() const;
 
 	job(job_impl_shared_ptr impl);
 

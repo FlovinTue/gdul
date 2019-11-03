@@ -46,7 +46,7 @@ void job_impl::operator()()
 
 	myFinished.store(true, std::memory_order_seq_cst);
 
-	enqueue_children();
+	detach_children();
 }
 bool job_impl::try_attach_child(job_impl_shared_ptr child)
 {
@@ -96,7 +96,7 @@ void job_impl::set_sibling(job_impl_shared_ptr sibling)
 {
 	myFirstSibling.unsafe_store(std::move(sibling));
 }
-void job_impl::enqueue_children()
+void job_impl::detach_children()
 {
 	job_impl_shared_ptr child(myFirstChild.exchange(nullptr, std::memory_order_relaxed));
 

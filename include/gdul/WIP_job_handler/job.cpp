@@ -75,13 +75,13 @@ void job::wait_for_finish()
 		job_handler::this_worker_impl->idle();
 	}
 }
-job::operator bool() const
-{
-	return myImpl;
-}
 job::job(job_impl_shared_ptr impl)
 	: myImpl(std::move(impl))
 	, myEnabled(false)
 {
+}
+job::operator bool() const noexcept 
+{
+	return myImpl;
 }
 }

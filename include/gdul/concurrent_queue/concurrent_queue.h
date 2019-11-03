@@ -184,10 +184,10 @@ public:
 	inline void reserve(size_type capacity);
 
 	// size hint
-	inline size_type size();
+	inline size_type size() const;
 
 	// fast unsafe size hint
-	inline size_type unsafe_size();
+	inline size_type unsafe_size() const;
 
 	// logically remove entries
 	void unsafe_clear();
@@ -406,7 +406,7 @@ inline void concurrent_queue<T, Allocator>::unsafe_reset()
 	std::atomic_thread_fence(std::memory_order_release);
 }
 template<class T, class Allocator>
-inline typename concurrent_queue<T, Allocator>::size_type concurrent_queue<T, Allocator>::size()
+inline typename concurrent_queue<T, Allocator>::size_type concurrent_queue<T, Allocator>::size() const
 {
 	const std::uint16_t producerCount(myProducerCount.load(std::memory_order_acquire));
 
@@ -414,13 +414,13 @@ inline typename concurrent_queue<T, Allocator>::size_type concurrent_queue<T, Al
 
 	size_type accumulatedSize(0);
 	for (std::uint16_t i = 0; i < producerCount; ++i) {
-		shared_ptr_slot_type slot(producerArray[i].load(std::memory_order_relaxed));
+		const shared_ptr_slot_type slot(producerArray[i].load(std::memory_order_relaxed));
 		accumulatedSize += slot->size();
 	}
 	return accumulatedSize;
 }
 template<class T, class Allocator>
-inline typename concurrent_queue<T, Allocator>::size_type concurrent_queue<T, Allocator>::unsafe_size()
+inline typename concurrent_queue<T, Allocator>::size_type concurrent_queue<T, Allocator>::unsafe_size() const
 {
 	const std::uint16_t producerCount(myProducerCount.load(std::memory_order_acquire));
 
@@ -428,7 +428,7 @@ inline typename concurrent_queue<T, Allocator>::size_type concurrent_queue<T, Al
 
 	size_type accumulatedSize(0);
 	for (std::uint16_t i = 0; i < producerCount; ++i) {
-		buffer_type* const slot(producerArray[i].unsafe_get_owned());
+		const buffer_type* const slot(producerArray[i].unsafe_get_owned());
 		accumulatedSize += slot->size();
 	}
 	return accumulatedSize;
@@ -771,7 +771,7 @@ inline typename concurrent_queue<T, Allocator>::shared_ptr_slot_type& concurrent
 		}
 		// Make sure to propagate instances of our allocator everywhere
 		else {
-			ourProducers = decltype(ourProducers)(myInitBufferCapacity + 1, ourDummyContainer.myDummyBuffer, myAllocator);
+			ourProducers = decltype(ourProducers)(myInstanceIndex + 1, ourDummyContainer.myDummyBuffer, myAllocator);
 		}
 	}
 	return ourProducers[myInstanceIndex];
@@ -837,6 +837,7 @@ private:
 public:
 	typedef typename concurrent_queue<T, Allocator>::size_type size_type;
 	typedef typename concurrent_queue<T, Allocator>::allocator_type allocator_type;
+	typedef producer_buffer<T, Allocator> buffer_type;
 
 	producer_buffer(size_type capacity, item_container<T>* dataBlock);
 	~producer_buffer();
@@ -1090,11 +1091,9 @@ template<class T, class Allocator>
 inline void producer_buffer<T, Allocator>::push_front(shared_ptr_slot_type newBuffer)
 {
 	producer_buffer<T, allocator_type>* last(this);
-	raw_ptr<typename shared_ptr_slot_type::value_type> verLast(nullptr);
 
 	while (last->myNext) {
-		verLast = last->myNext.unsafe_get_raw_ptr();
-		last = verLast.get_owned();
+		last = last->myNext.unsafe_get_owned();
 	}
 
 	last->myNext.store(std::move(newBuffer), std::memory_order_seq_cst);
