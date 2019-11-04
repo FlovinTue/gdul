@@ -68,17 +68,17 @@ int main()
 		atomic_shared_ptr<int> aeleventhweak(make_shared<int>(11));
 		raw_ptr<int> aeleventhexpweak(aeleventhweak.get_raw_ptr());
 		shared_ptr<int> aeleventhdesweak(make_shared<int>(1111));
-		const bool eleweakres = aeleventhweak.compare_exchange_strong(aeleventhexpweak, aeleventhdesweak);
+		const bool eleweakres = aeleventhweak.compare_exchange_weak(aeleventhexpweak, aeleventhdesweak);
 
 		atomic_shared_ptr<int> atwelfthweak(make_shared<int>(12));
 		shared_ptr<int> atwelfthexpweak(make_shared<int>(121));
 		shared_ptr<int> atwelfthdesweak(make_shared<int>(1212));
-		const bool twelweakres = atwelfthweak.compare_exchange_strong(atwelfthexpweak, atwelfthdesweak);
+		const bool twelweakres = atwelfthweak.compare_exchange_weak(atwelfthexpweak, atwelfthdesweak);
 
 		atomic_shared_ptr<int> athirteenthweak(make_shared<int>(13));
 		raw_ptr<int> athirteenthexpweak(nullptr);
 		shared_ptr<int> athirteenthdesweak(make_shared<int>(131));
-		const bool thirtweakres = athirteenthweak.compare_exchange_strong(athirteenthexpweak, athirteenthdesweak);
+		const bool thirtweakres = athirteenthweak.compare_exchange_weak(athirteenthexpweak, athirteenthdesweak);
 
 		athirteenth.get_raw_ptr();
 		athirteenthdes.get_raw_ptr();
