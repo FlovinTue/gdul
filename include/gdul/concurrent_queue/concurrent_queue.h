@@ -25,13 +25,14 @@
 #include <cassert>
 #include <cmath>
 #include <atomic>
+#include <stdexcept>
 #include <gdul\atomic_shared_ptr\atomic_shared_ptr.h>
 
 // Exception handling may be enabled for basic exception safety at the cost of 
 // a slight performance decrease
 
 
-  #define GDUL_CQ_ENABLE_EXCEPTIONHANDLING 
+/* #define GDUL_CQ_ENABLE_EXCEPTIONHANDLING */
 
 // In the event an exception is thrown during a pop operation, some entries may
 // be dequeued out-of-order as some consumers may already be halfway through a 
@@ -1515,16 +1516,19 @@ public:
 	shared_ptr_allocator_adaptor(const shared_ptr_allocator_adaptor<U, Allocator>& other)
 		: myAddress(other.myAddress)
 		, mySize(other.mySize)
-	{};
+	{
+	};
 
 	shared_ptr_allocator_adaptor()
 		: myAddress(nullptr)
 		, mySize(0)
-	{};
+	{
+	};
 	shared_ptr_allocator_adaptor(T* retAddr, std::size_t size)
 		: myAddress(retAddr)
 		, mySize(size)
-	{};
+	{
+	};
 
 	T* allocate(std::size_t count)
 	{
@@ -1741,10 +1745,7 @@ inline shared_ptr<typename index_pool<IndexType, Allocator>::node> index_pool<In
 			return top;
 		}
 	}
-
-	assert(false && "Pre allocated entries should be 1:1 to fetched indices");
-
-	return nullptr;
+	throw std::runtime_error("Pre allocated entries should be 1:1 to fetched indices");
 }
 }
 template <class T, class Allocator>
