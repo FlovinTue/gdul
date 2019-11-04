@@ -95,6 +95,8 @@ int main()
 
 		shared_ptr<int> sixteenth(new int, alloc);
 
+		shared_ptr<int> seventeenth(make_shared<int, std::allocator<int>>(17));
+
 		struct alignas(64) over_aligned {
 		};
 

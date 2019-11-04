@@ -1074,22 +1074,22 @@ inline typename ptr_base<T>::size_type ptr_base<T>::use_count() const noexcept
 }
 
 template <class T>
-inline constexpr bool operator==(std::nullptr_t /*aNullptr*/, const ptr_base<T>& ptr) noexcept
+inline constexpr bool operator==(std::nullptr_t /*null*/, const ptr_base<T>& ptr) noexcept
 {
 	return !ptr;
 }
 template <class T>
-inline constexpr bool operator!=(std::nullptr_t /*aNullptr*/, const ptr_base<T>& ptr) noexcept
+inline constexpr bool operator!=(std::nullptr_t /*null*/, const ptr_base<T>& ptr) noexcept
 {
 	return ptr;
 }
 template <class T>
-inline constexpr bool operator==(const ptr_base<T>& ptr, std::nullptr_t /*aNullptr*/) noexcept
+inline constexpr bool operator==(const ptr_base<T>& ptr, std::nullptr_t /*null*/) noexcept
 {
 	return !ptr;
 }
 template <class T>
-inline constexpr bool operator!=(const ptr_base<T>& ptr, std::nullptr_t /*aNullptr*/) noexcept
+inline constexpr bool operator!=(const ptr_base<T>& ptr, std::nullptr_t /*null*/) noexcept
 {
 	return ptr;
 }
@@ -1161,20 +1161,20 @@ public:
 
 	~shared_ptr() noexcept;
 
-	inline constexpr explicit operator T* () noexcept; // redefine
-	inline constexpr explicit operator const T* () const noexcept; // redefine
+	inline constexpr explicit operator T* () noexcept; 
+	inline constexpr explicit operator const T* () const noexcept; 
 
-	inline constexpr const T* get_owned() const noexcept; // redefine
-	inline constexpr T* get_owned() noexcept; // redefine
+	inline constexpr const T* get_owned() const noexcept; 
+	inline constexpr T* get_owned() noexcept; 
 
-	inline constexpr T* operator->(); // redefine
-	inline constexpr T& operator*(); // redefine
+	inline constexpr T* operator->();
+	inline constexpr T& operator*();
 
-	inline constexpr const T* operator->() const; // redefine
-	inline constexpr const T& operator*() const; // redefine
+	inline constexpr const T* operator->() const;
+	inline constexpr const T& operator*() const; 
 
-	inline const T& operator[](aspdetail::size_type index) const; // redefine
-	inline T& operator[](aspdetail::size_type index); // redefine
+	inline const T& operator[](aspdetail::size_type index) const; 
+	inline T& operator[](aspdetail::size_type index); 
 
 	inline constexpr raw_ptr<T> get_raw_ptr() const noexcept;
 
@@ -1601,7 +1601,6 @@ template<class T>
 inline constexpr raw_ptr<T>& raw_ptr<T>::operator=(const raw_ptr<T>& other)  noexcept
 {
 	this->myControlBlockStorage = other.myControlBlockStorage;
-	this->myPtr = other.myPtr;
 
 	return *this;
 }
@@ -1682,7 +1681,7 @@ template<class T, class ...Args>
 inline shared_ptr<T> make_shared(Args&& ...args)
 {
 	aspdetail::default_allocator alloc;
-	return make_shared<T>(alloc, std::forward<Args&&>(args)...);
+	return make_shared<T, aspdetail::default_allocator>(alloc, std::forward<Args&&>(args)...);
 }
 template<class T, class Allocator, class ...Args>
 inline shared_ptr<T> make_shared(Args&& ...args)
