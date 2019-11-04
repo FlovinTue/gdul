@@ -1198,8 +1198,8 @@ public:
 
 	// Adjusts the amount of local refs kept for fast copies. Setting this to 1
 	// means a copy operation will not attempt to modify local state, and thus is
-	// concurrency safe. Use of local refs may be completely disabled via define 
-	// GDUL_SP_SAFE_COPY
+	// concurrency safe(so long as the object remains unaltered). 
+	// Use of local refs may be completely disabled via define GDUL_SP_SAFE_COPY
 	inline void set_local_refs(std::uint8_t target) noexcept;
 
 	inline constexpr std::uint8_t get_local_refs() const noexcept;
@@ -1319,6 +1319,7 @@ inline void shared_ptr<T>::set_local_refs(std::uint8_t target) noexcept
 		}
 
 		this->myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] = target;
+		this->myControlBlockStorage.myU64 *= (bool)target;
 		myPtr = (T*)((uint64_t)myPtr * (bool)target);
 	}
 }
