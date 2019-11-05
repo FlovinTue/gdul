@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?> 
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+
+	<Type Name="gdul::thread_local_member&lt;*&gt;">
+		<DisplayString Condition="m_instanceIndex &lt; s_storage.m_capacity">{s_storage.m_arrayRef[m_instanceIndex]}</DisplayString>
+		<DisplayString Condition="!(m_instanceIndex &lt; s_storage.m_capacity)">Uninitialized</DisplayString>
+		<Expand>
+			<ExpandedItem Condition="m_instanceIndex &lt; s_storage.m_capacity">(s_storage.m_arrayRef[m_instanceIndex])</ExpandedItem>
+		</Expand>
+	</Type>
+	
+</AutoVisualizer>

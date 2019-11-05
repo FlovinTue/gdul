@@ -43,7 +43,10 @@
 						== 0)">
 				(void*)0
 			</Item>
-      <Item Name="[**ptr_use_count]" Condition="(
+      <Item Name="[**ptr_local_refs]">
+        (size_type)myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF]
+      </Item>
+      <Item Name="[**ptr_global_refs]" Condition="(
 				+ ((myControlBlockStorage.myU64 >> 1) * 2)
 				- ((uint64_t)myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
 				- ((uint64_t)myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] * (aspdetail::Versioned_Ptr_Mask + 1))
@@ -55,15 +58,12 @@
 				- ((uint64_t)myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] * (aspdetail::Versioned_Ptr_Mask + 1))
 				))
 			</Item>
-      <Item Name="[**ptr_use_count]" Condition="(
+      <Item Name="[**ptr_global_refs]" Condition="(
 				+ ((myControlBlockStorage.myU64 >> 1) * 2)
 				- ((uint64_t)myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
 				- ((uint64_t)myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] * (aspdetail::Versioned_Ptr_Mask + 1))
 						== 0)">
         0UL
-      </Item>
-      <Item Name="[**ptr_local_refs]">
-        (size_type)myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF]
       </Item>
       <Item Name="[**ptr_version]">
 				(size_type)myControlBlockStorage.myU8[aspdetail::STORAGE_BYTE_VERSION]
@@ -113,7 +113,10 @@
 						== 0)">
 				(void*)0
 			</Item>
-			<Item Name="[**ptr_use_count]" Condition="(
+      <Item Name="[**ptr_local_refs]">
+        (size_type)myDebugView.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF]
+      </Item>
+			<Item Name="[**ptr_global_refs]" Condition="(
 				+ ((myDebugView.myU64 >> 1) * 2)
 				- ((uint64_t)myDebugView.myU8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
 				- ((uint64_t)myDebugView.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] * (aspdetail::Versioned_Ptr_Mask + 1))
@@ -125,16 +128,13 @@
 				- ((uint64_t)myDebugView.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] * (aspdetail::Versioned_Ptr_Mask + 1))
 				))
 			</Item>
-			<Item Name="[**ptr_use_count]" Condition="(
+			<Item Name="[**ptr_global_refs]" Condition="(
 				+ ((myDebugView.myU64 >> 1) * 2)
 				- ((uint64_t)myDebugView.myU8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
 				- ((uint64_t)myDebugView.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF] * (aspdetail::Versioned_Ptr_Mask + 1))
 						== 0)">
 				0UL
 			</Item>
-      <Item Name="[**ptr_local_refs]">
-        (size_type)myDebugView.myU8[aspdetail::STORAGE_BYTE_LOCAL_REF]
-      </Item>
 			<Item Name="[**ptr_version]">
 				(size_type)myDebugView.myU8[aspdetail::STORAGE_BYTE_VERSION]
 			</Item>
