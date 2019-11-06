@@ -4,6 +4,31 @@
 #include <array>
 #include <gdul\atomic_shared_ptr\atomic_shared_ptr.h>
 
+
+//Maybe redesign to be based on a local array?
+//Could use ASP to ensure safe access (and 'upgrading').. 
+//Access would probably be slow(er). Current design ensures minimal thread/core interaction...
+//What benefits would local array have?. First of all, the static alloc could be kept in local storage.
+//Second
+
+//Could objects be initialized easier with this design? The answer is yes? Items would always be created per object(and thus have to be
+//default or manually constructed). Maybe set up test case with both versions? 
+//
+//Cacheline traffic would be an issue. For sure. No way to know if it would be outweighed by local-access benefit (apart from testing).
+
+
+
+// Idea for handling reinitializations:
+// Store 16bit index & 48 bit iteration in 64 bit var
+// If lessthan fails, it means that either capacity is too low, OR
+// iteration has changed. Then reexamination can be done, and if 
+// iteration != previous, reinitialize value.
+
+// A note: This will (probably) yield poor access performance if many 
+// objects are created and destroyed frequently.
+
+// We'll be counting on noone recreating an object type 2^48 times ...
+
 namespace gdul
 {
 template <class T, class Allocator = std::allocator<T>>
@@ -12,15 +37,17 @@ class thread_local_member;
 template <class T, class Allocator = std::allocator<T>>
 using tlm = thread_local_member<T, Allocator>;
 
-namespace thread_local_member_detail
+namespace tlm_detail
 {
 static constexpr std::size_t Static_Alloc_Size = 4;
+
+union versioned_index;
 
 template <class T, class Allocator>
 class alignas(alignof(T) < 8 ? 8 : alignof(T)) flexible_storage;
 
-template <class IndexType, class Allocator>
-class index_pool;
+template <class Object, class Allocator>
+class simple_pool;
 }
 
 template <class T, class Allocator>
@@ -44,38 +71,38 @@ public:
 private:
 	using allocator_type = typename std::allocator_traits<Allocator>::template rebind_alloc<T>;
 
-	static thread_local thread_local_member_detail::flexible_storage<T, Allocator> s_storage;
-	static thread_local_member_detail::index_pool<std::uint32_t, Allocator> s_indexPool;
+	static thread_local tlm_detail::flexible_storage<T, Allocator> s_storage;
+	static tlm_detail::simple_pool<tlm_detail::versioned_index, Allocator> s_indexPool;
 
 	allocator_type m_allocator;
-	const std::uint32_t m_instanceIndex;
+	const tlm_detail::versioned_index m_index;
 };
 
 template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::thread_local_member()
-	: m_instanceIndex(s_indexPool.get(m_allocator))
+	: m_index(s_indexPool.get(m_allocator))
 {
 }
 template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::thread_local_member(Allocator& allocator)
 	: m_allocator(allocator)
-	, m_instanceIndex(s_indexPool.get(m_allocator))
+	, m_index(s_indexPool.get(m_allocator))
 {
 }
 template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::~thread_local_member()
 {
-	s_indexPool.add(m_instanceIndex);
+	s_indexPool.add(m_index);
 }
 template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::operator T& ()
 {
-	return s_storage.get_index(m_instanceIndex, m_allocator);
+	return s_storage.get_index(m_index, m_allocator);
 }
 template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::operator T& () const
 {
-	return s_storage.get_index(m_instanceIndex, m_allocator);
+	return s_storage.get_index(m_index, m_allocator);
 }
 
 template<class T, class Allocator>
@@ -96,8 +123,24 @@ inline const T& thread_local_member<T, Allocator>::operator=(T&& other)
 }
 
 // detail
-namespace thread_local_member_detail
+namespace tlm_detail
 {
+union versioned_index
+{
+	versioned_index(std::uint16_t index) : m_version(index) {}
+
+	constexpr std::uint16_t index(){return m_index;}
+	constexpr std::uint64_t version(){return m_version << 16;}
+
+	constexpr void set_version(std::uint64_t version) { const std::uint64_t toStore(version | std::uint64_t(m_index)); m_version = toStore; }
+
+	constexpr bool operator<(const versioned_index& other) { return m_version < other.m_version; }
+
+	constexpr std::uint16_t operator++() { return m_version += std::numeric_limits<std::uint16_t>::max(); }
+private:
+	std::uint16_t m_index;
+	std::uint64_t m_version;
+};
 template <class T, class Allocator>
 class alignas(alignof(T) < 8 ? 8 : alignof(T)) flexible_storage
 {
@@ -117,12 +160,12 @@ private:
 	void destroy_static();
 	void destroy_dynamic();
 
-	std::array<T, thread_local_member_detail::Static_Alloc_Size>& get_static();
+	std::array<T, tlm_detail::Static_Alloc_Size>& get_static();
 	std::vector<T, Allocator>& get_dynamic();
 
 	union
 	{
-		std::uint8_t m_staticStorage[sizeof(std::array<T, thread_local_member_detail::Static_Alloc_Size>)];
+		std::uint8_t m_staticStorage[sizeof(std::array<T, tlm_detail::Static_Alloc_Size>)];
 		std::uint8_t m_dynamicStorage[sizeof(std::vector<T, Allocator>)];
 	};
 	T* m_arrayRef;
@@ -218,7 +261,7 @@ inline void flexible_storage<T, Allocator>::destroy_dynamic()
 	get_dynamic().~vector();
 }
 template<class T, class Allocator>
-inline std::array<T, thread_local_member_detail::Static_Alloc_Size>& flexible_storage<T, Allocator>::get_static()
+inline std::array<T, tlm_detail::Static_Alloc_Size>& flexible_storage<T, Allocator>::get_static()
 {
 	return *reinterpret_cast<std::array<T, Static_Alloc_Size>*>(&m_staticStorage[0]);
 }
@@ -227,45 +270,45 @@ inline std::vector<T, Allocator>& flexible_storage<T, Allocator>::get_dynamic()
 {
 	return *reinterpret_cast<std::vector<T, Allocator>*>(&m_dynamicStorage[0]);
 }
-template <class IndexType, class Allocator>
-class index_pool
+template <class Object, class Allocator>
+class simple_pool
 {
 public:
-	index_pool();
-	~index_pool();
+	simple_pool();
+	~simple_pool();
 
-	IndexType get(Allocator& allocator);
-	void add(IndexType index);
+	Object get(Allocator& allocator);
+	void add(Object index);
 
 	struct node
 	{
-		node(IndexType index, shared_ptr<node> next)
+		node(Object index, shared_ptr<node> next)
 			: m_index(index)
 			, m_next(std::move(next))
 		{}
-		IndexType m_index;
+		Object m_index;
 		atomic_shared_ptr<node> m_next;
 	};
 	atomic_shared_ptr<node> m_top;
 
 private:
-	// Pre-allocate 'return entry' (no allocations in destructor)
+	// Pre-allocate 'return entry' (so that adds can happen in destructor)
 	void push_pool_entry(Allocator& allocator);
 	void push_pool_entry(shared_ptr<node> node);
 	shared_ptr<node> get_pool_entry();
 
 	atomic_shared_ptr<node> m_topPool;
 
-	std::atomic<IndexType> m_iterator;
+	std::atomic<Object> m_iterator;
 };
-template<class IndexType, class Allocator>
-inline index_pool<IndexType, Allocator>::index_pool()
+template<class Object, class Allocator>
+inline simple_pool<Object, Allocator>::simple_pool()
 	: m_top(nullptr)
 	, m_iterator(0)
 {
 }
-template<class IndexType, class Allocator>
-inline index_pool<IndexType, Allocator>::~index_pool()
+template<class Object, class Allocator>
+inline simple_pool<Object, Allocator>::~simple_pool()
 {
 	shared_ptr<node> top(m_top.unsafe_load());
 	while (top) {
@@ -274,15 +317,15 @@ inline index_pool<IndexType, Allocator>::~index_pool()
 		top = std::move(next);
 	}
 }
-template<class IndexType, class Allocator>
-inline IndexType index_pool<IndexType, Allocator>::get(Allocator& allocator)
+template<class Object, class Allocator>
+inline Object simple_pool<Object, Allocator>::get(Allocator& allocator)
 {
 	shared_ptr<node> top(m_top.load(std::memory_order_relaxed));
 	while (top) {
 		raw_ptr<node> expected(top);
 		if (m_top.compare_exchange_strong(expected, top->m_next.load(std::memory_order_acquire), std::memory_order_relaxed)) {
 
-			const IndexType toReturn(top->m_index);
+			const Object toReturn(top->m_index);
 
 			push_pool_entry(std::move(top));
 
@@ -294,8 +337,8 @@ inline IndexType index_pool<IndexType, Allocator>::get(Allocator& allocator)
 
 	return m_iterator.fetch_add(1, std::memory_order_relaxed);
 }
-template<class IndexType, class Allocator>
-inline void index_pool<IndexType, Allocator>::add(IndexType index)
+template<class Object, class Allocator>
+inline void simple_pool<Object, Allocator>::add(Object index)
 {
 	shared_ptr<node> entry(get_pool_entry());
 	entry->m_index = index;
@@ -307,15 +350,15 @@ inline void index_pool<IndexType, Allocator>::add(IndexType index)
 		entry->m_next.unsafe_store(std::move(top));
 	} while (!m_top.compare_exchange_strong(expected, std::move(entry)));
 }
-template<class IndexType, class Allocator>
-inline void index_pool<IndexType, Allocator>::push_pool_entry(Allocator& allocator)
+template<class Object, class Allocator>
+inline void simple_pool<Object, Allocator>::push_pool_entry(Allocator& allocator)
 {
-	shared_ptr<node> entry(make_shared<node, Allocator>(allocator, std::numeric_limits<IndexType>::max(), nullptr));
+	shared_ptr<node> entry(make_shared<node, Allocator>(allocator, std::numeric_limits<Object>::max(), nullptr));
 
 	push_pool_entry(std::move(entry));
 }
-template<class IndexType, class Allocator>
-inline void index_pool<IndexType, Allocator>::push_pool_entry(shared_ptr<node> entry)
+template<class Object, class Allocator>
+inline void simple_pool<Object, Allocator>::push_pool_entry(shared_ptr<node> entry)
 {
 	shared_ptr<node> toInsert(std::move(entry));
 
@@ -326,8 +369,8 @@ inline void index_pool<IndexType, Allocator>::push_pool_entry(shared_ptr<node> e
 		toInsert->m_next = std::move(top);
 	} while (!m_topPool.compare_exchange_strong(expected, std::move(toInsert)));
 }
-template<class IndexType, class Allocator>
-inline shared_ptr<typename index_pool<IndexType, Allocator>::node> index_pool<IndexType, Allocator>::get_pool_entry()
+template<class Object, class Allocator>
+inline shared_ptr<typename simple_pool<Object, Allocator>::node> simple_pool<Object, Allocator>::get_pool_entry()
 {
 	shared_ptr<node> top(m_topPool.load(std::memory_order_relaxed));
 	while (top) {
@@ -340,8 +383,8 @@ inline shared_ptr<typename index_pool<IndexType, Allocator>::node> index_pool<In
 }
 }
 template <class T, class Allocator>
-thread_local_member_detail::index_pool<std::uint32_t, Allocator> thread_local_member<T, Allocator>::s_indexPool;
+tlm_detail::simple_pool<tlm_detail::versioned_index, Allocator> thread_local_member<T, Allocator>::s_indexPool;
 template <class T, class Allocator>
-thread_local thread_local_member_detail::flexible_storage<T, Allocator> thread_local_member<T, Allocator>::s_storage;
+thread_local tlm_detail::flexible_storage<T, Allocator> thread_local_member<T, Allocator>::s_storage;
 
 }
