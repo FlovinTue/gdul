@@ -40,9 +40,9 @@
 
 #ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING 
 #define GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(type) (std::is_nothrow_move_assignable<type>::value)
-#define GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(type) (!GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(type) && (std::is_nothrow_assignable<type, type&>::value))
+#define GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(type) (!GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(type) && (std::is_nothrow_copy_assignable<type>::value))
 #define GDUL_CQ_BUFFER_NOTHROW_PUSH_MOVE(type) (std::is_nothrow_move_assignable<type>::value)
-#define GDUL_CQ_BUFFER_NOTHROW_PUSH_ASSIGN(type) (std::is_nothrow_assignable<type, type&>::value)
+#define GDUL_CQ_BUFFER_NOTHROW_PUSH_ASSIGN(type) (std::is_nothrow_copy_assignable<type>::value)
 #else
 #define GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(type) (std::is_move_assignable<type>::value)
 #define GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(type) (!GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(type))
@@ -124,9 +124,6 @@ enum class item_state : std::uint8_t
 
 template <class Dummy>
 std::size_t log2_align(std::size_t from, std::size_t clamp);
-
-template <class T, class Allocator>
-std::size_t calc_block_size(std::size_t fromCapacity);
 
 template <class Dummy>
 inline std::uint8_t to_store_array_slot(std::uint16_t producerIndex);
