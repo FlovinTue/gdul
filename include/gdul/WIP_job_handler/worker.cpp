@@ -4,7 +4,7 @@
 namespace gdul
 {
 worker::worker(job_handler_detail::worker_impl * impl)
-	: myImpl(impl)
+	: m_impl(impl)
 {
 }
 
@@ -14,33 +14,33 @@ worker::~worker()
 
 void worker::set_core_affinity(std::uint8_t core)
 {
-	myImpl->set_core_affinity(core);
+	m_impl->set_core_affinity(core);
 }
 
 void worker::set_queue_affinity(std::uint8_t queue)
 {
-	myImpl->set_queue_affinity(queue);
+	m_impl->set_queue_affinity(queue);
 }
 
 void worker::set_execution_priority(std::int32_t priority)
 {
-	myImpl->set_execution_priority(priority);
+	m_impl->set_execution_priority(priority);
 }
 
 void worker::set_name(const char * name)
 {
-	myImpl->set_name(name);
+	m_impl->set_name(name);
 }
 void worker::activate()
 {
-	myImpl->activate();
+	m_impl->activate();
 }
 bool worker::deactivate()
 {
-	return myImpl->deactivate();
+	return m_impl->deactivate();
 }
 bool worker::is_active() const
 {
-	return myImpl->is_active();
+	return m_impl->is_active();
 }
 }

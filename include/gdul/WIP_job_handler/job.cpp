@@ -25,7 +25,7 @@
 namespace gdul
 {
 job::job()
-	: myEnabled(false)
+	: m_enabled(false)
 {
 }
 job::job(job && other)
@@ -34,41 +34,41 @@ job::job(job && other)
 }
 job & job::operator=(job && other)
 {
-	myEnabled.store(other.myEnabled.load(std::memory_order_relaxed), std::memory_order_relaxed);
-	myImpl = std::move(other.myImpl);
+	m_enabled.store(other.m_enabled.load(std::memory_order_relaxed), std::memory_order_relaxed);
+	m_impl = std::move(other.m_impl);
 
 	return *this;
 }
 
 void job::add_dependency(job & dependency)
 {
-	assert(myImpl && "Job not set");
+	assert(m_impl && "Job not set");
 
-	if (dependency.myImpl->try_attach_child(myImpl)) {
-		myImpl->add_dependencies(1);
+	if (dependency.m_impl->try_attach_child(m_impl)) {
+		m_impl->add_dependencies(1);
 	}
 }
 void job::enable()
 {
-	if (myEnabled.exchange(true ,std::memory_order_relaxed)) {
+	if (m_enabled.exchange(true ,std::memory_order_relaxed)) {
 		return;
 	}
 
-	assert(myImpl && "Job not set");
+	assert(m_impl && "Job not set");
 
-	if (myImpl->enable()) {
-		myImpl->get_handler()->enqueue_job(myImpl);
+	if (m_impl->enable()) {
+		m_impl->get_handler()->enqueue_job(m_impl);
 	}
 }
 bool job::is_finished() const
 {
-	assert(myImpl && "Job not set");
+	assert(m_impl && "Job not set");
 
-	return myImpl->is_finished();
+	return m_impl->is_finished();
 }
 void job::wait_for_finish()
 {
-	assert(myImpl && "Job not set");
+	assert(m_impl && "Job not set");
 
 	while (!is_finished()) {
 		job_handler::this_worker_impl->refresh_sleep_timer();
@@ -76,12 +76,12 @@ void job::wait_for_finish()
 	}
 }
 job::job(job_impl_shared_ptr impl)
-	: myImpl(std::move(impl))
-	, myEnabled(false)
+	: m_impl(std::move(impl))
+	, m_enabled(false)
 {
 }
 job::operator bool() const noexcept 
 {
-	return myImpl;
+	return m_impl;
 }
 }

@@ -58,7 +58,7 @@ private:
 
 	job(job_impl_shared_ptr impl);
 
-	job_impl_shared_ptr myImpl;
-	std::atomic_bool myEnabled;
+	job_impl_shared_ptr m_impl;
+	std::atomic_bool m_enabled;
 };
 }

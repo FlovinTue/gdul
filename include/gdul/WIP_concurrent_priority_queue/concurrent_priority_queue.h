@@ -105,13 +105,13 @@ private:
 
 	struct alloc_size_rep
 	{
-		atomic_shared_ptr_type myNext[Max_Node_Height];
+		atomic_shared_ptr_type m_next[Max_Node_Height];
 		std::pair<key_type, value_type> myKeyValuePair;
 		const size_type myHeight;
 	};
 	class alloc_type
 	{
-		uint8_t myBlock[shared_ptr<alloc_size_rep>::Alloc_Size_Make_Shared];
+		uint8_t m_block[shared_ptr<alloc_size_rep>::Alloc_Size_Make_Shared];
 	};
 
 	template <class Dummy>
@@ -141,28 +141,28 @@ private:
 	void try_splice(node_type* at, shared_ptr_type&& with, shared_ptr_type& current);
 	void try_link_if_unlinked(shared_ptr_type & toLink, node_type *(&last)[Max_Node_Height], shared_ptr_type(&expected)[Max_Node_Height]);
 
-	std::atomic<size_type> mySize;
+	std::atomic<size_type> m_size;
 
-	CSL_PADD(64 - (sizeof(mySize) % 64));
+	CSL_PADD(64 - (sizeof(m_size) % 64));
 	concurrent_object_pool<alloc_type> myMemoryPool;
-	allocator_type myAllocator;
-	CSL_PADD(64 - ((sizeof(myMemoryPool) + sizeof(myAllocator)) % 64));
+	allocator_type m_allocator;
+	CSL_PADD(64 - ((sizeof(myMemoryPool) + sizeof(m_allocator)) % 64));
 	comparator_type myComparator;
 	shared_ptr_type myFrontSentry;
 	shared_ptr_type myEndSentry;
 };
 template <class KeyType, class ValueType, cpqdetail::size_type ExpectedEntriesHint, class Comparator>
 inline concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, Comparator>::concurrent_priority_queue()
-	: mySize(0)
+	: m_size(0)
 	, myMemoryPool(128)
-	, myAllocator(&myMemoryPool)
-	, myFrontSentry(make_shared<node_type, allocator_type>(myAllocator, Max_Node_Height))
-	, myEndSentry(make_shared<node_type, allocator_type>(myAllocator, Max_Node_Height))
+	, m_allocator(&myMemoryPool)
+	, myFrontSentry(make_shared<node_type, allocator_type>(m_allocator, Max_Node_Height))
+	, myEndSentry(make_shared<node_type, allocator_type>(m_allocator, Max_Node_Height))
 {
 	static_assert(std::is_integral<key_type>::value || std::is_floating_point<key_type>::value, "Only integers and floats allowed as key type");
 
 	for (size_type i = 0; i < Max_Node_Height; ++i){
-		myFrontSentry->myNext[i].unsafe_store(myEndSentry);
+		myFrontSentry->m_next[i].unsafe_store(myEndSentry);
 	}
 }
 template <class KeyType, class ValueType, cpqdetail::size_type ExpectedEntriesHint , class Comparator>
@@ -173,7 +173,7 @@ inline concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, Compar
 template <class KeyType, class ValueType, cpqdetail::size_type ExpectedEntriesHint , class Comparator>
 inline typename concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, Comparator>::size_type concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, Comparator>::size() const
 {
-	return mySize.load(std::memory_order_acquire);
+	return m_size.load(std::memory_order_acquire);
 }
 template <class KeyType, class ValueType, cpqdetail::size_type ExpectedEntriesHint , class Comparator>
 inline void concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, Comparator>::insert(const std::pair<key_type, value_type>& in)
@@ -184,12 +184,12 @@ template <class KeyType, class ValueType, cpqdetail::size_type ExpectedEntriesHi
 inline void concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, Comparator>::insert(std::pair<key_type, value_type>&& in)
 {
 	//shared_ptr_type entry(make_shared<node_type, allocator_type>(myAllocator, cpqdetail::random_height(cpqdetail::random::ourRng, Max_Node_Height)));
-	shared_ptr_type entry(make_shared<node_type, allocator_type>(myAllocator, 5));
+	shared_ptr_type entry(make_shared<node_type, allocator_type>(m_allocator, 5));
 	entry->myKeyValuePair = std::move(in);
 
 	while (!try_insert(entry));
 
-	mySize.fetch_add(1, std::memory_order_relaxed);
+	m_size.fetch_add(1, std::memory_order_relaxed);
 }
 template <class KeyType, class ValueType, cpqdetail::size_type ExpectedEntriesHint , class Comparator>
 inline bool concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, Comparator>::try_pop(value_type & out)
@@ -213,7 +213,7 @@ inline bool concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, C
 template <class KeyType, class ValueType, cpqdetail::size_type ExpectedEntriesHint , class Comparator>
 inline bool concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, Comparator>::try_peek_top_key(key_type & out)
 {
-	const shared_ptr_type head(myFrontSentry->myNext[0].load());
+	const shared_ptr_type head(myFrontSentry->m_next[0].load());
 
 	if (!head) {
 		return false;
@@ -228,18 +228,18 @@ template <class KeyType, class ValueType, cpqdetail::size_type ExpectedEntriesHi
 inline void concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, Comparator>::unsafe_clear()
 {
 	std::vector<node_type*> arr;
-	arr.reserve(mySize.load(std::memory_order_acquire));
+	arr.reserve(m_size.load(std::memory_order_acquire));
 
 	node_type* prev(static_cast<node_type*>(myFrontSentry));
 
-	for (size_type i = 0; i < mySize.load(std::memory_order_acquire); ++i) {
-		prev = static_cast<node_type*>(prev->myNext[0]);
+	for (size_type i = 0; i < m_size.load(std::memory_order_acquire); ++i) {
+		prev = static_cast<node_type*>(prev->m_next[0]);
 		arr.push_back(prev);
 	}
 	for (typename std::vector<node_type*>::reverse_iterator it = arr.rbegin(); it != arr.rend(); ++it) {
-		(*it)->myNext[0].unsafe_store(nullptr);
+		(*it)->m_next[0].unsafe_store(nullptr);
 	}
-	mySize.store(0, std::memory_order_relaxed);
+	m_size.store(0, std::memory_order_relaxed);
 }
 template <class KeyType, class ValueType, cpqdetail::size_type ExpectedEntriesHint , class Comparator>
 inline bool concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, Comparator>::try_insert(shared_ptr_type& entry)
@@ -260,16 +260,16 @@ inline bool concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, C
 	for (size_type i = 0; i < Max_Node_Height; ++i) {
 		const size_type inverseIndex((Max_Node_Height - 1) - i);
 	
-		current[inverseIndex] = insertionPoint[inverseIndex]->myNext[inverseIndex].load();
+		current[inverseIndex] = insertionPoint[inverseIndex]->m_next[inverseIndex].load();
 		if (!search(insertionPoint, last, current, entry->myKeyValuePair.first, inverseIndex)) {
 			return false;
 		}
 	}
 	
 	raw_ptr_type expected(current[0].get_raw_ptr());
-	entry->myNext[0].unsafe_store(std::move(current[0]));
+	entry->m_next[0].unsafe_store(std::move(current[0]));
 
-	if (insertionPoint[0]->myNext[0].compare_exchange_strong(expected, entry)) {
+	if (insertionPoint[0]->m_next[0].compare_exchange_strong(expected, entry)) {
 		try_link_if_unlinked(entry, insertionPoint, current);
 		return true;
 	}
@@ -280,12 +280,12 @@ inline bool concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, C
 template <class KeyType, class ValueType, cpqdetail::size_type ExpectedEntriesHint , class Comparator>
 inline bool concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, Comparator>::try_pop_internal(key_type & expectedKey, value_type & outValue, bool matchKey)
 {
-	const size_type currentSize(mySize.fetch_sub(1, std::memory_order_acq_rel) - 1);
+	const size_type currentSize(m_size.fetch_sub(1, std::memory_order_acq_rel) - 1);
 	const size_type difference(std::numeric_limits<size_type>::max() - (currentSize));
 	const size_type threshhold(std::numeric_limits<size_type>::max() / 2);
 
 	if (difference < threshhold) {
-		mySize.fetch_add(1, std::memory_order_relaxed);
+		m_size.fetch_add(1, std::memory_order_relaxed);
 		return false;
 	}
 
@@ -295,7 +295,7 @@ inline bool concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, C
 	raw_ptr_type expected(nullptr);
 
 	for (;;) {
-		head = myFrontSentry->myNext[0].load();
+		head = myFrontSentry->m_next[0].load();
 
 		const key_type key(head->myKeyValuePair.first);
 		if (matchKey & (expectedKey != key)) {
@@ -303,7 +303,7 @@ inline bool concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, C
 			return false;
 		}
 
-		splice = head->myNext[0].load_and_tag();
+		splice = head->m_next[0].load_and_tag();
 		bool mine(!splice.get_tag());
 		splice.clear_tag();
 
@@ -328,14 +328,14 @@ inline bool concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, C
 			break;
 		}
 
-		shared_ptr_type next(current[atHeight]->myNext[atHeight].load());
+		shared_ptr_type next(current[atHeight]->m_next[atHeight].load());
 
 		if (next.get_tag()) {
 			next.clear_tag();
 
 			try_splice(insertionPoint[atHeight], std::move(next), current[atHeight]);
 
-			current[atHeight] = insertionPoint[atHeight]->myNext[atHeight].load();
+			current[atHeight] = insertionPoint[atHeight]->m_next[atHeight].load();
 
 			if (current[atHeight].get_tag()) {
 				return false;
@@ -354,10 +354,10 @@ template <class KeyType, class ValueType, cpqdetail::size_type ExpectedEntriesHi
 inline void concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, Comparator>::try_splice(node_type* at, shared_ptr_type&& with, shared_ptr_type& current)
 {
 	raw_ptr_type expected(current);
-	if (at->myNext[0].compare_exchange_strong(expected, std::move(with))) {
+	if (at->m_next[0].compare_exchange_strong(expected, std::move(with))) {
 		shared_ptr_type null(nullptr);
 		null.set_tag();
-		current->myNext[0].store(null);
+		current->m_next[0].store(null);
 	}
 }
 template<class KeyType, class ValueType, cpqdetail::size_type ExpectedEntriesHint, class Comparator>
@@ -370,7 +370,7 @@ inline void concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, C
 	memcpy(&expected_[0], &expected[0], sizeof(shared_ptr_type) * Max_Node_Height);
 
 	for (size_type index(toLink->myNumLinked.load(std::memory_order_acquire));  index < height; index = (toLink->myNumLinked.fetch_add(1, std::memory_order_acq_rel) + 1)){
-		if (!last[index]->myNext[index].compare_exchange_strong(expected_[index], toLink)){
+		if (!last[index]->m_next[index].compare_exchange_strong(expected_[index], toLink)){
 			toLink->myNumLinked.fetch_sub(1, std::memory_order_relaxed);
 			break;
 		}
@@ -396,14 +396,14 @@ public:
 	constexpr node(size_type height);
 
 	std::pair<key_type, value_type> myKeyValuePair;
-	atomic_shared_ptr_type myNext[MaxNodeHeight];
+	atomic_shared_ptr_type m_next[MaxNodeHeight];
 	std::atomic<size_type> myNumLinked;
 	const size_type myHeight;
 };
 template <class KeyType, class ValueType, size_type MaxNodeHeight, class Allocator>
 inline constexpr node<KeyType, ValueType, MaxNodeHeight, Allocator>::node(size_type height)
 	: myKeyValuePair{ std::numeric_limits<key_type>::max(), value_type() }
-	, myNext{ nullptr }
+	, m_next{ nullptr }
 	, myNumLinked(1)
 	, myHeight(height)
 {

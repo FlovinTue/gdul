@@ -21,17 +21,17 @@ thread_local job_handler_detail::worker_impl* job_handler::this_worker_impl(&job
 thread_local job_handler_detail::worker_impl job_handler::ourImplicitWorker;
 
 job_handler::job_handler()
-	: myJobImplChunkPool(job_handler_detail::Job_Impl_Allocator_Block_Size, myMainAllocator)
-	, myJobImplAllocator(&myJobImplChunkPool)
-	, myWorkerCount(0)
+	: m_jobImplChunkPool(job_handler_detail::Job_Impl_Allocator_Block_Size, m_mainAllocator)
+	, m_jobImplAllocator(&m_jobImplChunkPool)
+	, m_workerCount(0)
 {
 }
 
 job_handler::job_handler(allocator_type & allocator)
-	: myMainAllocator(allocator)
-	, myJobImplChunkPool(job_handler_detail::Job_Impl_Allocator_Block_Size, myMainAllocator)
-	, myJobImplAllocator(&myJobImplChunkPool)
-	, myWorkerCount(0)
+	: m_mainAllocator(allocator)
+	, m_jobImplChunkPool(job_handler_detail::Job_Impl_Allocator_Block_Size, m_mainAllocator)
+	, m_jobImplAllocator(&m_jobImplChunkPool)
+	, m_workerCount(0)
 {
 }
 
@@ -43,16 +43,16 @@ job_handler::~job_handler()
 
 void job_handler::retire_workers()
 {
-	const std::uint16_t workers(myWorkerCount.exchange(0, std::memory_order_seq_cst));
+	const std::uint16_t workers(m_workerCount.exchange(0, std::memory_order_seq_cst));
 
 	for (size_t i = 0; i < workers; ++i) {
-		myWorkers[i].deactivate();
+		m_workers[i].deactivate();
 	}
 }
 
 worker job_handler::make_worker()
 {
-	const std::uint16_t index(myWorkerCount.fetch_add(1, std::memory_order_relaxed));
+	const std::uint16_t index(m_workerCount.fetch_add(1, std::memory_order_relaxed));
 
 	const std::uint8_t coreAffinity(static_cast<std::uint8_t>(index % std::thread::hardware_concurrency()));
 	
@@ -60,9 +60,9 @@ worker job_handler::make_worker()
 
 	job_handler_detail::worker_impl impl(std::move(thread), coreAffinity);
 
-	myWorkers[index] = std::move(impl);
+	m_workers[index] = std::move(impl);
 
-	return worker(&myWorkers[index]);
+	return worker(&m_workers[index]);
 }
 
 std::size_t job_handler::num_enqueued() const
@@ -70,7 +70,7 @@ std::size_t job_handler::num_enqueued() const
 	std::size_t accum(0);
 
 	for (std::uint8_t i = 0; i < job_handler_detail::Priority_Granularity; ++i) {
-		accum += myJobQueues[i].size();
+		accum += m_jobQueues[i].size();
 	}
 
 	return accum;
@@ -80,12 +80,12 @@ void job_handler::enqueue_job(job_impl_shared_ptr job)
 {
 	const std::uint8_t priority(job->get_priority());
 
-	myJobQueues[priority].push(std::move(job));
+	m_jobQueues[priority].push(std::move(job));
 }
 
 void job_handler::launch_worker(std::uint16_t index)
 {
-	this_worker_impl = &myWorkers[index];
+	this_worker_impl = &m_workers[index];
 	this_worker = worker(this_worker_impl);
 
 	while (!this_worker_impl->is_enabled()) {
@@ -106,8 +106,8 @@ void job_handler::work()
 
 		this_job = job(fetch_job());
 
-		if (this_job.myImpl) {
-			(*this_job.myImpl)();
+		if (this_job.m_impl) {
+			(*this_job.m_impl)();
 
 			this_worker_impl->refresh_sleep_timer();
 
@@ -128,7 +128,7 @@ job_handler::job_impl_shared_ptr job_handler::fetch_job()
 
 		const uint8_t index((queueIndex + i) % job_handler_detail::Priority_Granularity);
 
-		if (myJobQueues[index].try_pop(out)) {
+		if (m_jobQueues[index].try_pop(out)) {
 			return out;
 		}
 	}

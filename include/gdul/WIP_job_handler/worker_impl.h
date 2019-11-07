@@ -46,24 +46,24 @@ public:
 	std::uint8_t get_fetch_retries() const;
 
 private:
-	std::thread myThread;
+	std::thread m_thread;
 
-	thread_handle myThreadHandle;
+	thread_handle m_threadHandle;
 	
-	std::size_t myPriorityDistributionIteration;
+	std::size_t m_priorityDistributionIteration;
 
-	std::chrono::high_resolution_clock::time_point myLastJobTimepoint;
+	std::chrono::high_resolution_clock::time_point m_lastJobTimepoint;
 
-	std::uint16_t mySleepThreshhold;
+	std::uint16_t m_sleepThreshhold;
 
-	std::chrono::high_resolution_clock mySleepTimer;
+	std::chrono::high_resolution_clock m_sleepTimer;
 
-	std::uint8_t myAutoCoreAffinity;
-	std::uint8_t myCoreAffinity;
-	std::uint8_t myQueueAffinity;
+	std::uint8_t m_autoCoreAffinity;
+	std::uint8_t m_coreAffinity;
+	std::uint8_t m_queueAffinity;
 
-	std::atomic_bool myIsEnabled;
-	std::atomic_bool myIsActive;
+	std::atomic_bool m_isEnabled;
+	std::atomic_bool m_isActive;
 };
 }
 }

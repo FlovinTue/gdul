@@ -55,28 +55,28 @@ public:
 	value_type* allocate(std::size_t);
 	void deallocate(value_type* chunk, std::size_t);
 
-	concurrent_object_pool<job_impl_chunk_rep, allocator_type>* myChunkSrc;
+	concurrent_object_pool<job_impl_chunk_rep, allocator_type>* m_chunks;
 };
 
 template<class Dummy>
 inline job_impl_allocator<Dummy>::job_impl_allocator(concurrent_object_pool<job_impl_chunk_rep, allocator_type>* chunkSrc)
-	: myChunkSrc(chunkSrc)
+	: m_chunks(chunkSrc)
 {
 }
 template<class Dummy>
 inline typename job_impl_allocator<Dummy>::value_type* job_impl_allocator<Dummy>::allocate(std::size_t)
 {
-	return (value_type*)myChunkSrc->get_object();
+	return (value_type*)m_chunks->get_object();
 }
 template<class Dummy>
 inline void job_impl_allocator<Dummy>::deallocate(value_type* chunk, std::size_t)
 {
-	myChunkSrc->recycle_object((job_impl_chunk_rep*)chunk);
+	m_chunks->recycle_object((job_impl_chunk_rep*)chunk);
 }
 template<class Dummy>
 template<class Dummy_>
 inline job_impl_allocator<Dummy>::job_impl_allocator(const job_impl_allocator<Dummy_>& other)
-	: myChunkSrc(other.myChunkSrc)
+	: m_chunks(other.m_chunks)
 {
 }
 }

@@ -35,29 +35,29 @@ namespace gdul{
 
 union uint128
 {
-	constexpr uint128() : myU64{ 0 } {}
-	constexpr uint128(std::uint64_t low) : myU64{ low ,  } {}
-	constexpr uint128(std::uint64_t low, std::uint64_t high) : myU64{ low,high } {}
+	constexpr uint128() : m_u64{ 0 } {}
+	constexpr uint128(std::uint64_t low) : m_u64{ low ,  } {}
+	constexpr uint128(std::uint64_t low, std::uint64_t high) : m_u64{ low,high } {}
 
 	inline constexpr bool operator==(const uint128& other) const {
-		return (myU64[0] == other.myU64[0]) & (myU64[1] == other.myU64[1]);
+		return (m_u64[0] == other.m_u64[0]) & (m_u64[1] == other.m_u64[1]);
 	}
 	inline constexpr bool operator!=(const uint128& other) const {
 		return !operator==(other);
 	}
 
 	constexpr operator bool() const{
-		return myU64[0] | myU64[1];
+		return m_u64[0] | m_u64[1];
 	}
 
-	std::uint64_t myU64[2];
-	std::uint32_t myU32[4];
-	std::uint16_t myU16[8];
-	std::uint8_t myU8[16];
+	std::uint64_t m_u64[2];
+	std::uint32_t m_u32[4];
+	std::uint16_t m_u16[8];
+	std::uint8_t m_u8[16];
 
 private:
 	friend class atomic_uint128;
-	std::int64_t myS64[2];
+	std::int64_t m_s64[2];
 };
 
 class alignas(16) atomic_uint128
@@ -105,7 +105,7 @@ private:
 
 	inline bool cas_internal(std::int64_t* expected, const std::int64_t* desired) const noexcept;
 
-	mutable uint128 myStorage;
+	mutable uint128 m_storage;
 };
 
 template<class IntegerType>
@@ -128,12 +128,12 @@ inline uint128 atomic_uint128::fetch_add_to_integer(const typename disable_deduc
 		std::uint8_t* int8Target;
 		int_type_no_const* target;
 	};
-	int8Target = &desired.myU8[scaledIndex];
+	int8Target = &desired.m_u8[scaledIndex];
 
 	do {
 		desired = expected;
 		*target += value;
-	} while (!cas_internal(expected.myS64, desired.myS64));
+	} while (!cas_internal(expected.m_s64, desired.m_s64));
 
 	return expected;
 }
@@ -156,12 +156,12 @@ inline uint128 atomic_uint128::fetch_sub_to_integer(const typename disable_deduc
 		std::uint8_t* int8Target;
 		int_type_no_const* target;
 	};
-	int8Target = &desired.myU8[scaledIndex];
+	int8Target = &desired.m_u8[scaledIndex];
 
 	do {
 		desired = expected;
 		*target -= value;
-	} while (!cas_internal(expected.myS64, desired.myS64));
+	} while (!cas_internal(expected.m_s64, desired.m_s64));
 
 	return expected;
 }
@@ -184,22 +184,22 @@ inline uint128 atomic_uint128::exchange_integer(const typename disable_deduction
 		std::uint8_t* int8Target;
 		int_type_no_const* target;
 	};
-	int8Target = &desired.myU8[scaledIndex];
+	int8Target = &desired.m_u8[scaledIndex];
 
 	do {
 		desired = expected;
 		*target = value;
-	} while (!cas_internal(expected.myS64, desired.myS64));
+	} while (!cas_internal(expected.m_s64, desired.m_s64));
 
 	return expected;
 }
 inline constexpr atomic_uint128::atomic_uint128(const uint128 & value) noexcept
-	: myStorage(value)
+	: m_storage(value)
 {
 }
 inline bool atomic_uint128::compare_exchange_strong(uint128 & expected, const uint128& desired) noexcept
 {
-	return cas_internal(expected.myS64, desired.myS64);
+	return cas_internal(expected.m_s64, desired.m_s64);
 }
 inline uint128 atomic_uint128::exchange(const uint128& desired) noexcept
 {
@@ -235,7 +235,7 @@ inline void atomic_uint128::store(const uint128& desired) noexcept
 inline uint128 atomic_uint128::load() const noexcept
 {
 	uint128 expectedDesired;
-	cas_internal(expectedDesired.myS64, expectedDesired.myS64);
+	cas_internal(expectedDesired.m_s64, expectedDesired.m_s64);
 	return expectedDesired;
 }
 inline uint128 atomic_uint128::fetch_add_to_u64(std::uint64_t value, std::uint8_t atIndex) noexcept
@@ -272,16 +272,16 @@ inline uint128 atomic_uint128::fetch_sub_to_u8(const std::uint8_t value, std::ui
 }
 inline constexpr const uint128& atomic_uint128::my_val() const noexcept
 {
-	return myStorage;
+	return m_storage;
 }
 inline constexpr uint128 & atomic_uint128::my_val() noexcept
 {
-	return myStorage;
+	return m_storage;
 }
 #if  defined(_MSC_VER) && !defined(__INTEL_COMPILER)
 inline bool atomic_uint128::cas_internal(std::int64_t* const expected, const std::int64_t* desired) const noexcept
 {
-	return _InterlockedCompareExchange128(reinterpret_cast<volatile std::int64_t*>(&myStorage.myS64[0]), desired[1], desired[0], expected);
+	return _InterlockedCompareExchange128(reinterpret_cast<volatile std::int64_t*>(&m_storage.m_s64[0]), desired[1], desired[0], expected);
 }
 #elif defined(__GNUC__) || defined(__clang__)
 inline bool atomic_uint128::cas_internal(std::int64_t* const expected, const std::int64_t* desired) const noexcept
@@ -292,7 +292,7 @@ inline bool atomic_uint128::cas_internal(std::int64_t* const expected, const std
 		"lock cmpxchg16b %1\n\t"
 		"setz %0"
 		: "=q" (result)
-		, "+m" (myStorage.myS64[0])
+		, "+m" (m_storage.m_s64[0])
 		, "+d" (expected[1])
 		, "+a" (expected[0])
 		: "c" (desired[1])

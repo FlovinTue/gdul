@@ -29,6 +29,11 @@
 
 // We'll be counting on noone recreating an object type 2^48 times ...
 
+
+// Give indices to threads? It won't be that many. Probably less than 32.
+// Then a local array, that *may* be extended to external mapping. ?
+// .. Pile external arrays? Would mean concurrency-safe access.. 
+
 namespace gdul
 {
 template <class T, class Allocator = std::allocator<T>>
@@ -40,8 +45,6 @@ using tlm = thread_local_member<T, Allocator>;
 namespace tlm_detail
 {
 static constexpr std::size_t Static_Alloc_Size = 4;
-
-union versioned_index;
 
 template <class T, class Allocator>
 class alignas(alignof(T) < 8 ? 8 : alignof(T)) flexible_storage;
@@ -72,10 +75,10 @@ private:
 	using allocator_type = typename std::allocator_traits<Allocator>::template rebind_alloc<T>;
 
 	static thread_local tlm_detail::flexible_storage<T, Allocator> s_storage;
-	static tlm_detail::simple_pool<tlm_detail::versioned_index, Allocator> s_indexPool;
+	static tlm_detail::simple_pool<std::uint32_t, Allocator> s_indexPool;
 
 	allocator_type m_allocator;
-	const tlm_detail::versioned_index m_index;
+	const std::uint32_t m_index;
 };
 
 template<class T, class Allocator>
@@ -125,22 +128,6 @@ inline const T& thread_local_member<T, Allocator>::operator=(T&& other)
 // detail
 namespace tlm_detail
 {
-union versioned_index
-{
-	versioned_index(std::uint16_t index) : m_version(index) {}
-
-	constexpr std::uint16_t index(){return m_index;}
-	constexpr std::uint64_t version(){return m_version << 16;}
-
-	constexpr void set_version(std::uint64_t version) { const std::uint64_t toStore(version | std::uint64_t(m_index)); m_version = toStore; }
-
-	constexpr bool operator<(const versioned_index& other) { return m_version < other.m_version; }
-
-	constexpr std::uint16_t operator++() { return m_version += std::numeric_limits<std::uint16_t>::max(); }
-private:
-	std::uint16_t m_index;
-	std::uint64_t m_version;
-};
 template <class T, class Allocator>
 class alignas(alignof(T) < 8 ? 8 : alignof(T)) flexible_storage
 {
@@ -383,7 +370,7 @@ inline shared_ptr<typename simple_pool<Object, Allocator>::node> simple_pool<Obj
 }
 }
 template <class T, class Allocator>
-tlm_detail::simple_pool<tlm_detail::versioned_index, Allocator> thread_local_member<T, Allocator>::s_indexPool;
+tlm_detail::simple_pool<std::uint32_t, Allocator> thread_local_member<T, Allocator>::s_indexPool;
 template <class T, class Allocator>
 thread_local tlm_detail::flexible_storage<T, Allocator> thread_local_member<T, Allocator>::s_storage;
 

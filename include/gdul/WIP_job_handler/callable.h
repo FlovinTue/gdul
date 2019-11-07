@@ -34,17 +34,17 @@ public:
 	void operator()() override;
 
 private:
-	Callable myCallable;
+	Callable m_callable;
 };
 template<class Callable>
 inline callable<Callable>::callable(Callable && callable)
-	: myCallable(std::forward<Callable&&>(callable))
+	: m_callable(std::forward<Callable&&>(callable))
 {
 }
 template<class Callable>
 inline void callable<Callable>::operator()()
 {
-	myCallable();
+	m_callable();
 }
 }
 }

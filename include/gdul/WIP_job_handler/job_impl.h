@@ -72,70 +72,70 @@ private:
 
 	union
 	{
-		std::uint8_t myStorage[Callable_Max_Size_No_Heap_Alloc];
+		std::uint8_t m_storage[Callable_Max_Size_No_Heap_Alloc];
 		struct
 		{
-			allocator_type myAllocator;
-			std::uint8_t* myCallableBegin;
-			std::size_t myAllocated;
-		}myAllocFields;
+			allocator_type m_allocator;
+			std::uint8_t* m_callableBegin;
+			std::size_t m_allocated;
+		}m_allocFields;
 	};
 
-	callable_base* myCallable;
-	job_handler* const myHandler;
+	callable_base* m_callable;
+	job_handler* const m_handler;
 
-	job_impl_atomic_shared_ptr myFirstSibling;
-	job_impl_atomic_shared_ptr myFirstChild;
+	job_impl_atomic_shared_ptr m_firstSibling;
+	job_impl_atomic_shared_ptr m_firstChild;
 
-	std::atomic<std::uint16_t> myDependencies;
+	std::atomic<std::uint16_t> m_dependencies;
 
-	std::atomic<bool> myFinished;
+	std::atomic<bool> m_finished;
 
-	const std::uint8_t myPriority;
+	const std::uint8_t m_priority;
 };
 
 template<class Callable, std::enable_if_t<(Callable_Max_Size_No_Heap_Alloc < sizeof(Callable))>*>
 inline job_impl::job_impl(job_handler* handler, Callable && callable, std::uint8_t priority, allocator_type alloc)
-	: myStorage{}
-	, myCallable(nullptr)
-	, myFinished(false)
-	, myFirstChild(nullptr)
-	, myFirstSibling(nullptr)
-	, myPriority(priority)
-	, myHandler(handler)
-	, myDependencies(Job_Max_Dependencies)
+	: m_storage{}
+	, m_callable(nullptr)
+	, m_finished(false)
+	, m_firstChild(nullptr)
+	, m_firstSibling(nullptr)
+	, m_priority(priority)
+	, m_handler(handler)
+	, m_dependencies(Job_Max_Dependencies)
 {
-	static_assert(!(Callable_Max_Size_No_Heap_Alloc < sizeof(myAllocFields)), "too high size / alignment on allocator_type");
+	static_assert(!(Callable_Max_Size_No_Heap_Alloc < sizeof(m_allocFields)), "too high size / alignment on allocator_type");
 
-	myAllocFields.myAllocator = alloc;
+	m_allocFields.m_allocator = alloc;
 
 	if (16 < alignof(Callable)) {
-		myAllocFields.myAllocated = sizeof(Callable) + alignof(Callable);
+		m_allocFields.m_allocated = sizeof(Callable) + alignof(Callable);
 	}
 	else {
-		myAllocFields.myAllocated = sizeof(Callable);
+		m_allocFields.m_allocated = sizeof(Callable);
 	}
-	myAllocFields.myCallableBegin = myAllocFields.myAllocator.allocate(myAllocFields.myAllocated);
+	m_allocFields.m_callableBegin = m_allocFields.m_allocator.allocate(m_allocFields.m_allocated);
 
-	const std::uintptr_t callableBeginAsInt(reinterpret_cast<std::uintptr_t>(myAllocFields.myCallableBegin));
+	const std::uintptr_t callableBeginAsInt(reinterpret_cast<std::uintptr_t>(m_allocFields.m_callableBegin));
 	const std::uintptr_t mod(callableBeginAsInt % alignof(Callable));
 	const std::size_t offset(mod ? alignof(Callable) - mod : 0);
 
-	myCallable = new (myAllocFields.myCallableBegin + offset) gdul::job_handler_detail::callable(std::forward<Callable&&>(callable));
+	m_callable = new (m_allocFields.m_callableBegin + offset) gdul::job_handler_detail::callable(std::forward<Callable&&>(callable));
 }
 
 template<class Callable, std::enable_if_t<!(Callable_Max_Size_No_Heap_Alloc < sizeof(Callable))>*>
 inline job_impl::job_impl(job_handler* handler, Callable && callable, std::uint8_t priority, allocator_type)
-	: myStorage{}
-	, myCallable(nullptr)
-	, myFinished(false)
-	, myFirstChild(nullptr)
-	, myFirstSibling(nullptr)
-	, myHandler(handler)
-	, myPriority(priority)
-	, myDependencies(Job_Max_Dependencies)
+	: m_storage{}
+	, m_callable(nullptr)
+	, m_finished(false)
+	, m_firstChild(nullptr)
+	, m_firstSibling(nullptr)
+	, m_handler(handler)
+	, m_priority(priority)
+	, m_dependencies(Job_Max_Dependencies)
 {
-	myCallable = new (&myStorage[0]) gdul::job_handler_detail::callable<Callable>(std::forward<Callable&&>(callable));
+	m_callable = new (&m_storage[0]) gdul::job_handler_detail::callable<Callable>(std::forward<Callable&&>(callable));
 }
 
 

@@ -31,9 +31,9 @@ public:
 	float run_mixed_parallel_test(std::size_t numInserts, void(*workfunc)(void));
 	float run_consumption_strand_test(std::size_t numInserts, void(*workfunc)(void));
 
-	job_handler_tester_info myInfo;
+	job_handler_tester_info m_info;
 
-	gdul::job_handler myHandler;
+	gdul::job_handler m_handler;
 };
 
 }

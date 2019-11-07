@@ -7,19 +7,19 @@ namespace gdul
 {
 
 job_handler_tester::job_handler_tester()
-	: myInfo()
+	: m_info()
 {
 }
 
 
 job_handler_tester::~job_handler_tester()
 {
-	myHandler.retire_workers();
+	m_handler.retire_workers();
 }
 
 void job_handler_tester::init(const job_handler_tester_info& info)
 {
-	myInfo = info;
+	m_info = info;
 
 	setup_workers();
 }
@@ -29,19 +29,19 @@ void job_handler_tester::setup_workers()
 
 	std::size_t dynamicWorkers(0);
 	std::size_t staticWorkers(0);
-	if (myInfo.affinity & JOB_HANDLER_TESTER_WORKER_AFFINITY_ASSIGNED) {
+	if (m_info.affinity & JOB_HANDLER_TESTER_WORKER_AFFINITY_ASSIGNED) {
 		staticWorkers = maxWorkers;
 	}
-	if (myInfo.affinity & JOB_HANDLER_TESTER_WORKER_AFFINITY_DYNAMIC) {
+	if (m_info.affinity & JOB_HANDLER_TESTER_WORKER_AFFINITY_DYNAMIC) {
 		dynamicWorkers = maxWorkers;
 	}
-	if (myInfo.affinity & JOB_HANDLER_TESTER_WORKER_AFFINITY_MIXED) {
+	if (m_info.affinity & JOB_HANDLER_TESTER_WORKER_AFFINITY_MIXED) {
 		dynamicWorkers = maxWorkers / 2;
 		staticWorkers = maxWorkers / 2;
 	}
 
 	for (std::size_t i = 0; i < dynamicWorkers; ++i) {
-		worker wrk(myHandler.make_worker());
+		worker wrk(m_handler.make_worker());
 		wrk.set_core_affinity(job_handler_detail::Worker_Auto_Affinity);
 		wrk.set_queue_affinity(job_handler_detail::Worker_Auto_Affinity);
 		wrk.set_execution_priority(4);
@@ -49,7 +49,7 @@ void job_handler_tester::setup_workers()
 		wrk.activate();
 	}
 	for (std::size_t i = 0; i < staticWorkers; ++i) {
-		worker wrk(myHandler.make_worker());
+		worker wrk(m_handler.make_worker());
 		wrk.set_core_affinity(job_handler_detail::Worker_Auto_Affinity);
 		wrk.set_queue_affinity(i % job_handler_detail::Priority_Granularity);
 		wrk.set_execution_priority(4);
@@ -60,9 +60,9 @@ void job_handler_tester::setup_workers()
 
 float job_handler_tester::run_consumption_parallel_test(std::size_t numInserts, void(*workfunc)(void))
 {
-	job root(myHandler.make_job(workfunc, 0));	
+	job root(m_handler.make_job(workfunc, 0));	
 	job next[8]{};
-	next[0] = myHandler.make_job(workfunc, 0);
+	next[0] = m_handler.make_job(workfunc, 0);
 
 	next[0].add_dependency(root);
 	next[0].enable();
@@ -74,7 +74,7 @@ float job_handler_tester::run_consumption_parallel_test(std::size_t numInserts, 
 		uint8_t children(rand() % 8);
 		job intermediate[8]{};
 		for (std::uint8_t j = 0; j < children; ++j, ++i) {
-			intermediate[j] = myHandler.make_job(workfunc, (j + i) % job_handler_detail::Priority_Granularity);
+			intermediate[j] = m_handler.make_job(workfunc, (j + i) % job_handler_detail::Priority_Granularity);
 			
 			for (std::uint8_t dependencies = 0; dependencies < nextNum; ++dependencies) {
 				intermediate[j].add_dependency(next[dependencies]);
@@ -88,7 +88,7 @@ float job_handler_tester::run_consumption_parallel_test(std::size_t numInserts, 
 		nextNum = children;
 	}
 
-	job end(myHandler.make_job([this]() {std::cout << "Finished run_consumption_parallel_test. Numer of enqueued jobs: " << myHandler.num_enqueued() << std::endl; }));
+	job end(m_handler.make_job([this]() {std::cout << "Finished run_consumption_parallel_test. Numer of enqueued jobs: " << m_handler.num_enqueued() << std::endl; }));
 	end.enable();
 
 	timer<float> timer;

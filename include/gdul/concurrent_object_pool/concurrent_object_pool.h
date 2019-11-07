@@ -49,40 +49,40 @@ private:
 
 	struct block_node
 	{
-		std::uint8_t* myBlock;
-		Object* myObjects;
-		std::size_t myByteSize;
-		std::atomic<block_node*> myPrevious;
+		std::uint8_t* m_block;
+		Object* m_objects;
+		std::size_t m_byteSize;
+		std::atomic<block_node*> m_previous;
 	};
 
 	using object_allocator = typename std::allocator_traits<Allocator>::template rebind_alloc<uint8_t>;
 	using node_allocator = typename std::allocator_traits<Allocator>::template rebind_alloc<block_node>;
 
-	Allocator myAllocator;
-	node_allocator myNodeAllocator;
+	Allocator m_allocator;
+	node_allocator m_nodeAllocator;
 
-	concurrent_queue<Object*, Allocator> myUnusedObjects;
+	concurrent_queue<Object*, Allocator> m_unusedObjects;
 
-	std::atomic<block_node*> myLastBlock;
+	std::atomic<block_node*> m_lastBlock;
 
-	const std::size_t myBlockSize;
+	const std::size_t m_blockSize;
 };
 
 template<class Object, class Allocator>
 inline concurrent_object_pool<Object, Allocator>::concurrent_object_pool(std::size_t blockSize)
-	: myBlockSize(blockSize)
-	, myUnusedObjects(blockSize, myAllocator)
-	, myLastBlock(nullptr)
+	: m_blockSize(blockSize)
+	, m_unusedObjects(blockSize, m_allocator)
+	, m_lastBlock(nullptr)
 {
 	try_alloc_block();
 }
 template<class Object, class Allocator>
 inline concurrent_object_pool<Object, Allocator>::concurrent_object_pool(std::size_t blockSize, Allocator & allocator)
-	: myAllocator(allocator)
-	, myNodeAllocator(allocator)
-	, myBlockSize(blockSize)
-	, myUnusedObjects(blockSize, allocator)
-	, myLastBlock(nullptr)
+	: m_allocator(allocator)
+	, m_nodeAllocator(allocator)
+	, m_blockSize(blockSize)
+	, m_unusedObjects(blockSize, allocator)
+	, m_lastBlock(nullptr)
 {
 	try_alloc_block();
 }
@@ -96,7 +96,7 @@ inline Object * concurrent_object_pool<Object, Allocator>::get_object()
 {
 	Object* out;
 
-	while (!myUnusedObjects.try_pop(out)) {
+	while (!m_unusedObjects.try_pop(out)) {
 		try_alloc_block();
 	}
 	return out;
@@ -104,79 +104,79 @@ inline Object * concurrent_object_pool<Object, Allocator>::get_object()
 template<class Object, class Allocator>
 inline void concurrent_object_pool<Object, Allocator>::recycle_object(Object * object)
 {
-	myUnusedObjects.push(object);
+	m_unusedObjects.push(object);
 }
 template<class Object, class Allocator>
 inline std::size_t concurrent_object_pool<Object, Allocator>::avaliable()
 {
-	return myUnusedObjects.size();
+	return m_unusedObjects.size();
 }
 template<class Object, class Allocator>
 inline void concurrent_object_pool<Object, Allocator>::unsafe_destroy()
 {
-	block_node* blockNode(myLastBlock.load(std::memory_order_acquire));
+	block_node* blockNode(m_lastBlock.load(std::memory_order_acquire));
 	while (blockNode) {
-		block_node* const previous(blockNode->myPrevious);
+		block_node* const previous(blockNode->m_previous);
 
-		for (std::size_t i = 0; i < myBlockSize; ++i) {
-			blockNode->myObjects[i].~Object();
+		for (std::size_t i = 0; i < m_blockSize; ++i) {
+			blockNode->m_objects[i].~Object();
 		}
-		myAllocator.deallocate(blockNode->myBlock, blockNode->myByteSize);
+		m_allocator.deallocate(blockNode->m_block, blockNode->m_byteSize);
 
 		blockNode->~block_node();
-		myNodeAllocator.deallocate(blockNode, 1);
+		m_nodeAllocator.deallocate(blockNode, 1);
 
 		blockNode = previous;
 	}
-	myLastBlock = nullptr;
+	m_lastBlock = nullptr;
 
-	myUnusedObjects.unsafe_reset();
+	m_unusedObjects.unsafe_reset();
 }
 template<class Object, class Allocator>
 inline void concurrent_object_pool<Object, Allocator>::try_alloc_block()
 {
-	block_node* expected(myLastBlock.load(std::memory_order_acquire));
+	block_node* expected(m_lastBlock.load(std::memory_order_acquire));
 
-	if (myUnusedObjects.size()) {
+	if (m_unusedObjects.size()) {
 		return;
 	}
 
-	const std::size_t allocSize(myBlockSize * sizeof(Object));
+	const std::size_t allocSize(m_blockSize * sizeof(Object));
 	const std::size_t align(alignof(Object));
 	const std::size_t alignComp(!(8 < align) ? 0 : align);
 	const std::size_t totalAllocSize(allocSize + alignComp);
 
-	uint8_t* const block(myAllocator.allocate(totalAllocSize));
+	uint8_t* const block(m_allocator.allocate(totalAllocSize));
 
 	const std::size_t alignMod((uint64_t)block % align);
 	uint8_t* const objectBegin(block + (alignMod ? align - alignMod : 0));
 	Object* const objects((Object*)objectBegin);
 
-	for (std::size_t i = 0; i < myBlockSize; ++i) {
+	for (std::size_t i = 0; i < m_blockSize; ++i) {
 		new (&objects[i]) (Object);
 	}
 
-	block_node* const desired(myNodeAllocator.allocate(1));
+	block_node* const desired(m_nodeAllocator.allocate(1));
 	new (desired)(block_node);
-	desired->myPrevious = expected;
-	desired->myBlock = block;
-	desired->myByteSize = totalAllocSize;
-	desired->myObjects = objects;
+	desired->m_previous = expected;
+	desired->m_block = block;
+	desired->m_byteSize = totalAllocSize;
+	desired->m_objects = objects;
 
-	if (!myLastBlock.compare_exchange_strong(expected, desired)) {
-		for (std::size_t i = 0; i < myBlockSize; ++i) {
+	if (!m_lastBlock.compare_exchange_strong(expected, desired)) {
+		for (std::size_t i = 0; i < m_blockSize; ++i) {
 			objects[i].~Object();
 		}
-		myAllocator.deallocate(block, totalAllocSize);
+		m_allocator.deallocate(block, totalAllocSize);
 
 		desired->~block_node();
-		myNodeAllocator.deallocate(desired, 1);
+		m_nodeAllocator.deallocate(desired, 1);
 
 		return;
 	}
 
-	for (std::size_t i = 0; i < myBlockSize; ++i) {
-		myUnusedObjects.push(&objects[i]);
+	for (std::size_t i = 0; i < m_blockSize; ++i) {
+		m_unusedObjects.push(&objects[i]);
 	}
 }
 }

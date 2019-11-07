@@ -14,7 +14,7 @@ using namespace gdul;
 template <class T>
 struct ReferenceComparison
 {
-	T* myPtr;
+	T* m_ptr;
 	uint8_t trash[sizeof(atomic_shared_ptr<int>) - 8];
 };
 
@@ -128,7 +128,7 @@ inline Tester<T, ArraySize, NumThreads>::Tester(bool aDoInitializeArray, InitArg
 		for (std::uint32_t i = 0; i < ArraySize; ++i) {
 #ifndef ASP_MUTEX_COMPARE
 			myTestArray[i] = make_shared<T>(std::forward<InitArgs&&>(aArgs)...);
-			myReferenceComparison[i].myPtr = new T(std::forward<InitArgs&&>(aArgs)...);
+			myReferenceComparison[i].m_ptr = new T(std::forward<InitArgs&&>(aArgs)...);
 #else
 			myTestArray[i] = std::make_shared<T>(std::forward<InitArgs&&>(aArgs)...);
 #endif
@@ -141,7 +141,7 @@ inline Tester<T, ArraySize, NumThreads>::~Tester()
 {
 #ifndef ASP_MUTEX_COMPARE
 	for (std::uint32_t i = 0; i < ArraySize; ++i) {
-		delete myReferenceComparison[i].myPtr;
+		delete myReferenceComparison[i].m_ptr;
 	}
 #endif
 }
@@ -230,7 +230,7 @@ inline void Tester<T, ArraySize, NumThreads>::WorkReferenceTest(std::uint32_t aA
 
 	for (std::uint32_t pass = 0; pass < aArrayPasses; ++pass) {
 		for (std::uint32_t i = 0; i < ArraySize; ++i) {
-			localSum += *myReferenceComparison[i].myPtr;
+			localSum += *myReferenceComparison[i].m_ptr;
 			//localSum += *myTestArray[i];
 		}
 	}
