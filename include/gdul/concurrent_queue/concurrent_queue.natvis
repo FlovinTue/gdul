@@ -9,22 +9,22 @@
 				<Variable Name = "producerSlotsRaw" InitialValue="(atomic_shared_ptr_slot_type*)0"/>
 				<Variable Name = "pBuffer" InitialValue = "(buffer_type*)(0)" />
 
-				<Exec Condition="producerIndex != (uint64_t)_myProducerCount">
-					producerSlotsRaw = *(atomic_shared_ptr_slot_type**)(8 + (myProducerSlots.myDebugView.myU64 &amp; aspdetail::Ptr_Mask))
+				<Exec Condition="producerIndex != (uint64_t)_m_producerCount">
+					producerSlotsRaw = *(atomic_shared_ptr_slot_type**)(8 + (m_producerSlots.m_debugView.m_u64 &amp; aspdetail::Ptr_Mask))
 				</Exec>
 				
 				<Loop>
-					<Break Condition = "producerIndex == (uint64_t)_myProducerCount" />
+					<Break Condition = "producerIndex == (uint64_t)_m_producerCount" />
 					<Exec>
-						pBuffer = *(buffer_type**)(8 + (producerSlotsRaw[producerIndex].myDebugView.myU64 &amp; aspdetail::Ptr_Mask))
+						pBuffer = *(buffer_type**)(8 + (producerSlotsRaw[producerIndex].m_debugView.m_u64 &amp; aspdetail::Ptr_Mask))
 					</Exec>
 					<Loop>
 						<Exec>
-							sizeAccumulator += ((uint64_t)pBuffer->_myPostWriteIterator - (uint64_t)pBuffer->_myReadSlot)
+							sizeAccumulator += ((uint64_t)pBuffer->_m_postWriteIterator - (uint64_t)pBuffer->_m_readSlot)
 						</Exec>
-						<Break Condition = "(pBuffer->myNext.myDebugView.myU64 &amp; aspdetail::Ptr_Mask) == 0"/>
+						<Break Condition = "(pBuffer->m_next.m_debugView.m_u64 &amp; aspdetail::Ptr_Mask) == 0"/>
 						<Exec>
-							pBuffer = *(buffer_type**)(8 + (pBuffer->myNext.myDebugView.myU64 &amp; aspdetail::Ptr_Mask))
+							pBuffer = *(buffer_type**)(8 + (pBuffer->m_next.m_debugView.m_u64 &amp; aspdetail::Ptr_Mask))
 						</Exec>
 					</Loop>
 					<Exec>
@@ -36,9 +36,9 @@
 				<Exec>producerIndex = 0</Exec>
 				
 				<Loop>
-					<Break Condition = "producerIndex == (uint64_t)_myProducerCount" />
+					<Break Condition = "producerIndex == (uint64_t)_m_producerCount" />
 					<Exec>
-						pBuffer = *(buffer_type**)(8 + (producerSlotsRaw[producerIndex].myDebugView.myU64 &amp; aspdetail::Ptr_Mask))
+						pBuffer = *(buffer_type**)(8 + (producerSlotsRaw[producerIndex].m_debugView.m_u64 &amp; aspdetail::Ptr_Mask))
 					</Exec>
 					<Item Name='[producer_{producerIndex + 1}]'>*pBuffer</Item>
 					<Exec>
@@ -47,7 +47,7 @@
 				</Loop>
 				
 				<Item Name = "[size]">sizeAccumulator</Item>
-				<Item Name = "[producer_count]">(uint64_t)_myProducerCount</Item>
+				<Item Name = "[producer_count]">(uint64_t)_m_producerCount</Item>
 
 				
 			</CustomListItems>
@@ -59,13 +59,13 @@
 			<CustomListItems MaxItemsPerView="512">
 				<Variable Name="pBuffer" InitialValue="this" />
 				<Variable Name="itemCount" InitialValue="0"/>
-				<Variable Name="pItem" InitialValue="myDataBlock + (uint64_t)(pBuffer->_myReadSlot - ((uint64_t)(pBuffer->_myReadSlot / pBuffer->myCapacity) * pBuffer->myCapacity))"/>
+				<Variable Name="pItem" InitialValue="m_dataBlock + (uint64_t)(pBuffer->_m_readSlot - ((uint64_t)(pBuffer->_m_readSlot / pBuffer->m_capacity) * pBuffer->m_capacity))"/>
 				<Variable Name="sizeAccumulator" InitialValue="0"/>
 
 				<Loop>
-					<Exec>sizeAccumulator += ((uint64_t)pBuffer->_myPostWriteIterator - (uint64_t)pBuffer->_myReadSlot)</Exec>
-					<Break Condition="((pBuffer->myNext.myDebugView.myU64 &amp; aspdetail::Ptr_Mask) == 0)" />
-					<Exec>pBuffer = *(buffer_type**)(8 + (pBuffer->myNext.myDebugView.myU64 &amp; aspdetail::Ptr_Mask))</Exec>
+					<Exec>sizeAccumulator += ((uint64_t)pBuffer->_m_postWriteIterator - (uint64_t)pBuffer->_m_readSlot)</Exec>
+					<Break Condition="((pBuffer->m_next.m_debugView.m_u64 &amp; aspdetail::Ptr_Mask) == 0)" />
+					<Exec>pBuffer = *(buffer_type**)(8 + (pBuffer->m_next.m_debugView.m_u64 &amp; aspdetail::Ptr_Mask))</Exec>
 				</Loop>
 
 				<Item Name="[size]">sizeAccumulator</Item>
@@ -73,17 +73,17 @@
 				<Exec>pBuffer = this</Exec>
 
 				<Loop>
-					<If Condition="itemCount == ((uint64_t)pBuffer->_myPostWriteIterator - (uint64_t)pBuffer->_myReadSlot)">
-						<Break Condition="((pBuffer->myNext.myDebugView.myU64 &amp; aspdetail::Ptr_Mask) == 0)" />
-						<Exec>pBuffer = *(buffer_type**)(8 + (pBuffer->myNext.myDebugView.myU64 &amp; aspdetail::Ptr_Mask))</Exec>
-						<Exec>pItem = pBuffer->myDataBlock + ((uint64_t)pBuffer->_myReadSlot - (((uint64_t)pBuffer->_myReadSlot / pBuffer->myCapacity) * pBuffer->myCapacity))</Exec>
+					<If Condition="itemCount == ((uint64_t)pBuffer->_m_postWriteIterator - (uint64_t)pBuffer->_m_readSlot)">
+						<Break Condition="((pBuffer->m_next.m_debugView.m_u64 &amp; aspdetail::Ptr_Mask) == 0)" />
+						<Exec>pBuffer = *(buffer_type**)(8 + (pBuffer->m_next.m_debugView.m_u64 &amp; aspdetail::Ptr_Mask))</Exec>
+						<Exec>pItem = pBuffer->m_dataBlock + ((uint64_t)pBuffer->_m_readSlot - (((uint64_t)pBuffer->_m_readSlot / pBuffer->m_capacity) * pBuffer->m_capacity))</Exec>
 						<Exec>itemCount = 0</Exec>
 					</If>
-					<If Condition="itemCount != ((uint64_t)pBuffer->_myPostWriteIterator - (uint64_t)pBuffer->_myReadSlot)">
-						<Item>pItem->myData</Item>
+					<If Condition="itemCount != ((uint64_t)pBuffer->_m_postWriteIterator - (uint64_t)pBuffer->_m_readSlot)">
+						<Item>pItem->m_data</Item>
 						<Exec>++pItem</Exec>
-						<If Condition="pItem == (pBuffer->myDataBlock + (uint64_t)pBuffer->_myPostWriteIterator - (uint64_t)pBuffer->_myReadSlot)">
-							<Exec>pItem= pBuffer->myDataBlock</Exec>
+						<If Condition="pItem == (pBuffer->m_dataBlock + (uint64_t)pBuffer->_m_postWriteIterator - (uint64_t)pBuffer->_m_readSlot)">
+							<Exec>pItem= pBuffer->m_dataBlock</Exec>
 						</If>
 						<Exec>++itemCount</Exec>
 					</If>

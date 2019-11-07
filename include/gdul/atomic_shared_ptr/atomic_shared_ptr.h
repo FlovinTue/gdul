@@ -73,6 +73,9 @@ template <std::uint8_t Align, std::size_t Size>
 struct aligned_storage;
 
 template <class T>
+constexpr bool is_unbounded_array();
+
+template <class T>
 class control_block_base_interface;
 template <class T, class Allocator>
 class control_block_base_members;
@@ -962,6 +965,11 @@ struct alignas(Align) aligned_storage
 {
 	std::uint8_t dummy[Size]{};
 };
+template <class T>
+constexpr bool is_unbounded_array()
+{
+	return std::is_array_v<T> & (std::extent_v<T> == 0);
+}
 template<class T>
 constexpr void assert_alignment(std::uint8_t* block)
 {
@@ -1693,12 +1701,27 @@ inline constexpr raw_ptr<T>::raw_ptr(compressed_storage from) noexcept
 	: aspdetail::ptr_base<T>(from)
 {
 }
-namespace aspdetail
+
+template<class T, class ...Args>
+inline shared_ptr<T> make_shared(Args&& ...args)
 {
-template<class T, class Allocator
-	, std::enable_if_t<(std::is_array_v<T> && std::extent_v<T> != 0) || !std::is_array_v<T>> * = nullptr
-	, class ...Args>
-	inline shared_ptr<T> allocate_shared(Allocator& allocator, Args&& ...args)
+	aspdetail::default_allocator alloc;
+	return make_shared<T, aspdetail::default_allocator>(alloc, std::forward<Args&&>(args)...);
+}
+template<class T, class Allocator, class ...Args>
+inline shared_ptr<T> make_shared(Args&& ...args)
+{
+	Allocator alloc;
+	return make_shared<T, Allocator>(alloc, std::forward<Args&&>(args)...);
+}
+template
+<
+	class T, 
+	class Allocator, 
+	std::enable_if_t<!aspdetail::is_unbounded_array<T>> * = nullptr, 
+	class ...Args
+>
+	inline shared_ptr<T> make_shared(Allocator& allocator, Args&& ...args)
 {
 	constexpr std::size_t blockSize(shared_ptr<T>::template alloc_size_make_shared<Allocator>());
 	constexpr std::size_t blockAlign(alignof(T));
@@ -1733,35 +1756,18 @@ template<class T, class Allocator
 
 	return shared_ptr<T>(storage);
 }
-template<class T, class Allocator
-	, std::enable_if_t<(std::is_array_v<T> && std::extent_v<T> == 0)> * = nullptr
-	, class ...Args>
-	inline shared_ptr<T> allocate_shared(Allocator& allocator, Args&& ...args)
+template
+<
+	class T, 
+	class Allocator, 
+	std::enable_if_t<aspdetail::is_unbounded_array<T>> * = nullptr, 
+	class ...Args
+>
+	inline shared_ptr<T> make_shared(Allocator& allocator, Args&& ...args)
 {
 	using base_type = std::remove_all_extents_t<T>;
 
 
 }
-
-}
-
-template<class T, class ...Args>
-inline shared_ptr<T> make_shared(Args&& ...args)
-{
-	aspdetail::default_allocator alloc;
-	return make_shared<T, aspdetail::default_allocator>(alloc, std::forward<Args&&>(args)...);
-}
-template<class T, class Allocator, class ...Args>
-inline shared_ptr<T> make_shared(Args&& ...args)
-{
-	Allocator alloc;
-	return make_shared<T, Allocator>(alloc, std::forward<Args&&>(args)...);
-}
-template<class T, class Allocator, class ...Args>
-inline shared_ptr<T> make_shared(Allocator& allocator, Args&& ...args)
-{
-	return aspdetail::allocate_shared<T, Allocator>(allocator, std::forward<Args&&>(args)...);
-}
-
 };
 #pragma warning(pop)
