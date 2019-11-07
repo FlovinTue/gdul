@@ -29,6 +29,29 @@
 
 // We'll be counting on noone recreating an object type 2^48 times ...
 
+// Can we do == rather than < ?. Maybe include both < and == in one op.
+
+// Right. So if we come accross an index that has been used before. It will have a higher value.
+// How do we see that this particular 'higher value' has not been seen before?. If the 'Higher value'
+// is global (to the object), and a further changelist is kept somewhere.. somewhere?. This would have to 
+// be global. Something that each destructor could access and say "Hey, this object has been destroyed and 
+// needs to be re-constructed". 
+
+// So. A static kept flexible storage?? Hmm. Ugh. Using the ms concurrency runtime would be un-portable. 
+// That would mean a hacked together concurrent_vector would have to be made. UGH.
+// Actually, this could probably just be done using an atomic_shared_ptr -> raw array. (Since we're not *that*
+// bound by performance at this place)
+
+// Say though, that this is made. Then what?.. The array would keep track of which iteration a particular index
+// was at. So. 2 ^ 48 iterations enough to assume it will never get capped? .
+
+// Wait. Where would this iteration be stored? . Since we need the new-object-created-iteration as well as a particular 
+// index iteration. Oh boy. Need to keep another array to track known iterations.
+
+// Hash?
+
+// Note: Global iteration means it would have to use an atomic var. That stinks. Starting to look like a local array-solution is
+// maybe better.
 namespace gdul
 {
 template <class T, class Allocator = std::allocator<T>>
@@ -92,17 +115,17 @@ inline thread_local_member<T, Allocator>::thread_local_member(Allocator& allocat
 template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::~thread_local_member()
 {
-	s_indexPool.add(m_index);
+	s_indexPool.add(m_index++);
 }
 template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::operator T& ()
 {
-	return s_storage.get_index(m_index, m_allocator);
+	return s_storage.get_index(m_index);
 }
 template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::operator T& () const
 {
-	return s_storage.get_index(m_index, m_allocator);
+	return s_storage.get_index(m_index);
 }
 
 template<class T, class Allocator>
@@ -136,7 +159,7 @@ union versioned_index
 
 	constexpr bool operator<(const versioned_index& other) { return m_version < other.m_version; }
 
-	constexpr std::uint16_t operator++() { return m_version += std::numeric_limits<std::uint16_t>::max(); }
+	constexpr std::uint64_t operator++() { return m_version += (std::uint64_t(std::numeric_limits<std::uint16_t>::max()) + 1); }
 private:
 	std::uint16_t m_index;
 	std::uint64_t m_version;
@@ -148,7 +171,11 @@ public:
 	flexible_storage();
 	~flexible_storage();
 
-	T& get_index(std::uint32_t index, Allocator & allocator);
+	const T& operator[](std::uint32_t index) const;
+	T& operator[](std::uint32_t index);
+
+	inline void reserve(std::uint16_t capacity, Allocator & allocator);
+	inline std::uint32_t capacity() const noexcept;
 
 private:
 
@@ -190,12 +217,26 @@ inline flexible_storage<T, Allocator>::~flexible_storage()
 	}
 }
 template<class T, class Allocator>
-inline T& flexible_storage<T, Allocator>::get_index(std::uint32_t index, Allocator& allocator)
+inline const T& flexible_storage<T, Allocator>::operator[](std::uint32_t index) const
+{
+	return m_arrayRef[index];
+}
+template<class T, class Allocator>
+inline T& flexible_storage<T, Allocator>::operator[](std::uint32_t index)
+{
+	return m_arrayRef[index];
+}
+template<class T, class Allocator>
+inline void flexible_storage<T, Allocator>::reserve(std::uint16_t capacity, Allocator& allocator)
 {
 	if (!(index < m_capacity)) {
 		m_arrayRef = get_array_ref(index + 1, allocator);
 	}
-	return m_arrayRef[index];
+}
+template<class T, class Allocator>
+inline std::uint32_t flexible_storage<T, Allocator>::capacity() const noexcept
+{
+	return m_capacity;
 }
 template<class T, class Allocator>
 inline T* flexible_storage<T, Allocator>::get_array_ref(std::uint32_t capacity, Allocator& allocator)

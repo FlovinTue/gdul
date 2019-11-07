@@ -128,6 +128,8 @@ inline const T& thread_local_member<T, Allocator>::operator=(T&& other)
 // detail
 namespace tlm_detail
 {
+// Flexible storage keeps a few local object slots, and if more are needed
+// it starts using an allocating vector instead.
 template <class T, class Allocator>
 class alignas(alignof(T) < 8 ? 8 : alignof(T)) flexible_storage
 {
