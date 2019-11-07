@@ -27,6 +27,7 @@ int main()
 		shared_ptr<int> seventh(new int(7), [](int* arg, decltype(alloc)&) {delete arg; });	
 		shared_ptr<int> eighth(new int(8), [](int* arg, decltype(alloc)& alloc) { delete arg; alloc; }, alloc);
 		shared_ptr<int> ninth(make_shared<int, std::allocator<std::uint8_t>>(alloc, 8));
+
 		shared_ptr<int> tenth;
 		tenth = ninth;
 		shared_ptr<int> eleventh;
@@ -49,6 +50,8 @@ int main()
 		shared_ptr<int> atenthexp(atenth.load());
 		shared_ptr<int> atenthdes(make_shared<int>(1010));
 		const bool tenres = atenth.compare_exchange_strong(atenthexp, atenthdes);
+
+		shared_ptr<int[]> blah = make_shared<int[]>(5, 0);
 		
 		atomic_shared_ptr<int> aeleventh(make_shared<int>(11));
 		raw_ptr<int> aeleventhexp(aeleventh.get_raw_ptr());
