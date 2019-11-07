@@ -148,7 +148,7 @@ struct alignas(log2align(Callable_Max_Size_No_Heap_Alloc)) job_impl_chunk_rep
 	{
 		return reinterpret_cast<uint8_t*>(this);
 	}
-	uint8_t dummy[shared_ptr<gdul::job_handler_detail::job_impl>::alloc_size_make_shared<job_impl_allocator<job_handler_detail::job_impl_chunk_rep>>()];
+	uint8_t dummy[alloc_size_make_shared<job_impl, job_impl_allocator<job_handler_detail::job_impl_chunk_rep>>()];
 };
 }
 }

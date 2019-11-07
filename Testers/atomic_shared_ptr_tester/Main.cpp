@@ -25,7 +25,7 @@ int main()
 		shared_ptr<int> fifth(std::move(fourth));
 		shared_ptr<int> sixth(new int(6));
 		shared_ptr<int> seventh(new int(7), [](int* arg, decltype(alloc)&) {delete arg; });	
-		shared_ptr<int> eighth(new int(8), [](int* arg, decltype(alloc)& alloc) { delete arg; alloc; }, alloc);
+		shared_ptr<int> eighth(new int(8), alloc, [](int* arg, decltype(alloc)& alloc) { delete arg; alloc; });
 		shared_ptr<int> ninth(make_shared<int, std::allocator<std::uint8_t>>(alloc, 8));
 
 		shared_ptr<int> tenth;
@@ -45,7 +45,7 @@ int main()
 		atomic_shared_ptr<int> aeighth(make_shared<int>(8));
 		shared_ptr<int> aeightTarget(aeighth.exchange(make_shared<int>(88)));
 		atomic_shared_ptr<int> aninth(make_shared<int>(9));
-		aninth.exchange(aeightTarget);
+		shared_ptr<int> exch(aninth.exchange(aeightTarget));
 		atomic_shared_ptr<int> atenth(make_shared<int>(10));
 		shared_ptr<int> atenthexp(atenth.load());
 		shared_ptr<int> atenthdes(make_shared<int>(1010));
@@ -86,10 +86,10 @@ int main()
 		athirteenth.get_raw_ptr();
 		athirteenthdes.get_raw_ptr();
 		
-		shared_ptr<int> fourteenth(new int[10]{ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }, [](int* obj, std::allocator<std::uint8_t>& /*alloc*/)
+		shared_ptr<int> fourteenth(new int[10]{ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }, alloc, [](int* obj, std::allocator<std::uint8_t>& /*alloc*/)
 		{
 			delete[] obj;
-		}, alloc);
+		});
 
 		const int access1(fourteenth[0]);
 		const int access5(fourteenth[4]);
@@ -190,9 +190,6 @@ int main()
 			<< ". The number of threads used were "
 			<< numThreads
 			<< std::endl;
-
-
-
 
 		return 0;
 }
