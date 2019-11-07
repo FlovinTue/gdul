@@ -5,34 +5,9 @@
 #include <gdul\atomic_shared_ptr\atomic_shared_ptr.h>
 
 
-//Maybe redesign to be based on a local array?
-//Could use ASP to ensure safe access (and 'upgrading').. 
-//Access would probably be slow(er). Current design ensures minimal thread/core interaction...
-//What benefits would local array have?. First of all, the static alloc could be kept in local storage.
-//Second
-
-//Could objects be initialized easier with this design? The answer is yes? Items would always be created per object(and thus have to be
-//default or manually constructed). Maybe set up test case with both versions? 
-//
-//Cacheline traffic would be an issue. For sure. No way to know if it would be outweighed by local-access benefit (apart from testing).
-
-
-
-// Idea for handling reinitializations:
-// Store 16bit index & 48 bit iteration in 64 bit var
-// If lessthan fails, it means that either capacity is too low, OR
-// iteration has changed. Then reexamination can be done, and if 
-// iteration != previous, reinitialize value.
-
-// A note: This will (probably) yield poor access performance if many 
-// objects are created and destroyed frequently.
-
-// We'll be counting on noone recreating an object type 2^48 times ...
-
-
-// Give indices to threads? It won't be that many. Probably less than 32.
-// Then a local array, that *may* be extended to external mapping. ?
-// .. Pile external arrays? Would mean concurrency-safe access.. 
+// Only check against global iterator?  . What if 1-2-3 is constructed, and a check is made against third?
+// Then we would update to global iterator, and recheck. It would need to be ordered carefully(lock-free mechanics)
+// 
 
 namespace gdul
 {

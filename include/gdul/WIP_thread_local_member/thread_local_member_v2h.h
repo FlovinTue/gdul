@@ -5,53 +5,6 @@
 #include <gdul\atomic_shared_ptr\atomic_shared_ptr.h>
 
 
-//Maybe redesign to be based on a local array?
-//Could use ASP to ensure safe access (and 'upgrading').. 
-//Access would probably be slow(er). Current design ensures minimal thread/core interaction...
-//What benefits would local array have?. First of all, the static alloc could be kept in local storage.
-//Second
-
-//Could objects be initialized easier with this design? The answer is yes? Items would always be created per object(and thus have to be
-//default or manually constructed). Maybe set up test case with both versions? 
-//
-//Cacheline traffic would be an issue. For sure. No way to know if it would be outweighed by local-access benefit (apart from testing).
-
-
-
-// Idea for handling reinitializations:
-// Store 16bit index & 48 bit iteration in 64 bit var
-// If lessthan fails, it means that either capacity is too low, OR
-// iteration has changed. Then reexamination can be done, and if 
-// iteration != previous, reinitialize value.
-
-// A note: This will (probably) yield poor access performance if many 
-// objects are created and destroyed frequently.
-
-// We'll be counting on noone recreating an object type 2^48 times ...
-
-// Can we do == rather than < ?. Maybe include both < and == in one op.
-
-// Right. So if we come accross an index that has been used before. It will have a higher value.
-// How do we see that this particular 'higher value' has not been seen before?. If the 'Higher value'
-// is global (to the object), and a further changelist is kept somewhere.. somewhere?. This would have to 
-// be global. Something that each destructor could access and say "Hey, this object has been destroyed and 
-// needs to be re-constructed". 
-
-// So. A static kept flexible storage?? Hmm. Ugh. Using the ms concurrency runtime would be un-portable. 
-// That would mean a hacked together concurrent_vector would have to be made. UGH.
-// Actually, this could probably just be done using an atomic_shared_ptr -> raw array. (Since we're not *that*
-// bound by performance at this place)
-
-// Say though, that this is made. Then what?.. The array would keep track of which iteration a particular index
-// was at. So. 2 ^ 48 iterations enough to assume it will never get capped? .
-
-// Wait. Where would this iteration be stored? . Since we need the new-object-created-iteration as well as a particular 
-// index iteration. Oh boy. Need to keep another array to track known iterations.
-
-// Hash?
-
-// Note: Global iteration means it would have to use an atomic var. That stinks. Starting to look like a local array-solution is
-// maybe better.
 namespace gdul
 {
 template <class T, class Allocator = std::allocator<T>>

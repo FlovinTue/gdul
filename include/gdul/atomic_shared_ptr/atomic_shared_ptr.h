@@ -943,6 +943,15 @@ inline void control_block_claim_custom_delete<T, Allocator, Deleter>::destroy() 
 
 	rebound.deallocate(reinterpret_cast<std::uint8_t*>(this), shared_ptr<T>::template alloc_size_claim_custom_delete<Allocator, Deleter>());
 }
+template<class T, class Allocator
+	, std::enable_if_t<(std::is_array_v<T> && std::extent_v<T> != 0) || !std::is_array_v<T>>*
+	, class ...Args>
+	inline shared_ptr<T> allocate_shared(Allocator&, Args&&...);
+
+template<class T, class Allocator
+	, std::enable_if_t<(std::is_array_v<T> && std::extent_v<T> == 0)>*
+	, class ...Args>
+	inline shared_ptr<T> allocate_shared(Allocator&, Args&&...);
 template <class T>
 struct disable_deduction
 {
@@ -1161,20 +1170,20 @@ public:
 
 	~shared_ptr() noexcept;
 
-	inline constexpr explicit operator T* () noexcept; 
-	inline constexpr explicit operator const T* () const noexcept; 
+	inline constexpr explicit operator T* () noexcept;
+	inline constexpr explicit operator const T* () const noexcept;
 
-	inline constexpr const T* get_owned() const noexcept; 
-	inline constexpr T* get_owned() noexcept; 
+	inline constexpr const T* get_owned() const noexcept;
+	inline constexpr T* get_owned() noexcept;
 
 	inline constexpr T* operator->();
 	inline constexpr T& operator*();
 
 	inline constexpr const T* operator->() const;
-	inline constexpr const T& operator*() const; 
+	inline constexpr const T& operator*() const;
 
-	inline const T& operator[](aspdetail::size_type index) const; 
-	inline T& operator[](aspdetail::size_type index); 
+	inline const T& operator[](aspdetail::size_type index) const;
+	inline T& operator[](aspdetail::size_type index);
 
 	inline constexpr raw_ptr<T> get_raw_ptr() const noexcept;
 
@@ -1218,8 +1227,15 @@ private:
 	friend class raw_ptr<T>;
 	friend class atomic_shared_ptr<T>;
 
-	template <class U, class Allocator, class ...Args>
-	friend shared_ptr<U> make_shared(Allocator&, Args&&...);
+	template<class U, class Allocator
+		, std::enable_if_t<(std::is_array_v<U> && std::extent_v<U> != 0) || !std::is_array_v<U>>*
+		, class ...Args>
+		friend shared_ptr<U> aspdetail::allocate_shared(Allocator&, Args&&...);
+
+	template<class U, class Allocator
+		, std::enable_if_t<(std::is_array_v<U> && std::extent_v<U> == 0)>*
+		, class ...Args>
+		friend shared_ptr<U> aspdetail::allocate_shared(Allocator&, Args&&...);
 
 	T* m_ptr;
 };
@@ -1677,20 +1693,12 @@ inline constexpr raw_ptr<T>::raw_ptr(compressed_storage from) noexcept
 	: aspdetail::ptr_base<T>(from)
 {
 }
-template<class T, class ...Args>
-inline shared_ptr<T> make_shared(Args&& ...args)
+namespace aspdetail
 {
-	aspdetail::default_allocator alloc;
-	return make_shared<T, aspdetail::default_allocator>(alloc, std::forward<Args&&>(args)...);
-}
-template<class T, class Allocator, class ...Args>
-inline shared_ptr<T> make_shared(Args&& ...args)
-{
-	Allocator alloc;
-	return make_shared<T, Allocator>(alloc, std::forward<Args&&>(args)...);
-}
-template<class T, class Allocator, class ...Args>
-inline shared_ptr<T> make_shared(Allocator& allocator, Args&& ...args)
+template<class T, class Allocator
+	, std::enable_if_t<(std::is_array_v<T> && std::extent_v<T> != 0) || !std::is_array_v<T>> * = nullptr
+	, class ...Args>
+	inline shared_ptr<T> allocate_shared(Allocator& allocator, Args&& ...args)
 {
 	constexpr std::size_t blockSize(shared_ptr<T>::template alloc_size_make_shared<Allocator>());
 	constexpr std::size_t blockAlign(alignof(T));
@@ -1725,5 +1733,35 @@ inline shared_ptr<T> make_shared(Allocator& allocator, Args&& ...args)
 
 	return shared_ptr<T>(storage);
 }
+template<class T, class Allocator
+	, std::enable_if_t<(std::is_array_v<T> && std::extent_v<T> == 0)> * = nullptr
+	, class ...Args>
+	inline shared_ptr<T> allocate_shared(Allocator& allocator, Args&& ...args)
+{
+	using base_type = std::remove_all_extents_t<T>;
+
+
+}
+
+}
+
+template<class T, class ...Args>
+inline shared_ptr<T> make_shared(Args&& ...args)
+{
+	aspdetail::default_allocator alloc;
+	return make_shared<T, aspdetail::default_allocator>(alloc, std::forward<Args&&>(args)...);
+}
+template<class T, class Allocator, class ...Args>
+inline shared_ptr<T> make_shared(Args&& ...args)
+{
+	Allocator alloc;
+	return make_shared<T, Allocator>(alloc, std::forward<Args&&>(args)...);
+}
+template<class T, class Allocator, class ...Args>
+inline shared_ptr<T> make_shared(Allocator& allocator, Args&& ...args)
+{
+	return aspdetail::allocate_shared<T, Allocator>(allocator, std::forward<Args&&>(args)...);
+}
+
 };
 #pragma warning(pop)
