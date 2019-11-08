@@ -37,11 +37,13 @@
 
 #undef max
 
-#pragma warning(push, 2)
+#pragma warning(push, 3)
 // Anonymous union
 #pragma warning(disable : 4201)
 // Non-class enums 
 #pragma warning(disable : 26812)
+// Deleter with internal linkage
+#pragma warning(disable : 5046)
 
 namespace gdul
 {
@@ -126,16 +128,16 @@ template <class T>
 class raw_ptr;
 
 template <class T, class Allocator, std::enable_if_t<!aspdetail::is_unbounded_array_v<T>> * = nullptr>
-static constexpr std::size_t alloc_size_make_shared() noexcept;
+constexpr std::size_t alloc_size_make_shared() noexcept;
 
 template <class T, class Allocator, std::enable_if_t<aspdetail::is_unbounded_array_v<T>> * = nullptr>
-static constexpr std::size_t alloc_size_make_shared(std::size_t count) noexcept;
+constexpr std::size_t alloc_size_make_shared(std::size_t count) noexcept;
 
 template <class T, class Allocator>
-static constexpr std::size_t alloc_size_sp_claim() noexcept;
+constexpr std::size_t alloc_size_sp_claim() noexcept;
 
 template <class T, class Allocator, class Deleter>
-static constexpr std::size_t alloc_size_sp_claim_custom_delete() noexcept;
+constexpr std::size_t alloc_size_sp_claim_custom_delete() noexcept;
 
 template
 <
@@ -918,16 +920,18 @@ inline void control_block_make_shared<T, Allocator>::destroy() noexcept
 	rebound.deallocate(typedBlock, 1);
 }
 template <class T, class Allocator>
-class control_block_make_array : public control_block_base_members<T, Allocator>
+class control_block_make_array : public control_block_base_members<std::remove_all_extents_t<T>, Allocator>
 {
 public:
-	control_block_make_array(T* obj, std::size_t count, Allocator& alloc) noexcept;
+	using base_type = std::remove_all_extents_t<T>;
+
+	control_block_make_array(base_type* obj, std::size_t count, Allocator& alloc) noexcept;
 	void destroy() noexcept override;
 
 	const std::size_t m_count;
 };
 template<class T, class Allocator>
-inline control_block_make_array<T, Allocator>::control_block_make_array(T* obj, std::size_t count, Allocator& alloc) noexcept
+inline control_block_make_array<T, Allocator>::control_block_make_array(base_type* obj, std::size_t count, Allocator& alloc) noexcept
 	: control_block_base_members<T, Allocator>(obj, alloc)
 	, m_count(count)
 {
@@ -937,10 +941,10 @@ inline void control_block_make_array<T, Allocator>::destroy() noexcept
 {
 	Allocator alloc(this->m_allocator);
 
-	T* const ptrBase(this->m_ptr);
+	base_type* const ptrBase(this->m_ptr);
 
 	for (std::size_t i = 0; i < m_count; ++i) {
-		ptrBase[i].~T();
+		ptrBase[i].~base_type();
 	}
 
 	(*this).~control_block_make_array<T, Allocator>();
@@ -1728,7 +1732,8 @@ inline constexpr std::size_t alloc_size_make_shared() noexcept
 template <class T, class Allocator, std::enable_if_t<aspdetail::is_unbounded_array_v<T>>*>
 inline constexpr std::size_t alloc_size_make_shared(std::size_t count) noexcept
 {
-	return sizeof(aspdetail::control_block_make_array<T, Allocator>) + (sizeof(T) * count);
+	using base_type = std::remove_all_extents_t<T>;
+	return sizeof(aspdetail::control_block_make_array<T, Allocator>) + (sizeof(base_type) * count);
 }
 #else
 // The amount of memory requested from the allocator when calling
@@ -1736,18 +1741,20 @@ inline constexpr std::size_t alloc_size_make_shared(std::size_t count) noexcept
 template <class T, class Allocator, std::enable_if_t<!aspdetail::is_unbounded_array_v<T>>*>
 inline constexpr std::size_t alloc_size_make_shared() noexcept
 {
-	constexpr std::size_t align(alignof(aspdetail::control_block_make_shared<T, Allocator>));
-	constexpr std::size_t maxOffset(align - alignof(std::max_align_t));
-	return sizeof(aspdetail::control_block_make_shared<T, Allocator>) + (alignof(std::max_align_t) < align ? maxOffset : 0);
+	constexpr std::size_t align(alignof(T) < alignof(std::max_align_t) ? alignof(std::max_align_t) : alignof(T));
+	constexpr std::size_t maxExtra(align - alignof(std::max_align_t));
+	return sizeof(aspdetail::control_block_make_shared<T, Allocator>) + maxExtra;
 }
 // The amount of memory requested from the allocator when calling
 // make_shared (dynamically sized array)
 template <class T, class Allocator, std::enable_if_t<aspdetail::is_unbounded_array_v<T>>*>
 inline constexpr std::size_t alloc_size_make_shared(std::size_t count) noexcept
 {
-	constexpr std::size_t align(alignof(aspdetail::control_block_make_shared<T, Allocator>));
-	constexpr std::size_t maxOffset(align - alignof(std::max_align_t));
-	return sizeof(aspdetail::control_block_make_array<T, Allocator>) + (alignof(std::max_align_t) < align ? maxOffset : 0) + (sizeof(T) * count);
+	using base_type = std::remove_all_extents_t<T>;
+
+	constexpr std::size_t align(alignof(base_type) < alignof(std::max_align_t) ? alignof(std::max_align_t) : alignof(base_type));
+	constexpr std::size_t maxExtra(align - alignof(std::max_align_t));
+	return sizeof(aspdetail::control_block_make_array<T, Allocator>) + maxExtra + (sizeof(base_type) * count);
 }
 #endif
 // The amount of memory requested from the allocator when 

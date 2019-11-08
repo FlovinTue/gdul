@@ -16,6 +16,12 @@ int main()
 {
 		using namespace gdul;
 
+		//constexpr std::size_t mxsh = gdul::alloc_size_make_shared<int, std::allocator<int>>();
+		constexpr std::size_t mxar = gdul::alloc_size_make_shared<int[], std::allocator<int>>(5);
+		//constexpr std::size_t claim = gdul::alloc_size_sp_claim<int, std::allocator<int>>();
+		//auto del = [](int*, std::allocator<int>&) {};
+		//constexpr std::size_t claimdel = gdul::alloc_size_sp_claim_custom_delete<int, std::allocator<int>&, decltype(del)> ();
+
 		std::allocator<uint8_t> alloc;
 
 		shared_ptr<int> first;

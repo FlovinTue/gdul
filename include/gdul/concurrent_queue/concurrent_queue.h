@@ -502,7 +502,7 @@ inline typename concurrent_queue<T, Allocator>::shared_ptr_slot_type concurrent_
 	const std::size_t bufferByteSize(sizeof(buffer_type));
 	const std::size_t dataBlockByteSize(sizeof(cqdetail::item_container<T>) * log2size);
 
-	constexpr std::size_t controlBlockByteSize(gdul::alloc_size_sp_claim_custom_delete<T, allocator_adapter_type, cqdetail::buffer_deleter<buffer_type, allocator_adapter_type>>());
+	constexpr std::size_t controlBlockByteSize(gdul::alloc_size_sp_claim_custom_delete<buffer_type, allocator_adapter_type, cqdetail::buffer_deleter<buffer_type, allocator_adapter_type>>());
 
 	constexpr std::size_t controlBlockSize(cqdetail::aligned_size<void>(controlBlockByteSize, 8));
 	constexpr std::size_t bufferSize(cqdetail::aligned_size<void>(bufferByteSize, 8));
@@ -597,7 +597,7 @@ inline void concurrent_queue<T, Allocator>::try_alloc_produer_store_slot(std::ui
 	std::uint8_t* const block(m_allocator.allocate(blockSize));
 
 	cqdetail::store_array_deleter<atomic_shared_ptr_slot_type, allocator_type> deleter(producerCapacity);
-	shared_ptr_array_type desired(reinterpret_cast<atomic_shared_ptr_slot_type*>(block), std::move(deleter), m_allocator);
+	shared_ptr_array_type desired(reinterpret_cast<atomic_shared_ptr_slot_type*>(block), m_allocator, std::move(deleter));
 
 	for (std::size_t i = 0; i < producerCapacity; ++i) {
 		atomic_shared_ptr_slot_type* const item(&desired[i]);
@@ -1587,7 +1587,7 @@ inline dummy_container<T, Allocator>::dummy_container()
 	, m_dummyRawBuffer(1, &m_dummyItem)
 {
 	Allocator alloc;
-	m_dummyBuffer = shared_ptr_slot_type(&m_dummyRawBuffer, [](buffer_type*, Allocator&) {}, alloc);
+	m_dummyBuffer = shared_ptr_slot_type(&m_dummyRawBuffer, alloc, [](buffer_type*, Allocator&) {});
 
 	// Make copying the dummy (shared_ptr) buffer concurrency safe
 	m_dummyBuffer.set_local_refs(1);
