@@ -114,6 +114,12 @@ int main()
 			shared_ptr<over_aligned> seventeen(make_shared<over_aligned>());
 			seventeen = nullptr;
 		}
+		{
+			std::allocator<int[]> alloc_;
+			shared_ptr<int[]> eighteen(make_shared<int[]>(55));
+			shared_ptr<int[]> nineteen(make_shared<int[], std::allocator<int[]>>(44444, 999999));
+			shared_ptr<int[]> twenty(make_shared<int[], std::allocator<int[]>>(174, alloc_));
+		}
 
 		shared_ptr<int> nulla(nullptr, std::uint8_t(5));
 		raw_ptr<int> nullb(nullptr, 10);
@@ -163,41 +169,42 @@ int main()
 			doreferencetest(false);
 
 		uint32_t arraySweeps(10000);
-		uint32_t runs(32);
+		uint32_t runs(0);
 		float time(0.f);
 		for (std::uint32_t i = 0; i < runs; ++i) {
 			time += tester.Execute(arraySweeps, doassign, doreassign, doCAStest, doreferencetest);
 		}
-
+		if (runs)
+		{
 #ifdef _DEBUG
-		std::string config("DEBUG");
+			std::string config("DEBUG");
 #else
-		std::string config("RELEASE");
+			std::string config("RELEASE");
 #endif
-		std::string assign(doassign ? ", assign" : "");
-		std::string reassign(doreassign ? ", reassign" : "");
-		std::string referencetest(doreferencetest ? ", referencetest" : "");
+			std::string assign(doassign ? ", assign" : "");
+			std::string reassign(doreassign ? ", reassign" : "");
+			std::string referencetest(doreferencetest ? ", referencetest" : "");
 
-		std::cout
-			<< "Executed "
-			<< runs
-			<< " runs with "
-			<< arraySweeps
-			<< " array sweeps over "
-			<< time
-			<< " seconds averaging "
-			<< time / runs
-			<< " seconds per run in "
-			<< config
-			<< " mode"
-			<< " using tests "
-			<< assign
-			<< reassign
-			<< referencetest
-			<< ". The number of threads used were "
-			<< numThreads
-			<< std::endl;
+			std::cout
+				<< "Executed "
+				<< runs
+				<< " runs with "
+				<< arraySweeps
+				<< " array sweeps over "
+				<< time
+				<< " seconds averaging "
+				<< time / runs
+				<< " seconds per run in "
+				<< config
+				<< " mode"
+				<< " using tests "
+				<< assign
+				<< reassign
+				<< referencetest
+				<< ". The number of threads used were "
+				<< numThreads
+				<< std::endl;
 
-		
+		}
 		return 0;
 }

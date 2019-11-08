@@ -2,64 +2,23 @@
 <AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
 
   <Type Name="gdul::aspdetail::ptr_base&lt;*&gt;">
-		<DisplayString Condition="(
-				+ ((m_controlBlockStorage.m_u64 >> 1) * 2)
-				- ((uint64_t)m_controlBlockStorage.m_u8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
-				- ((uint64_t)m_controlBlockStorage.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] * (aspdetail::Versioned_Ptr_Mask + 1))
-						!= 0)">
-			{**(($T1**)
-			(
-			+ 8
-			+ ((m_controlBlockStorage.m_u64 >> 1) * 2)
-			- ((uint64_t)m_controlBlockStorage.m_u8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
-			- ((uint64_t)m_controlBlockStorage.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] * (aspdetail::Versioned_Ptr_Mask + 1)))
-			)}
+		<DisplayString Condition="(m_controlBlockStorage.m_u64 &amp; aspdetail::Ptr_Mask) != 0">
+			{**($T1**) ((m_controlBlockStorage.m_u64 &amp; aspdetail::Ptr_Mask) + 8)}
 		</DisplayString>
-		<DisplayString Condition="(
-				+ ((m_controlBlockStorage.m_u64 >> 1) * 2)
-				- ((uint64_t)m_controlBlockStorage.m_u8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
-				- ((uint64_t)m_controlBlockStorage.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] * (aspdetail::Versioned_Ptr_Mask + 1))
-						== 0)">
+		<DisplayString Condition="(m_controlBlockStorage.m_u64 &amp; aspdetail::Ptr_Mask) == 0">
 			{(void*)0}
 		</DisplayString>
 		<Expand >
-			<ExpandedItem Condition="(
-				+ ((m_controlBlockStorage.m_u64 >> 1) * 2)
-				- ((uint64_t)m_controlBlockStorage.m_u8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
-				- ((uint64_t)m_controlBlockStorage.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] * (aspdetail::Versioned_Ptr_Mask + 1))
-						!= 0)">
-				(*(($T1**)
-				(
-				+8
-				+ ((m_controlBlockStorage.m_u64 >> 1) * 2)
-				- ((uint64_t)m_controlBlockStorage.m_u8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
-				- ((uint64_t)m_controlBlockStorage.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] * (aspdetail::Versioned_Ptr_Mask + 1)))
-				))
+			<ExpandedItem Condition="(m_controlBlockStorage.m_u64 &amp; aspdetail::Ptr_Mask) != 0">
+				*($T1**) ((m_controlBlockStorage.m_u64 &amp; aspdetail::Ptr_Mask) + 8)
 			</ExpandedItem>
-			<Item Name="[object]" Condition="(
-				+ ((m_controlBlockStorage.m_u64 >> 1) * 2)
-				- ((uint64_t)m_controlBlockStorage.m_u8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
-				- ((uint64_t)m_controlBlockStorage.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] * (aspdetail::Versioned_Ptr_Mask + 1))
-						== 0)">
+			<Item Name="[object]" Condition="(m_controlBlockStorage.m_u64 &amp; aspdetail::Ptr_Mask) == 0">
 				(void*)0
 			</Item>
-      <Item Name="[**ptr_use_count]" Condition="(
-				+ ((m_controlBlockStorage.m_u64 >> 1) * 2)
-				- ((uint64_t)m_controlBlockStorage.m_u8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
-				- ((uint64_t)m_controlBlockStorage.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] * (aspdetail::Versioned_Ptr_Mask + 1))
-						!= 0)">
-				*((size_type*)(
-				+ 16
-				+ ((m_controlBlockStorage.m_u64 >> 1) * 2)
-				- ((uint64_t)m_controlBlockStorage.m_u8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
-				- ((uint64_t)m_controlBlockStorage.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] * (aspdetail::Versioned_Ptr_Mask + 1))
-				))
+      <Item Name="[**ptr_use_count]" Condition="(m_controlBlockStorage.m_u64 &amp; aspdetail::Ptr_Mask) != 0">
+				*(size_type*)((m_controlBlockStorage.m_u64 &amp; aspdetail::Ptr_Mask) + 16)
 			</Item>
-      <Item Name="[**ptr_use_count]" Condition="(
-				+ ((m_controlBlockStorage.m_u64 >> 1) * 2)
-				- ((uint64_t)m_controlBlockStorage.m_u8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
-				- ((uint64_t)m_controlBlockStorage.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] * (aspdetail::Versioned_Ptr_Mask + 1))
-						== 0)">
+      <Item Name="[**ptr_use_count]" Condition="(m_controlBlockStorage.m_u64 &amp; aspdetail::Ptr_Mask) == 0">
         0UL
       </Item>
       <Item Name="[**ptr_local_refs]">
@@ -72,69 +31,28 @@
   </Type>
 
 	<Type Name="gdul::atomic_shared_ptr&lt;*&gt;">
-		<DisplayString Condition="(
-				+ ((m_debugView.m_u64 >> 1) * 2)
-				- ((uint64_t)m_debugView.m_u8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
-				- ((uint64_t)m_debugView.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] * (aspdetail::Versioned_Ptr_Mask + 1))
-						!= 0)">
-			{**(($T1**)
-			(
-			+ 8
-			+ ((m_debugView.m_u64 >> 1) * 2)
-			- ((uint64_t)m_debugView.m_u8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
-			- ((uint64_t)m_debugView.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] * (aspdetail::Versioned_Ptr_Mask + 1)))
-			)}
+		<DisplayString Condition="(m_debugView.m_u64 &amp; aspdetail::Ptr_Mask) != 0">
+			{**($T1**) ((m_debugView.m_u64 &amp; aspdetail::Ptr_Mask) + 8)}
 		</DisplayString>
-		<DisplayString Condition="(
-				+ ((m_debugView.m_u64 >> 1) * 2)
-				- ((uint64_t)m_debugView.m_u8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
-				- ((uint64_t)m_debugView.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] * (aspdetail::Versioned_Ptr_Mask + 1))
-						== 0)">
+		<DisplayString Condition="(m_debugView.m_u64 &amp; aspdetail::Ptr_Mask) == 0">
 			{(void*)0}
 		</DisplayString>
 		<Expand >
-			<ExpandedItem Condition="(
-				+ ((m_debugView.m_u64 >> 1) * 2)
-				- ((uint64_t)m_debugView.m_u8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
-				- ((uint64_t)m_debugView.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] * (aspdetail::Versioned_Ptr_Mask + 1))
-						!= 0)">
-				(*(($T1**)
-				(
-				+8
-				+ ((m_debugView.m_u64 >> 1) * 2)
-				- ((uint64_t)m_debugView.m_u8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
-				- ((uint64_t)m_debugView.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] * (aspdetail::Versioned_Ptr_Mask + 1)))
-				))
+			<ExpandedItem Condition="(m_debugView.m_u64 &amp; aspdetail::Ptr_Mask) != 0">
+				*($T1**) ((m_debugView.m_u64 &amp; aspdetail::Ptr_Mask) + 8)
 			</ExpandedItem>
-			<Item Name="[object]" Condition="(
-				+ ((m_debugView.m_u64 >> 1) * 2)
-				- ((uint64_t)m_debugView.m_u8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
-				- ((uint64_t)m_debugView.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] * (aspdetail::Versioned_Ptr_Mask + 1))
-						== 0)">
+			<Item Name="[object]" Condition="(m_debugView.m_u64 &amp; aspdetail::Ptr_Mask) == 0">
 				(void*)0
 			</Item>
-			<Item Name="[**ptr_use_count]" Condition="(
-				+ ((m_debugView.m_u64 >> 1) * 2)
-				- ((uint64_t)m_debugView.m_u8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
-				- ((uint64_t)m_debugView.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] * (aspdetail::Versioned_Ptr_Mask + 1))
-						!= 0)">
-				*((size_type*)(
-				+ 16
-				+ ((m_debugView.m_u64 >> 1) * 2)
-				- ((uint64_t)m_debugView.m_u8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
-				- ((uint64_t)m_debugView.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] * (aspdetail::Versioned_Ptr_Mask + 1))
-				))
+			<Item Name="[**ptr_use_count]" Condition="(m_debugView.m_u64 &amp; aspdetail::Ptr_Mask) != 0">
+				*(size_type*)((m_debugView.m_u64 &amp; aspdetail::Ptr_Mask) + 16)
 			</Item>
-			<Item Name="[**ptr_use_count]" Condition="(
-				+ ((m_debugView.m_u64 >> 1) * 2)
-				- ((uint64_t)m_debugView.m_u8[aspdetail::STORAGE_BYTE_VERSION] * (aspdetail::Ptr_Mask + 1))
-				- ((uint64_t)m_debugView.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] * (aspdetail::Versioned_Ptr_Mask + 1))
-						== 0)">
+			<Item Name="[**ptr_use_count]" Condition="(m_debugView.m_u64 &amp; aspdetail::Ptr_Mask) == 0">
 				0UL
 			</Item>
-      <Item Name="[**ptr_local_refs]">
-        (size_type)m_debugView.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF]
-      </Item>
+			<Item Name="[**ptr_local_refs]">
+				(size_type)m_debugView.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF]
+			</Item>
 			<Item Name="[**ptr_version]">
 				(size_type)m_debugView.m_u8[aspdetail::STORAGE_BYTE_VERSION]
 			</Item>

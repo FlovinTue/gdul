@@ -938,13 +938,12 @@ public:
 	void destroy() noexcept override;
 
 private:
-
 	const std::size_t m_count;
 };
 template<class T, class Allocator>
 template <class ...Args>
 inline control_block_make_unbounded_array<T, Allocator>::control_block_make_unbounded_array(decayed_type* arr, std::size_t count, Allocator& alloc) noexcept
-	: control_block_base_members<T, Allocator>(arr, alloc)
+	: control_block_base_members<T, Allocator>(arr, alloc) 
 	, m_count(count)
 {
 }
