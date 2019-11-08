@@ -80,6 +80,9 @@ template <class T>
 constexpr bool is_unbounded_array_v = std::is_array_v<T> & (std::extent_v<T> == 0);
 
 template <class T>
+using decay_unbounded_t = std::conditional_t<is_unbounded_array_v<T>, std::remove_all_extents_t<T>, T>;
+
+template <class T>
 class control_block_base_interface;
 template <class T, class Allocator>
 class control_block_base_members;
@@ -163,6 +166,8 @@ class atomic_shared_ptr
 {
 public:
 	using size_type = aspdetail::size_type;
+	using value_type = T;
+	using decayed_type = aspdetail::decay_unbounded_t<T>;
 
 	inline constexpr atomic_shared_ptr() noexcept;
 	inline constexpr atomic_shared_ptr(std::nullptr_t) noexcept;
@@ -242,8 +247,8 @@ public:
 
 	raw_ptr<T> get_raw_ptr() const noexcept;
 
-	T* unsafe_get_owned();
-	const T* unsafe_get_owned() const;
+	decayed_type* unsafe_get_owned();
+	const decayed_type* unsafe_get_owned() const;
 
 private:
 	template <class PtrType>
@@ -556,7 +561,7 @@ inline raw_ptr<T> atomic_shared_ptr<T>::get_raw_ptr() const noexcept
 	return raw_ptr<T>(storage);
 }
 template<class T>
-inline T* atomic_shared_ptr<T>::unsafe_get_owned()
+inline typename atomic_shared_ptr<T>::decayed_type* atomic_shared_ptr<T>::unsafe_get_owned()
 {
 	aspdetail::control_block_base_interface<T>* const cb(get_control_block());
 	if (cb) {
@@ -565,7 +570,7 @@ inline T* atomic_shared_ptr<T>::unsafe_get_owned()
 	return nullptr;
 }
 template<class T>
-inline const T* atomic_shared_ptr<T>::unsafe_get_owned() const
+inline const typename atomic_shared_ptr<T>::decayed_type* atomic_shared_ptr<T>::unsafe_get_owned() const
 {
 	const aspdetail::control_block_base_interface<T>* const cb(get_control_block());
 	if (cb) {
@@ -798,9 +803,10 @@ class control_block_base_interface
 {
 public:
 	using size_type = aspdetail::size_type;
+	using decayed_type = aspdetail::decay_unbounded_t<T>;
 
-	virtual T* get_owned() noexcept = 0;
-	virtual const T* get_owned() const noexcept = 0;
+	virtual decayed_type* get_owned() noexcept = 0;
+	virtual const decayed_type* get_owned() const noexcept = 0;
 
 	virtual size_type use_count() const noexcept = 0;
 
@@ -816,11 +822,12 @@ class control_block_base_members : public control_block_base_interface<T>
 {
 public:
 	using size_type = aspdetail::size_type;
+	using decayed_type = aspdetail::decay_unbounded_t<T>;
 
-	control_block_base_members(T* object, Allocator& allocator, std::uint8_t blockOffset = 0);
+	control_block_base_members(decayed_type* object, Allocator& allocator, std::uint8_t blockOffset = 0);
 
-	T* get_owned() noexcept;
-	const T* get_owned() const noexcept;
+	decayed_type* get_owned() noexcept;
+	const decayed_type* get_owned() const noexcept;
 
 	size_type use_count() const noexcept;
 
@@ -831,14 +838,14 @@ protected:
 	virtual ~control_block_base_members() = default;
 	virtual void destroy() = 0;
 
-	T* const m_ptr;
+	decayed_type* const m_ptr;
 	std::atomic<size_type> m_useCount;
 	Allocator m_allocator;
 	const std::uint8_t m_blockOffset;
 };
 
 template<class T, class Allocator>
-inline control_block_base_members<T, Allocator>::control_block_base_members(T* object, Allocator& allocator, std::uint8_t blockOffset)
+inline control_block_base_members<T, Allocator>::control_block_base_members(decayed_type* object, Allocator& allocator, std::uint8_t blockOffset)
 	: m_useCount(Default_Local_Refs)
 	, m_ptr(object)
 	, m_allocator(allocator)
@@ -858,12 +865,12 @@ inline void control_block_base_members<T, Allocator>::decref(size_type count) no
 	}
 }
 template <class T, class Allocator>
-inline T* control_block_base_members<T, Allocator>::get_owned() noexcept
+inline typename control_block_base_members<T, Allocator>::decayed_type* control_block_base_members<T, Allocator>::get_owned() noexcept
 {
 	return m_ptr;
 }
 template<class T, class Allocator>
-inline const T* control_block_base_members<T, Allocator>::get_owned() const noexcept
+inline const typename control_block_base_members<T, Allocator>::decayed_type* control_block_base_members<T, Allocator>::get_owned() const noexcept
 {
 	return m_ptr;
 }
@@ -885,7 +892,7 @@ public:
 private:
 	T m_owned;
 };
-template<class T, class Allocator>
+template<class T, class Allocator> 
 template <class ...Args, class U, std::enable_if_t<std::is_array<U>::value>*>
 inline control_block_make_shared<T, Allocator>::control_block_make_shared(Allocator& alloc, std::uint8_t blockOffset, Args&& ...args)
 	: control_block_base_members<T, Allocator>(&m_owned, alloc, blockOffset)
@@ -920,18 +927,18 @@ inline void control_block_make_shared<T, Allocator>::destroy() noexcept
 	rebound.deallocate(typedBlock, 1);
 }
 template <class T, class Allocator>
-class control_block_make_array : public control_block_base_members<std::remove_all_extents_t<T>, Allocator>
+class control_block_make_array : public control_block_base_members<T, Allocator>
 {
 public:
-	using base_type = std::remove_all_extents_t<T>;
+	using decayed_type = std::remove_all_extents_t<T>;
 
-	control_block_make_array(base_type* obj, std::size_t count, Allocator& alloc) noexcept;
+	control_block_make_array(decayed_type* obj, std::size_t count, Allocator& alloc) noexcept;
 	void destroy() noexcept override;
 
 	const std::size_t m_count;
 };
 template<class T, class Allocator>
-inline control_block_make_array<T, Allocator>::control_block_make_array(base_type* obj, std::size_t count, Allocator& alloc) noexcept
+inline control_block_make_array<T, Allocator>::control_block_make_array(decayed_type* obj, std::size_t count, Allocator& alloc) noexcept
 	: control_block_base_members<T, Allocator>(obj, alloc)
 	, m_count(count)
 {
@@ -941,10 +948,10 @@ inline void control_block_make_array<T, Allocator>::destroy() noexcept
 {
 	Allocator alloc(this->m_allocator);
 
-	base_type* const ptrBase(this->m_ptr);
+	decayed_type* const ptrBase(this->m_ptr);
 
 	for (std::size_t i = 0; i < m_count; ++i) {
-		ptrBase[i].~base_type();
+		ptrBase[i].~decayed_type();
 	}
 
 	(*this).~control_block_make_array<T, Allocator>();
@@ -1045,6 +1052,7 @@ class ptr_base
 public:
 	using size_type = aspdetail::size_type;
 	using value_type = T;
+	using decayed_type = aspdetail::decay_unbounded_t<T>;
 
 	inline constexpr ptr_base(std::nullptr_t) noexcept;
 	inline constexpr ptr_base(std::nullptr_t, std::uint8_t version) noexcept;
@@ -1071,10 +1079,10 @@ protected:
 	inline void clear() noexcept;
 
 	constexpr control_block_base_interface<T>* to_control_block(compressed_storage from) noexcept;
-	constexpr T* to_object(compressed_storage from) noexcept;
+	constexpr decayed_type* to_object(compressed_storage from) noexcept;
 
 	constexpr const control_block_base_interface<T>* to_control_block(compressed_storage from) const noexcept;
-	constexpr const T* to_object(compressed_storage from) const noexcept;
+	constexpr const decayed_type* to_object(compressed_storage from) const noexcept;
 
 	friend class atomic_shared_ptr<T>;
 
@@ -1174,7 +1182,7 @@ inline constexpr const control_block_base_interface<T>* ptr_base<T>::to_control_
 	return reinterpret_cast<const control_block_base_interface<T>*>(from.m_u64 & Ptr_Mask);
 }
 template <class T>
-inline constexpr T* ptr_base<T>::to_object(compressed_storage from) noexcept
+inline constexpr typename ptr_base<T>::decayed_type* ptr_base<T>::to_object(compressed_storage from) noexcept
 {
 	control_block_base_interface<T>* const cb(to_control_block(from));
 	if (cb) {
@@ -1183,7 +1191,7 @@ inline constexpr T* ptr_base<T>::to_object(compressed_storage from) noexcept
 	return nullptr;
 }
 template <class T>
-inline constexpr const T* ptr_base<T>::to_object(compressed_storage from) const noexcept
+inline constexpr const typename ptr_base<T>::decayed_type* ptr_base<T>::to_object(compressed_storage from) const noexcept
 {
 	const control_block_base_interface<T>* const cb(to_control_block(from));
 	if (cb) {
@@ -1211,6 +1219,8 @@ template <class T>
 class shared_ptr : public aspdetail::ptr_base<T>
 {
 public:
+	using decayed_type = std::remove_all_extents_t<T>;
+
 	inline constexpr shared_ptr() noexcept;
 
 	inline constexpr shared_ptr(std::nullptr_t) noexcept;
@@ -1231,20 +1241,20 @@ public:
 
 	~shared_ptr() noexcept;
 
-	inline constexpr explicit operator T* () noexcept;
-	inline constexpr explicit operator const T* () const noexcept;
+	inline constexpr explicit operator decayed_type* () noexcept;
+	inline constexpr explicit operator const decayed_type* () const noexcept;
 
-	inline constexpr const T* get_owned() const noexcept;
-	inline constexpr T* get_owned() noexcept;
+	inline constexpr const decayed_type* get_owned() const noexcept;
+	inline constexpr decayed_type* get_owned() noexcept;
 
-	inline constexpr T* operator->();
-	inline constexpr T& operator*();
+	inline constexpr decayed_type* operator->();
+	inline constexpr decayed_type& operator*();
 
-	inline constexpr const T* operator->() const;
-	inline constexpr const T& operator*() const;
+	inline constexpr const decayed_type* operator->() const;
+	inline constexpr const decayed_type& operator*() const;
 
-	inline const T& operator[](aspdetail::size_type index) const;
-	inline T& operator[](aspdetail::size_type index);
+	inline const decayed_type& operator[](aspdetail::size_type index) const;
+	inline decayed_type& operator[](aspdetail::size_type index);
 
 	inline constexpr raw_ptr<T> get_raw_ptr() const noexcept;
 
@@ -1291,7 +1301,7 @@ private:
 		>
 		friend shared_ptr<U> make_shared(Allocator& allocator, Args&& ...args);
 
-	T* m_ptr;
+	decayed_type* m_ptr;
 };
 template <class T>
 inline constexpr shared_ptr<T>::shared_ptr() noexcept
@@ -1390,7 +1400,7 @@ inline void shared_ptr<T>::set_local_refs(std::uint8_t target) noexcept
 
 		this->m_controlBlockStorage.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] = target;
 		this->m_controlBlockStorage.m_u64 *= (bool)target;
-		m_ptr = (T*)((uint64_t)m_ptr * (bool)target);
+		m_ptr = (decayed_type*)((uint64_t)m_ptr * (bool)target);
 	}
 }
 template <class T>
@@ -1410,52 +1420,52 @@ inline constexpr raw_ptr<T> shared_ptr<T>::get_raw_ptr() const noexcept
 	return raw_ptr<T>(this->m_controlBlockStorage);
 }
 template <class T>
-inline constexpr shared_ptr<T>::operator T* () noexcept
+inline constexpr shared_ptr<T>::operator typename shared_ptr<T>::decayed_type* () noexcept
 {
 	return get_owned();
 }
 template <class T>
-inline constexpr shared_ptr<T>::operator const T* () const noexcept
+inline constexpr shared_ptr<T>::operator const typename shared_ptr<T>::decayed_type* () const noexcept
 {
 	return get_owned();
 }
 template <class T>
-inline constexpr T* shared_ptr<T>::operator->()
+inline constexpr typename shared_ptr<T>::decayed_type* shared_ptr<T>::operator->()
 {
 	return get_owned();
 }
 template <class T>
-inline constexpr T& shared_ptr<T>::operator*()
+inline constexpr typename shared_ptr<T>::decayed_type& shared_ptr<T>::operator*()
 {
 	return *get_owned();
 }
 template <class T>
-inline constexpr const T* shared_ptr<T>::operator->() const
+inline constexpr const typename shared_ptr<T>::decayed_type* shared_ptr<T>::operator->() const
 {
 	return get_owned();
 }
 template <class T>
-inline constexpr const T& shared_ptr<T>::operator*() const
+inline constexpr const typename shared_ptr<T>::decayed_type& shared_ptr<T>::operator*() const
 {
 	return *get_owned();
 }
 template <class T>
-inline const T& shared_ptr<T>::operator[](aspdetail::size_type index) const
+inline const typename shared_ptr<T>::decayed_type& shared_ptr<T>::operator[](aspdetail::size_type index) const
 {
 	return get_owned()[index];
 }
 template <class T>
-inline T& shared_ptr<T>::operator[](aspdetail::size_type index)
+inline typename shared_ptr<T>::decayed_type& shared_ptr<T>::operator[](aspdetail::size_type index)
 {
 	return get_owned()[index];
 }
 template <class T>
-inline constexpr const T* shared_ptr<T>::get_owned() const noexcept
+inline constexpr const typename shared_ptr<T>::decayed_type* shared_ptr<T>::get_owned() const noexcept
 {
 	return m_ptr;
 }
 template <class T>
-inline constexpr T* shared_ptr<T>::get_owned() noexcept
+inline constexpr typename shared_ptr<T>::decayed_type* shared_ptr<T>::get_owned() noexcept
 {
 	return m_ptr;
 }
@@ -1573,6 +1583,7 @@ public:
 	inline constexpr raw_ptr() noexcept;
 
 	using aspdetail::ptr_base<T>::ptr_base;
+	using decayed_type = std::remove_all_extents_t<T>;
 
 	constexpr raw_ptr(raw_ptr<T>&& other) noexcept;
 	constexpr raw_ptr(const raw_ptr<T>& other) noexcept;
@@ -1581,20 +1592,20 @@ public:
 
 	explicit raw_ptr(const atomic_shared_ptr<T>& from) noexcept;
 
-	inline constexpr explicit operator T* () noexcept;
-	inline constexpr explicit operator const T* () const noexcept;
+	inline constexpr explicit operator decayed_type* () noexcept;
+	inline constexpr explicit operator const decayed_type* () const noexcept;
 
-	inline constexpr const T* get_owned() const noexcept;
-	inline constexpr T* get_owned() noexcept;
+	inline constexpr const decayed_type* get_owned() const noexcept;
+	inline constexpr decayed_type* get_owned() noexcept;
 
-	inline constexpr T* operator->();
-	inline constexpr T& operator*();
+	inline constexpr decayed_type* operator->();
+	inline constexpr decayed_type& operator*();
 
-	inline constexpr const T* operator->() const;
-	inline constexpr const T& operator*() const;
+	inline constexpr const decayed_type* operator->() const;
+	inline constexpr const decayed_type& operator*() const;
 
-	inline const T& operator[](aspdetail::size_type index) const;
-	inline T& operator[](aspdetail::size_type index);
+	inline const decayed_type& operator[](aspdetail::size_type index) const;
+	inline decayed_type& operator[](aspdetail::size_type index);
 
 	constexpr raw_ptr<T>& operator=(const raw_ptr<T>& other) noexcept;
 	constexpr raw_ptr<T>& operator=(raw_ptr<T>&& other) noexcept;
@@ -1665,52 +1676,52 @@ inline constexpr raw_ptr<T>& raw_ptr<T>::operator=(const atomic_shared_ptr<T>& f
 	return *this;
 }
 template <class T>
-inline constexpr raw_ptr<T>::operator T* () noexcept
+inline constexpr raw_ptr<T>::operator typename raw_ptr<T>::decayed_type*() noexcept
 {
 	return get_owned();
 }
 template <class T>
-inline constexpr raw_ptr<T>::operator const T* () const noexcept
+inline constexpr raw_ptr<T>::operator const typename raw_ptr<T>::decayed_type*() const noexcept
 {
 	return get_owned();
 }
 template <class T>
-inline constexpr const T* raw_ptr<T>::get_owned() const noexcept
+inline constexpr const typename raw_ptr<T>::decayed_type* raw_ptr<T>::get_owned() const noexcept
 {
 	return this->to_object(this->m_controlBlockStorage);
 }
 template <class T>
-inline constexpr T* raw_ptr<T>::get_owned() noexcept
+inline constexpr typename raw_ptr<T>::decayed_type* raw_ptr<T>::get_owned() noexcept
 {
 	return this->to_object(this->m_controlBlockStorage);
 }
 template <class T>
-inline constexpr T* raw_ptr<T>::operator->()
+inline constexpr typename raw_ptr<T>::decayed_type* raw_ptr<T>::operator->()
 {
 	return get_owned();
 }
 template <class T>
-inline constexpr T& raw_ptr<T>::operator*()
+inline constexpr typename raw_ptr<T>::decayed_type& raw_ptr<T>::operator*()
 {
 	return *get_owned();
 }
 template <class T>
-inline constexpr const T* raw_ptr<T>::operator->() const
+inline constexpr const typename raw_ptr<T>::decayed_type* raw_ptr<T>::operator->() const
 {
 	return get_owned();
 }
 template <class T>
-inline constexpr const T& raw_ptr<T>::operator*() const
+inline constexpr const typename raw_ptr<T>::decayed_type& raw_ptr<T>::operator*() const
 {
 	return *get_owned();
 }
 template <class T>
-inline const T& raw_ptr<T>::operator[](aspdetail::size_type index) const
+inline const typename raw_ptr<T>::decayed_type& raw_ptr<T>::operator[](aspdetail::size_type index) const
 {
 	return get_owned()[index];
 }
 template <class T>
-inline T& raw_ptr<T>::operator[](aspdetail::size_type index)
+inline typename raw_ptr<T>::decayed_type& raw_ptr<T>::operator[](aspdetail::size_type index)
 {
 	return get_owned()[index];
 }
@@ -1732,8 +1743,8 @@ inline constexpr std::size_t alloc_size_make_shared() noexcept
 template <class T, class Allocator, std::enable_if_t<aspdetail::is_unbounded_array_v<T>>*>
 inline constexpr std::size_t alloc_size_make_shared(std::size_t count) noexcept
 {
-	using base_type = std::remove_all_extents_t<T>;
-	return sizeof(aspdetail::control_block_make_array<T, Allocator>) + (sizeof(base_type) * count);
+	using decayed_type = std::remove_all_extents_t<T>;
+	return sizeof(aspdetail::control_block_make_array<T, Allocator>) + (sizeof(decayed_type) * count);
 }
 #else
 // The amount of memory requested from the allocator when calling
@@ -1750,11 +1761,11 @@ inline constexpr std::size_t alloc_size_make_shared() noexcept
 template <class T, class Allocator, std::enable_if_t<aspdetail::is_unbounded_array_v<T>>*>
 inline constexpr std::size_t alloc_size_make_shared(std::size_t count) noexcept
 {
-	using base_type = std::remove_all_extents_t<T>;
+	using decayed_type = std::remove_all_extents_t<T>;
 
-	constexpr std::size_t align(alignof(base_type) < alignof(std::max_align_t) ? alignof(std::max_align_t) : alignof(base_type));
+	constexpr std::size_t align(alignof(decayed_type) < alignof(std::max_align_t) ? alignof(std::max_align_t) : alignof(decayed_type));
 	constexpr std::size_t maxExtra(align - alignof(std::max_align_t));
-	return sizeof(aspdetail::control_block_make_array<T, Allocator>) + maxExtra + (sizeof(base_type) * count);
+	return sizeof(aspdetail::control_block_make_array<T, Allocator>) + maxExtra + (sizeof(decayed_type) * count);
 }
 #endif
 // The amount of memory requested from the allocator when 
@@ -1849,7 +1860,7 @@ template
 // make_shared from dynamically sized array using declared, instanced allocator
 	inline shared_ptr<T> make_shared(std::size_t count, Allocator& allocator, Args&& ...args)
 {
-	using base_type = std::remove_all_extents_t<T>;
+	using decayed_type = std::remove_all_extents_t<T>;
 
 	// should make new control_block for this.. 
 
