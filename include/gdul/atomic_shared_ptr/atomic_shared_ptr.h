@@ -962,17 +962,13 @@ inline void control_block_make_unbounded_array<T, Allocator>::destroy() noexcept
 
 	(*this).~control_block_make_unbounded_array<T, Allocator>();
 
-	constexpr std::size_t blockSize(alloc_size_make_shared<T, Allocator>(m_count));
-	constexpr std::size_t blockAlign(alignof(decayed_type));
-
-	using block_type = aspdetail::aligned_storage<blockAlign, blockSize>;
-	using rebound_alloc = typename std::allocator_traits<Allocator>::template rebind_alloc<block_type>;
+	using rebound_alloc = typename std::allocator_traits<Allocator>::template rebind_alloc<std::uint8_t>;
 
 	rebound_alloc rebound(alloc);
 
-	block_type* const typedBlock((block_type*)this);
+	uint8_t* const block((uint8_t*)this);
 
-	rebound.deallocate(typedBlock, 1);
+	rebound.deallocate(block, alloc_size_make_shared<T, Allocator>(m_count));
 }
 template <class T, class Allocator>
 class control_block_claim : public control_block_base_members<T, Allocator>
@@ -1311,7 +1307,7 @@ private:
 		std::enable_if_t<aspdetail::is_unbounded_array_v<U>> *,
 		class ...Args
 		>
-		friend shared_ptr<U> make_shared(Allocator& allocator, Args&& ...args);
+		friend shared_ptr<U> make_shared(std::size_t, Allocator&, Args&& ...);
 
 	decayed_type* m_ptr;
 };
@@ -1750,14 +1746,6 @@ inline constexpr std::size_t alloc_size_make_shared() noexcept
 {
 	return sizeof(aspdetail::control_block_make_shared<T, Allocator>);
 }
-// The amount of memory requested from the allocator when calling
-// make_shared (dynamically sized array)
-template <class T, class Allocator, std::enable_if_t<aspdetail::is_unbounded_array_v<T>>*>
-inline constexpr std::size_t alloc_size_make_shared(std::size_t count) noexcept
-{
-	using decayed_type = aspdetail::decay_unbounded_t<T>;
-	return sizeof(aspdetail::control_block_make_unbounded_array<T, Allocator>) + (sizeof(decayed_type) * count);
-}
 #else
 // The amount of memory requested from the allocator when calling
 // make_shared (object or statically sized array)
@@ -1768,6 +1756,7 @@ inline constexpr std::size_t alloc_size_make_shared() noexcept
 	constexpr std::size_t maxExtra(align - alignof(std::max_align_t));
 	return sizeof(aspdetail::control_block_make_shared<T, Allocator>) + maxExtra;
 }
+#endif
 // The amount of memory requested from the allocator when calling
 // make_shared (dynamically sized array)
 template <class T, class Allocator, std::enable_if_t<aspdetail::is_unbounded_array_v<T>>*>
@@ -1779,7 +1768,6 @@ inline constexpr std::size_t alloc_size_make_shared(std::size_t count) noexcept
 	constexpr std::size_t maxExtra(align - alignof(std::max_align_t));
 	return sizeof(aspdetail::control_block_make_unbounded_array<T, Allocator>) + maxExtra + (sizeof(decayed_type) * count);
 }
-#endif
 // The amount of memory requested from the allocator when 
 // shared_ptr takes ownership of an object using default deleter
 template <class T, class Allocator>
@@ -1853,8 +1841,10 @@ template
 		if (controlBlock) {
 			(*controlBlock).~control_block_make_shared();
 		}
+		if (typedBlock){
+			rebound.deallocate(typedBlock, 1);
+		}
 		throw;
-		rebound.deallocate(typedBlock, 1);
 	}
 
 	aspdetail::compressed_storage storage(reinterpret_cast<std::uint64_t>(controlBlock));
@@ -1874,22 +1864,19 @@ template
 {
 	using decayed_type = aspdetail::decay_unbounded_t<T>;
 
-	constexpr std::size_t blockSize(alloc_size_make_shared<T, Allocator>());
-	constexpr std::size_t blockAlign(alignof(decayed_type));
+	const std::size_t blockSize(alloc_size_make_shared<T, Allocator>(count));
 
-	using block_type = aspdetail::aligned_storage<blockAlign, blockSize>;
-	using rebound_alloc = typename std::allocator_traits<Allocator>::template rebind_alloc<block_type>;
+	using rebound_alloc = typename std::allocator_traits<Allocator>::template rebind_alloc<uint8_t>;
 
 	rebound_alloc rebound(allocator);
-	block_type* typedBlock(nullptr);
+	std::uint8_t* block(nullptr);
 	aspdetail::control_block_make_unbounded_array<T, Allocator>* controlBlock(nullptr);
 	decayed_type* arrayloc(nullptr);
 
 	std::size_t constructed(0);
 	try
 	{
-		typedBlock = rebound.allocate(1);
-		std::uint8_t* const block((std::uint8_t*)typedBlock);
+		block = rebound.allocate(blockSize);
 
 		uint8_t* const cbend(block + sizeof(aspdetail::control_block_make_unbounded_array<T, Allocator>));
 		const uintptr_t asint((uintptr_t)cbend);
@@ -1903,23 +1890,22 @@ template
 			new (&arrayloc[i]) decayed_type(std::forward<Args&&>(args)...);
 		}
 
-		aspdetail::assert_alignment<decayed_type>(block);
+		aspdetail::assert_alignment<std::max_align_t>(block);
 
 		controlBlock = new (reinterpret_cast<std::uint8_t*>(block)) aspdetail::control_block_make_unbounded_array<T, Allocator>(arrayloc, count, allocator);
 	}
 	catch (...)
 	{
-		if (controlBlock)
-		{
-			(*controlBlock).~control_block_make_shared();
+		if (controlBlock){
+			(*controlBlock).~control_block_make_unbounded_array();
 		}
-		for (std::size_t i = 0; i < constructed; ++i)
-		{
+		for (std::size_t i = 0; i < constructed; ++i){
 			arrayloc[i].~decayed_type();
 		}
-
+		if (block){
+			rebound.deallocate(block, blockSize);
+		}
 		throw;
-		rebound.deallocate(typedBlock, 1);
 	}
 
 	aspdetail::compressed_storage storage(reinterpret_cast<std::uint64_t>(controlBlock));
