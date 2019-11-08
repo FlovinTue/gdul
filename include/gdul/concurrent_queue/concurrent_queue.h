@@ -514,6 +514,8 @@ inline typename concurrent_queue<T, Allocator>::shared_ptr_slot_type concurrent_
 
 	buffer_type* buffer(nullptr);
 	cqdetail::item_container<T>* data(nullptr);
+	
+	std::size_t constructed(0);
 
 #ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
 	try {
@@ -533,8 +535,8 @@ inline typename concurrent_queue<T, Allocator>::shared_ptr_slot_type concurrent_
 
 		// new (addr) (arr[n]) is unreliable...
 		data = reinterpret_cast<cqdetail::item_container<T>*>(totalBlock + dataOffset);
-		for (std::size_t i = 0; i < log2size; ++i) {
-			cqdetail::item_container<T>* const item(&data[i]);
+		for (; constructed < log2size; ++constructed) {
+			cqdetail::item_container<T>* const item(&data[constructed]);
 			new (item) (cqdetail::item_container<T>);
 		}
 
@@ -543,6 +545,9 @@ inline typename concurrent_queue<T, Allocator>::shared_ptr_slot_type concurrent_
 	}
 	catch (...) {
 		m_allocator.deallocate(totalBlock, totalBlockSize);
+		for (std::size_t i = 0; i < constructed; ++i){
+			data[i].~item_container<T>();
+		}
 		throw;
 	}
 #endif
