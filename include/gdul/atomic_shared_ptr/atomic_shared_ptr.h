@@ -55,7 +55,7 @@ typedef std::allocator<std::uint8_t> default_allocator;
 
 static constexpr std::uint64_t Ptr_Mask = (std::numeric_limits<std::uint64_t>::max() >> 16);
 static constexpr std::uint64_t Versioned_Ptr_Mask = (std::numeric_limits<std::uint64_t>::max() >> 8);
-
+static constexpr std::uint64_t Local_Ref_Mask = ~Versioned_Ptr_Mask;
 union compressed_storage
 {
 	constexpr compressed_storage()  noexcept : m_u64(0ULL) {}
@@ -247,8 +247,8 @@ public:
 
 	raw_ptr<T> get_raw_ptr() const noexcept;
 
-	decayed_type* unsafe_get_owned();
-	const decayed_type* unsafe_get_owned() const;
+	decayed_type* unsafe_get();
+	const decayed_type* unsafe_get() const;
 
 private:
 	template <class PtrType>
@@ -561,20 +561,20 @@ inline raw_ptr<T> atomic_shared_ptr<T>::get_raw_ptr() const noexcept
 	return raw_ptr<T>(storage);
 }
 template<class T>
-inline typename atomic_shared_ptr<T>::decayed_type* atomic_shared_ptr<T>::unsafe_get_owned()
+inline typename atomic_shared_ptr<T>::decayed_type* atomic_shared_ptr<T>::unsafe_get()
 {
 	aspdetail::control_block_base_interface<T>* const cb(get_control_block());
 	if (cb) {
-		return cb->get_owned();
+		return cb->get();
 	}
 	return nullptr;
 }
 template<class T>
-inline const typename atomic_shared_ptr<T>::decayed_type* atomic_shared_ptr<T>::unsafe_get_owned() const
+inline const typename atomic_shared_ptr<T>::decayed_type* atomic_shared_ptr<T>::unsafe_get() const
 {
 	const aspdetail::control_block_base_interface<T>* const cb(get_control_block());
 	if (cb) {
-		return cb->get_owned();
+		return cb->get();
 	}
 	return nullptr;
 }
@@ -805,8 +805,8 @@ public:
 	using size_type = aspdetail::size_type;
 	using decayed_type = aspdetail::decay_unbounded_t<T>;
 
-	virtual decayed_type* get_owned() noexcept = 0;
-	virtual const decayed_type* get_owned() const noexcept = 0;
+	virtual decayed_type* get() noexcept = 0;
+	virtual const decayed_type* get() const noexcept = 0;
 
 	virtual size_type use_count() const noexcept = 0;
 
@@ -826,8 +826,8 @@ public:
 
 	control_block_base_members(decayed_type* object, Allocator& allocator, std::uint8_t blockOffset = 0);
 
-	decayed_type* get_owned() noexcept;
-	const decayed_type* get_owned() const noexcept;
+	decayed_type* get() noexcept;
+	const decayed_type* get() const noexcept;
 
 	size_type use_count() const noexcept;
 
@@ -837,19 +837,20 @@ public:
 protected:
 	virtual ~control_block_base_members() = default;
 	virtual void destroy() = 0;
+	std::uint8_t block_offset() const;
 
-	decayed_type* const m_ptr;
+private:
+	const compressed_storage m_ptrStorage;
 	std::atomic<size_type> m_useCount;
+protected:
 	Allocator m_allocator;
-	const std::uint8_t m_blockOffset;
 };
 
 template<class T, class Allocator>
 inline control_block_base_members<T, Allocator>::control_block_base_members(decayed_type* object, Allocator& allocator, std::uint8_t blockOffset)
 	: m_useCount(Default_Local_Refs)
-	, m_ptr(object)
+	, m_ptrStorage(std::uint64_t(object) | (std::uint64_t(blockOffset) << 48) | (std::uint64_t(is_unbounded_array_v<T>) << 56))
 	, m_allocator(allocator)
-	, m_blockOffset(blockOffset)
 {
 }
 template<class T, class Allocator>
@@ -864,15 +865,20 @@ inline void control_block_base_members<T, Allocator>::decref(size_type count) no
 		destroy();
 	}
 }
-template <class T, class Allocator>
-inline typename control_block_base_members<T, Allocator>::decayed_type* control_block_base_members<T, Allocator>::get_owned() noexcept
+template<class T, class Allocator>
+inline std::uint8_t control_block_base_members<T, Allocator>::block_offset() const
 {
-	return m_ptr;
+	return std::uint8_t(m_ptrStorage.m_u8[6]);
+}
+template <class T, class Allocator>
+inline typename control_block_base_members<T, Allocator>::decayed_type* control_block_base_members<T, Allocator>::get() noexcept
+{
+	return (decayed_type*)(m_ptrStorage.m_u64 & Ptr_Mask);
 }
 template<class T, class Allocator>
-inline const typename control_block_base_members<T, Allocator>::decayed_type* control_block_base_members<T, Allocator>::get_owned() const noexcept
+inline const typename control_block_base_members<T, Allocator>::decayed_type* control_block_base_members<T, Allocator>::get() const noexcept
 {
-	return m_ptr;
+	return (decayed_type*)(m_ptrStorage.m_u64 & Ptr_Mask);
 }
 template <class T, class Allocator>
 inline typename control_block_base_members<T, Allocator>::size_type control_block_base_members<T, Allocator>::use_count() const noexcept
@@ -921,7 +927,7 @@ inline void control_block_make_shared<T, Allocator>::destroy() noexcept
 
 	rebound_alloc rebound(alloc);
 
-	uint8_t* beginPtr((std::uint8_t*)this - this->m_blockOffset);
+	uint8_t* beginPtr((std::uint8_t*)this - this->block_offset());
 	block_type* const typedBlock((block_type*)beginPtr);
 
 	rebound.deallocate(typedBlock, 1);
@@ -952,7 +958,7 @@ inline void control_block_make_unbounded_array<T, Allocator>::destroy() noexcept
 {
 	Allocator alloc(this->m_allocator);
 
-	decayed_type* const ptrBase(this->m_ptr);
+	decayed_type* const ptrBase(this->get());
 
 	for (std::size_t i = 0; i < m_count; ++i)
 	{
@@ -986,7 +992,7 @@ inline void control_block_claim<T, Allocator>::destroy() noexcept
 {
 	Allocator alloc(this->m_allocator);
 
-	delete this->m_ptr;
+	delete this->get();
 	(*this).~control_block_claim<T, Allocator>();
 
 	using rebound_alloc = typename std::allocator_traits<Allocator>::template rebind_alloc<std::uint8_t>;
@@ -1016,7 +1022,7 @@ inline void control_block_claim_custom_delete<T, Allocator, Deleter>::destroy() 
 {
 	Allocator alloc(this->m_allocator);
 
-	T* ptrAddr(this->m_ptr);
+	T* ptrAddr(this->get());
 	m_deleter(ptrAddr, alloc);
 	(*this).~control_block_claim_custom_delete<T, Allocator, Deleter>();
 
@@ -1193,7 +1199,7 @@ inline constexpr typename ptr_base<T>::decayed_type* ptr_base<T>::to_object(comp
 {
 	control_block_base_interface<T>* const cb(to_control_block(from));
 	if (cb) {
-		return cb->get_owned();
+		return cb->get();
 	}
 	return nullptr;
 }
@@ -1202,7 +1208,7 @@ inline constexpr const typename ptr_base<T>::decayed_type* ptr_base<T>::to_objec
 {
 	const control_block_base_interface<T>* const cb(to_control_block(from));
 	if (cb) {
-		return cb->get_owned();
+		return cb->get();
 	}
 	return nullptr;
 }
@@ -1251,8 +1257,8 @@ public:
 	inline constexpr explicit operator decayed_type* () noexcept;
 	inline constexpr explicit operator const decayed_type* () const noexcept;
 
-	inline constexpr const decayed_type* get_owned() const noexcept;
-	inline constexpr decayed_type* get_owned() noexcept;
+	inline constexpr const decayed_type* get() const noexcept;
+	inline constexpr decayed_type* get() noexcept;
 
 	inline constexpr decayed_type* operator->();
 	inline constexpr decayed_type& operator*();
@@ -1429,50 +1435,50 @@ inline constexpr raw_ptr<T> shared_ptr<T>::get_raw_ptr() const noexcept
 template <class T>
 inline constexpr shared_ptr<T>::operator typename shared_ptr<T>::decayed_type* () noexcept
 {
-	return get_owned();
+	return get();
 }
 template <class T>
 inline constexpr shared_ptr<T>::operator const typename shared_ptr<T>::decayed_type* () const noexcept
 {
-	return get_owned();
+	return get();
 }
 template <class T>
 inline constexpr typename shared_ptr<T>::decayed_type* shared_ptr<T>::operator->()
 {
-	return get_owned();
+	return get();
 }
 template <class T>
 inline constexpr typename shared_ptr<T>::decayed_type& shared_ptr<T>::operator*()
 {
-	return *get_owned();
+	return *get();
 }
 template <class T>
 inline constexpr const typename shared_ptr<T>::decayed_type* shared_ptr<T>::operator->() const
 {
-	return get_owned();
+	return get();
 }
 template <class T>
 inline constexpr const typename shared_ptr<T>::decayed_type& shared_ptr<T>::operator*() const
 {
-	return *get_owned();
+	return *get();
 }
 template <class T>
 inline const typename shared_ptr<T>::decayed_type& shared_ptr<T>::operator[](aspdetail::size_type index) const
 {
-	return get_owned()[index];
+	return get()[index];
 }
 template <class T>
 inline typename shared_ptr<T>::decayed_type& shared_ptr<T>::operator[](aspdetail::size_type index)
 {
-	return get_owned()[index];
+	return get()[index];
 }
 template <class T>
-inline constexpr const typename shared_ptr<T>::decayed_type* shared_ptr<T>::get_owned() const noexcept
+inline constexpr const typename shared_ptr<T>::decayed_type* shared_ptr<T>::get() const noexcept
 {
 	return m_ptr;
 }
 template <class T>
-inline constexpr typename shared_ptr<T>::decayed_type* shared_ptr<T>::get_owned() noexcept
+inline constexpr typename shared_ptr<T>::decayed_type* shared_ptr<T>::get() noexcept
 {
 	return m_ptr;
 }
@@ -1602,8 +1608,8 @@ public:
 	inline constexpr explicit operator decayed_type* () noexcept;
 	inline constexpr explicit operator const decayed_type* () const noexcept;
 
-	inline constexpr const decayed_type* get_owned() const noexcept;
-	inline constexpr decayed_type* get_owned() noexcept;
+	inline constexpr const decayed_type* get() const noexcept;
+	inline constexpr decayed_type* get() noexcept;
 
 	inline constexpr decayed_type* operator->();
 	inline constexpr decayed_type& operator*();
@@ -1685,57 +1691,58 @@ inline constexpr raw_ptr<T>& raw_ptr<T>::operator=(const atomic_shared_ptr<T>& f
 template <class T>
 inline constexpr raw_ptr<T>::operator typename raw_ptr<T>::decayed_type*() noexcept
 {
-	return get_owned();
+	return get();
 }
 template <class T>
 inline constexpr raw_ptr<T>::operator const typename raw_ptr<T>::decayed_type*() const noexcept
 {
-	return get_owned();
+	return get();
 }
 template <class T>
-inline constexpr const typename raw_ptr<T>::decayed_type* raw_ptr<T>::get_owned() const noexcept
+inline constexpr const typename raw_ptr<T>::decayed_type* raw_ptr<T>::get() const noexcept
 {
 	return this->to_object(this->m_controlBlockStorage);
 }
 template <class T>
-inline constexpr typename raw_ptr<T>::decayed_type* raw_ptr<T>::get_owned() noexcept
+inline constexpr typename raw_ptr<T>::decayed_type* raw_ptr<T>::get() noexcept
 {
 	return this->to_object(this->m_controlBlockStorage);
 }
 template <class T>
 inline constexpr typename raw_ptr<T>::decayed_type* raw_ptr<T>::operator->()
 {
-	return get_owned();
+	return get();
 }
 template <class T>
 inline constexpr typename raw_ptr<T>::decayed_type& raw_ptr<T>::operator*()
 {
-	return *get_owned();
+	return *get();
 }
 template <class T>
 inline constexpr const typename raw_ptr<T>::decayed_type* raw_ptr<T>::operator->() const
 {
-	return get_owned();
+	return get();
 }
 template <class T>
 inline constexpr const typename raw_ptr<T>::decayed_type& raw_ptr<T>::operator*() const
 {
-	return *get_owned();
+	return *get();
 }
 template <class T>
 inline const typename raw_ptr<T>::decayed_type& raw_ptr<T>::operator[](aspdetail::size_type index) const
 {
-	return get_owned()[index];
+	return get()[index];
 }
 template <class T>
 inline typename raw_ptr<T>::decayed_type& raw_ptr<T>::operator[](aspdetail::size_type index)
 {
-	return get_owned()[index];
+	return get()[index];
 }
 template<class T>
 inline constexpr raw_ptr<T>::raw_ptr(compressed_storage from) noexcept
 	: aspdetail::ptr_base<T>(from)
 {
+	this->m_controlBlockStorage.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] = 0;
 }
 #if 201700 < __cplusplus || _HAS_CXX17
 // The amount of memory requested from the allocator when calling

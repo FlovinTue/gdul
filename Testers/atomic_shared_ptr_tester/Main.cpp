@@ -169,7 +169,7 @@ int main()
 			doreferencetest(false);
 
 		uint32_t arraySweeps(10000);
-		uint32_t runs(0);
+		uint32_t runs(8);
 		float time(0.f);
 		for (std::uint32_t i = 0; i < runs; ++i) {
 			time += tester.Execute(arraySweeps, doassign, doreassign, doCAStest, doreferencetest);
