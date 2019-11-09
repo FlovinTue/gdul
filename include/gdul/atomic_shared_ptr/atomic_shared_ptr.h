@@ -83,9 +83,9 @@ template <class T>
 using decay_unbounded_t = std::conditional_t<is_unbounded_array_v<T>, std::remove_all_extents_t<T>, T>;
 
 template <class T>
-class control_block_base_interface;
+class control_block_base;
 template <class T, class Allocator>
-class control_block_base_members;
+class control_block_base_alloc;
 template <class T, class Allocator>
 class control_block_make_shared;
 template <class T, class Allocator>
@@ -257,8 +257,8 @@ private:
 	template <class PtrType>
 	inline bool compare_exchange_weak(typename aspdetail::disable_deduction<PtrType>::type& expected, shared_ptr<T>&& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept;
 
-	inline constexpr aspdetail::control_block_base_interface<T>* get_control_block() noexcept;
-	inline constexpr const aspdetail::control_block_base_interface<T>* get_control_block() const noexcept;
+	inline constexpr aspdetail::control_block_base<T>* get_control_block() noexcept;
+	inline constexpr const aspdetail::control_block_base<T>* get_control_block() const noexcept;
 
 	using compressed_storage = aspdetail::compressed_storage;
 
@@ -276,7 +276,9 @@ private:
 	inline void unsafe_fill_local_refs() const noexcept;
 	inline void try_fill_local_refs(compressed_storage& expected) const noexcept;
 
-	inline constexpr aspdetail::control_block_base_interface<T>* to_control_block(compressed_storage from) const noexcept;
+	inline constexpr aspdetail::control_block_base<T>* to_control_block(compressed_storage from) const noexcept;
+
+	using cb_base_type = aspdetail::control_block_base<T>;
 
 	friend class shared_ptr<T>;
 	friend class raw_ptr<T>;
@@ -563,7 +565,7 @@ inline raw_ptr<T> atomic_shared_ptr<T>::get_raw_ptr() const noexcept
 template<class T>
 inline typename atomic_shared_ptr<T>::decayed_type* atomic_shared_ptr<T>::unsafe_get()
 {
-	aspdetail::control_block_base_interface<T>* const cb(get_control_block());
+	aspdetail::control_block_base<T>* const cb(get_control_block());
 	if (cb) {
 		return cb->get();
 	}
@@ -572,19 +574,19 @@ inline typename atomic_shared_ptr<T>::decayed_type* atomic_shared_ptr<T>::unsafe
 template<class T>
 inline const typename atomic_shared_ptr<T>::decayed_type* atomic_shared_ptr<T>::unsafe_get() const
 {
-	const aspdetail::control_block_base_interface<T>* const cb(get_control_block());
+	const aspdetail::control_block_base<T>* const cb(get_control_block());
 	if (cb) {
 		return cb->get();
 	}
 	return nullptr;
 }
 template<class T>
-inline constexpr const aspdetail::control_block_base_interface<T>* atomic_shared_ptr<T>::get_control_block() const noexcept
+inline constexpr const aspdetail::control_block_base<T>* atomic_shared_ptr<T>::get_control_block() const noexcept
 {
 	return to_control_block(m_storage.load(std::memory_order_acquire));
 }
 template<class T>
-inline constexpr aspdetail::control_block_base_interface<T>* atomic_shared_ptr<T>::get_control_block() noexcept
+inline constexpr aspdetail::control_block_base<T>* atomic_shared_ptr<T>::get_control_block() noexcept
 {
 	return to_control_block(m_storage.load(std::memory_order_acquire));
 }
@@ -641,9 +643,9 @@ inline void atomic_shared_ptr<T>::store_internal(compressed_storage from, std::m
 	exchange_internal(from, aspdetail::CAS_FLAG_NONE, order);
 }
 template<class T>
-inline constexpr aspdetail::control_block_base_interface<T>* atomic_shared_ptr<T>::to_control_block(compressed_storage from) const noexcept
+inline constexpr aspdetail::control_block_base<T>* atomic_shared_ptr<T>::to_control_block(compressed_storage from) const noexcept
 {
-	return reinterpret_cast<aspdetail::control_block_base_interface<T>*>(from.m_u64 & aspdetail::Ptr_Mask);
+	return reinterpret_cast<aspdetail::control_block_base<T>*>(from.m_u64 & aspdetail::Ptr_Mask);
 }
 template<class T>
 inline bool atomic_shared_ptr<T>::compare_exchange_weak_internal(compressed_storage& expected, compressed_storage desired, aspdetail::CAS_FLAG flags, aspdetail::memory_orders orders) noexcept
@@ -658,7 +660,7 @@ inline bool atomic_shared_ptr<T>::compare_exchange_weak_internal(compressed_stor
 	result = m_storage.compare_exchange_weak(expected_.m_u64, desired_.m_u64, orders.m_first, orders.m_second);
 
 	if (result & !(flags & aspdetail::CAS_FLAG_STEAL_PREVIOUS)) {
-		if (aspdetail::control_block_base_interface<T>* const cb = to_control_block(expected)) {
+		if (aspdetail::control_block_base<T>* const cb = to_control_block(expected)) {
 			cb->decref(expected.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF]);
 		}
 	}
@@ -680,7 +682,7 @@ inline void atomic_shared_ptr<T>::try_fill_local_refs(compressed_storage& expect
 		return;
 	}
 
-	aspdetail::control_block_base_interface<T>* const cb(to_control_block(expected));
+	aspdetail::control_block_base<T>* const cb(to_control_block(expected));
 
 	if (!cb) {
 		return;
@@ -763,7 +765,7 @@ inline void atomic_shared_ptr<T>::unsafe_store_internal(compressed_storage from,
 
 	m_storage.store(next.m_u64, std::memory_order_relaxed);
 
-	aspdetail::control_block_base_interface<T>* const prevCb(to_control_block(previous));
+	aspdetail::control_block_base<T>* const prevCb(to_control_block(previous));
 	if (prevCb) {
 		prevCb->decref(previous.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF]);
 	}
@@ -776,7 +778,7 @@ template<class T>
 inline void atomic_shared_ptr<T>::unsafe_fill_local_refs() const noexcept
 {
 	const compressed_storage current(m_storage.load(std::memory_order_relaxed));
-	aspdetail::control_block_base_interface<T>* const cb(to_control_block(current));
+	aspdetail::control_block_base<T>* const cb(to_control_block(current));
 
 	if (cb && current.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] < aspdetail::Local_Ref_Fill_Boundary) {
 		const std::uint8_t newRefs(std::numeric_limits<std::uint8_t>::max() - current.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF]);
@@ -799,32 +801,11 @@ inline union aspdetail::compressed_storage atomic_shared_ptr<T>::exchange_intern
 namespace aspdetail
 {
 template <class T>
-class control_block_base_interface
+class control_block_base
 {
 public:
 	using size_type = aspdetail::size_type;
 	using decayed_type = aspdetail::decay_unbounded_t<T>;
-
-	virtual decayed_type* get() noexcept = 0;
-	virtual const decayed_type* get() const noexcept = 0;
-
-	virtual size_type use_count() const noexcept = 0;
-
-	virtual void incref(size_type count) noexcept = 0;
-	virtual void decref(size_type count) noexcept = 0;
-
-protected:
-	virtual ~control_block_base_interface() = default;
-	virtual void destroy() = 0;
-};
-template <class T, class Allocator>
-class control_block_base_members : public control_block_base_interface<T>
-{
-public:
-	using size_type = aspdetail::size_type;
-	using decayed_type = aspdetail::decay_unbounded_t<T>;
-
-	control_block_base_members(decayed_type* object, Allocator& allocator, std::uint8_t blockOffset = 0);
 
 	decayed_type* get() noexcept;
 	const decayed_type* get() const noexcept;
@@ -835,58 +816,79 @@ public:
 	void decref(size_type count) noexcept;
 
 protected:
-	virtual ~control_block_base_members() = default;
+	control_block_base(decayed_type* object, std::uint8_t blockOffset, std::uint64_t debugCountOffset);
+	virtual ~control_block_base() = default;
 	virtual void destroy() = 0;
+
 	std::uint8_t block_offset() const;
 
 private:
 	const compressed_storage m_ptrStorage;
 	std::atomic<size_type> m_useCount;
-protected:
-	Allocator m_allocator;
 };
-
-template<class T, class Allocator>
-inline control_block_base_members<T, Allocator>::control_block_base_members(decayed_type* object, Allocator& allocator, std::uint8_t blockOffset)
-	: m_useCount(Default_Local_Refs)
-	, m_ptrStorage(std::uint64_t(object) | (std::uint64_t(blockOffset) << 48) | (std::uint64_t(is_unbounded_array_v<T>) << 56))
-	, m_allocator(allocator)
+template<class T>
+control_block_base<T>::control_block_base(decayed_type* object, std::uint8_t blockOffset, std::uint64_t debugCountOffset) 
+	: m_ptrStorage(std::uint64_t(object) | (std::uint64_t(blockOffset) << 48) | (std::uint64_t(debugCountOffset < 256 ? debugCountOffset : 0) << 56))
+	, m_useCount(Default_Local_Refs)
 {
 }
-template<class T, class Allocator>
-inline void control_block_base_members<T, Allocator>::incref(size_type count) noexcept
+template<class T>
+inline void control_block_base<T>::incref(size_type count) noexcept
 {
 	m_useCount.fetch_add(count, std::memory_order_relaxed);
 }
-template<class T, class Allocator>
-inline void control_block_base_members<T, Allocator>::decref(size_type count) noexcept
+template<class T>
+inline void control_block_base<T>::decref(size_type count) noexcept
 {
 	if (!(m_useCount.fetch_sub(count, std::memory_order_acq_rel) - count)) {
 		destroy();
 	}
 }
-template<class T, class Allocator>
-inline std::uint8_t control_block_base_members<T, Allocator>::block_offset() const
+template<class T>
+inline std::uint8_t control_block_base<T>::block_offset() const
 {
 	return std::uint8_t(m_ptrStorage.m_u8[6]);
 }
-template <class T, class Allocator>
-inline typename control_block_base_members<T, Allocator>::decayed_type* control_block_base_members<T, Allocator>::get() noexcept
+template <class T>
+inline typename control_block_base<T>::decayed_type* control_block_base<T>::get() noexcept
 {
 	return (decayed_type*)(m_ptrStorage.m_u64 & Ptr_Mask);
 }
-template<class T, class Allocator>
-inline const typename control_block_base_members<T, Allocator>::decayed_type* control_block_base_members<T, Allocator>::get() const noexcept
+template<class T>
+inline const typename control_block_base<T>::decayed_type* control_block_base<T>::get() const noexcept
 {
 	return (decayed_type*)(m_ptrStorage.m_u64 & Ptr_Mask);
 }
-template <class T, class Allocator>
-inline typename control_block_base_members<T, Allocator>::size_type control_block_base_members<T, Allocator>::use_count() const noexcept
+template <class T>
+inline typename control_block_base<T>::size_type control_block_base<T>::use_count() const noexcept
 {
 	return m_useCount.load(std::memory_order_relaxed);
 }
 template <class T, class Allocator>
-class control_block_make_shared : public control_block_base_members<T, Allocator>
+class control_block_base_alloc : public control_block_base<T>
+{
+public:
+	using size_type = aspdetail::size_type;
+	using decayed_type = aspdetail::decay_unbounded_t<T>;
+
+	control_block_base_alloc(Allocator& allocator, decayed_type* object, std::uint8_t blockOffset = 0, std::uint64_t debugCountOffset = 0);
+
+protected:
+	virtual ~control_block_base_alloc() = default;
+	virtual void destroy() = 0;
+
+protected:
+	Allocator m_allocator;
+};
+
+template<class T, class Allocator>
+inline control_block_base_alloc<T, Allocator>::control_block_base_alloc(Allocator& allocator, decayed_type* object, std::uint8_t blockOffset, std::uint64_t debugCountOffset)
+	: control_block_base<T>(object, blockOffset, debugCountOffset)
+	, m_allocator(allocator)
+{
+}
+template <class T, class Allocator>
+class control_block_make_shared : public control_block_base_alloc<T, Allocator>
 {
 public:
 	template <class ...Args, class U = T, std::enable_if_t<std::is_array<U>::value> * = nullptr>
@@ -901,14 +903,14 @@ private:
 template<class T, class Allocator> 
 template <class ...Args, class U, std::enable_if_t<std::is_array<U>::value>*>
 inline control_block_make_shared<T, Allocator>::control_block_make_shared(Allocator& alloc, std::uint8_t blockOffset, Args&& ...args)
-	: control_block_base_members<T, Allocator>(&m_owned, alloc, blockOffset)
+	: control_block_base_alloc<T, Allocator>(alloc, &m_owned, blockOffset)
 	, m_owned{ std::forward<Args&&>(args)... }
 {
 }
 template<class T, class Allocator>
 template <class ...Args, class U, std::enable_if_t<!std::is_array<U>::value>*>
 inline control_block_make_shared<T, Allocator>::control_block_make_shared(Allocator& alloc, std::uint8_t blockOffset, Args&& ...args)
-	: control_block_base_members<T, Allocator>(&m_owned, alloc, blockOffset)
+	: control_block_base_alloc<T, Allocator>(alloc, &m_owned, blockOffset)
 	, m_owned(std::forward<Args&&>(args)...)
 {
 }
@@ -933,7 +935,7 @@ inline void control_block_make_shared<T, Allocator>::destroy() noexcept
 	rebound.deallocate(typedBlock, 1);
 }
 template <class T, class Allocator>
-class control_block_make_unbounded_array : public control_block_base_members<T, Allocator>
+class control_block_make_unbounded_array : public control_block_base_alloc<T, Allocator>
 {
 public:
 	using decayed_type = aspdetail::decay_unbounded_t<T>;
@@ -949,7 +951,7 @@ private:
 template<class T, class Allocator>
 template <class ...Args>
 inline control_block_make_unbounded_array<T, Allocator>::control_block_make_unbounded_array(decayed_type* arr, std::size_t count, Allocator& alloc) noexcept
-	: control_block_base_members<T, Allocator>(arr, alloc) 
+	: control_block_base_alloc<T, Allocator>(alloc, arr, 0, ((std::uint64_t)& m_count - (std::uint64_t)this))
 	, m_count(count)
 {
 }
@@ -976,7 +978,7 @@ inline void control_block_make_unbounded_array<T, Allocator>::destroy() noexcept
 	rebound.deallocate(block, alloc_size_make_shared<T, Allocator>(m_count));
 }
 template <class T, class Allocator>
-class control_block_claim : public control_block_base_members<T, Allocator>
+class control_block_claim : public control_block_base_alloc<T, Allocator>
 {
 public:
 	control_block_claim(T* obj, Allocator& alloc) noexcept;
@@ -984,7 +986,7 @@ public:
 };
 template<class T, class Allocator>
 inline control_block_claim<T, Allocator>::control_block_claim(T* obj, Allocator& alloc) noexcept
-	:control_block_base_members<T, Allocator>(obj, alloc)
+	:control_block_base_alloc<T, Allocator>(alloc, obj)
 {
 }
 template<class T, class Allocator>
@@ -1002,7 +1004,7 @@ inline void control_block_claim<T, Allocator>::destroy() noexcept
 	rebound.deallocate(reinterpret_cast<std::uint8_t*>(this), gdul::alloc_size_sp_claim<T, Allocator>());
 }
 template <class T, class Allocator, class Deleter>
-class control_block_claim_custom_delete : public control_block_base_members<T, Allocator>
+class control_block_claim_custom_delete : public control_block_base_alloc<T, Allocator>
 {
 public:
 	control_block_claim_custom_delete(T* obj, Allocator& alloc, Deleter&& deleter) noexcept;
@@ -1013,7 +1015,7 @@ private:
 };
 template<class T, class Allocator, class Deleter>
 inline control_block_claim_custom_delete<T, Allocator, Deleter>::control_block_claim_custom_delete(T* obj, Allocator& alloc, Deleter&& deleter) noexcept
-	: control_block_base_members<T, Allocator>(obj, alloc)
+	: control_block_base_alloc<T, Allocator>(alloc, obj)
 	, m_deleter(std::forward<Deleter&&>(deleter))
 {
 }
@@ -1083,19 +1085,21 @@ public:
 	inline size_type use_count() const noexcept;
 
 protected:
-	inline constexpr const control_block_base_interface<T>* get_control_block() const noexcept;
-	inline constexpr control_block_base_interface<T>* get_control_block() noexcept;
+	inline constexpr const control_block_base<T>* get_control_block() const noexcept;
+	inline constexpr control_block_base<T>* get_control_block() noexcept;
 
 	inline constexpr ptr_base() noexcept;
 	inline constexpr ptr_base(compressed_storage from) noexcept;
 
 	inline void clear() noexcept;
 
-	constexpr control_block_base_interface<T>* to_control_block(compressed_storage from) noexcept;
+	constexpr control_block_base<T>* to_control_block(compressed_storage from) noexcept;
 	constexpr decayed_type* to_object(compressed_storage from) noexcept;
 
-	constexpr const control_block_base_interface<T>* to_control_block(compressed_storage from) const noexcept;
+	constexpr const control_block_base<T>* to_control_block(compressed_storage from) const noexcept;
 	constexpr const decayed_type* to_object(compressed_storage from) const noexcept;
+
+	using cb_base_type = aspdetail::control_block_base<T>;
 
 	friend class atomic_shared_ptr<T>;
 
@@ -1185,19 +1189,19 @@ inline constexpr bool operator!=(const ptr_base<T>& ptr, std::nullptr_t /*null*/
 	return ptr;
 }
 template <class T>
-inline constexpr control_block_base_interface<T>* ptr_base<T>::to_control_block(compressed_storage from) noexcept
+inline constexpr control_block_base<T>* ptr_base<T>::to_control_block(compressed_storage from) noexcept
 {
-	return reinterpret_cast<control_block_base_interface<T>*>(from.m_u64 & Ptr_Mask);
+	return reinterpret_cast<control_block_base<T>*>(from.m_u64 & Ptr_Mask);
 }
 template <class T>
-inline constexpr const control_block_base_interface<T>* ptr_base<T>::to_control_block(compressed_storage from) const noexcept
+inline constexpr const control_block_base<T>* ptr_base<T>::to_control_block(compressed_storage from) const noexcept
 {
-	return reinterpret_cast<const control_block_base_interface<T>*>(from.m_u64 & Ptr_Mask);
+	return reinterpret_cast<const control_block_base<T>*>(from.m_u64 & Ptr_Mask);
 }
 template <class T>
 inline constexpr typename ptr_base<T>::decayed_type* ptr_base<T>::to_object(compressed_storage from) noexcept
 {
-	control_block_base_interface<T>* const cb(to_control_block(from));
+	control_block_base<T>* const cb(to_control_block(from));
 	if (cb) {
 		return cb->get();
 	}
@@ -1206,19 +1210,19 @@ inline constexpr typename ptr_base<T>::decayed_type* ptr_base<T>::to_object(comp
 template <class T>
 inline constexpr const typename ptr_base<T>::decayed_type* ptr_base<T>::to_object(compressed_storage from) const noexcept
 {
-	const control_block_base_interface<T>* const cb(to_control_block(from));
+	const control_block_base<T>* const cb(to_control_block(from));
 	if (cb) {
 		return cb->get();
 	}
 	return nullptr;
 }
 template <class T>
-inline constexpr const control_block_base_interface<T>* ptr_base<T>::get_control_block() const noexcept
+inline constexpr const control_block_base<T>* ptr_base<T>::get_control_block() const noexcept
 {
 	return to_control_block(m_controlBlockStorage);
 }
 template <class T>
-inline constexpr control_block_base_interface<T>* ptr_base<T>::get_control_block() noexcept
+inline constexpr control_block_base<T>* ptr_base<T>::get_control_block() noexcept
 {
 	return to_control_block(m_controlBlockStorage);
 }
@@ -1340,7 +1344,7 @@ inline constexpr shared_ptr<T>::shared_ptr(std::nullptr_t, std::uint8_t version)
 template<class T>
 inline shared_ptr<T>::~shared_ptr() noexcept
 {
-	aspdetail::control_block_base_interface<T>* const cb(this->get_control_block());
+	aspdetail::control_block_base<T>* const cb(this->get_control_block());
 	if (cb) {
 		cb->decref(this->m_controlBlockStorage.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF]);
 	}
@@ -1401,7 +1405,7 @@ inline constexpr void shared_ptr<T>::clear() noexcept
 template<class T>
 inline void shared_ptr<T>::set_local_refs(std::uint8_t target) noexcept
 {
-	if (aspdetail::control_block_base_interface<T>* const cb = this->get_control_block()) {
+	if (aspdetail::control_block_base<T>* const cb = this->get_control_block()) {
 		const uint8_t localRefs(this->m_controlBlockStorage.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF]);
 
 		if (localRefs < target) {
@@ -1556,7 +1560,7 @@ inline shared_ptr<T>& shared_ptr<T>::operator=(const shared_ptr<T>& other) noexc
 {
 	compressed_storage copy(other.m_controlBlockStorage);
 
-	if (aspdetail::control_block_base_interface<T>* const copyCb = this->to_control_block(copy)) {
+	if (aspdetail::control_block_base<T>* const copyCb = this->to_control_block(copy)) {
 #ifndef GDUL_SP_SAFE_COPY
 		copy.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] = copy.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] / 2;
 		if (copy.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF]) {
@@ -1571,7 +1575,7 @@ inline shared_ptr<T>& shared_ptr<T>::operator=(const shared_ptr<T>& other) noexc
 #endif
 	}
 
-	if (aspdetail::control_block_base_interface<T>* const cb = this->get_control_block()) {
+	if (aspdetail::control_block_base<T>* const cb = this->get_control_block()) {
 		cb->decref(this->m_controlBlockStorage.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF]);
 	}
 

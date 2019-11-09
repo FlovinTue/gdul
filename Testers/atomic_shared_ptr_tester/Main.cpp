@@ -57,8 +57,6 @@ int main()
 		shared_ptr<int> atenthexp(atenth.load());
 		shared_ptr<int> atenthdes(make_shared<int>(1010));
 		const bool tenres = atenth.compare_exchange_strong(atenthexp, atenthdes);
-
-		shared_ptr<int[]> blah = make_shared<int[]>(5, 0);
 		
 		atomic_shared_ptr<int> aeleventh(make_shared<int>(11));
 		raw_ptr<int> aeleventhexp(aeleventh.get_raw_ptr());
@@ -106,6 +104,7 @@ int main()
 		shared_ptr<int> sixteenth(new int, alloc);
 
 		shared_ptr<int> seventeenth(make_shared<int, std::allocator<int>>(17));
+
 
 		struct alignas(64) over_aligned {
 		};
