@@ -307,7 +307,7 @@ inline bool concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, C
 		bool mine(!splice.get_tag());
 		splice.clear_tag();
 
-		try_splice(myFrontSentry.get_owned(), std::move(splice), head);
+		try_splice(myFrontSentry.get(), std::move(splice), head);
 
 		if (mine) {
 			break;

@@ -376,7 +376,7 @@ inline void concurrent_queue<T, Allocator>::unsafe_clear()
 
 	shared_ptr_array_type producerArray(m_producerSlots.unsafe_load(std::memory_order_relaxed));
 	for (std::uint16_t i = 0; i < m_producerCount.load(std::memory_order_relaxed); ++i) {
-		producerArray[i].unsafe_get_owned()->unsafe_clear();
+		producerArray[i].unsafe_get()->unsafe_clear();
 	}
 
 	std::atomic_thread_fence(std::memory_order_release);
@@ -398,7 +398,7 @@ inline void concurrent_queue<T, Allocator>::unsafe_reset()
 	m_producerSlotReservation.store(0, std::memory_order_relaxed);
 
 	for (std::uint16_t i = 0; i < producerCount; ++i) {
-		m_producerSlots.unsafe_get_owned()[i].unsafe_store(nullptr, std::memory_order_relaxed);
+		m_producerSlots.unsafe_get()[i].unsafe_store(nullptr, std::memory_order_relaxed);
 	}
 
 	std::atomic_thread_fence(std::memory_order_release);
@@ -422,11 +422,11 @@ inline typename concurrent_queue<T, Allocator>::size_type concurrent_queue<T, Al
 {
 	const std::uint16_t producerCount(m_producerCount.load(std::memory_order_acquire));
 
-	atomic_shared_ptr_slot_type* const producerArray(m_producerSlots.unsafe_get_owned());
+	atomic_shared_ptr_slot_type* const producerArray(m_producerSlots.unsafe_get());
 
 	size_type accumulatedSize(0);
 	for (std::uint16_t i = 0; i < producerCount; ++i) {
-		const buffer_type* const slot(producerArray[i].unsafe_get_owned());
+		const buffer_type* const slot(producerArray[i].unsafe_get());
 		accumulatedSize += slot->size();
 	}
 	return accumulatedSize;
@@ -668,7 +668,7 @@ inline bool concurrent_queue<T, Allocator>::has_producer_array_been_superceeded(
 	}
 
 	for (std::uint8_t higherStoreSlot = arraySlot + 1; higherStoreSlot < cqdetail::Producer_Slots_Max_Growth_Count; ++higherStoreSlot) {
-		if (m_producerArrayStore[higherStoreSlot].load(std::memory_order_relaxed).get_owned() == activeArray.get_owned()) {
+		if (m_producerArrayStore[higherStoreSlot].load(std::memory_order_relaxed).get() == activeArray.get()) {
 			return true;
 		}
 	}
@@ -966,7 +966,7 @@ inline void producer_buffer<T, Allocator>::invalidate()
 {
 	m_dataBlock[m_writeSlot % m_capacity].set_state(item_state::Dummy);
 	if (m_next) {
-		m_next.unsafe_get_owned()->invalidate();
+		m_next.unsafe_get()->invalidate();
 	}
 }
 template<class T, class Allocator>
@@ -991,7 +991,7 @@ inline typename producer_buffer<T, Allocator>::shared_ptr_slot_type producer_buf
 		}
 
 		back = inspect->m_next.load(std::memory_order_seq_cst);
-		inspect = back.get_owned();
+		inspect = back.get();
 	}
 	return back;
 }
@@ -1004,7 +1004,7 @@ inline typename producer_buffer<T, Allocator>::size_type producer_buffer<T, Allo
 	accumulatedSize -= readSlot;
 
 	if (m_next)
-		accumulatedSize += m_next.unsafe_get_owned()->size();
+		accumulatedSize += m_next.unsafe_get()->size();
 
 	return accumulatedSize;
 }
@@ -1042,9 +1042,9 @@ inline bool producer_buffer<T, Allocator>::verify_successor(const shared_ptr_slo
 		}
 
 		next = inspect->m_next.load(std::memory_order_seq_cst);
-		inspect = next.get_owned();
+		inspect = next.get();
 
-		if (inspect == successor.get_owned()) {
+		if (inspect == successor.get()) {
 			break;
 		}
 	} while (inspect->m_next);
@@ -1096,7 +1096,7 @@ inline void producer_buffer<T, Allocator>::push_front(shared_ptr_slot_type newBu
 	producer_buffer<T, allocator_type>* last(this);
 
 	while (last->m_next) {
-		last = last->m_next.unsafe_get_owned();
+		last = last->m_next.unsafe_get();
 	}
 
 	last->m_next.store(std::move(newBuffer), std::memory_order_seq_cst);
@@ -1119,7 +1119,7 @@ inline void producer_buffer<T, Allocator>::unsafe_clear()
 	m_postReadIterator.store(postWrite, std::memory_order_relaxed);
 #endif
 	if (m_next) {
-		m_next.unsafe_get_owned()->unsafe_clear();
+		m_next.unsafe_get()->unsafe_clear();
 	}
 }
 template<class T, class Allocator>
