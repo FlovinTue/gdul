@@ -84,8 +84,8 @@ using decay_unbounded_t = std::conditional_t<is_unbounded_array_v<T>, std::remov
 
 template <class T>
 class control_block_base;
-template <class T, class Allocator>
-class control_block_base_alloc;
+template <class T>
+class control_block_base_count;
 template <class T, class Allocator>
 class control_block_make_shared;
 template <class T, class Allocator>
@@ -146,7 +146,7 @@ template
 <
 	class T,
 	class Allocator,
-	std::enable_if_t<!aspdetail::is_unbounded_array_v<T>> *,
+	std::enable_if_t<!aspdetail::is_unbounded_array_v<T>>*,
 	class ...Args
 >
 inline shared_ptr<T> make_shared(Allocator& allocator, Args&& ...args);
@@ -155,7 +155,7 @@ template
 <
 	class T,
 	class Allocator,
-	std::enable_if_t<aspdetail::is_unbounded_array_v<T>> *,
+	std::enable_if_t<aspdetail::is_unbounded_array_v<T>>*,
 	class ...Args
 >
 inline shared_ptr<T> make_shared(Allocator& allocator, Args&& ...args);
@@ -250,6 +250,8 @@ public:
 	decayed_type* unsafe_get();
 	const decayed_type* unsafe_get() const;
 
+	const std::size_t unsafe_item_count() const;
+
 private:
 	template <class PtrType>
 	inline bool compare_exchange_strong(typename aspdetail::disable_deduction<PtrType>::type& expected, shared_ptr<T>&& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept;
@@ -279,6 +281,7 @@ private:
 	inline constexpr aspdetail::control_block_base<T>* to_control_block(compressed_storage from) const noexcept;
 
 	using cb_base_type = aspdetail::control_block_base<T>;
+	using cb_count_type = aspdetail::control_block_base_count<T>;
 
 	friend class shared_ptr<T>;
 	friend class raw_ptr<T>;
@@ -581,6 +584,11 @@ inline const typename atomic_shared_ptr<T>::decayed_type* atomic_shared_ptr<T>::
 	return nullptr;
 }
 template<class T>
+inline const std::size_t atomic_shared_ptr<T>::unsafe_item_count() const
+{
+	return raw_ptr<T>(*this)->item_count();
+}
+template<class T>
 inline constexpr const aspdetail::control_block_base<T>* atomic_shared_ptr<T>::get_control_block() const noexcept
 {
 	return to_control_block(m_storage.load(std::memory_order_acquire));
@@ -812,11 +820,13 @@ public:
 
 	size_type use_count() const noexcept;
 
+	std::size_t item_count() const noexcept;
+
 	void incref(size_type count) noexcept;
 	void decref(size_type count) noexcept;
 
 protected:
-	control_block_base(decayed_type* object, std::uint8_t blockOffset, std::uint64_t debugCountOffset);
+	control_block_base(decayed_type* object, std::uint8_t blockOffset = 0) noexcept;
 	virtual ~control_block_base() = default;
 	virtual void destroy() = 0;
 
@@ -827,8 +837,8 @@ private:
 	std::atomic<size_type> m_useCount;
 };
 template<class T>
-control_block_base<T>::control_block_base(decayed_type* object, std::uint8_t blockOffset, std::uint64_t debugCountOffset) 
-	: m_ptrStorage(std::uint64_t(object) | (std::uint64_t(blockOffset) << 48) | (std::uint64_t(debugCountOffset < 256 ? debugCountOffset : 0) << 56))
+control_block_base<T>::control_block_base(decayed_type* object, std::uint8_t blockOffset) noexcept
+	: m_ptrStorage(std::uint64_t(object) | (std::uint64_t(blockOffset) << 48) | (std::uint64_t(is_unbounded_array_v<T>) << 56))
 	, m_useCount(Default_Local_Refs)
 {
 }
@@ -864,31 +874,39 @@ inline typename control_block_base<T>::size_type control_block_base<T>::use_coun
 {
 	return m_useCount.load(std::memory_order_relaxed);
 }
-template <class T, class Allocator>
-class control_block_base_alloc : public control_block_base<T>
+template<class T>
+inline std::size_t control_block_base<T>::item_count() const noexcept
+{
+	return !is_unbounded_array_v<T> ? sizeof(decayed_type) / sizeof(std::remove_all_extents_t<T>) : ((control_block_base_count<T>*)this)->item_count();
+}
+template <class T>
+class control_block_base_count : public control_block_base<T>
 {
 public:
 	using size_type = aspdetail::size_type;
 	using decayed_type = aspdetail::decay_unbounded_t<T>;
 
-	control_block_base_alloc(Allocator& allocator, decayed_type* object, std::uint8_t blockOffset = 0, std::uint64_t debugCountOffset = 0);
+	control_block_base_count(decayed_type* object, std::size_t count)  noexcept;
 
-protected:
-	virtual ~control_block_base_alloc() = default;
-	virtual void destroy() = 0;
+	std::size_t item_count() const noexcept;
 
-protected:
-	Allocator m_allocator;
+private:
+	const std::size_t m_count;
 };
 
-template<class T, class Allocator>
-inline control_block_base_alloc<T, Allocator>::control_block_base_alloc(Allocator& allocator, decayed_type* object, std::uint8_t blockOffset, std::uint64_t debugCountOffset)
-	: control_block_base<T>(object, blockOffset, debugCountOffset)
-	, m_allocator(allocator)
+template<class T>
+inline control_block_base_count<T>::control_block_base_count(decayed_type* object, std::size_t count) noexcept
+	: control_block_base<T>(object)
+	, m_count(count)
 {
 }
+template <class T>
+inline std::size_t control_block_base_count<T>::item_count() const  noexcept
+{
+	return m_count;
+}
 template <class T, class Allocator>
-class control_block_make_shared : public control_block_base_alloc<T, Allocator>
+class control_block_make_shared : public control_block_base<T>
 {
 public:
 	template <class ...Args, class U = T, std::enable_if_t<std::is_array<U>::value> * = nullptr>
@@ -899,19 +917,22 @@ public:
 	void destroy() noexcept override;
 private:
 	T m_owned;
+	Allocator m_allocator;
 };
-template<class T, class Allocator> 
+template<class T, class Allocator>
 template <class ...Args, class U, std::enable_if_t<std::is_array<U>::value>*>
 inline control_block_make_shared<T, Allocator>::control_block_make_shared(Allocator& alloc, std::uint8_t blockOffset, Args&& ...args)
-	: control_block_base_alloc<T, Allocator>(alloc, &m_owned, blockOffset)
+	: control_block_base<T>(&m_owned, blockOffset)
 	, m_owned{ std::forward<Args&&>(args)... }
+	, m_allocator(alloc)
 {
 }
 template<class T, class Allocator>
 template <class ...Args, class U, std::enable_if_t<!std::is_array<U>::value>*>
 inline control_block_make_shared<T, Allocator>::control_block_make_shared(Allocator& alloc, std::uint8_t blockOffset, Args&& ...args)
-	: control_block_base_alloc<T, Allocator>(alloc, &m_owned, blockOffset)
+	: control_block_base<T>(&m_owned, blockOffset)
 	, m_owned(std::forward<Args&&>(args)...)
+	, m_allocator(alloc)
 {
 }
 template<class T, class Allocator>
@@ -935,7 +956,7 @@ inline void control_block_make_shared<T, Allocator>::destroy() noexcept
 	rebound.deallocate(typedBlock, 1);
 }
 template <class T, class Allocator>
-class control_block_make_unbounded_array : public control_block_base_alloc<T, Allocator>
+class control_block_make_unbounded_array : public control_block_base_count<T>
 {
 public:
 	using decayed_type = aspdetail::decay_unbounded_t<T>;
@@ -946,13 +967,13 @@ public:
 	void destroy() noexcept override;
 
 private:
-	const std::size_t m_count;
+	Allocator m_allocator;
 };
 template<class T, class Allocator>
 template <class ...Args>
 inline control_block_make_unbounded_array<T, Allocator>::control_block_make_unbounded_array(decayed_type* arr, std::size_t count, Allocator& alloc) noexcept
-	: control_block_base_alloc<T, Allocator>(alloc, arr, 0, ((std::uint64_t)& m_count - (std::uint64_t)this))
-	, m_count(count)
+	: control_block_base_count<T>(arr, count)
+	, m_allocator(alloc)
 {
 }
 template<class T, class Allocator>
@@ -962,7 +983,9 @@ inline void control_block_make_unbounded_array<T, Allocator>::destroy() noexcept
 
 	decayed_type* const ptrBase(this->get());
 
-	for (std::size_t i = 0; i < m_count; ++i)
+	const std::size_t nItems(this->item_count());
+
+	for (std::size_t i = 0; i < nItems; ++i)
 	{
 		ptrBase[i].~decayed_type();
 	}
@@ -975,18 +998,21 @@ inline void control_block_make_unbounded_array<T, Allocator>::destroy() noexcept
 
 	uint8_t* const block((uint8_t*)this);
 
-	rebound.deallocate(block, alloc_size_make_shared<T, Allocator>(m_count));
+	rebound.deallocate(block, alloc_size_make_shared<T, Allocator>(nItems));
 }
 template <class T, class Allocator>
-class control_block_claim : public control_block_base_alloc<T, Allocator>
+class control_block_claim : public control_block_base<T>
 {
 public:
 	control_block_claim(T* obj, Allocator& alloc) noexcept;
 	void destroy() noexcept override;
+
+private:
+	Allocator m_allocator;
 };
 template<class T, class Allocator>
 inline control_block_claim<T, Allocator>::control_block_claim(T* obj, Allocator& alloc) noexcept
-	:control_block_base_alloc<T, Allocator>(alloc, obj)
+	: control_block_base<T>(obj)
 {
 }
 template<class T, class Allocator>
@@ -1004,7 +1030,7 @@ inline void control_block_claim<T, Allocator>::destroy() noexcept
 	rebound.deallocate(reinterpret_cast<std::uint8_t*>(this), gdul::alloc_size_sp_claim<T, Allocator>());
 }
 template <class T, class Allocator, class Deleter>
-class control_block_claim_custom_delete : public control_block_base_alloc<T, Allocator>
+class control_block_claim_custom_delete : public control_block_base<T>
 {
 public:
 	control_block_claim_custom_delete(T* obj, Allocator& alloc, Deleter&& deleter) noexcept;
@@ -1012,11 +1038,13 @@ public:
 
 private:
 	Deleter m_deleter;
+	Allocator m_allocator;
 };
 template<class T, class Allocator, class Deleter>
 inline control_block_claim_custom_delete<T, Allocator, Deleter>::control_block_claim_custom_delete(T* obj, Allocator& alloc, Deleter&& deleter) noexcept
-	: control_block_base_alloc<T, Allocator>(alloc, obj)
+	: control_block_base<T>(obj)
 	, m_deleter(std::forward<Deleter&&>(deleter))
+	, m_allocator(alloc)
 {
 }
 template<class T, class Allocator, class Deleter>
@@ -1099,7 +1127,8 @@ protected:
 	constexpr const control_block_base<T>* to_control_block(compressed_storage from) const noexcept;
 	constexpr const decayed_type* to_object(compressed_storage from) const noexcept;
 
-	using cb_base_type = aspdetail::control_block_base<T>;
+	using cb_base_type = control_block_base<T>;
+	using cb_count_type = control_block_base_count<T>;
 
 	friend class atomic_shared_ptr<T>;
 
@@ -1264,6 +1293,8 @@ public:
 	inline constexpr const decayed_type* get() const noexcept;
 	inline constexpr decayed_type* get() noexcept;
 
+	inline std::size_t item_count() const noexcept;
+
 	inline constexpr decayed_type* operator->();
 	inline constexpr decayed_type& operator*();
 
@@ -1304,7 +1335,7 @@ private:
 		<
 		class U,
 		class Allocator,
-		std::enable_if_t<!aspdetail::is_unbounded_array_v<U>> *,
+		std::enable_if_t<!aspdetail::is_unbounded_array_v<U>>*,
 		class ...Args
 		>
 		friend shared_ptr<U> make_shared(Allocator& allocator, Args&& ...args);
@@ -1313,7 +1344,7 @@ private:
 		<
 		class U,
 		class Allocator,
-		std::enable_if_t<aspdetail::is_unbounded_array_v<U>> *,
+		std::enable_if_t<aspdetail::is_unbounded_array_v<U>>*,
 		class ...Args
 		>
 		friend shared_ptr<U> make_shared(std::size_t, Allocator&, Args&& ...);
@@ -1486,6 +1517,15 @@ inline constexpr typename shared_ptr<T>::decayed_type* shared_ptr<T>::get() noex
 {
 	return m_ptr;
 }
+template<class T>
+inline std::size_t shared_ptr<T>::item_count() const noexcept
+{
+	if (!this->operator bool()) {
+		return 0;
+	}
+
+	return this->get_control_block()->item_count();
+}
 template <class T>
 template<class Deleter, class Allocator>
 inline union aspdetail::compressed_storage shared_ptr<T>::create_control_block(T* object, Allocator& allocator, Deleter&& deleter)
@@ -1615,6 +1655,8 @@ public:
 	inline constexpr const decayed_type* get() const noexcept;
 	inline constexpr decayed_type* get() noexcept;
 
+	inline std::size_t item_count() const;
+
 	inline constexpr decayed_type* operator->();
 	inline constexpr decayed_type& operator*();
 
@@ -1693,12 +1735,12 @@ inline constexpr raw_ptr<T>& raw_ptr<T>::operator=(const atomic_shared_ptr<T>& f
 	return *this;
 }
 template <class T>
-inline constexpr raw_ptr<T>::operator typename raw_ptr<T>::decayed_type*() noexcept
+inline constexpr raw_ptr<T>::operator typename raw_ptr<T>::decayed_type* () noexcept
 {
 	return get();
 }
 template <class T>
-inline constexpr raw_ptr<T>::operator const typename raw_ptr<T>::decayed_type*() const noexcept
+inline constexpr raw_ptr<T>::operator const typename raw_ptr<T>::decayed_type* () const noexcept
 {
 	return get();
 }
@@ -1711,6 +1753,15 @@ template <class T>
 inline constexpr typename raw_ptr<T>::decayed_type* raw_ptr<T>::get() noexcept
 {
 	return this->to_object(this->m_controlBlockStorage);
+}
+template<class T>
+inline std::size_t raw_ptr<T>::item_count() const
+{
+	if (!this->operator bool()) {
+		return 0;
+	}
+
+	return this->get_control_block()->item_count();
 }
 template <class T>
 inline constexpr typename raw_ptr<T>::decayed_type* raw_ptr<T>::operator->()
@@ -1819,13 +1870,13 @@ inline shared_ptr<T> make_shared(Args&& ...args)
 }
 template
 <
-	class T, 
-	class Allocator, 
+	class T,
+	class Allocator,
 	std::enable_if_t<!aspdetail::is_unbounded_array_v<T>> * = nullptr,
 	class ...Args
 >
 // make_shared from object or statically sized array using declared, instanced allocator
-	inline shared_ptr<T> make_shared(Allocator& allocator, Args&& ...args)
+inline shared_ptr<T> make_shared(Allocator& allocator, Args&& ...args)
 {
 	constexpr std::size_t blockSize(alloc_size_make_shared<T, Allocator>());
 	constexpr std::size_t blockAlign(alignof(T));
@@ -1851,7 +1902,7 @@ template
 		if (controlBlock) {
 			(*controlBlock).~control_block_make_shared();
 		}
-		if (typedBlock){
+		if (typedBlock) {
 			rebound.deallocate(typedBlock, 1);
 		}
 		throw;
@@ -1864,13 +1915,13 @@ template
 }
 template
 <
-	class T, 
-	class Allocator, 
+	class T,
+	class Allocator,
 	std::enable_if_t<aspdetail::is_unbounded_array_v<T>> * = nullptr,
 	class ...Args
 >
 // make_shared from dynamically sized array using declared, instanced allocator
-	inline shared_ptr<T> make_shared(std::size_t count, Allocator& allocator, Args&& ...args)
+inline shared_ptr<T> make_shared(std::size_t count, Allocator& allocator, Args&& ...args)
 {
 	using decayed_type = aspdetail::decay_unbounded_t<T>;
 
@@ -1906,13 +1957,13 @@ template
 	}
 	catch (...)
 	{
-		if (controlBlock){
+		if (controlBlock) {
 			(*controlBlock).~control_block_make_unbounded_array();
 		}
-		for (std::size_t i = 0; i < constructed; ++i){
+		for (std::size_t i = 0; i < constructed; ++i) {
 			arrayloc[i].~decayed_type();
 		}
-		if (block){
+		if (block) {
 			rebound.deallocate(block, blockSize);
 		}
 		throw;

@@ -287,8 +287,8 @@ inline void Tester<T, ArraySize, NumThreads>::CheckPointers() const
 	//uint32_t count(0);
 	//for (std::uint32_t i = 0; i < ArraySize; ++i) {
 	//	const gdul::aspdetail::control_block_base<T, gdul::aspdetail::default_allocator>* const controlBlock(myTestArray[i].unsafe_get_control_block());
-	//	const T* const directObject(myTestArray[i].unsafe_get_owned());
-	//	const T* const sharedObject(controlBlock->get_owned());
+	//	const T* const directObject(myTestArray[i].unsafe_get());
+	//	const T* const sharedObject(controlBlock->get());
 	//
 	//	if (directObject != sharedObject) {
 	//		++count;

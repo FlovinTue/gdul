@@ -100,11 +100,12 @@ int main()
 		const int access5(fourteenth[4]);
 
 		shared_ptr<int[10]> fifteenth(make_shared<int[10]>(1, 2, 3, 4, 5, 6, 7, 8, 9, 10));
+		const std::size_t fifteenthCount(fifteenth.item_count());
 
 		shared_ptr<int> sixteenth(new int, alloc);
 
 		shared_ptr<int> seventeenth(make_shared<int, std::allocator<int>>(17));
-
+		const std::size_t seventeenCount(seventeenth.item_count());
 
 		struct alignas(64) over_aligned {
 		};
@@ -116,12 +117,14 @@ int main()
 		{
 			std::allocator<int[]> alloc_;
 			shared_ptr<int[]> eighteen(make_shared<int[]>(55));
+			const std::size_t eighteenCount(eighteen.item_count());
 			shared_ptr<int[]> nineteen(make_shared<int[], std::allocator<int[]>>(44444, 999999));
 			shared_ptr<int[]> twenty(make_shared<int[], std::allocator<int[]>>(174, alloc_));
 		}
 
 		shared_ptr<int> nulla(nullptr, std::uint8_t(5));
 		raw_ptr<int> nullb(nullptr, 10);
+		const std::size_t nullCount(nullb.item_count());
 		atomic_shared_ptr<int> nullc(nullptr, 15);
 
 		// Removed tagging for now. Made things complicated
