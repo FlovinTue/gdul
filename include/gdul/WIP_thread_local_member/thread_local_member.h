@@ -60,10 +60,15 @@ private:
 		tlm_detail::flexible_storage<T, Allocator> m_storage;
 		std::size_t m_iteration;
 	};
+	struct st_container
+	{
+		tlm_detail::simple_pool<std::size_t, Allocator> m_indexPool;
+		std::atomic<std::size_t> m_nextIteration;
+		atomic_shared_ptr<std::size_t[]> m_itemIterations;
+	};
 
 	static thread_local tl_container s_tl_container;
-	static tlm_detail::simple_pool<std::uint32_t, Allocator> s_indexPool;
-	static std::atomic<std::size_t> s_nextIteration;
+	static st_container s_st_container;
 
 	allocator_type m_allocator;
 
@@ -80,8 +85,8 @@ inline thread_local_member<T, Allocator>::thread_local_member()
 template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::thread_local_member(Allocator& allocator)
 	: m_allocator(allocator)
-	, m_index(s_indexPool.get(m_allocator))
-	, m_iteration(s_nextIteration.operator++())
+	, m_index(s_st_container.m_indexPool.get(m_allocator))
+	, m_iteration(s_st_container.m_nextIteration.operator++())
 {
 }
 template<class T, class Allocator>
@@ -89,7 +94,7 @@ inline thread_local_member<T, Allocator>::~thread_local_member()
 {
 	flag_for_destruction();
 
-	s_indexPool.add(m_index);
+	s_st_container.m_indexPool.add(m_index);
 }
 template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::operator T& ()
@@ -117,6 +122,17 @@ inline void thread_local_member<T, Allocator>::flag_for_destruction()
 template<class T, class Allocator>
 inline void thread_local_member<T, Allocator>::refresh() const
 {
+	shared_ptr<std::size_t[]> itemIterations(s_st_container.m_itemIterations.load());
+
+	while (!(itemIterations.item_count() < m_index)) {
+		shared_ptr<std::size_t[]> grown(make_shared<std::size_t[]>(m_index + 1));
+		if (s_st_container.m_itemIterations.compare_exchange_strong(itemIterations, grown)) {
+			itemIterations = std::move(grown);
+			break;
+		}
+	}
+
+	// Hmm.. And then ?
 }
 template<class T, class Allocator>
 template <std::enable_if_t<std::is_copy_assignable_v<T>>*>
@@ -399,9 +415,7 @@ inline shared_ptr<typename simple_pool<Object, Allocator>::node> simple_pool<Obj
 }
 }
 template <class T, class Allocator>
-tlm_detail::simple_pool<std::uint32_t, Allocator> thread_local_member<T, Allocator>::s_indexPool;
+thread_local_member<T, Allocator>::st_container thread_local_member<T, Allocator>::s_st_container;
 template <class T, class Allocator>
 thread_local thread_local_member<T, Allocator>::tl_container thread_local_member<T, Allocator>::s_tl_container;
-template <class T, class Allocator>
-std::atomic<std::size_t> thread_local_member<T, Allocator>::s_nextIteration(0);
 }
