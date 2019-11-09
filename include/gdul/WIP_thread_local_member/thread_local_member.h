@@ -26,6 +26,7 @@ class alignas(alignof(T) < 8 ? 8 : alignof(T)) flexible_storage;
 
 template <class Object, class Allocator>
 class simple_pool;
+
 }
 
 template <class T, class Allocator>
@@ -47,42 +48,76 @@ public:
 	const T& operator=(const T& other);
 
 private:
+	inline void check_for_invalidation() const;
+	inline void flag_for_destruction();
+	inline void refresh() const;
+
 	using allocator_type = typename std::allocator_traits<Allocator>::template rebind_alloc<T>;
 
-	static thread_local tlm_detail::flexible_storage<T, Allocator> s_storage;
+	struct tl_container
+	{
+		tl_container() : m_iteration(0) {}
+		tlm_detail::flexible_storage<T, Allocator> m_storage;
+		std::size_t m_iteration;
+	};
+
+	static thread_local tl_container s_tl_container;
 	static tlm_detail::simple_pool<std::uint32_t, Allocator> s_indexPool;
+	static std::atomic<std::size_t> s_nextIteration;
 
 	allocator_type m_allocator;
-	const std::uint32_t m_index;
+
+	const std::size_t m_index;
+	const std::size_t m_iteration;
 };
 
 template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::thread_local_member()
 	: m_index(s_indexPool.get(m_allocator))
+	, m_iteration(s_nextIteration.operator++())
 {
 }
 template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::thread_local_member(Allocator& allocator)
 	: m_allocator(allocator)
 	, m_index(s_indexPool.get(m_allocator))
+	, m_iteration(s_nextIteration.operator++())
 {
 }
 template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::~thread_local_member()
 {
+	flag_for_destruction();
+
 	s_indexPool.add(m_index);
 }
 template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::operator T& ()
 {
-	return s_storage.get_index(m_index, m_allocator);
+	check_for_invalidation();
+	return s_tl_container.m_storage[m_index];
 }
 template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::operator T& () const
 {
-	return s_storage.get_index(m_index, m_allocator);
+	check_for_invalidation();
+	return s_tl_container.m_storage[m_index];
 }
-
+template<class T, class Allocator>
+inline void thread_local_member<T, Allocator>::check_for_invalidation() const
+{
+	if (!(m_iteration < s_tl_container.m_iteration)) {
+		refresh();
+	}
+}
+template<class T, class Allocator>
+inline void thread_local_member<T, Allocator>::flag_for_destruction()
+{
+}
+template<class T, class Allocator>
+inline void thread_local_member<T, Allocator>::refresh() const
+{
+}
 template<class T, class Allocator>
 template <std::enable_if_t<std::is_copy_assignable_v<T>>*>
 inline const T& thread_local_member<T, Allocator>::operator=(const T& other)
@@ -99,7 +134,6 @@ inline const T& thread_local_member<T, Allocator>::operator=(T&& other)
 	myval = std::move(other);
 	return *this;
 }
-
 // detail
 namespace tlm_detail
 {
@@ -112,15 +146,19 @@ public:
 	flexible_storage();
 	~flexible_storage();
 
-	T& get_index(std::uint32_t index, Allocator & allocator);
+	const T& operator[](std::size_t index) const;
+	T& operator[](std::size_t index);
+
+	inline void reserve(std::size_t capacity, Allocator & allocator);
+	inline std::size_t capacity() const noexcept;
 
 private:
 
-	T* get_array_ref(std::uint32_t capacity, Allocator & allocator);
-	void grow_to_size(std::uint32_t capacity, Allocator & allocator);
+	T* get_array_ref(std::size_t capacity, Allocator & allocator);
+	void grow_to_size(std::size_t capacity, Allocator & allocator);
 
 	void construct_static();
-	void construct_dynamic(Allocator& allocator);
+	void construct_dynamic(Allocator & allocator);
 	void destroy_static();
 	void destroy_dynamic();
 
@@ -133,7 +171,7 @@ private:
 		std::uint8_t m_dynamicStorage[sizeof(std::vector<T, Allocator>)];
 	};
 	T* m_arrayRef;
-	std::uint32_t m_capacity;
+	std::size_t m_capacity;
 };
 
 template<class T, class Allocator>
@@ -154,15 +192,29 @@ inline flexible_storage<T, Allocator>::~flexible_storage()
 	}
 }
 template<class T, class Allocator>
-inline T& flexible_storage<T, Allocator>::get_index(std::uint32_t index, Allocator& allocator)
+inline const T& flexible_storage<T, Allocator>::operator[](std::size_t index) const
+{
+	return m_arrayRef[index];
+}
+template<class T, class Allocator>
+inline T& flexible_storage<T, Allocator>::operator[](std::size_t index)
+{
+	return m_arrayRef[index];
+}
+template<class T, class Allocator>
+inline void flexible_storage<T, Allocator>::reserve(std::size_t capacity, Allocator& allocator)
 {
 	if (!(index < m_capacity)) {
 		m_arrayRef = get_array_ref(index + 1, allocator);
 	}
-	return m_arrayRef[index];
 }
 template<class T, class Allocator>
-inline T* flexible_storage<T, Allocator>::get_array_ref(std::uint32_t capacity, Allocator& allocator)
+inline std::size_t flexible_storage<T, Allocator>::capacity() const noexcept
+{
+	return m_capacity;
+}
+template<class T, class Allocator>
+inline T* flexible_storage<T, Allocator>::get_array_ref(std::size_t capacity, Allocator& allocator)
 {
 	if (m_capacity < capacity) {
 		grow_to_size(capacity, allocator);
@@ -174,14 +226,14 @@ inline T* flexible_storage<T, Allocator>::get_array_ref(std::uint32_t capacity, 
 	return &get_dynamic()[0];
 }
 template<class T, class Allocator>
-inline void flexible_storage<T, Allocator>::grow_to_size(std::uint32_t capacity, Allocator& allocator)
+inline void flexible_storage<T, Allocator>::grow_to_size(std::size_t capacity, Allocator& allocator)
 {
 	if (!(Static_Alloc_Size < capacity)) {
 		if (!m_capacity) {
 			construct_static();
 		}
 	}
-	else{
+	else {
 		if (!(Static_Alloc_Size < m_capacity)) {
 			construct_dynamic(allocator);
 		}
@@ -206,7 +258,7 @@ inline void flexible_storage<T, Allocator>::construct_dynamic(Allocator& allocat
 
 		destroy_static();
 	}
-	
+
 	new ((std::vector<T, Allocator>*) & m_dynamicStorage[0]) std::vector<T, Allocator>(m_capacity, allocator);
 	get_dynamic().resize(0);
 
@@ -349,6 +401,7 @@ inline shared_ptr<typename simple_pool<Object, Allocator>::node> simple_pool<Obj
 template <class T, class Allocator>
 tlm_detail::simple_pool<std::uint32_t, Allocator> thread_local_member<T, Allocator>::s_indexPool;
 template <class T, class Allocator>
-thread_local tlm_detail::flexible_storage<T, Allocator> thread_local_member<T, Allocator>::s_storage;
-
+thread_local thread_local_member<T, Allocator>::tl_container thread_local_member<T, Allocator>::s_tl_container;
+template <class T, class Allocator>
+std::atomic<std::size_t> thread_local_member<T, Allocator>::s_nextIteration(0);
 }
