@@ -92,7 +92,6 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\..\include\gdul\WIP_thread_local_member\thread_local_member.h" />
-    <ClInclude Include="..\..\include\gdul\WIP_thread_local_member\thread_local_member_v2h.h" />
     <ClInclude Include="pch.h" />
   </ItemGroup>
   <ItemGroup>
