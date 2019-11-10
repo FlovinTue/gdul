@@ -100,7 +100,7 @@ class ptr_base;
 
 struct memory_orders { std::memory_order m_first, m_second; };
 
-using size_type = std::uint32_t;
+using size_type = std::size_t;
 
 static constexpr std::uint8_t Local_Ref_Index(7);
 static constexpr std::uint64_t Local_Ref_Step(1ULL << (Local_Ref_Index * 8));
