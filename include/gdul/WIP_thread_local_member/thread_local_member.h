@@ -36,10 +36,10 @@ public:
 	operator T& ();
 	operator T& () const;
 
-	template <std::enable_if_t<std::is_move_assignable_v<T>>* = nullptr>
+	template <std::enable_if_t<std::is_move_assignable_v<T>> * = nullptr>
 	const T& operator=(T&& other);
 
-	template <std::enable_if_t<std::is_copy_assignable_v<T>>* = nullptr>
+	template <std::enable_if_t<std::is_copy_assignable_v<T>> * = nullptr>
 	const T& operator=(const T& other);
 
 private:
@@ -143,10 +143,12 @@ inline void thread_local_member<T, Allocator>::grow_item_iterations_array()
 	shared_ptr<std::size_t[]> itemIterations(s_st_container.m_itemIterations.load());
 	const std::size_t minimum(m_index + 1);
 
-	allocator_size_t_array arrayAlloc(m_allocator);
 
 	while (itemIterations.item_count() < minimum) {
 		const float growth(((float)minimum) * 1.3f);
+
+		allocator_size_t_array arrayAlloc(m_allocator);
+
 		shared_ptr<std::size_t[]> grown(make_shared<std::size_t[], allocator_size_t_array>((std::size_t)growth, arrayAlloc));
 		for (std::size_t i = 0; i < itemIterations.item_count(); ++i) {
 			grown[i] = itemIterations[i];
@@ -192,7 +194,7 @@ public:
 	inline void reserve(std::size_t capacity, Allocator & allocator, Args && ...args);
 
 	template <class ...Args>
-	inline void reconstruct(std::size_t index, Args&& ...args);
+	inline void reconstruct(std::size_t index, Args && ...args);
 
 	inline std::size_t capacity() const noexcept;
 private:
@@ -201,7 +203,7 @@ private:
 	T* get_array_ref() noexcept;
 
 	template <class ...Args>
-	void grow_to_size(std::size_t capacity, Allocator & allocator, Args&& ...args);
+	void grow_to_size(std::size_t capacity, Allocator & allocator, Args && ...args);
 	template <class ...Args>
 	void construct_static(Args && ...args);
 	template <class ...Args>
