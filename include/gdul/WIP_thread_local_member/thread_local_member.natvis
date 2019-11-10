@@ -2,10 +2,10 @@
 <AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
 
 	<Type Name="gdul::thread_local_member&lt;*&gt;">
-		<DisplayString Condition="m_instanceIndex &lt; s_storage.m_capacity">{s_storage.m_arrayRef[m_instanceIndex]}</DisplayString>
-		<DisplayString Condition="!(m_instanceIndex &lt; s_storage.m_capacity)">Uninitialized</DisplayString>
+		<DisplayString Condition="m_index &lt; s_tl_container.m_items.m_capacity">{s_tl_container.m_items.m_arrayRef[m_index]}</DisplayString>
+		<DisplayString Condition="!(m_index &lt; s_tl_container.m_items.m_capacity)">Uninitialized</DisplayString>
 		<Expand>
-			<ExpandedItem Condition="m_instanceIndex &lt; s_storage.m_capacity">(s_storage.m_arrayRef[m_instanceIndex])</ExpandedItem>
+			<ExpandedItem Condition="m_index &lt; s_tl_container.m_items.m_capacity">(s_tl_container.m_items.m_arrayRef[m_index])</ExpandedItem>
 		</Expand>
 	</Type>
 	
