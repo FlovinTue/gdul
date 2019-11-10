@@ -14,8 +14,6 @@ using tlm = thread_local_member<T, Allocator>;
 
 namespace tlm_detail
 {
-using index_iteration = std::pair<std::size_t, std::size_t>;
-
 static constexpr std::size_t Static_Alloc_Size = 4;
 
 template <class T, class Allocator>
@@ -51,38 +49,44 @@ private:
 	inline void grow_item_iterations_array();
 
 	using allocator_type = typename std::allocator_traits<Allocator>::template rebind_alloc<T>;
-	using index_iteration = typename tlm_detail::index_iteration;
+	using allocator_size_t = typename std::allocator_traits<Allocator>::template rebind_alloc<std::size_t>;
+	using allocator_size_t_array = typename std::allocator_traits<Allocator>::template rebind_alloc<std::size_t[]>;
 
 	struct tl_container
 	{
 		tl_container() : m_iteration(0) {}
-		tlm_detail::flexible_storage<T, Allocator> m_items;
+		tlm_detail::flexible_storage<T, allocator_type> m_items;
 		std::size_t m_iteration;
 	};
 	struct st_container
 	{
-		tlm_detail::index_pool<Allocator> m_indexPool;
+		st_container() : m_nextIteration(0) {}
+		tlm_detail::index_pool<allocator_size_t> m_indexPool;
 		atomic_shared_ptr<std::size_t[]> m_itemIterations;
+		std::atomic<std::size_t> m_nextIteration;
 	};
 
 	static thread_local tl_container s_tl_container;
 	static st_container s_st_container;
 
-	allocator_type m_allocator;
+	mutable allocator_type m_allocator;
 
-	const index_iteration m_indexPair;
+	const std::size_t m_index;
+	const std::size_t m_iteration;
 };
 
 template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::thread_local_member()
-	: m_indexPair(s_st_container.m_indexPool.get(m_allocator))
+	: m_index(s_st_container.m_indexPool.get(allocator_size_t(m_allocator)))
+	, m_iteration(s_st_container.m_nextIteration.operator++())
 {
 	grow_item_iterations_array();
 }
 template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::thread_local_member(Allocator& allocator)
 	: m_allocator(allocator)
-	, m_indexPair(s_st_container.m_indexPool.get(m_allocator))
+	, m_index(s_st_container.m_indexPool.get(allocator_size_t(m_allocator)))
+	, m_iteration(s_st_container.m_nextIteration.operator++())
 {
 }
 template<class T, class Allocator>
@@ -90,55 +94,64 @@ inline thread_local_member<T, Allocator>::~thread_local_member()
 {
 	store_current_iteration();
 
-	s_st_container.m_indexPool.add(m_indexPair);
+	s_st_container.m_indexPool.add(m_index);
 }
 template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::operator T& ()
 {
 	check_for_invalidation();
-	return s_tl_container.m_items[m_indexPair.first];
+	return s_tl_container.m_items[m_index];
 }
 template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::operator T& () const
 {
 	check_for_invalidation();
-	return s_tl_container.m_items[m_indexPair.first];
+	return s_tl_container.m_items[m_index];
 }
 template<class T, class Allocator>
 inline void thread_local_member<T, Allocator>::check_for_invalidation() const
 {
-	if (!(m_indexPair.second < s_tl_container.m_iteration)) {
+	if (s_tl_container.m_iteration < m_iteration) {
 		refresh();
+		s_tl_container.m_iteration = m_iteration;
 	}
 }
 template<class T, class Allocator>
 inline void thread_local_member<T, Allocator>::store_current_iteration()
 {
 	shared_ptr<std::size_t[]> itemIterations(s_st_container.m_itemIterations.load());
-	itemIterations[m_indexPair.first] = m_indexPair.second;
+	itemIterations[m_index] = m_iteration;
 }
 template<class T, class Allocator>
 inline void thread_local_member<T, Allocator>::refresh() const
 {
 	const shared_ptr<std::size_t[]> itemIterations(s_st_container.m_itemIterations.load());
-	const std::size_t items(itemIterations.item_count());
+	const std::size_t items(s_tl_container.m_items.capacity());
 
 	for (std::size_t i = 0; i < items; ++i) {
 		const std::size_t currentItemIteration(itemIterations[i]);
-		if (s_tl_container.m_iteration < currentItemIteration & !(m_indexPair.second < currentItemIteration)) {
+		if ((s_tl_container.m_iteration < currentItemIteration) & !(m_iteration < currentItemIteration)) {
 			s_tl_container.m_items.reconstruct(i);
 		}
 	}
+
+	s_tl_container.m_items.reserve(itemIterations.item_count(), m_allocator);
 }
 template<class T, class Allocator>
 inline void thread_local_member<T, Allocator>::grow_item_iterations_array()
 {
-	const shared_ptr<std::size_t[]> itemIterations(s_st_container.m_itemIterations.load());
-	const std::size_t target(m_indexPair.first + 1);
+	shared_ptr<std::size_t[]> itemIterations(s_st_container.m_itemIterations.load());
+	const std::size_t minimum(m_index + 1);
 
-	while (target < itemIterations.item_count()) {
-		const float growth(((float)target) * 1.3f);
-		shared_ptr<std::size_t[]> grown(make_shared<std::size_t[], Allocator>((std::size_t)growth, m_allocator));
+	allocator_size_t_array arrayAlloc(m_allocator);
+
+	while (itemIterations.item_count() < minimum) {
+		const float growth(((float)minimum) * 1.3f);
+		shared_ptr<std::size_t[]> grown(make_shared<std::size_t[], allocator_size_t_array>((std::size_t)growth, arrayAlloc));
+		for (std::size_t i = 0; i < itemIterations.item_count(); ++i) {
+			grown[i] = itemIterations[i];
+		}
+
 		if (s_st_container.m_itemIterations.compare_exchange_strong(itemIterations, std::move(grown))) {
 			break;
 		}
@@ -163,7 +176,7 @@ inline const T& thread_local_member<T, Allocator>::operator=(T&& other)
 // detail
 namespace tlm_detail
 {
-// Flexible storage keeps a few local index_iteration slots, and if more are needed
+// Flexible storage keeps a few local std::size_t slots, and if more are needed
 // it starts using an allocating vector instead.
 template <class T, class Allocator>
 class alignas(alignof(T) < 8 ? 8 : alignof(T)) flexible_storage
@@ -181,7 +194,9 @@ public:
 	template <class ...Args>
 	inline void reconstruct(std::size_t index, Args&& ...args);
 
+	inline std::size_t capacity() const noexcept;
 private:
+
 
 	T* get_array_ref() noexcept;
 
@@ -249,6 +264,11 @@ inline void flexible_storage<T, Allocator>::reconstruct(std::size_t index, Args&
 {
 	m_arrayRef[index].~T();
 	new (&m_arrayRef[index]) T(std::forward<Args&&>(args)...);
+}
+template<class T, class Allocator>
+inline std::size_t flexible_storage<T, Allocator>::capacity() const noexcept
+{
+	return m_capacity;
 }
 template<class T, class Allocator>
 inline T* flexible_storage<T, Allocator>::get_array_ref() noexcept
@@ -331,8 +351,8 @@ public:
 	index_pool() noexcept;
 	~index_pool() noexcept;
 
-	index_iteration get(Allocator& allocator);
-	void add(index_iteration index) noexcept;
+	std::size_t get(Allocator allocator);
+	void add(std::size_t index) noexcept;
 
 	struct node
 	{
@@ -353,7 +373,6 @@ private:
 	atomic_shared_ptr<node> m_topPool;
 	atomic_shared_ptr<node> m_top;
 
-	std::atomic<std::size_t> m_nextIteration;
 	std::atomic<std::size_t> m_nextIndex;
 };
 template<class Allocator>
@@ -361,7 +380,6 @@ inline index_pool<Allocator>::index_pool() noexcept
 	: m_topPool(nullptr)
 	, m_top(nullptr)
 	, m_nextIndex(0)
-	, m_nextIteration(0)
 {
 }
 template<class Allocator>
@@ -375,7 +393,7 @@ inline index_pool<Allocator>::~index_pool() noexcept
 	}
 }
 template<class Allocator>
-inline index_iteration index_pool<Allocator>::get(Allocator& allocator)
+inline std::size_t index_pool<Allocator>::get(Allocator allocator)
 {
 	shared_ptr<node> top(m_top.load(std::memory_order_relaxed));
 	while (top) {
@@ -386,19 +404,19 @@ inline index_iteration index_pool<Allocator>::get(Allocator& allocator)
 
 			push_pool_entry(std::move(top));
 
-			return { index, m_nextIteration.fetch_add(1, std::memory_order_relaxed) };
+			return index;
 		}
 	}
 
 	push_pool_entry(allocator);
 
-	return { m_nextIndex.fetch_add(1, std::memory_order_relaxed), 0 };
+	return m_nextIndex.fetch_add(1, std::memory_order_relaxed);
 }
 template<class Allocator>
-inline void index_pool<Allocator>::add(index_iteration index) noexcept
+inline void index_pool<Allocator>::add(std::size_t index) noexcept
 {
 	shared_ptr<node> entry(get_pooled_entry());
-	entry->m_index = index.first;
+	entry->m_index = index;
 
 	raw_ptr<node> expected;
 	do {
