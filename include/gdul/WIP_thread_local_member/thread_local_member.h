@@ -32,8 +32,8 @@ template <class T, class Allocator, class ...Args>
 class thread_local_member
 {
 public:
-	thread_local_member();
-	thread_local_member(Allocator& allocator);
+	thread_local_member(Args&& ...args);
+	thread_local_member(Allocator& allocator, Args&& ...args);
 
 	~thread_local_member();
 
@@ -48,19 +48,20 @@ public:
 
 private:
 	inline void check_for_invalidation() const;
-	inline void store_current_iteration();
+	inline void store_tracked_instance(Args&& ...args);
 	inline void refresh() const;
-	inline void grow_item_iterations_array();
+	inline void grow_instance_tracker_array();
+
+	using instance_tracker_entry = shared_ptr<tlm_detail::instance_tracker<Args...>>;
+	using instance_tracker_atomic_entry = atomic_shared_ptr<tlm_detail::instance_tracker<Args...>>;
+
+	using instance_tracker_array = shared_ptr<instance_tracker_atomic_entry[]>;
+	using instance_tracker_atomic_array = atomic_shared_ptr<instance_tracker_atomic_entry[]>;
 
 	using allocator_type = typename std::allocator_traits<Allocator>::template rebind_alloc<T>;
 	using allocator_size_t = typename std::allocator_traits<Allocator>::template rebind_alloc<std::size_t>;
-	using allocator_size_t_array = typename std::allocator_traits<Allocator>::template rebind_alloc<std::size_t[]>;
-
-	using tracked_instance_entry = shared_ptr<tlm_detail::instance_tracker<Args...>>;
-	using tracked_instance_atomic_entry = atomic_shared_ptr<tlm_detail::instance_tracker<Args...>>;
-
-	using tracked_instance_array = shared_ptr<tracked_instance_atomic_entry[]>;
-	using tracked_instance_atomic_array = shared_ptr<tracked_instance_atomic_entry[]>;
+	using allocator_instance_tracker_array = typename std::allocator_traits<Allocator>::template rebind_alloc<instance_tracker_atomic_entry[]>;
+	using allocator_instance_tracker_entry = typename std::allocator_traits<Allocator>::template rebind_alloc<tlm_detail::instance_tracker<Args...>>;
 
 	struct tl_container
 	{
@@ -76,7 +77,7 @@ private:
 			: m_nextIteration(0) {}
 
 		tlm_detail::index_pool<allocator_size_t> m_indexPool;
-		tracked_instance_atomic_array m_instanceTrackers;
+		instance_tracker_atomic_array m_instanceTrackers;
 		std::atomic<std::size_t> m_nextIteration;
 	};
 
@@ -90,24 +91,23 @@ private:
 };
 
 template<class T, class Allocator, class ...Args>
-inline thread_local_member<T, Allocator, Args...>::thread_local_member()
+inline thread_local_member<T, Allocator, Args...>::thread_local_member(Args&& ...args)
 	: m_index(s_st_container.m_indexPool.get(allocator_size_t(m_allocator)))
 	, m_iteration(s_st_container.m_nextIteration.operator++())
 {
-	grow_item_iterations_array();
+	store_tracked_instance(std::forward<Args&&>(args)...);
 }
 template<class T, class Allocator, class ...Args>
-inline thread_local_member<T, Allocator, Args...>::thread_local_member(Allocator& allocator)
+inline thread_local_member<T, Allocator, Args...>::thread_local_member(Allocator& allocator, Args&& ...args)
 	: m_allocator(allocator)
 	, m_index(s_st_container.m_indexPool.get(allocator_size_t(m_allocator)))
 	, m_iteration(s_st_container.m_nextIteration.operator++())
 {
+	store_tracked_instance(std::forward<Args&&>(args)...);
 }
 template<class T, class Allocator, class ...Args>
 inline thread_local_member<T, Allocator, Args...>::~thread_local_member()
 {
-	store_current_iteration();
-
 	s_st_container.m_indexPool.add(m_index);
 }
 template<class T, class Allocator, class ...Args>
@@ -131,19 +131,22 @@ inline void thread_local_member<T, Allocator, Args...>::check_for_invalidation()
 	}
 }
 template<class T, class Allocator, class ...Args>
-inline void thread_local_member<T, Allocator, Args...>::store_current_iteration()
+inline void thread_local_member<T, Allocator, Args...>::store_tracked_instance(Args&& ...args)
 {
-	shared_ptr<std::size_t[]> itemIterations(s_st_container.m_instanceTrackers.load(std::memory_order_relaxed));
-	itemIterations[m_index] = m_iteration;
+	grow_instance_tracker_array();
+
+	instance_tracker_array itemIterations(s_st_container.m_instanceTrackers.load(std::memory_order_relaxed));
+	itemIterations[m_index]->m_iteration = m_iteration;
+	itemIterations[m_index]->m_initArgs = std::forward<Args&&>(args)...;
 }
 template<class T, class Allocator, class ...Args>
 inline void thread_local_member<T, Allocator, Args...>::refresh() const
 {
-	const tracked_instance_array trackedInstances(s_st_container.m_instanceTrackers.load(std::memory_order_relaxed));
+	const instance_tracker_array trackedInstances(s_st_container.m_instanceTrackers.load(std::memory_order_relaxed));
 	const std::size_t items(s_tl_container.m_items.capacity());
 
 	for (std::size_t i = 0; i < items; ++i) {
-		tracked_instance_entry instance(trackedInstances[i].load(std::memory_order_acquire));
+		instance_tracker_entry instance(trackedInstances[i].load(std::memory_order_acquire));
 
 		if ((s_tl_container.m_iteration < instance->m_iteration) & !(m_iteration < instance->m_iteration)) {
 			s_tl_container.m_items.reconstruct(i, std::forward<Args&&>(instance->m_initArgs));
@@ -153,7 +156,7 @@ inline void thread_local_member<T, Allocator, Args...>::refresh() const
 	s_tl_container.m_items.reserve(itemIterations.item_count(), m_allocator);
 }
 template<class T, class Allocator, class ...Args>
-inline void thread_local_member<T, Allocator, Args...>::grow_item_iterations_array()
+inline void thread_local_member<T, Allocator, Args...>::grow_instance_tracker_array()
 {
 	shared_ptr<std::size_t[]> itemIterations(s_st_container.m_instanceTrackers.load());
 	const std::size_t minimum(m_index + 1);
