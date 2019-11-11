@@ -6,11 +6,11 @@
 
 namespace gdul
 {
-template <class T, class Allocator = std::allocator<T>>
+template <class T, class Allocator = std::allocator<T>, class ...Args>
 class thread_local_member;
 
-template <class T, class Allocator = std::allocator<T>>
-using tlm = thread_local_member<T, Allocator>;
+template <class T, class Allocator = std::allocator<T>, class ...Args>
+using tlm = thread_local_member<T, Allocator, Args>;
 
 namespace tlm_detail
 {
@@ -24,7 +24,7 @@ class index_pool;
 
 }
 
-template <class T, class Allocator>
+template <class T, class Allocator, class ...Args>
 class thread_local_member
 {
 public:
@@ -75,55 +75,55 @@ private:
 	const std::size_t m_iteration;
 };
 
-template<class T, class Allocator>
-inline thread_local_member<T, Allocator>::thread_local_member()
+template<class T, class Allocator, class ...Args>
+inline thread_local_member<T, Allocator, Args...>::thread_local_member()
 	: m_index(s_st_container.m_indexPool.get(allocator_size_t(m_allocator)))
 	, m_iteration(s_st_container.m_nextIteration.operator++())
 {
 	grow_item_iterations_array();
 }
-template<class T, class Allocator>
-inline thread_local_member<T, Allocator>::thread_local_member(Allocator& allocator)
+template<class T, class Allocator, class ...Args>
+inline thread_local_member<T, Allocator, Args...>::thread_local_member(Allocator& allocator)
 	: m_allocator(allocator)
 	, m_index(s_st_container.m_indexPool.get(allocator_size_t(m_allocator)))
 	, m_iteration(s_st_container.m_nextIteration.operator++())
 {
 }
-template<class T, class Allocator>
-inline thread_local_member<T, Allocator>::~thread_local_member()
+template<class T, class Allocator, class ...Args>
+inline thread_local_member<T, Allocator, Args...>::~thread_local_member()
 {
 	store_current_iteration();
 
 	s_st_container.m_indexPool.add(m_index);
 }
-template<class T, class Allocator>
-inline thread_local_member<T, Allocator>::operator T& ()
+template<class T, class Allocator, class ...Args>
+inline thread_local_member<T, Allocator, Args...>::operator T& ()
 {
 	check_for_invalidation();
 	return s_tl_container.m_items[m_index];
 }
-template<class T, class Allocator>
-inline thread_local_member<T, Allocator>::operator T& () const
+template<class T, class Allocator, class ...Args>
+inline thread_local_member<T, Allocator, Args...>::operator T& () const
 {
 	check_for_invalidation();
 	return s_tl_container.m_items[m_index];
 }
-template<class T, class Allocator>
-inline void thread_local_member<T, Allocator>::check_for_invalidation() const
+template<class T, class Allocator, class ...Args>
+inline void thread_local_member<T, Allocator, Args...>::check_for_invalidation() const
 {
 	if (s_tl_container.m_iteration < m_iteration) {
 		refresh();
 		s_tl_container.m_iteration = m_iteration;
 	}
 }
-template<class T, class Allocator>
-inline void thread_local_member<T, Allocator>::store_current_iteration()
+template<class T, class Allocator, class ...Args>
+inline void thread_local_member<T, Allocator, Args...>::store_current_iteration()
 {
 	shared_ptr<std::size_t[]> itemIterations(s_st_container.m_itemIterations.load());
 	itemIterations[m_index] = m_iteration;
 }
-template<class T, class Allocator>
-inline void thread_local_member<T, Allocator>::refresh() const
+template<class T, class Allocator, class ...Args>
+inline void thread_local_member<T, Allocator, Args...>::refresh() const
 {
 	const shared_ptr<std::size_t[]> itemIterations(s_st_container.m_itemIterations.load());
 	const std::size_t items(s_tl_container.m_items.capacity());
@@ -137,8 +137,8 @@ inline void thread_local_member<T, Allocator>::refresh() const
 
 	s_tl_container.m_items.reserve(itemIterations.item_count(), m_allocator);
 }
-template<class T, class Allocator>
-inline void thread_local_member<T, Allocator>::grow_item_iterations_array()
+template<class T, class Allocator, class ...Args>
+inline void thread_local_member<T, Allocator, Args...>::grow_item_iterations_array()
 {
 	shared_ptr<std::size_t[]> itemIterations(s_st_container.m_itemIterations.load());
 	const std::size_t minimum(m_index + 1);
@@ -159,17 +159,17 @@ inline void thread_local_member<T, Allocator>::grow_item_iterations_array()
 		}
 	}
 }
-template<class T, class Allocator>
+template<class T, class Allocator, class ...Args>
 template <std::enable_if_t<std::is_copy_assignable_v<T>>*>
-inline const T& thread_local_member<T, Allocator>::operator=(const T& other)
+inline const T& thread_local_member<T, Allocator, Args...>::operator=(const T& other)
 {
 	T& myval(*this);
 	myval = other;
 	return *this;
 }
-template<class T, class Allocator>
+template<class T, class Allocator, class ...Args>
 template<std::enable_if_t<std::is_move_assignable_v<T>>*>
-inline const T& thread_local_member<T, Allocator>::operator=(T&& other)
+inline const T& thread_local_member<T, Allocator, Args... >::operator=(T&& other)
 {
 	T& myval(*this);
 	myval = std::move(other);
@@ -459,8 +459,8 @@ inline shared_ptr<typename index_pool<Allocator>::node> index_pool<Allocator>::g
 	throw std::runtime_error("Pre allocated entries should be 1:1 to fetched indices");
 }
 }
-template <class T, class Allocator>
-typename thread_local_member<T, Allocator>::st_container thread_local_member<T, Allocator>::s_st_container;
-template <class T, class Allocator>
-typename thread_local thread_local_member<T, Allocator>::tl_container thread_local_member<T, Allocator>::s_tl_container;
+template <class T, class Allocator, class ...Args>
+typename thread_local_member<T, Allocator, Args... >::st_container thread_local_member<T, Allocator, Args...>::s_st_container;
+template <class T, class Allocator, class ...Args>
+typename thread_local thread_local_member<T, Allocator, Args... >::tl_container thread_local_member<T, Allocator, Args...>::s_tl_container;
 }
