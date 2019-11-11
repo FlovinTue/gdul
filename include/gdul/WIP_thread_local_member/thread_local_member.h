@@ -11,7 +11,7 @@ template <class T, class Allocator = std::allocator<T>, class ...Args>
 class thread_local_member;
 
 template <class T, class Allocator = std::allocator<T>, class ...Args>
-using tlm = thread_local_member<T, Allocator, Args>;
+using tlm = thread_local_member<T, Allocator, Args...>;
 
 namespace tlm_detail
 {
@@ -136,8 +136,12 @@ inline void thread_local_member<T, Allocator, Args...>::store_tracked_instance(A
 	grow_instance_tracker_array();
 
 	instance_tracker_array itemIterations(s_st_container.m_instanceTrackers.load(std::memory_order_relaxed));
-	itemIterations[m_index]->m_iteration = m_iteration;
-	itemIterations[m_index]->m_initArgs = std::forward<Args&&>(args)...;
+
+	allocator_instance_tracker_entry alloc(m_allocator);
+
+	instance_tracker_entry trackedEntry(make_shared<tlm_detail::instance_tracker<Args...>, allocator_instance_tracker_entry>(alloc, m_iteration, std::forward<Args&&>(args)...));
+
+	itemIterations[m_index].store(trackedEntry, std::memory_order_release);
 }
 template<class T, class Allocator, class ...Args>
 inline void thread_local_member<T, Allocator, Args...>::refresh() const
@@ -149,30 +153,30 @@ inline void thread_local_member<T, Allocator, Args...>::refresh() const
 		instance_tracker_entry instance(trackedInstances[i].load(std::memory_order_acquire));
 
 		if ((s_tl_container.m_iteration < instance->m_iteration) & !(m_iteration < instance->m_iteration)) {
-			s_tl_container.m_items.reconstruct(i, std::forward<Args&&>(instance->m_initArgs));
+			s_tl_container.m_items.reconstruct(i, std::forward<Args&&>(instance->m_initArgs)...);
 		}
 	}
 
-	s_tl_container.m_items.reserve(itemIterations.item_count(), m_allocator);
+	s_tl_container.m_items.reserve(trackedInstances.item_count(), m_allocator);
 }
 template<class T, class Allocator, class ...Args>
 inline void thread_local_member<T, Allocator, Args...>::grow_instance_tracker_array()
 {
-	shared_ptr<std::size_t[]> itemIterations(s_st_container.m_instanceTrackers.load());
+	instance_tracker_array trackedInstances(s_st_container.m_instanceTrackers.load(std::memory_order_relaxed));
 	const std::size_t minimum(m_index + 1);
 
 
-	while (itemIterations.item_count() < minimum) {
+	while (trackedInstances.item_count() < minimum) {
 		const float growth(((float)minimum) * 1.3f);
 
-		allocator_size_t_array arrayAlloc(m_allocator);
+		allocator_instance_tracker_array arrayAlloc(m_allocator);
 
-		shared_ptr<std::size_t[]> grown(make_shared<std::size_t[], allocator_size_t_array>((std::size_t)growth, arrayAlloc));
-		for (std::size_t i = 0; i < itemIterations.item_count(); ++i) {
-			grown[i] = itemIterations[i];
+		instance_tracker_array grown(make_shared<instance_tracker_atomic_entry[], allocator_instance_tracker_array>((std::size_t)growth, arrayAlloc));
+		for (std::size_t i = 0; i < trackedInstances.item_count(); ++i) {
+			grown[i] = trackedInstances[i].load();
 		}
 
-		if (s_st_container.m_instanceTrackers.compare_exchange_strong(itemIterations, std::move(grown))) {
+		if (s_st_container.m_instanceTrackers.compare_exchange_strong(trackedInstances, std::move(grown))) {
 			break;
 		}
 	}
@@ -485,7 +489,7 @@ struct instance_tracker
 	{
 	}
 
-	std::tuple<Args> m_initArgs;
+	std::tuple<Args...> m_initArgs;
 	const std::size_t m_iteration;
 };
 }
