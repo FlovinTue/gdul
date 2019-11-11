@@ -411,8 +411,9 @@ template<class T>
 template<class PtrType>
 inline bool atomic_shared_ptr<T>::compare_exchange_strong(typename aspdetail::disable_deduction<PtrType>::type& expected, shared_ptr<T>&& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept
 {
-	if (desired.get_local_refs() < aspdetail::Local_Ref_Fill_Boundary)
-		desired.set_local_refs(std::numeric_limits<std::uint8_t>::max());
+	const uint8_t localRefs(desired.get_local_refs());
+	if (localRefs < aspdetail::Local_Ref_Fill_Boundary)
+		desired.set_local_refs_internal(std::numeric_limits<std::uint8_t>::max());
 
 	const compressed_storage desired_(desired.m_controlBlockStorage.m_u64);
 
@@ -438,6 +439,8 @@ inline bool atomic_shared_ptr<T>::compare_exchange_strong(typename aspdetail::di
 
 	} while (preCompare == (expected_.m_u64 & aspdetail::Versioned_Ptr_Mask));
 
+	desired.set_local_refs_internal(localRefs);
+
 	expected = raw_type(expected_);
 
 	return false;
@@ -446,8 +449,9 @@ template<class T>
 template<class PtrType>
 inline bool atomic_shared_ptr<T>::compare_exchange_weak(typename aspdetail::disable_deduction<PtrType>::type& expected, shared_ptr<T>&& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept
 {
-	if (desired.get_local_refs() < aspdetail::Local_Ref_Fill_Boundary)
-		desired.set_local_refs(std::numeric_limits<std::uint8_t>::max());
+	const uint8_t localRefs(desired.get_local_refs());
+	if (localRefs < aspdetail::Local_Ref_Fill_Boundary)
+		desired.set_local_refs_internal(std::numeric_limits<std::uint8_t>::max());
 
 	const compressed_storage desired_(desired.m_controlBlockStorage.m_u64);
 	compressed_storage expected_(m_storage.load(std::memory_order_relaxed));
@@ -470,6 +474,8 @@ inline bool atomic_shared_ptr<T>::compare_exchange_weak(typename aspdetail::disa
 		return true;
 	}
 
+	desired.set_local_refs_internal(localRefs);
+	
 	const std::uint64_t postCompare(expected_.m_u64 & aspdetail::Versioned_Ptr_Mask);
 
 	// Failed, but not spuriously (other thread loaded, or compare_exchange_weak spurious fail)
@@ -505,7 +511,7 @@ template<class T>
 inline void atomic_shared_ptr<T>::store(shared_ptr<T>&& from, std::memory_order order) noexcept
 {
 	if (from.get_local_refs() < aspdetail::Local_Ref_Fill_Boundary)
-		from.set_local_refs(std::numeric_limits<std::uint8_t>::max());
+		from.set_local_refs_internal(std::numeric_limits<std::uint8_t>::max());
 
 	store_internal(from.m_controlBlockStorage.m_u64, order);
 	from.clear();
@@ -519,7 +525,7 @@ template<class T>
 inline shared_ptr<T> atomic_shared_ptr<T>::exchange(shared_ptr<T>&& with, std::memory_order order) noexcept
 {
 	if (with.get_local_refs() < aspdetail::Local_Ref_Fill_Boundary)
-		with.set_local_refs(std::numeric_limits<std::uint8_t>::max());
+		with.set_local_refs_internal(std::numeric_limits<std::uint8_t>::max());
 
 	compressed_storage previous(exchange_internal(with.m_controlBlockStorage, aspdetail::CAS_FLAG_STEAL_PREVIOUS, order));
 	with.clear();
@@ -1312,11 +1318,12 @@ public:
 	// Adjusts the amount of local refs kept for fast copies. Setting this to 1
 	// means a copy operation will not attempt to modify local state, and thus is
 	// concurrency safe(so long as the object remains unaltered). 
-	// Use of local refs may be completely disabled via define GDUL_SP_SAFE_COPY
+	// Caching of local refs may be completely disabled via define GDUL_SP_SAFE_COPY
 	inline void set_local_refs(std::uint8_t target) noexcept;
 
 	inline constexpr std::uint8_t get_local_refs() const noexcept;
 private:
+	inline void set_local_refs_internal(std::uint8_t target) noexcept;
 
 	constexpr void clear() noexcept;
 
@@ -1436,13 +1443,25 @@ inline constexpr void shared_ptr<T>::clear() noexcept
 template<class T>
 inline void shared_ptr<T>::set_local_refs(std::uint8_t target) noexcept
 {
-	if (aspdetail::control_block_base<T>* const cb = this->get_control_block()) {
+#ifndef GDUL_SP_SAFE_COPY
+	set_local_refs_internal(target);
+#else
+	(void)target;
+#endif
+}
+template<class T>
+inline void shared_ptr<T>::set_local_refs_internal(std::uint8_t target) noexcept
+{
+	if (aspdetail::control_block_base<T>* const cb = this->get_control_block())
+	{
 		const uint8_t localRefs(this->m_controlBlockStorage.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF]);
 
-		if (localRefs < target) {
+		if (localRefs < target)
+		{
 			cb->incref(target - localRefs);
 		}
-		else if (target < localRefs) {
+		else if (target < localRefs)
+		{
 			cb->decref(localRefs - target);
 		}
 
