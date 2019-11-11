@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <array>
+#include <tuple>
 #include <gdul\atomic_shared_ptr\atomic_shared_ptr.h>
 
 namespace gdul
@@ -18,6 +19,9 @@ static constexpr std::size_t Static_Alloc_Size = 4;
 
 template <class T, class Allocator>
 class alignas(alignof(T) < 8 ? 8 : alignof(T)) flexible_storage;
+
+template <class ...Args>
+struct instance_tracker;
 
 template <class Allocator>
 class index_pool;
@@ -52,17 +56,27 @@ private:
 	using allocator_size_t = typename std::allocator_traits<Allocator>::template rebind_alloc<std::size_t>;
 	using allocator_size_t_array = typename std::allocator_traits<Allocator>::template rebind_alloc<std::size_t[]>;
 
+	using tracked_instance_entry = shared_ptr<tlm_detail::instance_tracker<Args...>>;
+	using tracked_instance_atomic_entry = atomic_shared_ptr<tlm_detail::instance_tracker<Args...>>;
+
+	using tracked_instance_array = shared_ptr<tracked_instance_atomic_entry[]>;
+	using tracked_instance_atomic_array = shared_ptr<tracked_instance_atomic_entry[]>;
+
 	struct tl_container
 	{
-		tl_container() : m_iteration(0) {}
+		tl_container() 
+			: m_iteration(0) {}
+
 		tlm_detail::flexible_storage<T, allocator_type> m_items;
 		std::size_t m_iteration;
 	};
 	struct st_container
 	{
-		st_container() : m_nextIteration(0) {}
+		st_container() 
+			: m_nextIteration(0) {}
+
 		tlm_detail::index_pool<allocator_size_t> m_indexPool;
-		atomic_shared_ptr<std::size_t[]> m_itemIterations;
+		tracked_instance_atomic_array m_instanceTrackers;
 		std::atomic<std::size_t> m_nextIteration;
 	};
 
@@ -119,19 +133,20 @@ inline void thread_local_member<T, Allocator, Args...>::check_for_invalidation()
 template<class T, class Allocator, class ...Args>
 inline void thread_local_member<T, Allocator, Args...>::store_current_iteration()
 {
-	shared_ptr<std::size_t[]> itemIterations(s_st_container.m_itemIterations.load());
+	shared_ptr<std::size_t[]> itemIterations(s_st_container.m_instanceTrackers.load(std::memory_order_relaxed));
 	itemIterations[m_index] = m_iteration;
 }
 template<class T, class Allocator, class ...Args>
 inline void thread_local_member<T, Allocator, Args...>::refresh() const
 {
-	const shared_ptr<std::size_t[]> itemIterations(s_st_container.m_itemIterations.load());
+	const tracked_instance_array trackedInstances(s_st_container.m_instanceTrackers.load(std::memory_order_relaxed));
 	const std::size_t items(s_tl_container.m_items.capacity());
 
 	for (std::size_t i = 0; i < items; ++i) {
-		const std::size_t currentItemIteration(itemIterations[i]);
-		if ((s_tl_container.m_iteration < currentItemIteration) & !(m_iteration < currentItemIteration)) {
-			s_tl_container.m_items.reconstruct(i);
+		tracked_instance_entry instance(trackedInstances[i].load(std::memory_order_acquire));
+
+		if ((s_tl_container.m_iteration < instance->m_iteration) & !(m_iteration < instance->m_iteration)) {
+			s_tl_container.m_items.reconstruct(i, std::forward<Args&&>(instance->m_initArgs));
 		}
 	}
 
@@ -140,7 +155,7 @@ inline void thread_local_member<T, Allocator, Args...>::refresh() const
 template<class T, class Allocator, class ...Args>
 inline void thread_local_member<T, Allocator, Args...>::grow_item_iterations_array()
 {
-	shared_ptr<std::size_t[]> itemIterations(s_st_container.m_itemIterations.load());
+	shared_ptr<std::size_t[]> itemIterations(s_st_container.m_instanceTrackers.load());
 	const std::size_t minimum(m_index + 1);
 
 
@@ -154,7 +169,7 @@ inline void thread_local_member<T, Allocator, Args...>::grow_item_iterations_arr
 			grown[i] = itemIterations[i];
 		}
 
-		if (s_st_container.m_itemIterations.compare_exchange_strong(itemIterations, std::move(grown))) {
+		if (s_st_container.m_instanceTrackers.compare_exchange_strong(itemIterations, std::move(grown))) {
 			break;
 		}
 	}
@@ -458,6 +473,18 @@ inline shared_ptr<typename index_pool<Allocator>::node> index_pool<Allocator>::g
 	}
 	throw std::runtime_error("Pre allocated entries should be 1:1 to fetched indices");
 }
+template <class ...Args>
+struct instance_tracker
+{
+	instance_tracker(std::size_t iteration, Args&& ...args)
+		: m_initArgs(std::forward<Args&&>(args)...)
+		, m_iteration(iteration)
+	{
+	}
+
+	std::tuple<Args> m_initArgs;
+	const std::size_t m_iteration;
+};
 }
 template <class T, class Allocator, class ...Args>
 typename thread_local_member<T, Allocator, Args... >::st_container thread_local_member<T, Allocator, Args...>::s_st_container;
