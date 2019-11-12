@@ -3,6 +3,7 @@
 #include <vector>
 #include <array>
 #include <tuple>
+#include <utility>
 #include <gdul\atomic_shared_ptr\atomic_shared_ptr.h>
 
 namespace gdul
@@ -25,6 +26,9 @@ struct instance_tracker;
 
 template <class Allocator>
 class index_pool;
+
+template <class T, std::size_t N, class ...Args>
+constexpr std::array<T, N> make_array(Args&&... args);
 
 }
 
@@ -326,13 +330,8 @@ template<class T, class Allocator>
 template<class ...Args>
 inline void flexible_storage<T, Allocator>::construct_static(Args&& ...args)
 {
-	new ((std::array<T, Static_Alloc_Size>*) & m_staticStorage[0]) std::array<T, Static_Alloc_Size>();
-	std::array<T, Static_Alloc_Size>& arr(get_static());
+	new ((std::array<T, Static_Alloc_Size>*) & m_staticStorage[0]) std::array<T, Static_Alloc_Size>(make_array<T, Static_Alloc_Size>(std::forward<Args&&>(args)...));
 
-	for (std::size_t i = 0; i < Static_Alloc_Size; ++i) {
-		arr[i].~T();
-		new(&arr[i]) T(std::forward<Args&&>(args)...);
-	}
 }
 template<class T, class Allocator>
 template<class ...Args>
@@ -492,6 +491,17 @@ struct instance_tracker
 	std::tuple<Args...> m_initArgs;
 	const std::size_t m_iteration;
 };
+
+template<class T, std::size_t ...Ix, typename ...Args>
+constexpr std::array<T, sizeof ...(Ix)> repeat(std::index_sequence<Ix...>, Args&&... args)
+{
+	return { {((void)Ix, T(std::forward<Args&&>(args)...))...} };
+}
+template <class T, std::size_t N, class ...Args>
+constexpr std::array<T, N> make_array(Args&&... args)
+{
+	return std::array<T, N>(repeat<T>(std::make_index_sequence<N>(), std::forward<Args&&>(args)...));
+}
 }
 template <class T, class Allocator, class ...Args>
 typename thread_local_member<T, Allocator, Args... >::st_container thread_local_member<T, Allocator, Args...>::s_st_container;
