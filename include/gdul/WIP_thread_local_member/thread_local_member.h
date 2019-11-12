@@ -21,7 +21,8 @@ static constexpr std::size_t Static_Alloc_Size = 4;
 template <class T, class Allocator>
 class alignas(alignof(T) < 8 ? 8 : alignof(T)) flexible_storage;
 
-template <class ...Args>
+//template <class ...Args>
+template <class T>
 struct instance_tracker;
 
 template <class Allocator>
@@ -38,6 +39,8 @@ class thread_local_member
 public:
 	thread_local_member(Args&& ...args);
 	thread_local_member(Allocator& allocator, Args&& ...args);
+
+	using value_type = T;
 
 	~thread_local_member();
 
@@ -161,7 +164,7 @@ inline void thread_local_member<T, Allocator, Args...>::refresh() const
 		}
 	}
 
-	s_tl_container.m_items.reserve(trackedInstances.item_count(), m_allocator);
+	s_tl_container.m_items.reserve(trackedInstances.item_count(), m_allocator, std::forward<Args&&>(trackedInstances[m_index].load(std::memory_order_relaxed)->m_initArgs)...);
 }
 template<class T, class Allocator, class ...Args>
 inline void thread_local_member<T, Allocator, Args...>::grow_instance_tracker_array()
@@ -479,16 +482,19 @@ inline shared_ptr<typename index_pool<Allocator>::node> index_pool<Allocator>::g
 	}
 	throw std::runtime_error("Pre allocated entries should be 1:1 to fetched indices");
 }
-template <class ...Args>
+//template <class ...Args>
+template <class T>
 struct instance_tracker
 {
-	instance_tracker(std::size_t iteration, Args&& ...args)
-		: m_initArgs(std::forward<Args&&>(args)...)
+	instance_tracker(std::size_t iteration, T args/*Args&& ...args*/)
+		//: m_initArgs(std::forward<Args&&>(args)...)
+		: m_initArgs(args)
 		, m_iteration(iteration)
 	{
 	}
 
-	std::tuple<Args...> m_initArgs;
+	//std::tuple<Args...> m_initArgs;
+	T m_initArgs;
 	const std::size_t m_iteration;
 };
 

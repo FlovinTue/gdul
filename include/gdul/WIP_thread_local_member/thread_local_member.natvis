@@ -3,9 +3,11 @@
 
 	<Type Name="gdul::thread_local_member&lt;*&gt;">
 		<DisplayString Condition="m_index &lt; s_tl_container.m_items.m_capacity">{s_tl_container.m_items.m_arrayRef[m_index]}</DisplayString>
-		<DisplayString Condition="!(m_index &lt; s_tl_container.m_items.m_capacity)">Uninitialized</DisplayString>
+		<DisplayString Condition="!(m_index &lt; s_tl_container.m_items.m_capacity)">
+			(decayed_type*)(((cb_base_type*)(s_st_container->m_instanceTrackers.m_controlBlockStorage.m_u64 &amp; aspdetail::Ptr_Mask))->m_ptrStorage.m_u64 &amp; aspdetail::Ptr_Mask)
+		</DisplayString>
 		<Expand>
-			<ExpandedItem Condition="m_index &lt; s_tl_container.m_items.m_capacity">(s_tl_container.m_items.m_arrayRef[m_index])</ExpandedItem>
+			<ExpandedItem Condition="m_index &lt; s_tl_container.m_items.m_capacity">(&amp;s_tl_container.m_items.m_arrayRef[m_index])</ExpandedItem>
 		</Expand>
 	</Type>
 	
