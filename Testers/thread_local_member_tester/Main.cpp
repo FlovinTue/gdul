@@ -16,7 +16,8 @@ int main()
 		std::allocator<int> alloc;
 		{
 			gdul::tlm<int, std::allocator<int>, int> aliased(555);
-
+			uint64_t blah = (uint64_t) aliased.s_st_container.m_instanceTrackers.load()[aliased.m_index].load().get();
+			blah;
 			const int heja = aliased;
 			aliased = 1;
 		}

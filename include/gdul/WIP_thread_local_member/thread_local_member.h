@@ -21,7 +21,6 @@ static constexpr std::size_t Static_Alloc_Size = 4;
 template <class T, class Allocator>
 class alignas(alignof(T) < 8 ? 8 : alignof(T)) flexible_storage;
 
-//template <class ...Args>
 template <class T>
 struct instance_tracker;
 
@@ -53,7 +52,7 @@ public:
 	template <std::enable_if_t<std::is_copy_assignable_v<T>> * = nullptr>
 	const T& operator=(const T& other);
 
-private:
+//private:
 	inline void check_for_invalidation() const;
 	inline void store_tracked_instance(Args&& ...args);
 	inline void refresh() const;
@@ -340,15 +339,15 @@ template<class T, class Allocator>
 template<class ...Args>
 inline void flexible_storage<T, Allocator>::construct_dynamic(Allocator& allocator, Args&& ...args)
 {
-	std::array<T, Static_Alloc_Size> src;
-
+	std::vector<T, Allocator>* newStorage = new ((std::vector<T, Allocator>*) & m_dynamicStorage[0]) std::vector<T, Allocator>(m_capacity, std::forward<Args&&>(args)..., allocator);
+	
 	if (m_capacity) {
-		src = std::move(get_static());
+		for (std::size_t i = 0; i < m_capacity; ++i) {
+			(*newStorage)[i] = std::move(m_arrayRef[i]);
+		}
 
 		destroy_static();
 	}
-
-	new ((std::vector<T, Allocator>*) & m_dynamicStorage[0]) std::vector<T, Allocator>(m_capacity, std::forward<Args&&>(args)..., allocator);
 }
 template<class T, class Allocator>
 inline void flexible_storage<T, Allocator>::destroy_static() noexcept
@@ -482,18 +481,15 @@ inline shared_ptr<typename index_pool<Allocator>::node> index_pool<Allocator>::g
 	}
 	throw std::runtime_error("Pre allocated entries should be 1:1 to fetched indices");
 }
-//template <class ...Args>
 template <class T>
 struct instance_tracker
 {
-	instance_tracker(std::size_t iteration, T args/*Args&& ...args*/)
-		//: m_initArgs(std::forward<Args&&>(args)...)
+	instance_tracker(std::size_t iteration, T&& args)
 		: m_initArgs(args)
 		, m_iteration(iteration)
 	{
 	}
 
-	//std::tuple<Args...> m_initArgs;
 	T m_initArgs;
 	const std::size_t m_iteration;
 };
