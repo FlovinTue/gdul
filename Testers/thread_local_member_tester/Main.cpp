@@ -15,9 +15,18 @@ int main()
 	{
 		std::allocator<int> alloc;
 		{
-			gdul::tlm<int, std::allocator<int>, int> aliased(555);
-			uint64_t blah = (uint64_t) aliased.s_st_container.m_instanceTrackers.load()[aliased.m_index].load().get();
-			blah;
+			for (int i = 0; i < 10; ++i)
+			{
+				gdul::tlm<int, std::allocator<int>> aliased(i);
+			}
+			gdul::tlm<int, std::allocator<int>> aliased(555);
+			gdul::tlm<int, std::allocator<int>> aliased1(222);
+			gdul::tlm<int, std::allocator<int>> aliased2(333);
+			gdul::tlm<int, std::allocator<int>> aliased3(111);
+			gdul::tlm<int, std::allocator<int>> aliased4(777);
+			gdul::tlm<int, std::allocator<int>> aliased5(888);
+			gdul::tlm<int, std::allocator<int>> aliased6(999);
+
 			const int heja = aliased;
 			aliased = 1;
 		}
