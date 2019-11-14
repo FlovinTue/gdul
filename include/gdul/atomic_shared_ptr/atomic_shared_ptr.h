@@ -80,7 +80,7 @@ template <class T>
 constexpr bool is_unbounded_array_v = std::is_array_v<T> & (std::extent_v<T> == 0);
 
 template <class T>
-using decay_unbounded_t = std::conditional_t<is_unbounded_array_v<T>, std::remove_all_extents_t<T>, T>;
+using decay_unbounded_t = std::conditional_t<is_unbounded_array_v<T>, std::remove_pointer_t<std::decay_t<T>>, T>;
 
 template <class T>
 class control_block_base;
