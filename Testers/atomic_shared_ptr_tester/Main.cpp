@@ -14,7 +14,6 @@
 
 int main()
 {
-
 		using namespace gdul;
 
 		constexpr std::size_t mksh = gdul::alloc_size_make_shared<int, std::allocator<int>>();
