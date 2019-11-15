@@ -104,6 +104,8 @@ using size_type = std::size_t;
 
 static constexpr std::uint8_t Local_Ref_Index(7);
 static constexpr std::uint64_t Local_Ref_Step(1ULL << (Local_Ref_Index * 8));
+
+// Also, the maximum number of concurrently accessing threads
 static constexpr std::uint8_t Local_Ref_Fill_Boundary(112);
 static constexpr std::uint8_t Default_Local_Refs =
 #if defined (GDUL_SP_SAFE_COPY) 
@@ -296,7 +298,7 @@ private:
 };
 template <class T>
 inline constexpr atomic_shared_ptr<T>::atomic_shared_ptr() noexcept
-	: m_storage(0ULL)
+	: m_storage(0ULL | (std::uint64_t(std::numeric_limits<std::uint8_t>::max()) << (aspdetail::STORAGE_BYTE_LOCAL_REF * 8)))
 {
 }
 template<class T>
@@ -306,7 +308,7 @@ inline constexpr atomic_shared_ptr<T>::atomic_shared_ptr(std::nullptr_t) noexcep
 }
 template<class T>
 inline constexpr atomic_shared_ptr<T>::atomic_shared_ptr(std::nullptr_t, std::uint8_t version) noexcept
-	: m_storage(0ULL | (std::uint64_t(version) << (aspdetail::STORAGE_BYTE_VERSION * 8)))
+	: m_storage(0ULL | (std::uint64_t(version) << (aspdetail::STORAGE_BYTE_VERSION * 8)) | (std::uint64_t(std::numeric_limits<std::uint8_t>::max()) << (aspdetail::STORAGE_BYTE_LOCAL_REF * 8)))
 {
 }
 template <class T>
@@ -698,10 +700,6 @@ inline void atomic_shared_ptr<T>::try_fill_local_refs(compressed_storage& expect
 
 	aspdetail::control_block_base<T>* const cb(to_control_block(expected));
 
-	if (!cb) {
-		return;
-	}
-
 	const compressed_storage initialPtrBlock(expected.m_u64 & aspdetail::Versioned_Ptr_Mask);
 
 	do {
@@ -711,14 +709,18 @@ inline void atomic_shared_ptr<T>::try_fill_local_refs(compressed_storage& expect
 		compressed_storage desired(expected);
 		desired.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] = std::numeric_limits<std::uint8_t>::max();
 
-		cb->incref(newRefs);
+		// Accept 'null' refs, to be able to avoid using compare_exchange_strong during copy_internal
+		if (cb){
+			cb->incref(newRefs);
+		}
 
 		if (m_storage.compare_exchange_weak(expected.m_u64, desired.m_u64, std::memory_order_relaxed)) {
-			expected.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] = std::numeric_limits<std::uint8_t>::max();
 			return;
 		}
 
-		cb->decref(newRefs);
+		if (cb){
+			cb->decref(newRefs);
+		}
 
 	} while (
 		(expected.m_u64 & aspdetail::Versioned_Ptr_Mask) == initialPtrBlock.m_u64 &&
@@ -794,10 +796,13 @@ inline void atomic_shared_ptr<T>::unsafe_fill_local_refs() const noexcept
 	const compressed_storage current(m_storage.load(std::memory_order_relaxed));
 	aspdetail::control_block_base<T>* const cb(to_control_block(current));
 
-	if (cb && current.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] < aspdetail::Local_Ref_Fill_Boundary) {
+	if (current.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] < aspdetail::Local_Ref_Fill_Boundary) {
 		const std::uint8_t newRefs(std::numeric_limits<std::uint8_t>::max() - current.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF]);
 
-		cb->incref(newRefs);
+		// Accept 'null' refs, to be able to avoid using compare_exchange_strong during copy_internal
+		if (cb){
+			cb->incref(newRefs);
+		}
 
 		compressed_storage newStorage(current);
 		newStorage.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] = std::numeric_limits<std::uint8_t>::max();
@@ -1465,10 +1470,11 @@ inline void shared_ptr<T>::set_local_refs_internal(std::uint8_t target) noexcept
 			cb->decref(localRefs - target);
 		}
 
-		this->m_controlBlockStorage.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] = target;
 		this->m_controlBlockStorage.m_u64 *= (bool)target;
 		m_ptr = (decayed_type*)((uint64_t)m_ptr * (bool)target);
 	}
+
+	this->m_controlBlockStorage.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] = target;
 }
 template <class T>
 inline constexpr std::uint8_t shared_ptr<T>::get_local_refs() const noexcept
