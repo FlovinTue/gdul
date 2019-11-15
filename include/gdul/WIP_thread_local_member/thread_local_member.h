@@ -98,7 +98,7 @@ private:
 	mutable allocator_type m_allocator;
 
 	const std::size_t m_index;
-	const std::size_t m_iteration;
+	std::size_t m_iteration;
 };
 template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::thread_local_member()
@@ -124,17 +124,19 @@ template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::thread_local_member(const Allocator& allocator, T&& init)
 	: m_allocator(allocator)
 	, m_index(s_st_container.m_indexPool.get(allocator_size_t(m_allocator)))
-	, m_iteration(s_st_container.m_nextIteration.operator++())
 {
 	store_tracked_instance(std::forward<T&&>(init));
+	// No good. Ordering must be investigated. store_tracked_instance uses iteration.
+	m_iteration = s_st_container.m_nextIteration.operator++();
 }
 template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::thread_local_member(const Allocator& allocator, const T& init)
 	: m_allocator(allocator)
 	, m_index(s_st_container.m_indexPool.get(allocator_size_t(m_allocator)))
-	, m_iteration(s_st_container.m_nextIteration.operator++())
 {
 	store_tracked_instance(std::forward<const T&>(init));
+	// No good. Ordering must be investigated. store_tracked_instance uses iteration.
+	m_iteration = s_st_container.m_nextIteration.operator++();
 }
 template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::~thread_local_member()
@@ -185,11 +187,11 @@ inline void thread_local_member<T, Allocator>::refresh() const
 		instance_tracker_entry instance(trackedInstances[i].load(std::memory_order_acquire));
 
 		if ((s_tl_container.m_iteration < instance->m_iteration) & !(m_iteration < instance->m_iteration)) {
+			s_tl_container.m_items.reserve(i + 1, m_allocator);
 			s_tl_container.m_items.reconstruct(i, instance->m_initArgs);
 		}
 	}
 
-	s_tl_container.m_items.reserve(trackedInstances.item_count(), m_allocator, trackedInstances[m_index].load(std::memory_order_relaxed)->m_initArgs);
 }
 template<class T, class Allocator>
 inline void thread_local_member<T, Allocator>::grow_instance_tracker_array()
