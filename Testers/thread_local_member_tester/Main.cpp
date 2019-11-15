@@ -5,6 +5,9 @@
 #include <thread>
 #include <vld.h>
 #include <gdul\atomic_shared_ptr\atomic_shared_ptr.h>
+#include <gdul\concurrent_queue\concurrent_queue.h>
+#include <functional>
+#include <vector>
 
 int main()
 {
@@ -67,12 +70,33 @@ int main()
 		}
 	};
 
-	lam();
+	gdul::concurrent_queue<std::function<void()>> que;
 
-	std::thread thr(lam);
+	for (uint32_t i = 0; i < 20000; ++i){
+		que.push(lam);
+	}
 
-	thr.join();
+	auto consume = [&que]()
+	{
+		std::function<void()> out;
 
-	lam();
+		while (que.try_pop(out))
+		{
+			out();
+		}
+	};
+
+	std::vector<std::thread> threads;
+
+	for (uint32_t i = 0; i < 8; ++i)
+	{
+		threads.push_back(std::thread(consume));
+	}
+
+	for (uint32_t i = 0; i < 8; ++i)
+	{
+		threads[i].join();
+	}
+
 	return 0;
 }

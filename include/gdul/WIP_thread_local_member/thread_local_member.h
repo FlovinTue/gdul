@@ -186,7 +186,9 @@ inline void thread_local_member<T, Allocator>::refresh() const
 	for (std::size_t i = 0; i < items; ++i) {
 		instance_tracker_entry instance(trackedInstances[i].load(std::memory_order_acquire));
 
-		if ((s_tl_container.m_iteration < instance->m_iteration) & !(m_iteration < instance->m_iteration)) {
+		if (instance 
+			&& ((s_tl_container.m_iteration < instance->m_iteration) 
+			& !(m_iteration < instance->m_iteration))) {
 			s_tl_container.m_items.reserve(i + 1, m_allocator);
 			s_tl_container.m_items.reconstruct(i, instance->m_initArgs);
 		}
@@ -199,15 +201,14 @@ inline void thread_local_member<T, Allocator>::grow_instance_tracker_array() con
 	instance_tracker_array trackedInstances(s_st_container.m_instanceTrackers.load(std::memory_order_relaxed));
 	const std::size_t minimum(m_index + 1);
 
+	allocator_instance_tracker_array arrayAlloc(m_allocator);
 
 	while (trackedInstances.item_count() < minimum) {
 		const float growth(((float)minimum) * 1.3f);
 
-		allocator_instance_tracker_array arrayAlloc(m_allocator);
-
 		instance_tracker_array grown(make_shared<instance_tracker_atomic_entry[], allocator_instance_tracker_array>((std::size_t)growth, arrayAlloc));
 		for (std::size_t i = 0; i < trackedInstances.item_count(); ++i) {
-			grown[i] = trackedInstances[i].load();
+			grown[i].unsafe_store(trackedInstances[i].load(std::memory_order_relaxed), std::memory_order_relaxed);
 		}
 
 		if (s_st_container.m_instanceTrackers.compare_exchange_strong(trackedInstances, std::move(grown))) {
@@ -446,16 +447,26 @@ inline index_pool<Allocator>::~index_pool() noexcept
 		m_top.unsafe_store(next);
 		top = std::move(next);
 	}
+
+	top = m_topPool.unsafe_load();
+	while (top)
+	{
+		shared_ptr<node> next(top->m_next.unsafe_load());
+		m_topPool.unsafe_store(next);
+		top = std::move(next);
+	}
 }
 template<class Allocator>
 inline std::size_t index_pool<Allocator>::get(Allocator allocator)
 {
+	allocator;
 	shared_ptr<node> top(m_top.load(std::memory_order_relaxed));
 	while (top) {
-		raw_ptr<node> expected(top);
-		if (m_top.compare_exchange_strong(expected, top->m_next.load(std::memory_order_acquire), std::memory_order_relaxed)) {
+		if (m_top.compare_exchange_strong(top, top->m_next.load(std::memory_order_acquire), std::memory_order_relaxed)) {
 
 			const std::size_t index(top->m_index);
+			
+			top->m_next = nullptr;
 
 			push_pool_entry(std::move(top));
 
@@ -470,15 +481,22 @@ inline std::size_t index_pool<Allocator>::get(Allocator allocator)
 template<class Allocator>
 inline void index_pool<Allocator>::add(std::size_t index) noexcept
 {
-	shared_ptr<node> entry(get_pooled_entry());
-	entry->m_index = index;
+	shared_ptr<node> toInsert(make_shared<node, Allocator>(index, nullptr));
+	//shared_ptr<node> blah(get_pooled_entry()); blah;
+	//toInsert->m_index = index;
+	raw_ptr<node> expected(m_top);
+	do{
+		toInsert->m_next.unsafe_store(m_top.load());
+	} while (!m_top.compare_exchange_strong(expected, std::move(toInsert)));
+	//shared_ptr<node> entry(get_pooled_entry());
+	//entry->m_index = index;
 
-	raw_ptr<node> expected;
-	do {
-		shared_ptr<node> top(m_top.load());
-		expected = top.get_raw_ptr();
-		entry->m_next.unsafe_store(std::move(top));
-	} while (!m_top.compare_exchange_strong(expected, std::move(entry)));
+	//raw_ptr<node> expected;
+	//do {
+	//	shared_ptr<node> top(m_top.load());
+	//	expected = top.get_raw_ptr();
+	//	entry->m_next.unsafe_store(std::move(top));
+	//} while (!m_top.compare_exchange_strong(expected, std::move(entry)));
 }
 template<class Allocator>
 inline void index_pool<Allocator>::push_pool_entry(Allocator& allocator)
@@ -496,16 +514,17 @@ inline void index_pool<Allocator>::push_pool_entry(shared_ptr<node> entry)
 	do {
 		shared_ptr<node> top(m_topPool.load(std::memory_order_acquire));
 		expected = top.get_raw_ptr();
-		toInsert->m_next = std::move(top);
+		toInsert->m_next.unsafe_store(std::move(top));
 	} while (!m_topPool.compare_exchange_strong(expected, std::move(toInsert)));
 }
 template<class Allocator>
 inline shared_ptr<typename index_pool<Allocator>::node> index_pool<Allocator>::get_pooled_entry()
 {
 	shared_ptr<node> top(m_topPool.load(std::memory_order_relaxed));
+	
 	while (top) {
-		raw_ptr<node> expected(top);
-		if (m_topPool.compare_exchange_strong(expected, top->m_next.load(std::memory_order_acquire), std::memory_order_relaxed)) {
+		if (m_topPool.compare_exchange_strong(top, top->m_next.load(std::memory_order_acquire), std::memory_order_relaxed)) {
+			//top->m_next.store(nullptr);
 			return top;
 		}
 	}
