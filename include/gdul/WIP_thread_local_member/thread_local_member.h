@@ -59,9 +59,9 @@ public:
 private:
 	inline void check_for_invalidation() const;
 	template <class ...Args>
-	inline void store_tracked_instance(Args&& ...args);
+	inline std::size_t store_tracked_instance(Args&& ...args) const;
 	inline void refresh() const;
-	inline void grow_instance_tracker_array();
+	inline void grow_instance_tracker_array() const;
 
 	using instance_tracker_entry = shared_ptr<tlm_detail::instance_tracker<T>>;
 	using instance_tracker_atomic_entry = atomic_shared_ptr<tlm_detail::instance_tracker<T>>;
@@ -98,7 +98,7 @@ private:
 	mutable allocator_type m_allocator;
 
 	const std::size_t m_index;
-	std::size_t m_iteration;
+	const std::size_t m_iteration;
 };
 template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::thread_local_member()
@@ -124,19 +124,15 @@ template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::thread_local_member(const Allocator& allocator, T&& init)
 	: m_allocator(allocator)
 	, m_index(s_st_container.m_indexPool.get(allocator_size_t(m_allocator)))
+	, m_iteration(store_tracked_instance(std::forward<T&&>(init)))
 {
-	store_tracked_instance(std::forward<T&&>(init));
-	// No good. Ordering must be investigated. store_tracked_instance uses iteration.
-	m_iteration = s_st_container.m_nextIteration.operator++();
 }
 template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::thread_local_member(const Allocator& allocator, const T& init)
 	: m_allocator(allocator)
 	, m_index(s_st_container.m_indexPool.get(allocator_size_t(m_allocator)))
+	, m_iteration(store_tracked_instance(std::forward<const T&>(init)))
 {
-	store_tracked_instance(std::forward<const T&>(init));
-	// No good. Ordering must be investigated. store_tracked_instance uses iteration.
-	m_iteration = s_st_container.m_nextIteration.operator++();
 }
 template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::~thread_local_member()
@@ -165,7 +161,7 @@ inline void thread_local_member<T, Allocator>::check_for_invalidation() const
 }
 template<class T, class Allocator>
 template <class ...Args>
-inline void thread_local_member<T, Allocator>::store_tracked_instance(Args&& ...args)
+inline std::size_t thread_local_member<T, Allocator>::store_tracked_instance(Args&& ...args) const
 {
 	grow_instance_tracker_array();
 
@@ -173,15 +169,19 @@ inline void thread_local_member<T, Allocator>::store_tracked_instance(Args&& ...
 
 	allocator_instance_tracker_entry alloc(m_allocator);
 
-	instance_tracker_entry trackedEntry(make_shared<tlm_detail::instance_tracker<T>, allocator_instance_tracker_entry>(alloc, m_iteration, std::forward<Args&&>(args)...));
+	instance_tracker_entry trackedEntry(make_shared<tlm_detail::instance_tracker<T>, allocator_instance_tracker_entry>(alloc, 0, std::forward<Args&&>(args)...));
 
 	itemIterations[m_index].store(trackedEntry, std::memory_order_release);
+
+	trackedEntry->m_iteration = s_st_container.m_nextIteration.operator++();
+
+	return trackedEntry->m_iteration;
 }
 template<class T, class Allocator>
 inline void thread_local_member<T, Allocator>::refresh() const
 {
 	const instance_tracker_array trackedInstances(s_st_container.m_instanceTrackers.load(std::memory_order_relaxed));
-	const std::size_t items(s_tl_container.m_items.capacity());
+	const std::size_t items(trackedInstances.item_count());
 
 	for (std::size_t i = 0; i < items; ++i) {
 		instance_tracker_entry instance(trackedInstances[i].load(std::memory_order_acquire));
@@ -194,7 +194,7 @@ inline void thread_local_member<T, Allocator>::refresh() const
 
 }
 template<class T, class Allocator>
-inline void thread_local_member<T, Allocator>::grow_instance_tracker_array()
+inline void thread_local_member<T, Allocator>::grow_instance_tracker_array() const
 {
 	instance_tracker_array trackedInstances(s_st_container.m_instanceTrackers.load(std::memory_order_relaxed));
 	const std::size_t minimum(m_index + 1);
@@ -263,7 +263,7 @@ private:
 	template <class ...Args>
 	void construct_static(Args && ...args);
 	template <class ...Args>
-	void construct_dynamic(Allocator & allocator, Args && ...args);
+	void construct_dynamic(std::size_t capacity, Allocator & allocator, Args && ...args);
 	void destroy_static() noexcept;
 	void destroy_dynamic() noexcept;
 
@@ -348,7 +348,7 @@ inline void flexible_storage<T, Allocator>::grow_to_size(std::size_t capacity, A
 	}
 	else {
 		if (!(Static_Alloc_Size < m_capacity)) {
-			construct_dynamic(allocator, std::forward<Args&&>(args)...);
+			construct_dynamic(capacity, allocator, std::forward<Args&&>(args)...);
 		}
 
 		get_dynamic().resize(capacity, std::forward<Args&&>(args)...);
@@ -365,17 +365,19 @@ inline void flexible_storage<T, Allocator>::construct_static(Args&& ...args)
 }
 template<class T, class Allocator>
 template<class ...Args>
-inline void flexible_storage<T, Allocator>::construct_dynamic(Allocator& allocator, Args&& ...args)
+inline void flexible_storage<T, Allocator>::construct_dynamic(std::size_t capacity, Allocator& allocator, Args&& ...args)
 {
-	std::vector<T, Allocator>* newStorage = new ((std::vector<T, Allocator>*) & m_dynamicStorage[0]) std::vector<T, Allocator>(m_capacity, std::forward<Args&&>(args)..., allocator);
-	
+	std::vector<T, Allocator> replacement(capacity, std::forward<Args&&>(args)..., allocator);
+
 	if (m_capacity) {
 		for (std::size_t i = 0; i < m_capacity; ++i) {
-			(*newStorage)[i] = std::move(m_arrayRef[i]);
+			replacement[i] = std::move(m_arrayRef[i]);
 		}
 
 		destroy_static();
 	}
+
+	new ((std::vector<T, Allocator>*) & m_dynamicStorage[0]) std::vector<T, Allocator>(std::move(replacement));
 }
 template<class T, class Allocator>
 inline void flexible_storage<T, Allocator>::destroy_static() noexcept
@@ -520,7 +522,7 @@ struct instance_tracker
 	}
 
 	const T m_initArgs;
-	const std::size_t m_iteration;
+	std::size_t m_iteration;
 };
 
 template<class T, std::size_t ...Ix, typename ...Args>
