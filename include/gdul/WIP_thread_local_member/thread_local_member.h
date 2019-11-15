@@ -422,7 +422,7 @@ public:
 
 private:
 	// Pre-allocate 'return entry' (so that adds can happen in destructor)
-	void push_pool_entry(Allocator& allocator);
+	void alloc_pool_entry(Allocator& allocator);
 	void push_pool_entry(shared_ptr<node> node);
 	shared_ptr<node> get_pooled_entry();
 
@@ -468,13 +468,13 @@ inline std::size_t index_pool<Allocator>::get(Allocator allocator)
 			
 			top->m_next = nullptr;
 
-			push_pool_entry(std::move(top));
+			//push_pool_entry(std::move(top));
 
 			return index;
 		}
 	}
 
-	push_pool_entry(allocator);
+	//alloc_pool_entry(allocator);
 
 	return m_nextIndex.fetch_add(1, std::memory_order_relaxed);
 }
@@ -488,18 +488,9 @@ inline void index_pool<Allocator>::add(std::size_t index) noexcept
 	do{
 		toInsert->m_next.unsafe_store(m_top.load());
 	} while (!m_top.compare_exchange_strong(expected, std::move(toInsert)));
-	//shared_ptr<node> entry(get_pooled_entry());
-	//entry->m_index = index;
-
-	//raw_ptr<node> expected;
-	//do {
-	//	shared_ptr<node> top(m_top.load());
-	//	expected = top.get_raw_ptr();
-	//	entry->m_next.unsafe_store(std::move(top));
-	//} while (!m_top.compare_exchange_strong(expected, std::move(entry)));
 }
 template<class Allocator>
-inline void index_pool<Allocator>::push_pool_entry(Allocator& allocator)
+inline void index_pool<Allocator>::alloc_pool_entry(Allocator& allocator)
 {
 	shared_ptr<node> entry(make_shared<node, Allocator>(allocator, std::numeric_limits<std::size_t>::max(), nullptr));
 
@@ -524,7 +515,6 @@ inline shared_ptr<typename index_pool<Allocator>::node> index_pool<Allocator>::g
 	
 	while (top) {
 		if (m_topPool.compare_exchange_strong(top, top->m_next.load(std::memory_order_acquire), std::memory_order_relaxed)) {
-			//top->m_next.store(nullptr);
 			return top;
 		}
 	}
