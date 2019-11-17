@@ -447,14 +447,6 @@ inline index_pool<Allocator>::~index_pool() noexcept
 		m_top.unsafe_store(next);
 		top = std::move(next);
 	}
-
-	top = m_topPool.unsafe_load();
-	while (top)
-	{
-		shared_ptr<node> next(top->m_next.unsafe_load());
-		m_topPool.unsafe_store(next);
-		top = std::move(next);
-	}
 }
 template<class Allocator>
 inline std::size_t index_pool<Allocator>::get(Allocator allocator)
@@ -468,26 +460,25 @@ inline std::size_t index_pool<Allocator>::get(Allocator allocator)
 			
 			top->m_next = nullptr;
 
-			//push_pool_entry(std::move(top));
+			push_pool_entry(std::move(top));
 
 			return index;
 		}
 	}
 
-	//alloc_pool_entry(allocator);
+	alloc_pool_entry(allocator);
 
 	return m_nextIndex.fetch_add(1, std::memory_order_relaxed);
 }
 template<class Allocator>
 inline void index_pool<Allocator>::add(std::size_t index) noexcept
 {
-	shared_ptr<node> toInsert(make_shared<node, Allocator>(index, nullptr));
-	//shared_ptr<node> blah(get_pooled_entry()); blah;
-	//toInsert->m_index = index;
-	raw_ptr<node> expected(m_top);
+	shared_ptr<node> toInsert(get_pooled_entry());
+	toInsert->m_index = index;
+	shared_ptr<node> top(m_top.load());
 	do{
-		toInsert->m_next.unsafe_store(m_top.load());
-	} while (!m_top.compare_exchange_strong(expected, std::move(toInsert)));
+		toInsert->m_next.store(top);
+	} while (!m_top.compare_exchange_strong(top, std::move(toInsert)));
 }
 template<class Allocator>
 inline void index_pool<Allocator>::alloc_pool_entry(Allocator& allocator)
@@ -501,12 +492,10 @@ inline void index_pool<Allocator>::push_pool_entry(shared_ptr<node> entry)
 {
 	shared_ptr<node> toInsert(std::move(entry));
 
-	raw_ptr<node> expected;
+	shared_ptr<node> top(m_topPool.load(std::memory_order_acquire));
 	do {
-		shared_ptr<node> top(m_topPool.load(std::memory_order_acquire));
-		expected = top.get_raw_ptr();
-		toInsert->m_next.unsafe_store(std::move(top));
-	} while (!m_topPool.compare_exchange_strong(expected, std::move(toInsert)));
+		toInsert->m_next.store(top);
+	} while (!m_topPool.compare_exchange_strong(top, std::move(toInsert)));
 }
 template<class Allocator>
 inline shared_ptr<typename index_pool<Allocator>::node> index_pool<Allocator>::get_pooled_entry()
@@ -514,7 +503,7 @@ inline shared_ptr<typename index_pool<Allocator>::node> index_pool<Allocator>::g
 	shared_ptr<node> top(m_topPool.load(std::memory_order_relaxed));
 	
 	while (top) {
-		if (m_topPool.compare_exchange_strong(top, top->m_next.load(std::memory_order_acquire), std::memory_order_relaxed)) {
+		if (m_topPool.compare_exchange_strong(top, top->m_next.load(std::memory_order_acquire))) {
 			return top;
 		}
 	}
