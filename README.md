@@ -1,6 +1,7 @@
 # gdul
  A collection of threading related utilities 
  #something with space
+ #something-with-space
 -------------------------------------------------------------------------------------------------------------------------------------------
 
 ## atomic_shared_ptr
@@ -27,6 +28,6 @@ Multi producer multi consumer unbounded lock-free queue. FIFO is respected withi
 Includes needed are concurrent_queue.h and atomic_shared_ptr.h. concurrent_queue.natvis and atomic_shared_ptr.natvis may be added to projects for additional debug information in Visual Studio
 
 
-#something-without-space
+
 
 [Go to something with space](#something-without-space)
