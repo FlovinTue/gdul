@@ -16,8 +16,8 @@ There are eight different versions of compare_exchange_strong, four of which tak
  
 -------------------------------------------------------------------------------------------------------------------------------------------
 
-## atomic_uint128
-utilityclass for 128 bit atomic operations
+## atomic_128
+utility wrapper class for 128 bit atomic operations. 
 
 -------------------------------------------------------------------------------------------------------------------------------------------
 
