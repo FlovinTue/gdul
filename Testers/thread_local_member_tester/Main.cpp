@@ -8,11 +8,12 @@
 #include <gdul\concurrent_queue\concurrent_queue.h>
 #include <functional>
 #include <vector>
-#include "Tester.h"
+#include "tester.h"
 
 int main()
 {
-	
+	gdul::tester<> tester;
+	tester.execute();
 
 	return 0;
 }
