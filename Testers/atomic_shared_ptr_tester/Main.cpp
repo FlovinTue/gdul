@@ -160,7 +160,7 @@ int main()
 
 		const std::uint32_t testArraySize(32);
 		const std::uint32_t numThreads(8);
-		Tester<std::uint64_t, testArraySize, numThreads> tester(true, rand());
+		tester<std::uint64_t, testArraySize, numThreads> tester(true, rand());
 
 		const bool
 			doassign(true),
@@ -173,7 +173,7 @@ int main()
 		uint32_t runs(32);
 		float time(0.f);
 		for (std::uint32_t i = 0; i < runs; ++i) {
-			time += tester.Execute(arraySweeps, doassign, doreassign, doCAStest, doreferencetest);
+			time += tester.execute(arraySweeps, doassign, doreassign, doCAStest, doreferencetest);
 		}
 		if (runs)
 		{
