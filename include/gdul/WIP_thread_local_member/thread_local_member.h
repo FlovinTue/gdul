@@ -56,6 +56,7 @@ public:
 	template <std::enable_if_t<std::is_copy_assignable_v<T>> * = nullptr>
 	const T& operator=(const T& other);
 
+	static void _unsafe_reset();
 private:
 	inline void check_for_invalidation() const;
 	template <class ...Args>
@@ -150,6 +151,12 @@ inline thread_local_member<T, Allocator>::operator T& () const
 {
 	check_for_invalidation();
 	return s_tl_container.m_items[m_index];
+}
+template<class T, class Allocator>
+inline void thread_local_member<T, Allocator>::_unsafe_reset()
+{
+	s_st_container.m_indexPool.unsafe_reset();
+	s_st_container.m_instanceTrackers.unsafe_store(nullptr);
 }
 template<class T, class Allocator>
 inline void thread_local_member<T, Allocator>::check_for_invalidation() const
@@ -407,6 +414,8 @@ public:
 	index_pool() noexcept;
 	~index_pool() noexcept;
 
+	void unsafe_reset();
+
 	std::size_t get(Allocator allocator);
 	void add(std::size_t index) noexcept;
 
@@ -441,12 +450,19 @@ inline index_pool<Allocator>::index_pool() noexcept
 template<class Allocator>
 inline index_pool<Allocator>::~index_pool() noexcept
 {
+}
+template<class Allocator>
+inline void index_pool<Allocator>::unsafe_reset()
+{
 	shared_ptr<node> top(m_top.unsafe_load());
-	while (top) {
+	while (top)
+	{
 		shared_ptr<node> next(top->m_next.unsafe_load());
 		m_top.unsafe_store(next);
 		top = std::move(next);
 	}
+
+	m_nextIndex.store(0, std::memory_order_relaxed);
 }
 template<class Allocator>
 inline std::size_t index_pool<Allocator>::get(Allocator allocator)

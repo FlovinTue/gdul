@@ -26,7 +26,7 @@ public:
 		T* ret = std::allocator<T>::allocate(count);
 		spin();
 		s_allocated += count * sizeof(T);
-		std::cout << "allocated " << count * sizeof(T) << "--------------" << " new value: " << s_allocated << std::endl;
+		//std::cout << "allocated " << count * sizeof(T) << "--------------" << " new value: " << s_allocated << std::endl;
 		release();
 		return ret;
 	}
@@ -35,7 +35,7 @@ public:
 		std::allocator<T>::deallocate(obj, count);
 		spin();
 		s_allocated -= count * sizeof(T);
-		std::cout << "deallocated " << count * sizeof(T) << "--------------" << " new value: " << s_allocated << std::endl;
+		//std::cout << "deallocated " << count * sizeof(T) << "--------------" << " new value: " << s_allocated << std::endl;
 		release();
 	}
 	void spin()
