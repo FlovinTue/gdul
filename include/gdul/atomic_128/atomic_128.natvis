@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
   
-  <Type Name="gdul::uint128">
+  <Type Name="gdul::u128">
     <DisplayString>{m_u64[0]},{m_u64[1]}</DisplayString>
 
   </Type>
-  <Type Name="gdul::atomic_uint128">
-    <DisplayString>{m_storage.m_u64[0]},{m_storage.m_u64[1]}</DisplayString>
+  <Type Name="gdul::atomic_128&lt;*&gt;">
+    <DisplayString>{m_storage}</DisplayString>
     <Expand>
       <ExpandedItem>
         m_storage
