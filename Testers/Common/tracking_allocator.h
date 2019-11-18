@@ -49,7 +49,9 @@ public:
 		s_spin.clear();
 	}
 	template <class Other>
-	tracking_allocator(tracking_allocator<Other>&) {};
+	tracking_allocator(const tracking_allocator<Other>&) {};
+	template <class Other>
+	const tracking_allocator<Other>& operator=(const tracking_allocator<Other>&) {};
 };
 
 }
