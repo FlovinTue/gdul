@@ -66,6 +66,8 @@ private:
 	std::int64_t m_s64[2];
 };
 
+using atomic_u128 = atomic_128<u128>;
+
 // Utility wrapper class for atomic operations on 128 bit types. 
 // Supplies extra integer utility functionality if used with gdul::u128 as value type
 template <class T>
