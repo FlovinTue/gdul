@@ -85,12 +85,6 @@ namespace cqdetail
 
 typedef std::size_t size_type;
 
-class producer_overflow : public std::runtime_error
-{
-public:
-	producer_overflow(const char* errorMessage) : runtime_error(errorMessage) {}
-};
-
 template <class T, class Allocator>
 struct accessor_cache;
 
@@ -567,7 +561,7 @@ inline void concurrent_queue<T, Allocator>::push_producer_buffer(shared_ptr_slot
 	const std::uint16_t bufferSlot(claim_store_slot());
 #ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
 	if (!(bufferSlot < cqdetail::Max_Producers)) {
-		throw cqdetail::producer_overflow("Max producers exceeded");
+		throw std::runtime_error("Max producers exceeded");
 	}
 #endif
 	insert_to_store(std::move(buffer), bufferSlot, cqdetail::to_store_array_slot<void>(bufferSlot));
