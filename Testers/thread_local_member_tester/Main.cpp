@@ -12,7 +12,7 @@
 
 int main()
 {
-	gdul::tester<> tester;
+	gdul::tester<int> tester(5);
 	tester.execute();
 
 	return 0;

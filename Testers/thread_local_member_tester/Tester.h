@@ -8,160 +8,165 @@
 namespace gdul
 {
 
-template <class Dummy = void>
+template <class T>
 class tester
 {
 public:
-
+	tester(const T& init);
 	void execute();
+
+
+
+
+	void test_index_pool(uint32_t tasks);
+	void test_construction(uint32_t tasks);
+	void test_assignment(uint32_t tasks);
+
+	
 
 	gdul::thread_pool m_worker;
 
-	gdul::tracking_allocator<uint8_t> m_alloc;
+	gdul::tracking_allocator<T> m_alloc;
 
 	using alloc_t = decltype(m_alloc);
+	using tlm_t = gdul::tlm<T, alloc_t>;
+
+	gdul::tlm_detail::index_pool<alloc_t> m_indexPool;
+
+	const T m_init;
 };
 
-template <class Dummy>
-void tester<Dummy>::execute()
+template <class T>
+tester<T>::tester(const T& init)
+	: m_init(init)
 {
-	{
-		//auto lam = []()
-		//{
-		//	gdul::tracking_allocator<int> alloc;
-		//	using all = decltype(alloc);
-		//	{
-		//		for (int i = 0; i < 40; ++i)
-		//		{
-		//			gdul::tlm<int, std::allocator<int>> aliased(i);
-		//			aliased = 5;
-		//		}
-		//		gdul::tlm<int, all> aliased(555);
-		//		gdul::tlm<int, all> aliased1(222);
-		//		gdul::tlm<int, all> aliased2(333);
-		//		gdul::tlm<int, all> aliased3(111);
-		//		gdul::tlm<int, all> aliased4(777);
-		//		gdul::tlm<int, all> aliased5(888);
-		//		gdul::tlm<int, all> aliased6(999);
+}
+template <class T>
+void tester<T>::execute()
+{
+	test_assignment(10000);
+	test_construction(10000);
+	test_index_pool(100000);
 
-		//		const int heja = aliased;
-		//		aliased = 1;
-		//	}
-		//	{
-		//		gdul::thread_local_member<std::string, gdul::tracking_allocator<int>> first;
-		//		gdul::thread_local_member<std::string, gdul::tracking_allocator<int>> second;
-		//		gdul::thread_local_member<std::string, gdul::tracking_allocator<int>> third;
-		//		gdul::thread_local_member<std::string, gdul::tracking_allocator<int>> fourth;
-		//		gdul::thread_local_member<std::string, gdul::tracking_allocator<int>> fifth;
-		//		first = "first john long long john brother tuck";
-		//		second = "second john long long john brother tuck";
-		//		third = "third john long long john brother tuck";
-		//		fourth = "fourth john long long john brother tuck";
-		//		fifth = "fifth john long long john brother tuck";
-
-		//		std::string firstOut = first;
-		//		std::string secondOut = second;
-		//		std::string thirdOut = third;
-		//		std::string fourthOut = fourth;
-		//		std::string fifthOut = fifth;
-		//	}
-		//	{
-		//		gdul::thread_local_member<int, gdul::tracking_allocator<int>> first;
-		//		gdul::thread_local_member<int, gdul::tracking_allocator<int>> second;
-		//		gdul::thread_local_member<int, gdul::tracking_allocator<int>> third;
-		//		gdul::thread_local_member<int, gdul::tracking_allocator<int>> fourth;
-		//		gdul::thread_local_member<int, gdul::tracking_allocator<int>> fifth;
-
-		//		first = 1;
-		//		second = 2;
-		//		third = 3;
-		//		fourth = 4;
-		//		fifth = 5;
-
-		//		const int firstOut = first;
-		//		const int secondOut = second;
-		//		const int thirdOut = third;
-		//		const int fourthOut = fourth;
-		//		const int fifthOut = fifth;
-		//	}
-		//};
-
-		gdul::tlm_detail::index_pool<gdul::tracking_allocator<int>> ind;
-		auto lam = [&ind] {
-			gdul::tracking_allocator<int> alloc;
-
-			{
-				auto one = ind.get(alloc);
-				auto two = ind.get(alloc);
-				auto three = ind.get(alloc);
-				auto four = ind.get(alloc);
-				auto five = ind.get(alloc);
-
-				ind.add(five);
-				ind.add(two);
-				ind.add(one);
-				ind.add(four);
-				ind.add(three);
-			}
-			{
-				auto one = ind.get(alloc);
-				auto two = ind.get(alloc);
-				auto three = ind.get(alloc);
-				auto four = ind.get(alloc);
-				auto five = ind.get(alloc);
-
-				ind.add(five);
-				ind.add(two);
-				ind.add(one);
-				ind.add(four);
-				ind.add(three);
-			}
-			{
-				auto one = ind.get(alloc);
-				auto two = ind.get(alloc);
-				auto three = ind.get(alloc);
-				auto four = ind.get(alloc);
-				auto five = ind.get(alloc);
-
-				ind.add(five);
-				ind.add(two);
-				ind.add(one);
-				ind.add(four);
-				ind.add(three);
-			}
-		};
-
-		gdul::concurrent_queue<std::function<void()>> que;
-
-		for (uint32_t i = 0; i < 180000; ++i)
-		{
-			que.push(lam);
-		}
-
-		auto consume = [&que]()
-		{
-			std::function<void()> out;
-
-			while (que.try_pop(out))
-			{
-				out();
-			}
-		};
-
-		std::vector<std::thread> threads;
-
-		for (uint32_t i = 0; i < 8; ++i)
-		{
-			threads.push_back(std::thread(consume));
-		}
-
-		for (uint32_t i = 0; i < 8; ++i)
-		{
-			threads[i].join();
-		}
-		gdul::tlm<int, gdul::tracking_allocator<int>>::_unsafe_reset();
-		gdul::tlm<std::string, gdul::tracking_allocator<int>>::_unsafe_reset();
-	}
+	gdul::tlm<T, alloc_t>::_unsafe_reset();
+	
 	std::cout << "final: " << gdul::s_allocated << std::endl;
+}
+template<class T>
+inline void tester<T>::test_index_pool(uint32_t tasks)
+{
+	auto lam = [this]
+	{
+		auto one = m_indexPool.get(m_alloc);
+		auto two = m_indexPool.get(m_alloc);
+		auto three = m_indexPool.get(m_alloc);
+		auto four = m_indexPool.get(m_alloc);
+		auto five = m_indexPool.get(m_alloc);
+
+		m_indexPool.add(five);
+		m_indexPool.add(two);
+		m_indexPool.add(one);
+		m_indexPool.add(four);
+		m_indexPool.add(three);
+	};
+	for (uint32_t i = 0; i < tasks; ++i)
+	{
+		m_worker.add_task(lam);
+	}
+}
+template<class T>
+inline void tester<T>::test_construction(uint32_t tasks)
+{
+	auto lam = [this]()
+	{
+		for (int i = 0; i < 40; ++i)
+		{
+			gdul::tlm<T, alloc_t> first(m_init);
+			gdul::tlm<T, alloc_t> second(m_init);
+			gdul::tlm<T, alloc_t> third(m_init);
+			gdul::tlm<T, alloc_t> fourth(m_init);
+			gdul::tlm<T, alloc_t> fifth(m_init);
+
+			if (!first == m_init)
+			{
+				throw std::runtime_error("Mismatch first default");
+			}
+			if (!first == m_init)
+			{
+				throw std::runtime_error("Mismatch second default");
+			}
+			if (!first == m_init)
+			{
+				throw std::runtime_error("Mismatch third default");
+			}
+			if (!first == m_init)
+			{
+				throw std::runtime_error("Mismatch fourth default");
+			}
+			if (!first == m_init)
+			{
+				throw std::runtime_error("Mismatch fifth default");
+			}
+		}
+	};
+	for (uint32_t i = 0; i < tasks; ++i)
+	{
+		m_worker.add_task(lam);
+	}
+}
+template<class T>
+inline void tester<T>::test_assignment(uint32_t tasks)
+{
+	auto lam = [this]()
+	{
+		gdul::tlm<T, alloc_t> first;
+		gdul::tlm<T, alloc_t> second;
+		gdul::tlm<T, alloc_t> third;
+		gdul::tlm<T, alloc_t> fourth;
+		gdul::tlm<T, alloc_t> fifth;
+
+		const T firstExp = T();
+		const T secondExp = T();
+		const T thirdExp = T();
+		const T fourthExp = T();
+		const T fifthExp = T();
+
+		first = firstExp;
+		second = secondExp;
+		third = thirdExp;
+		fourth = fourthExp;
+		fifth = fifthExp;
+
+		const T firstOut = first;
+		const T secondOut = second;
+		const T thirdOut = third;
+		const T fourthOut = fourth;
+		const T fifthOut = fifth;
+
+		if (!firstOut == firstExp)
+		{
+			throw std::runtime_error("Mismatch first");
+		}
+		if (!secondOut == secondExp)
+		{
+			throw std::runtime_error("Mismatch second");
+		}
+		if (!thirdOut == thirdExp)
+		{
+			throw std::runtime_error("Mismatch third");
+		}
+		if (!fourthOut == fourthExp)
+		{
+			throw std::runtime_error("Mismatch fourth");
+		}
+		if (!fifthOut == fifthExp)
+		{
+			throw std::runtime_error("Mismatch fifth");
+		}
+	};
+	for (uint32_t i = 0; i < tasks; ++i)
+	{
+		m_worker.add_task(lam);
+	}
 }
 }
