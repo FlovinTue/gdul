@@ -16,7 +16,7 @@
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>gdul</RootNamespace>
     <WindowsTargetPlatformVersion>10.0.18362.0</WindowsTargetPlatformVersion>
-    <ProjectName>atomic_uint128</ProjectName>
+    <ProjectName>atomic_128</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
@@ -91,7 +91,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\include\gdul\atomic_uint128\atomic_uint128.h" />
+    <ClInclude Include="..\..\include\gdul\atomic_128\atomic_128.h" />
     <ClInclude Include="pch.h" />
   </ItemGroup>
   <ItemGroup>
@@ -102,10 +102,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\atomic_shared_ptr_tester\atomic_shared_ptr.vcxproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <Natvis Include="..\..\include\gdul\atomic_uint128\atomic_uint128.natvis" />
+    <Natvis Include="..\..\include\gdul\atomic_128\atomic_128.natvis" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
