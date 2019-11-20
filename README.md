@@ -28,3 +28,7 @@ Multi producer multi consumer unbounded lock-free queue. FIFO is respected withi
 Includes needed are concurrent_queue.h and atomic_shared_ptr.h. concurrent_queue.natvis and atomic_shared_ptr.natvis may be added to projects for additional debug information in Visual Studio
 
 
+## concurrent_object_pool
+Allocates chunks of objects and makes them avaliable for usage via get_object. Return objects using recycle_object. Concurrency safe & lock-free.
+
+Includes needed are concurrent_object_pool.h, concurrent_queue_.h
