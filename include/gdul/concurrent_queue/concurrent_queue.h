@@ -1709,7 +1709,7 @@ inline void index_pool<IndexType, Allocator>::add(IndexType index)
 	do {
 		shared_ptr<node> top(m_top.load());
 		expected = top.get_raw_ptr();
-		entry->m_next.unsafe_store(std::move(top));
+		entry->m_next.store(std::move(top));
 	} while (!m_top.compare_exchange_strong(expected, std::move(entry)));
 }
 template<class IndexType, class Allocator>

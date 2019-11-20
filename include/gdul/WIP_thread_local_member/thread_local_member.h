@@ -5,9 +5,12 @@
 #include <tuple>
 #include <utility>
 #include <gdul\atomic_shared_ptr\atomic_shared_ptr.h>
+#include <thread>
+#include <queue>
 
 namespace gdul
 {
+
 template <class T, class Allocator = std::allocator<T>>
 class thread_local_member;
 
@@ -26,7 +29,7 @@ class alignas(alignof(T) < 8 ? 8 : alignof(T)) flexible_storage;
 template <class T>
 struct instance_tracker;
 
-template <class Allocator>
+template <class T>
 class index_pool;
 
 template <class T, size_type N, class ...Args>
@@ -412,7 +415,7 @@ inline std::vector<T, Allocator>& flexible_storage<T, Allocator>::get_dynamic() 
 {
 	return *reinterpret_cast<std::vector<T, Allocator>*>(&m_dynamicStorage[0]);
 }
-template <class Allocator>
+template <class T>
 class index_pool
 {
 public:
@@ -421,6 +424,7 @@ public:
 
 	void unsafe_reset();
 
+	template <class Allocator>
 	size_type get(Allocator allocator);
 	void add(size_type index) noexcept;
 
@@ -434,30 +438,39 @@ public:
 		atomic_shared_ptr<node> m_next;
 	};
 
+
+
 private:
 	// Pre-allocate 'return entry' (so that adds can happen in destructor)
-	void alloc_pool_entry(Allocator& allocator);
+	template <class Allocator>
+	void alloc_pool_entry(Allocator allocator);
+
 	void push_pool_entry(shared_ptr<node> node);
 	shared_ptr<node> get_pooled_entry();
+
+	static thread_local std::queue<shared_ptr<node>> nodes;
 
 	atomic_shared_ptr<node> m_topPool;
 	atomic_shared_ptr<node> m_top;
 
 	std::atomic<size_type> m_nextIndex;
 };
-template<class Allocator>
-inline index_pool<Allocator>::index_pool() noexcept
+
+template <class T>
+thread_local std::queue<shared_ptr<typename index_pool<T>::node>> index_pool<T>::nodes;
+template<class T>
+inline index_pool<T>::index_pool() noexcept
 	: m_topPool(nullptr)
 	, m_top(nullptr)
 	, m_nextIndex(0)
 {
 }
-template<class Allocator>
-inline index_pool<Allocator>::~index_pool() noexcept
+template<class T>
+inline index_pool<T>::~index_pool() noexcept
 {
 }
-template<class Allocator>
-inline void index_pool<Allocator>::unsafe_reset()
+template<class T>
+inline void index_pool<T>::unsafe_reset()
 {
 	shared_ptr<node> top(m_top.unsafe_load());
 	while (top)
@@ -469,19 +482,21 @@ inline void index_pool<Allocator>::unsafe_reset()
 
 	m_nextIndex.store(0, std::memory_order_relaxed);
 }
-template<class Allocator>
-inline size_type index_pool<Allocator>::get(Allocator allocator)
+template<class T>
+template <class Allocator>
+inline size_type index_pool<T>::get(Allocator allocator)
 {
-	allocator;
 	shared_ptr<node> top(m_top.load(std::memory_order_relaxed));
 	while (top) {
-		if (m_top.compare_exchange_strong(top, top->m_next.load(std::memory_order_acquire), std::memory_order_relaxed)) {
+		shared_ptr<node> next(top->m_next.load()); 
+		if (m_top.compare_exchange_strong(top, next, std::memory_order_relaxed)) {
 
 			const size_type index(top->m_index);
 			
 			top->m_next = nullptr;
 
-			push_pool_entry(std::move(top));
+			push_pool_entry(top);
+			//alloc_pool_entry(allocator);
 
 			return index;
 		}
@@ -491,43 +506,62 @@ inline size_type index_pool<Allocator>::get(Allocator allocator)
 
 	return m_nextIndex.fetch_add(1, std::memory_order_relaxed);
 }
-template<class Allocator>
-inline void index_pool<Allocator>::add(size_type index) noexcept
+template<class T>
+inline void index_pool<T>::add(size_type index) noexcept
 {
 	shared_ptr<node> toInsert(get_pooled_entry());
 	toInsert->m_index = index;
+
 	shared_ptr<node> top(m_top.load());
 	do{
 		toInsert->m_next.store(top);
-	} while (!m_top.compare_exchange_strong(top, std::move(toInsert)));
+	} while (!m_top.compare_exchange_strong(top, toInsert));
 }
-template<class Allocator>
-inline void index_pool<Allocator>::alloc_pool_entry(Allocator& allocator)
+template<class T>
+template <class Allocator>
+inline void index_pool<T>::alloc_pool_entry(Allocator allocator)
 {
 	shared_ptr<node> entry(make_shared<node, Allocator>(allocator, std::numeric_limits<size_type>::max(), nullptr));
-
-	push_pool_entry(std::move(entry));
+	push_pool_entry(entry);
 }
-template<class Allocator>
-inline void index_pool<Allocator>::push_pool_entry(shared_ptr<node> entry)
+template<class T>
+inline void index_pool<T>::push_pool_entry(shared_ptr<node> entry)
 {
-	shared_ptr<node> toInsert(std::move(entry));
+	shared_ptr<node> toInsert(entry);
 
-	shared_ptr<node> top(m_topPool.load(std::memory_order_acquire));
-	do {
-		toInsert->m_next.store(top);
-	} while (!m_topPool.compare_exchange_strong(top, std::move(toInsert)));
+	nodes.push(toInsert);
+
+	//shared_ptr<node> top(m_topPool.load(std::memory_order_acquire));
+	//do {
+	//	toInsert->m_next.store(top);
+	//} while (!m_topPool.compare_exchange_strong(top, std::move(toInsert)));
 }
-template<class Allocator>
-inline shared_ptr<typename index_pool<Allocator>::node> index_pool<Allocator>::get_pooled_entry()
+template<class T>
+inline shared_ptr<typename index_pool<T>::node> index_pool<T>::get_pooled_entry()
 {
-	shared_ptr<node> top(m_topPool.load(std::memory_order_relaxed));
-	
-	while (top) {
-		if (m_topPool.compare_exchange_strong(top, top->m_next.load(std::memory_order_acquire))) {
-			return top;
-		}
-	}
+	//shared_ptr<node> top(m_topPool.load(std::memory_order_relaxed));
+	//
+	//while (top) {
+	//	if (m_topPool.compare_exchange_strong(top, top->m_next.load(std::memory_order_acquire))) {
+	//		return top;
+	//	}
+	//}
+
+	shared_ptr<node> out;
+	out = nodes.front();
+	nodes.pop();
+
+	//while (out.get_local_refs() != out.use_count())
+	//{
+	//	std::this_thread::yield();
+	//}
+
+	return out;
+
+	//Allocator alloc;
+	//alloc_pool_entry(alloc);
+	//
+	//return get_pooled_entry();
 	throw std::runtime_error("Pre allocated entries should be 1:1 to fetched indices");
 }
 template <class T>
