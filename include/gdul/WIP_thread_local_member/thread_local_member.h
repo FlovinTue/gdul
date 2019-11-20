@@ -435,6 +435,7 @@ public:
 			, m_next(std::move(next))
 		{}
 		size_type m_index;
+		size_type* index = nullptr;
 		atomic_shared_ptr<node> m_next;
 	};
 
@@ -487,19 +488,25 @@ template <class Allocator>
 inline size_type index_pool<T>::get(Allocator allocator)
 {
 	shared_ptr<node> top(m_top.load(std::memory_order_relaxed));
+	volatile int count(0);
 	while (top) {
 		shared_ptr<node> next(top->m_next.load()); 
+		// Possibility of next getting inserted even though previous cas success...
+		// could be ABA issue? What issues could this cause?
+		// An earlier ->next could be inserted
 		if (m_top.compare_exchange_strong(top, next, std::memory_order_relaxed)) {
 
-			const size_type index(top->m_index);
-			
-			top->m_next = nullptr;
+			const size_type index(*top->index);
+			top->index = nullptr;
+			//node* const null(nullptr);
+			//top->m_next.store(shared_ptr<node>(null));
 
-			push_pool_entry(top);
+			push_pool_entry(std::move(top));
 			//alloc_pool_entry(allocator);
 
 			return index;
 		}
+		++count;
 	}
 
 	alloc_pool_entry(allocator);
@@ -511,11 +518,12 @@ inline void index_pool<T>::add(size_type index) noexcept
 {
 	shared_ptr<node> toInsert(get_pooled_entry());
 	toInsert->m_index = index;
+	toInsert->index = &toInsert->m_index;
 
 	shared_ptr<node> top(m_top.load());
 	do{
 		toInsert->m_next.store(top);
-	} while (!m_top.compare_exchange_strong(top, toInsert));
+	} while (!m_top.compare_exchange_strong(top, std::move(toInsert)));
 }
 template<class T>
 template <class Allocator>
@@ -527,9 +535,9 @@ inline void index_pool<T>::alloc_pool_entry(Allocator allocator)
 template<class T>
 inline void index_pool<T>::push_pool_entry(shared_ptr<node> entry)
 {
-	shared_ptr<node> toInsert(entry);
+	shared_ptr<node> toInsert(std::move(entry));
 
-	nodes.push(toInsert);
+	nodes.push(std::move(toInsert));
 
 	//shared_ptr<node> top(m_topPool.load(std::memory_order_acquire));
 	//do {
@@ -548,7 +556,7 @@ inline shared_ptr<typename index_pool<T>::node> index_pool<T>::get_pooled_entry(
 	//}
 
 	shared_ptr<node> out;
-	out = nodes.front();
+	out = std::move(nodes.front());
 	nodes.pop();
 
 	//while (out.get_local_refs() != out.use_count())

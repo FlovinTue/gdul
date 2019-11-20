@@ -6,6 +6,7 @@
 namespace gdul{
 	
 static std::atomic_flag s_spin{ ATOMIC_FLAG_INIT };
+static std::atomic_bool doPrint(false);
 static std::atomic<int64_t> s_allocated(0);
 template <class T>
 class tracking_allocator : public std::allocator<T>
@@ -24,19 +25,23 @@ public:
 	T* allocate(std::size_t count)
 	{
 		T* ret = std::allocator<T>::allocate(count);
-		//spin();
 		s_allocated += count * sizeof(T);
-		//std::cout << "allocated " << count * sizeof(T) << "--------------" << " new value: " << s_allocated << std::endl;
-		release();
+		if (doPrint) {
+			spin();
+			std::cout << "allocated " << count * sizeof(T) << "--------------" << " new value: " << s_allocated << std::endl;
+			release();
+		}
 		return ret;
 	}
 	void deallocate(T* obj, std::size_t count)
 	{
 		std::allocator<T>::deallocate(obj, count);
-		//spin();
 		s_allocated -= count * sizeof(T);
-		//std::cout << "deallocated " << count * sizeof(T) << "--------------" << " new value: " << s_allocated << std::endl;
-		//release();
+		if (doPrint) {
+			spin();
+			std::cout << "deallocated " << count * sizeof(T) << "--------------" << " new value: " << s_allocated << std::endl;
+			release();
+		}
 	}
 	void spin()
 	{
