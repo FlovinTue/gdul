@@ -689,14 +689,14 @@ inline bool atomic_shared_ptr<T>::compare_exchange_weak_internal(compressed_stor
 
 	expected = expected_;
 
-	if ((flags & aspdetail::CAS_FLAG_CAPTURE_ON_FAILURE) && result)
-	{
-		aspdetail::control_block_base<T>* const cb = to_control_block(expected);
-		if (cb)
-		{
-			GDUL_ASSERT(cb->get()->index);
-		}
-	}
+	//if ((flags & aspdetail::CAS_FLAG_CAPTURE_ON_FAILURE) && result)
+	//{
+	//	aspdetail::control_block_base<T>* const cb = to_control_block(expected);
+	//	if (cb)
+	//	{
+	//		GDUL_ASSERT(cb->get()->index);
+	//	}
+	//}
 
 	if (otherInterjection & (flags & aspdetail::CAS_FLAG_CAPTURE_ON_FAILURE)) {
 		expected = copy_internal(std::memory_order_relaxed);
