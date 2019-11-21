@@ -53,7 +53,7 @@ namespace aspdetail
 {
 typedef std::allocator<std::uint8_t> default_allocator;
 
-static constexpr std::uint64_t Ptr_Mask = (std::numeric_limits<std::uint64_t>::max() >> 16);
+static constexpr std::uint64_t Ptr_Mask = (std::numeric_limits<std::uint64_t>::max() >> 16) & ~ std::uint64_t(7);
 static constexpr std::uint64_t Versioned_Ptr_Mask = (std::numeric_limits<std::uint64_t>::max() >> 8);
 static constexpr std::uint64_t Local_Ref_Mask = ~Versioned_Ptr_Mask;
 union compressed_storage
@@ -69,6 +69,10 @@ union compressed_storage
 
 template <class T>
 constexpr void assert_alignment(std::uint8_t* block);
+
+constexpr std::uint16_t to_version(compressed_storage);
+constexpr compressed_storage set_version(compressed_storage, std::uint16_t);
+constexpr compressed_storage inc_version(compressed_storage);
 
 template <class T>
 struct disable_deduction;
@@ -116,7 +120,8 @@ std::numeric_limits<std::uint8_t>::max();
 
 enum STORAGE_BYTE : std::uint8_t
 {
-	STORAGE_BYTE_VERSION = 6,
+	STORAGE_BYTE_VERSION_LOWER = 0,
+	STORAGE_BYTE_VERSION_UPPER = 6,
 	STORAGE_BYTE_LOCAL_REF = Local_Ref_Index,
 };
 enum CAS_FLAG : std::uint8_t
@@ -173,7 +178,7 @@ public:
 
 	inline constexpr atomic_shared_ptr() noexcept;
 	inline constexpr atomic_shared_ptr(std::nullptr_t) noexcept;
-	inline constexpr atomic_shared_ptr(std::nullptr_t, std::uint8_t version) noexcept;
+	inline constexpr atomic_shared_ptr(std::nullptr_t, std::uint16_t version) noexcept;
 
 	inline atomic_shared_ptr(const shared_ptr<T>& from) noexcept;
 	inline atomic_shared_ptr(shared_ptr<T>&& from) noexcept;
@@ -228,7 +233,7 @@ public:
 	inline shared_ptr<T> exchange(const shared_ptr<T>& with, std::memory_order order = std::memory_order_seq_cst) noexcept;
 	inline shared_ptr<T> exchange(shared_ptr<T>&& with, std::memory_order order = std::memory_order_seq_cst) noexcept;
 
-	inline std::uint8_t get_version() const noexcept;
+	inline std::uint16_t get_version() const noexcept;
 
 	inline shared_ptr<T> unsafe_load(std::memory_order order = std::memory_order_seq_cst) const;
 
@@ -298,7 +303,7 @@ private:
 };
 template <class T>
 inline constexpr atomic_shared_ptr<T>::atomic_shared_ptr() noexcept
-	: m_storage(0ULL | (std::uint64_t(std::numeric_limits<std::uint8_t>::max()) << (aspdetail::STORAGE_BYTE_LOCAL_REF * 8)))
+	: m_storage((std::uint64_t(std::numeric_limits<std::uint8_t>::max()) << (aspdetail::STORAGE_BYTE_LOCAL_REF * 8)))
 {
 }
 template<class T>
@@ -307,8 +312,8 @@ inline constexpr atomic_shared_ptr<T>::atomic_shared_ptr(std::nullptr_t) noexcep
 {
 }
 template<class T>
-inline constexpr atomic_shared_ptr<T>::atomic_shared_ptr(std::nullptr_t, std::uint8_t version) noexcept
-	: m_storage(0ULL | (std::uint64_t(version) << (aspdetail::STORAGE_BYTE_VERSION * 8)) | (std::uint64_t(std::numeric_limits<std::uint8_t>::max()) << (aspdetail::STORAGE_BYTE_LOCAL_REF * 8)))
+inline constexpr atomic_shared_ptr<T>::atomic_shared_ptr(std::nullptr_t, std::uint16_t version) noexcept
+	: m_storage(aspdetail::set_version(compressed_storage(), version).m_u64 | (std::uint64_t(std::numeric_limits<std::uint8_t>::max()) << (aspdetail::STORAGE_BYTE_LOCAL_REF * 8)))
 {
 }
 template <class T>
@@ -534,10 +539,10 @@ inline shared_ptr<T> atomic_shared_ptr<T>::exchange(shared_ptr<T>&& with, std::m
 	return shared_ptr<T>(previous);
 }
 template<class T>
-inline std::uint8_t atomic_shared_ptr<T>::get_version() const noexcept
+inline std::uint16_t atomic_shared_ptr<T>::get_version() const noexcept
 {
 	const compressed_storage storage(m_storage.load(std::memory_order_relaxed));
-	return storage.m_u8[aspdetail::STORAGE_BYTE_VERSION];
+	return aspdetail::to_version(storage);
 }
 template<class T>
 inline shared_ptr<T> atomic_shared_ptr<T>::unsafe_load(std::memory_order order) const
@@ -668,9 +673,7 @@ inline bool atomic_shared_ptr<T>::compare_exchange_weak_internal(compressed_stor
 {
 	bool result(false);
 
-	compressed_storage desired_(desired);
-	desired_.m_u8[aspdetail::STORAGE_BYTE_VERSION] = expected.m_u8[aspdetail::STORAGE_BYTE_VERSION] + 1;
-
+	const compressed_storage desired_(aspdetail::set_version(desired, aspdetail::to_version(expected) + 1));
 	compressed_storage expected_(expected);
 
 	result = m_storage.compare_exchange_weak(expected_.m_u64, desired_.m_u64, orders.m_first, orders.m_second);
@@ -760,9 +763,7 @@ template<class T>
 inline union aspdetail::compressed_storage atomic_shared_ptr<T>::unsafe_exchange_internal(compressed_storage with, std::memory_order order)
 {
 	const compressed_storage old(m_storage.load(std::memory_order_relaxed));
-
-	compressed_storage replacement(with.m_u64);
-	replacement.m_u8[aspdetail::STORAGE_BYTE_VERSION] = old.m_u8[aspdetail::STORAGE_BYTE_VERSION] + 1;
+	const compressed_storage replacement(aspdetail::set_version(with, aspdetail::to_version(old) + 1));
 
 	m_storage.store(replacement.m_u64, std::memory_order_relaxed);
 
@@ -776,8 +777,7 @@ template <class T>
 inline void atomic_shared_ptr<T>::unsafe_store_internal(compressed_storage from, std::memory_order order)
 {
 	const compressed_storage previous(m_storage.load(std::memory_order_relaxed));
-	compressed_storage next(from);
-	next.m_u8[aspdetail::STORAGE_BYTE_VERSION] = previous.m_u8[aspdetail::STORAGE_BYTE_VERSION] + 1;
+	const compressed_storage next(aspdetail::set_version(from, aspdetail::to_version(previous) + 1));
 
 	m_storage.store(next.m_u64, std::memory_order_relaxed);
 
@@ -1084,6 +1084,35 @@ struct alignas(Align) aligned_storage
 {
 	std::uint8_t dummy[Size]{};
 };
+constexpr std::uint16_t to_version(compressed_storage from)
+{
+	const std::uint8_t numBottomBits(3);
+	const std::uint8_t bottomBits(7);
+	const std::uint8_t lower(from.m_u8[STORAGE_BYTE_VERSION_LOWER] & bottomBits);
+	const std::uint8_t upper(from.m_u8[STORAGE_BYTE_VERSION_UPPER]);
+
+	const std::uint16_t version((std::uint16_t(upper) << numBottomBits) | std::uint16_t(lower));
+
+	return version;
+}
+constexpr compressed_storage set_version(compressed_storage storage, std::uint16_t to)
+{
+	const std::uint8_t numBottomBits(3);
+	const std::uint8_t bottomBits(7);
+	const std::uint8_t lower(((std::uint8_t)to) & bottomBits);
+	const std::uint8_t upper((std::uint8_t) (to >> numBottomBits));
+
+	compressed_storage updated(storage);
+	updated.m_u8[STORAGE_BYTE_VERSION_LOWER] &= ~bottomBits;
+	updated.m_u8[STORAGE_BYTE_VERSION_LOWER] |= lower;
+	updated.m_u8[STORAGE_BYTE_VERSION_UPPER] = upper;
+
+	return updated;
+}
+constexpr compressed_storage inc_version(compressed_storage storage)
+{
+	return set_version(storage, to_version(storage) + 1);
+}
 template<class T>
 constexpr void assert_alignment(std::uint8_t* block)
 {
@@ -1109,7 +1138,7 @@ public:
 	using decayed_type = aspdetail::decay_unbounded_t<T>;
 
 	inline constexpr ptr_base(std::nullptr_t) noexcept;
-	inline constexpr ptr_base(std::nullptr_t, std::uint8_t version) noexcept;
+	inline constexpr ptr_base(std::nullptr_t, std::uint16_t version) noexcept;
 
 	inline constexpr operator bool() const noexcept;
 
@@ -1119,7 +1148,7 @@ public:
 	inline bool operator==(const atomic_shared_ptr<T>& other) const noexcept;
 	inline bool operator!=(const atomic_shared_ptr<T>& other) const noexcept;
 
-	inline constexpr std::uint8_t get_version() const noexcept;
+	inline constexpr std::uint16_t get_version() const noexcept;
 
 	inline size_type use_count() const noexcept;
 
@@ -1157,8 +1186,8 @@ inline constexpr ptr_base<T>::ptr_base(std::nullptr_t) noexcept
 {
 }
 template<class T>
-inline constexpr ptr_base<T>::ptr_base(std::nullptr_t, std::uint8_t version) noexcept
-	: m_controlBlockStorage(0ULL | (std::uint64_t(version) << (STORAGE_BYTE_VERSION * 8)))
+inline constexpr ptr_base<T>::ptr_base(std::nullptr_t, std::uint16_t version) noexcept
+	: m_controlBlockStorage(set_version(compressed_storage(), version))
 {
 }
 template <class T>
@@ -1267,9 +1296,9 @@ inline constexpr control_block_base<T>* ptr_base<T>::get_control_block() noexcep
 	return to_control_block(m_controlBlockStorage);
 }
 template<class T>
-inline constexpr std::uint8_t ptr_base<T>::get_version() const noexcept
+inline constexpr std::uint16_t ptr_base<T>::get_version() const noexcept
 {
-	return m_controlBlockStorage.m_u8[STORAGE_BYTE_VERSION];
+	return to_version(m_controlBlockStorage);
 }
 };
 template <class T>
