@@ -53,9 +53,12 @@ namespace aspdetail
 {
 typedef std::allocator<std::uint8_t> default_allocator;
 
-static constexpr std::uint64_t Ptr_Mask = (std::numeric_limits<std::uint64_t>::max() >> 16) & ~ std::uint64_t(7);
+constexpr std::uint8_t Num_Bottom_Bits = 3;
+
+static constexpr std::uint64_t Ptr_Mask = (std::numeric_limits<std::uint64_t>::max() >> 16) & ~ std::uint64_t(15);
 static constexpr std::uint64_t Versioned_Ptr_Mask = (std::numeric_limits<std::uint64_t>::max() >> 8);
 static constexpr std::uint64_t Local_Ref_Mask = ~Versioned_Ptr_Mask;
+static constexpr std::uint16_t Max_Version = (std::uint16_t(std::numeric_limits<std::uint8_t>::max()) << Num_Bottom_Bits | ((std::uint16_t(1) << Num_Bottom_Bits) - 1));
 union compressed_storage
 {
 	constexpr compressed_storage()  noexcept : m_u64(0ULL) {}
@@ -1086,21 +1089,20 @@ struct alignas(Align) aligned_storage
 };
 constexpr std::uint16_t to_version(compressed_storage from)
 {
-	const std::uint8_t numBottomBits(3);
-	const std::uint8_t bottomBits(7);
+	constexpr std::uint8_t bottomBits((std::uint8_t(1) << Num_Bottom_Bits) - 1);
 	const std::uint8_t lower(from.m_u8[STORAGE_BYTE_VERSION_LOWER] & bottomBits);
 	const std::uint8_t upper(from.m_u8[STORAGE_BYTE_VERSION_UPPER]);
 
-	const std::uint16_t version((std::uint16_t(upper) << numBottomBits) | std::uint16_t(lower));
+	const std::uint16_t version((std::uint16_t(upper) << Num_Bottom_Bits) | std::uint16_t(lower));
 
 	return version;
 }
 constexpr compressed_storage set_version(compressed_storage storage, std::uint16_t to)
 {
-	const std::uint8_t numBottomBits(3);
-	const std::uint8_t bottomBits(7);
+	constexpr std::uint8_t bottomBits((std::uint8_t(1) << Num_Bottom_Bits) - 1);
+
 	const std::uint8_t lower(((std::uint8_t)to) & bottomBits);
-	const std::uint8_t upper((std::uint8_t) (to >> numBottomBits));
+	const std::uint8_t upper((std::uint8_t) (to >> Num_Bottom_Bits));
 
 	compressed_storage updated(storage);
 	updated.m_u8[STORAGE_BYTE_VERSION_LOWER] &= ~bottomBits;
