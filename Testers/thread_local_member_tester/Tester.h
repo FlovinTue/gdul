@@ -39,6 +39,7 @@ public:
 template <class T>
 tester<T>::tester(const T& init)
 	: m_init(init)
+	, m_worker()
 {
 }
 template <class T>

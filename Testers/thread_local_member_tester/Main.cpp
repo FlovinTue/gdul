@@ -20,7 +20,7 @@ int main()
 	{
 		{
 			gdul::tester<int> tester(5);
-			tester.test_index_pool(100000);
+			tester.test_index_pool(300000);
 			while (tester.m_worker.has_unfinished_tasks())
 			{
 				std::this_thread::yield();

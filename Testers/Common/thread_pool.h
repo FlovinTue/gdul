@@ -3,7 +3,7 @@
 #include <functional>
 #include <thread>
 #include <atomic>
-#include <gdul/concurrent_queue/concurrent_queue.h>
+#include <concurrent_queue.h>
 #include <vector>
 
 #define WIN32_LEAN_AND_MEAN
@@ -30,7 +30,7 @@ private:
 
 	std::vector<std::thread> m_threads;
 
-	gdul::concurrent_queue<std::function<void()>> m_taskQueue;
+	concurrency::concurrent_queue<std::function<void()>> m_taskQueue;
 
 	std::atomic<bool> m_inCommission;
 

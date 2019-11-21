@@ -520,10 +520,13 @@ inline void index_pool<T>::add(size_type index) noexcept
 	toInsert->m_index = index;
 	toInsert->index = &toInsert->m_index;
 
-	shared_ptr<node> top(m_top.load());
+	shared_ptr<node> top;
+	raw_ptr<node> exp;
 	do{
-		toInsert->m_next.store(top);
-	} while (!m_top.compare_exchange_strong(top, std::move(toInsert)));
+		top = m_top.load();
+		exp = top;
+		toInsert->m_next.store(std::move(top));
+	} while (!m_top.compare_exchange_strong(exp, std::move(toInsert)));
 }
 template<class T>
 template <class Allocator>

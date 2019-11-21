@@ -27,6 +27,7 @@
 #include <stdexcept>
 #include <memory>
 #include <cstddef>
+#include "../Common/util.h"
 
 // (not atomic_)shared_ptr uses local refs by default to speed up the copy process,
 // which means if the number of local refs kept is > 1, the copyee must modify local
@@ -687,6 +688,15 @@ inline bool atomic_shared_ptr<T>::compare_exchange_weak_internal(compressed_stor
 	const bool otherInterjection((expected_.m_u64 ^ expected.m_u64) & aspdetail::Versioned_Ptr_Mask);
 
 	expected = expected_;
+
+	if ((flags & aspdetail::CAS_FLAG_CAPTURE_ON_FAILURE) && result)
+	{
+		aspdetail::control_block_base<T>* const cb = to_control_block(expected);
+		if (cb)
+		{
+			GDUL_ASSERT(cb->get()->index);
+		}
+	}
 
 	if (otherInterjection & (flags & aspdetail::CAS_FLAG_CAPTURE_ON_FAILURE)) {
 		expected = copy_internal(std::memory_order_relaxed);
