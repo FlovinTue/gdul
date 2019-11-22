@@ -1,6 +1,7 @@
 
 
 #include "../Common/thread_pool.h"
+#include "../Common/util.h"
 #include "../Common/tracking_allocator.h"
 #include <gdul/concurrent_queue/concurrent_queue.h>
 #include <gdul/WIP_thread_local_member/thread_local_member.h>
@@ -15,14 +16,9 @@ public:
 	tester(const T& init);
 	void execute();
 
-
-
-
 	void test_index_pool(uint32_t tasks);
 	void test_construction(uint32_t tasks);
 	void test_assignment(uint32_t tasks);
-
-	
 
 	gdul::thread_pool m_worker;
 
@@ -31,7 +27,7 @@ public:
 	using alloc_t = decltype(m_alloc);
 	using tlm_t = gdul::tlm<T, alloc_t>;
 
-	gdul::tlm_detail::index_pool<alloc_t> m_indexPool;
+	gdul::tlm_detail::index_pool<> m_indexPool;
 
 	const T m_init;
 };
@@ -39,15 +35,15 @@ public:
 template <class T>
 tester<T>::tester(const T& init)
 	: m_init(init)
-	, m_worker()
+	, m_worker(1)
 {
 }
 template <class T>
 void tester<T>::execute()
 {
-	test_assignment(10000);
-	test_construction(10000);
-	test_index_pool(100000);
+	//test_assignment(100);
+	test_construction(100);
+	test_index_pool(100);
 
 	gdul::tlm<T, alloc_t>::_unsafe_reset();
 	
@@ -88,23 +84,23 @@ inline void tester<T>::test_construction(uint32_t tasks)
 			gdul::tlm<T, alloc_t> fourth(m_init);
 			gdul::tlm<T, alloc_t> fifth(m_init);
 
-			if (!first == m_init)
+			if (first != m_init)
 			{
 				throw std::runtime_error("Mismatch first default");
 			}
-			if (!first == m_init)
+			if (first != m_init)
 			{
 				throw std::runtime_error("Mismatch second default");
 			}
-			if (!first == m_init)
+			if (first != m_init)
 			{
 				throw std::runtime_error("Mismatch third default");
 			}
-			if (!first == m_init)
+			if (first != m_init)
 			{
 				throw std::runtime_error("Mismatch fourth default");
 			}
-			if (!first == m_init)
+			if (first != m_init)
 			{
 				throw std::runtime_error("Mismatch fifth default");
 			}
@@ -138,29 +134,50 @@ inline void tester<T>::test_assignment(uint32_t tasks)
 		fourth = fourthExp;
 		fifth = fifthExp;
 
+		if (first != firstExp)
+		{
+			GDUL_BREAK_CATCHER;
+		}
+		if (second != secondExp)
+		{
+			GDUL_BREAK_CATCHER;
+		}
+		if (third != thirdExp)
+		{
+			GDUL_BREAK_CATCHER;
+		}
+		if (fourth != fourthExp)
+		{
+			GDUL_BREAK_CATCHER;
+		}
+		if (fifth != fifthExp)
+		{
+			GDUL_BREAK_CATCHER;
+		}
+
 		const T firstOut = first;
 		const T secondOut = second;
 		const T thirdOut = third;
 		const T fourthOut = fourth;
 		const T fifthOut = fifth;
 
-		if (!firstOut == firstExp)
+		if (firstOut != firstExp)
 		{
 			throw std::runtime_error("Mismatch first");
 		}
-		if (!secondOut == secondExp)
+		if (secondOut != secondExp)
 		{
 			throw std::runtime_error("Mismatch second");
 		}
-		if (!thirdOut == thirdExp)
+		if (thirdOut != thirdExp)
 		{
 			throw std::runtime_error("Mismatch third");
 		}
-		if (!fourthOut == fourthExp)
+		if (fourthOut != fourthExp)
 		{
 			throw std::runtime_error("Mismatch fourth");
 		}
-		if (!fifthOut == fifthExp)
+		if (fifthOut != fifthExp)
 		{
 			throw std::runtime_error("Mismatch fifth");
 		}

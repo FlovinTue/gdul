@@ -42,10 +42,10 @@ thread_pool::thread_pool(std::uint32_t threads, std::uint32_t affinityBegin) :
 	m_inCommission(true),
 	m_taskCounter(0)
 {
-	const std::size_t numThreads(std::thread::hardware_concurrency());
+	const std::size_t numCores(std::thread::hardware_concurrency());
 	for (std::uint32_t i = 0; i < threads; ++i)
 	{
-		const std::uint64_t affinity((((std::uint64_t)affinityBegin + i) % numThreads));
+		const std::uint64_t affinity((((std::uint64_t)affinityBegin + i) % numCores));
 		const std::uint64_t affinityMask((std::size_t(1) << affinity));
 		m_threads.push_back(std::thread(&thread_pool::idle, this, affinityMask));
 	}

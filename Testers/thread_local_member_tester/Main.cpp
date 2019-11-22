@@ -12,6 +12,22 @@
 #include "../Common/Timer.h"
 #include "no_opt.h"
 
+struct int_iter
+{
+	int_iter()
+	{
+		m_iter = ++iters;
+	}
+	int_iter(int i) { m_iter = i; }
+
+	bool operator!=(const int_iter& other) const { return other.m_iter != m_iter; }
+	bool operator==(const int_iter& other) const { return other.m_iter == m_iter; }
+
+	static int iters;
+	int m_iter;
+};
+int int_iter::iters = 0;
+
 int main()
 {
 	timer<float> time;
@@ -19,8 +35,9 @@ int main()
 	for(uint32_t i =0; i < 100; ++i)
 	{
 		{
-			gdul::tester<int> tester(5);
-			tester.test_index_pool(300000);
+			gdul::tester<int_iter> tester(int_iter{ 5 });
+			tester.execute(); 
+
 			while (tester.m_worker.has_unfinished_tasks())
 			{
 				std::this_thread::yield();
