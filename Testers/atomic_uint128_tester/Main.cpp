@@ -15,6 +15,8 @@ int main()
 {
 	using namespace gdul;
 
+	atomic_u128 aliased(5);
+
 	{
 		atomic_128<u128> one;
 		atomic_128<u128> two(u128{});
