@@ -488,25 +488,16 @@ template <class Allocator>
 inline size_type index_pool<T>::get(Allocator allocator)
 {
 	shared_ptr<node> top(m_top.load(std::memory_order_relaxed));
-	volatile int count(0);
 	while (top) {
-		shared_ptr<node> next(top->m_next.load()); 
-		// Possibility of next getting inserted even though previous cas success...
-		// could be ABA issue? What issues could this cause?
-		// An earlier ->next could be inserted
-		if (m_top.compare_exchange_strong(top, next, std::memory_order_relaxed)) {
+		if (m_top.compare_exchange_strong(top, top->m_next.load(), std::memory_order_relaxed)) {
 
-			const size_type index(*top->index);
-			top->index = nullptr;
-			//node* const null(nullptr);
-			//top->m_next.store(shared_ptr<node>(null));
+			const size_type index(top->m_index);
 
-			push_pool_entry(std::move(top));
-			//alloc_pool_entry(allocator);
+			// Need to alloc new to counteract possible ABA issues
+			alloc_pool_entry(allocator);
 
 			return index;
 		}
-		++count;
 	}
 
 	alloc_pool_entry(allocator);
@@ -518,7 +509,6 @@ inline void index_pool<T>::add(size_type index) noexcept
 {
 	shared_ptr<node> toInsert(get_pooled_entry());
 	toInsert->m_index = index;
-	toInsert->index = &toInsert->m_index;
 
 	shared_ptr<node> top;
 	raw_ptr<node> exp;
@@ -539,40 +529,22 @@ template<class T>
 inline void index_pool<T>::push_pool_entry(shared_ptr<node> entry)
 {
 	shared_ptr<node> toInsert(std::move(entry));
-
-	nodes.push(std::move(toInsert));
-
-	//shared_ptr<node> top(m_topPool.load(std::memory_order_acquire));
-	//do {
-	//	toInsert->m_next.store(top);
-	//} while (!m_topPool.compare_exchange_strong(top, std::move(toInsert)));
+	shared_ptr<node> top(m_topPool.load(std::memory_order_acquire));
+	do {
+		toInsert->m_next.store(top);
+	} while (!m_topPool.compare_exchange_strong(top, std::move(toInsert)));
 }
 template<class T>
 inline shared_ptr<typename index_pool<T>::node> index_pool<T>::get_pooled_entry()
 {
-	//shared_ptr<node> top(m_topPool.load(std::memory_order_relaxed));
-	//
-	//while (top) {
-	//	if (m_topPool.compare_exchange_strong(top, top->m_next.load(std::memory_order_acquire))) {
-	//		return top;
-	//	}
-	//}
+	shared_ptr<node> top(m_topPool.load(std::memory_order_relaxed));
+	
+	while (top) {
+		if (m_topPool.compare_exchange_strong(top, top->m_next.load(std::memory_order_acquire))) {
+			return top;
+		}
+	}
 
-	shared_ptr<node> out;
-	out = std::move(nodes.front());
-	nodes.pop();
-
-	//while (out.get_local_refs() != out.use_count())
-	//{
-	//	std::this_thread::yield();
-	//}
-
-	return out;
-
-	//Allocator alloc;
-	//alloc_pool_entry(alloc);
-	//
-	//return get_pooled_entry();
 	throw std::runtime_error("Pre allocated entries should be 1:1 to fetched indices");
 }
 template <class T>
