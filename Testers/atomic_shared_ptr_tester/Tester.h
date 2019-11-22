@@ -2,6 +2,7 @@
 
 #include "..\Common\thread_pool.h"
 #include "..\Common\util.h"
+#include "..\Common\tracking_allocator.h"
 #include <gdul\atomic_shared_ptr\atomic_shared_ptr.h>
 #include <random>
 #include <string>
@@ -332,7 +333,7 @@ inline void tester<T, ArraySize, NumThreads>::aba_claim()
 			return;
 		}
 	}
-	m_abaStorage.push(make_shared<aba_node>());
+	m_abaStorage.push(make_shared<aba_node, tracking_allocator<aba_node>>());
 }
 
 template<class T, std::uint32_t ArraySize, std::uint32_t NumThreads>
