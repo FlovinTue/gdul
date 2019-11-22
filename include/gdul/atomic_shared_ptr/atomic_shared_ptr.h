@@ -55,7 +55,7 @@ typedef std::allocator<std::uint8_t> default_allocator;
 
 constexpr std::uint8_t Num_Bottom_Bits = 3;
 
-static constexpr std::uint64_t Ptr_Mask = (std::numeric_limits<std::uint64_t>::max() >> 16) & ~ std::uint64_t(15);
+static constexpr std::uint64_t Ptr_Mask = (std::numeric_limits<std::uint64_t>::max() >> 16) & ~ std::uint64_t((std::uint16_t(1) << Num_Bottom_Bits) - 1);
 static constexpr std::uint64_t Versioned_Ptr_Mask = (std::numeric_limits<std::uint64_t>::max() >> 8);
 static constexpr std::uint64_t Local_Ref_Mask = ~Versioned_Ptr_Mask;
 static constexpr std::uint16_t Max_Version = (std::uint16_t(std::numeric_limits<std::uint8_t>::max()) << Num_Bottom_Bits | ((std::uint16_t(1) << Num_Bottom_Bits) - 1));

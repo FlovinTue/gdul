@@ -26,7 +26,7 @@
       </Item>
       <Item Name="[**ptr_use_count]" Condition="(m_controlBlockStorage.m_u64 &amp; aspdetail::Ptr_Mask) == 0">0UL</Item>
       <Item Name="[**ptr_local_refs]">(size_type)m_controlBlockStorage.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF]</Item>
-      <Item Name="[**ptr_version]">(size_type)m_controlBlockStorage.m_u8[aspdetail::STORAGE_BYTE_VERSION]</Item>
+      <Item Name="[**ptr_version]">(size_type)m_controlBlockStorage.m_u8[aspdetail::STORAGE_BYTE_VERSION_UPPER]</Item>
 
     </Expand>
   </Type>
@@ -56,7 +56,7 @@
       </Item>
       <Item Name="[**ptr_use_count]" Condition="(m_debugView.m_u64 &amp; aspdetail::Ptr_Mask) == 0">0UL</Item>
       <Item Name="[**ptr_local_refs]">(size_type)m_debugView.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF]</Item>
-      <Item Name="[**ptr_version]">(size_type)m_debugView.m_u8[aspdetail::STORAGE_BYTE_VERSION]</Item>
+      <Item Name="[**ptr_version]">(size_type)m_debugView.m_u8[aspdetail::STORAGE_BYTE_VERSION_UPPER]</Item>
 
     </Expand>
 	</Type>
