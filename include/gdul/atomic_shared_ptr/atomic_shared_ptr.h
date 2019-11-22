@@ -53,13 +53,13 @@ namespace aspdetail
 {
 typedef std::allocator<std::uint8_t> default_allocator;
 
-constexpr std::uint8_t num_bottom_bits() { std::uint8_t i = 0, align(alignof(std::max_align_t)); for (; align; ++i, align >>= 1); return i - 1; };
-
+static constexpr std::uint8_t Cb_Ptr_Bottom_Bits = []() constexpr { std::uint8_t i = 0, align(alignof(std::max_align_t)); for (; align; ++i, align >>= 1); return i - 1; }();
 static constexpr std::uint64_t Owned_Mask = (std::numeric_limits<std::uint64_t>::max() >> 16);
-static constexpr std::uint64_t Cb_Mask = (std::numeric_limits<std::uint64_t>::max() >> 16) & ~ std::uint64_t((std::uint16_t(1) << num_bottom_bits()) - 1);
+static constexpr std::uint64_t Cb_Mask = (std::numeric_limits<std::uint64_t>::max() >> 16) & ~ std::uint64_t((std::uint16_t(1) << Cb_Ptr_Bottom_Bits) - 1);
 static constexpr std::uint64_t Versioned_Cb_Mask = (std::numeric_limits<std::uint64_t>::max() >> 8);
 static constexpr std::uint64_t Local_Ref_Mask = ~Versioned_Cb_Mask;
-static constexpr std::uint16_t Max_Version = (std::uint16_t(std::numeric_limits<std::uint8_t>::max()) << num_bottom_bits() | ((std::uint16_t(1) << num_bottom_bits()) - 1));
+static constexpr std::uint16_t Max_Version = (std::uint16_t(std::numeric_limits<std::uint8_t>::max()) << Cb_Ptr_Bottom_Bits | ((std::uint16_t(1) << Cb_Ptr_Bottom_Bits) - 1));
+
 union compressed_storage
 {
 	constexpr compressed_storage()  noexcept : m_u64(0ULL) {}
@@ -1090,20 +1090,20 @@ struct alignas(Align) aligned_storage
 };
 constexpr std::uint16_t to_version(compressed_storage from)
 {
-	constexpr std::uint8_t bottomBits((std::uint8_t(1) << num_bottom_bits()) - 1);
+	constexpr std::uint8_t bottomBits((std::uint8_t(1) << Cb_Ptr_Bottom_Bits) - 1);
 	const std::uint8_t lower(from.m_u8[STORAGE_BYTE_VERSION_LOWER] & bottomBits);
 	const std::uint8_t upper(from.m_u8[STORAGE_BYTE_VERSION_UPPER]);
 
-	const std::uint16_t version((std::uint16_t(upper) << num_bottom_bits()) | std::uint16_t(lower));
+	const std::uint16_t version((std::uint16_t(upper) << Cb_Ptr_Bottom_Bits) | std::uint16_t(lower));
 
 	return version;
 }
 constexpr compressed_storage set_version(compressed_storage storage, std::uint16_t to)
 {
-	constexpr std::uint8_t bottomBits((std::uint8_t(1) << num_bottom_bits()) - 1);
+	constexpr std::uint8_t bottomBits((std::uint8_t(1) << Cb_Ptr_Bottom_Bits) - 1);
 
 	const std::uint8_t lower(((std::uint8_t)to) & bottomBits);
-	const std::uint8_t upper((std::uint8_t) (to >> num_bottom_bits()));
+	const std::uint8_t upper((std::uint8_t) (to >> Cb_Ptr_Bottom_Bits));
 
 	compressed_storage updated(storage);
 	updated.m_u8[STORAGE_BYTE_VERSION_LOWER] &= ~bottomBits;
