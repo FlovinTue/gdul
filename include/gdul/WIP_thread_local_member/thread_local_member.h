@@ -8,6 +8,8 @@
 #include <thread>
 #include <queue>
 
+// Check if maybe arraygrow method needs dummy_entry instead of nullptr during item move.
+
 namespace gdul
 {
 
@@ -99,7 +101,10 @@ private:
 			: m_nextIteration(0) {}
 
 		tlm_detail::index_pool<> m_indexPool;
+
 		instance_tracker_atomic_array m_instanceTrackers;
+		instance_tracker_atomic_array m_swapArray;
+
 		std::atomic<std::uint64_t> m_nextIteration;
 	};
 
@@ -150,6 +155,7 @@ inline thread_local_member<T, Allocator>::thread_local_member(const Allocator& a
 template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::~thread_local_member()
 {
+	s_st_container.m_instanceTrackers.load()[m_index].store(nullptr);
 	s_st_container.m_indexPool.add(m_index);
 }
 template<class T, class Allocator>
@@ -179,6 +185,7 @@ inline void thread_local_member<T, Allocator>::_unsafe_reset()
 {
 	s_st_container.m_indexPool.unsafe_reset();
 	s_st_container.m_instanceTrackers.unsafe_store(nullptr);
+	s_st_container.m_nextIteration = 0;
 }
 template<class T, class Allocator>
 inline void thread_local_member<T, Allocator>::check_for_invalidation() const
@@ -194,13 +201,25 @@ inline std::uint64_t thread_local_member<T, Allocator>::store_tracked_instance(A
 {
 	grow_instance_tracker_array();
 
-	instance_tracker_array itemIterations(s_st_container.m_instanceTrackers.load(std::memory_order_relaxed));
-
 	allocator_instance_tracker_entry alloc(m_allocator);
-
 	instance_tracker_entry trackedEntry(make_shared<tlm_detail::instance_tracker<T>, allocator_instance_tracker_entry>(alloc, 0, std::forward<Args&&>(args)...));
 
-	itemIterations[m_index].store(trackedEntry, std::memory_order_release);
+	instance_tracker_array trackedInstances(nullptr);
+	instance_tracker_array swapArray(nullptr);
+
+	do {
+		trackedInstances = s_st_container.m_instanceTrackers.load(std::memory_order_acquire);
+		swapArray = s_st_container.m_swapArray.load(std::memory_order_relaxed);
+
+		if (m_index < swapArray.item_count() &&
+			swapArray[m_index] != trackedEntry) {
+			swapArray[m_index].store(trackedEntry, std::memory_order_release);
+		}
+		if (trackedInstances[m_index] != trackedEntry) {
+			trackedInstances[m_index].store(trackedEntry, std::memory_order_release);
+		}
+		// Just keep re-storing until the relation between m_swapArray / m_instanceTrackers has stabilized
+	} while (s_st_container.m_swapArray != swapArray && s_st_container.m_instanceTrackers != trackedInstances);
 
 	trackedEntry->m_iteration = s_st_container.m_nextIteration.operator++();
 
@@ -211,6 +230,7 @@ inline void thread_local_member<T, Allocator>::refresh() const
 {
 	const instance_tracker_array trackedInstances(s_st_container.m_instanceTrackers.load(std::memory_order_relaxed));
 	const size_type items((size_type)trackedInstances.item_count());
+	s_tl_container.m_items.reserve(items, m_allocator);
 
 	for (size_type i = 0; i < items; ++i) {
 		instance_tracker_entry instance(trackedInstances[i].load(std::memory_order_acquire));
@@ -218,7 +238,6 @@ inline void thread_local_member<T, Allocator>::refresh() const
 		if (instance 
 			&& ((s_tl_container.m_iteration < instance->m_iteration) 
 			& !(m_iteration < instance->m_iteration))) {
-			s_tl_container.m_items.reserve(i + 1, m_allocator);
 			s_tl_container.m_items.reconstruct(i, instance->m_initArgs);
 		}
 	}
@@ -227,23 +246,48 @@ inline void thread_local_member<T, Allocator>::refresh() const
 template<class T, class Allocator>
 inline void thread_local_member<T, Allocator>::grow_instance_tracker_array() const
 {
-	instance_tracker_array trackedInstances(s_st_container.m_instanceTrackers.load(std::memory_order_relaxed));
 	const size_type minimum(m_index + 1);
-
-	allocator_instance_tracker_array arrayAlloc(m_allocator);
-
-	while (trackedInstances.item_count() < minimum) {
-		const float growth(((float)minimum) * 1.3f);
-
-		instance_tracker_array grown(make_shared<instance_tracker_atomic_entry[], allocator_instance_tracker_array>((size_type)growth, arrayAlloc));
-		for (size_type i = 0; i < trackedInstances.item_count(); ++i) {
-			grown[i].unsafe_store(trackedInstances[i].load(std::memory_order_relaxed), std::memory_order_relaxed);
+	instance_tracker_array activeArray(nullptr);
+	do {
+		activeArray = s_st_container.m_instanceTrackers.load();
+		// If there is a fully committed array with enough entries, we can just break here.
+		if (!(activeArray.item_count() < minimum)) {
+			return;
 		}
 
-		if (s_st_container.m_instanceTrackers.compare_exchange_strong(trackedInstances, std::move(grown))) {
+		instance_tracker_array swapArray(s_st_container.m_swapArray.load());
+
+		if (swapArray.item_count() < minimum) {
+			const float growth(((float)minimum) * 1.4f);
+
+			allocator_instance_tracker_array arrayAlloc(m_allocator);
+			instance_tracker_array grown(make_shared<instance_tracker_atomic_entry[], allocator_instance_tracker_array>((size_type)growth, arrayAlloc));
+
+			raw_ptr<instance_tracker_atomic_entry[]> exp(swapArray);
+			if (!s_st_container.m_swapArray.compare_exchange_strong(exp, std::move(grown))) {
+				continue;
+			}
+			
+			swapArray = s_st_container.m_swapArray.load();
+
+			if (swapArray.item_count() < minimum) {
+				continue;
+			}
+		}
+
+		for (size_type i = 0, itemCount((size_type)activeArray.item_count()); i < itemCount; ++i) {
+			// Only swap in if this entry is unaltered. (Leaving room for store(rs) to insert)
+			raw_ptr<tlm_detail::instance_tracker<T>> exp(nullptr, 0);
+			swapArray[i].compare_exchange_strong(exp, activeArray[i].load());
+		}
+
+		if (s_st_container.m_instanceTrackers.compare_exchange_strong(activeArray, swapArray)) {
+			// We successfully swapped in and can now remove the swap-in entry
+			raw_ptr<instance_tracker_atomic_entry[]> expSwap(swapArray);
+			s_st_container.m_swapArray.compare_exchange_strong(expSwap, nullptr);
 			break;
 		}
-	}
+	} while (activeArray.item_count() < minimum);
 }
 template<class T, class Allocator>
 template <std::enable_if_t<std::is_copy_assignable_v<T>>*>
@@ -260,6 +304,14 @@ inline const T& thread_local_member<T, Allocator>::operator=(T&& other)
 	T& myval(*this);
 	myval = std::move(other);
 	return *this;
+}
+template <class T, class Allocator>
+bool operator==(const tlm<T, Allocator>& tl, const T& t) {
+	return tl.operator==(t);
+}
+template <class T, class Allocator>
+bool operator!=(const tlm<T, Allocator>& tl, const T& t) {
+	return tl.operator!=(t);
 }
 // detail
 namespace tlm_detail

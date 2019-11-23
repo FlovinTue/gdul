@@ -10,7 +10,6 @@
 #include <vector>
 #include "tester.h"
 #include "../Common/Timer.h"
-#include "no_opt.h"
 
 struct int_iter
 {
@@ -32,7 +31,7 @@ int main()
 {
 	timer<float> time;
 
-	for(uint32_t i =0; i < 100; ++i)
+	for(uint32_t i =0; i < 200; ++i)
 	{
 		{
 			gdul::tester<int_iter> tester(int_iter{ 5 });
@@ -47,6 +46,7 @@ int main()
 	}
 
 	gdul::doPrint = true;
+
 
 	return 0;
 }

@@ -35,15 +35,19 @@ public:
 template <class T>
 tester<T>::tester(const T& init)
 	: m_init(init)
-	, m_worker(1)
+	, m_worker()
 {
 }
 template <class T>
 void tester<T>::execute()
 {
-	//test_assignment(100);
+	test_assignment(100);
 	test_construction(100);
 	test_index_pool(100);
+
+	while (m_worker.has_unfinished_tasks()) {
+		std::this_thread::yield();
+	}
 
 	gdul::tlm<T, alloc_t>::_unsafe_reset();
 	
@@ -84,26 +88,11 @@ inline void tester<T>::test_construction(uint32_t tasks)
 			gdul::tlm<T, alloc_t> fourth(m_init);
 			gdul::tlm<T, alloc_t> fifth(m_init);
 
-			if (first != m_init)
-			{
-				throw std::runtime_error("Mismatch first default");
-			}
-			if (first != m_init)
-			{
-				throw std::runtime_error("Mismatch second default");
-			}
-			if (first != m_init)
-			{
-				throw std::runtime_error("Mismatch third default");
-			}
-			if (first != m_init)
-			{
-				throw std::runtime_error("Mismatch fourth default");
-			}
-			if (first != m_init)
-			{
-				throw std::runtime_error("Mismatch fifth default");
-			}
+			GDUL_ASSERT(first == m_init);
+			GDUL_ASSERT(second == m_init);
+			GDUL_ASSERT(third == m_init);
+			GDUL_ASSERT(fourth == m_init);
+			GDUL_ASSERT(fifth == m_init);
 		}
 	};
 	for (uint32_t i = 0; i < tasks; ++i)
@@ -134,53 +123,19 @@ inline void tester<T>::test_assignment(uint32_t tasks)
 		fourth = fourthExp;
 		fifth = fifthExp;
 
-		if (first != firstExp)
-		{
-			GDUL_BREAK_CATCHER;
-		}
-		if (second != secondExp)
-		{
-			GDUL_BREAK_CATCHER;
-		}
-		if (third != thirdExp)
-		{
-			GDUL_BREAK_CATCHER;
-		}
-		if (fourth != fourthExp)
-		{
-			GDUL_BREAK_CATCHER;
-		}
-		if (fifth != fifthExp)
-		{
-			GDUL_BREAK_CATCHER;
-		}
-
 		const T firstOut = first;
 		const T secondOut = second;
 		const T thirdOut = third;
 		const T fourthOut = fourth;
 		const T fifthOut = fifth;
 
-		if (firstOut != firstExp)
-		{
-			throw std::runtime_error("Mismatch first");
-		}
-		if (secondOut != secondExp)
-		{
-			throw std::runtime_error("Mismatch second");
-		}
-		if (thirdOut != thirdExp)
-		{
-			throw std::runtime_error("Mismatch third");
-		}
-		if (fourthOut != fourthExp)
-		{
-			throw std::runtime_error("Mismatch fourth");
-		}
-		if (fifthOut != fifthExp)
-		{
-			throw std::runtime_error("Mismatch fifth");
-		}
+
+		GDUL_ASSERT(firstOut == firstExp);
+		GDUL_ASSERT(secondOut == secondExp);
+		GDUL_ASSERT(thirdOut == thirdExp);
+		GDUL_ASSERT(fourthOut == fourthExp);
+		GDUL_ASSERT(fifthOut == fifthExp);
+
 	};
 	for (uint32_t i = 0; i < tasks; ++i)
 	{
