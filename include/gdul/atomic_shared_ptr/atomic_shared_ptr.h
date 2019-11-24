@@ -53,7 +53,9 @@ namespace aspdetail
 {
 typedef std::allocator<std::uint8_t> default_allocator;
 
-static constexpr std::uint8_t Cb_Ptr_Bottom_Bits = []() constexpr { std::uint8_t i = 0, align(alignof(std::max_align_t)); for (; align; ++i, align >>= 1); return i - 1; }();
+constexpr std::uint8_t get_num_bottom_bits() { std::uint8_t i = 0, align(alignof(std::max_align_t)); for (; align; ++i, align >>= 1); return i - 1; }
+
+static constexpr std::uint8_t Cb_Ptr_Bottom_Bits = get_num_bottom_bits();
 static constexpr std::uint64_t Owned_Mask = (std::numeric_limits<std::uint64_t>::max() >> 16);
 static constexpr std::uint64_t Cb_Mask = (std::numeric_limits<std::uint64_t>::max() >> 16) & ~ std::uint64_t((std::uint16_t(1) << Cb_Ptr_Bottom_Bits) - 1);
 static constexpr std::uint64_t Versioned_Cb_Mask = (std::numeric_limits<std::uint64_t>::max() >> 8);
