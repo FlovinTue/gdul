@@ -27,7 +27,6 @@
 #include <stdexcept>
 #include <memory>
 #include <cstddef>
-#include "../Common/util.h"
 
 // (not atomic_)shared_ptr uses local refs by default to speed up the copy process,
 // which means if the number of local refs kept is > 1, the copyee must modify local

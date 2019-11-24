@@ -91,7 +91,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\include\gdul\WIP_thread_local_member\thread_local_member.h" />
+    <ClInclude Include="..\..\include\gdul\thread_local_member\thread_local_member.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="tester.h" />
   </ItemGroup>
@@ -104,7 +104,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <Natvis Include="..\..\include\gdul\WIP_thread_local_member\thread_local_member.natvis" />
+    <Natvis Include="..\..\include\gdul\thread_local_member\thread_local_member.natvis" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

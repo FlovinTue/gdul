@@ -4,7 +4,7 @@
 #include "../Common/util.h"
 #include "../Common/tracking_allocator.h"
 #include <gdul/concurrent_queue/concurrent_queue.h>
-#include <gdul/WIP_thread_local_member/thread_local_member.h>
+#include <gdul/thread_local_member/thread_local_member.h>
 
 namespace gdul
 {
@@ -37,6 +37,11 @@ tester<T>::tester(const T& init)
 	: m_init(init)
 	, m_worker()
 {
+	tlm<char> boolOpFalse(0);
+	tlm<char> boolOpTrue(1);
+
+	GDUL_ASSERT(!boolOpFalse);
+	GDUL_ASSERT(boolOpTrue);
 }
 template <class T>
 void tester<T>::execute()
@@ -48,8 +53,6 @@ void tester<T>::execute()
 	while (m_worker.has_unfinished_tasks()) {
 		std::this_thread::yield();
 	}
-
-	gdul::tlm<T, alloc_t>::_unsafe_reset();
 	
 	std::cout << "final: " << gdul::s_allocated << std::endl;
 }
