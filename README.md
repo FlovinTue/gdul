@@ -33,3 +33,20 @@ Includes needed are concurrent_queue.h and atomic_shared_ptr.h. concurrent_queue
 Allocates chunks of objects and makes them avaliable for usage via get_object. Return objects using recycle_object. Concurrency safe & lock-free.
 
 Includes needed are concurrent_object_pool.h, concurrent_queue_.h
+
+-------------------------------------------------------------------------------------------------------------------------------------------
+
+## thread_local_member
+####  -- Still fairly untested, and may not be the most stable --
+
+Abstraction to enable members to be thread local. Internally, fast path contains 1 integer 
+comparison. Fast path is potentially invalidated when the accessing thread sees a not-before seen object. 
+
+If the number of tlm instances of the same type (e.g tlm<int> != tlm<float>)
+does not exceed gdul::tlm_detail::Static_Alloc_Size, objects will be located in the corresponding
+thread's thread_local storage block and contain one level of redirect(tlm->thread_local) else it will be mapped to an external
+array and contain two(tlm->thread_local->array). 
+ 
+For sanity's sake, use alias tlm<T> instead of thread_local_member<T>
+
+New operators may be added to the interface using the implicit conversion operators as accessors.
