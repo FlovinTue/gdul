@@ -39,8 +39,8 @@ Includes needed are concurrent_object_pool.h, concurrent_queue_.h
 ## thread_local_member
 ####  -- Still fairly untested, and may not be the most stable --
 
-Abstraction to enable members to be thread local. Internally, fast path contains 1 integer 
-comparison. Fast path is potentially invalidated when the accessing thread sees a not-before seen object. 
+Abstraction to enable members to be thread local. Internally, fast path contains only 1 integer comparison before returning object reference. Fast path is potentially invalidated when the accessed object is not-before seen by the accessing thread (Frequently
+recreating and destroying tlm objects may yield poor performance).
 
 If the number of tlm instances of the same type (e.g tlm<int> != tlm<float>)
 does not exceed gdul::tlm_detail::Static_Alloc_Size, objects will be located in the corresponding
