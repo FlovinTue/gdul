@@ -77,6 +77,9 @@ public:
 
 	inline operator bool() const;
 
+	inline T& get();
+	inline const T& get() const;
+
 private:
 	using instance_tracker_entry = shared_ptr<tlm_detail::instance_tracker<T>>;
 	using instance_tracker_atomic_entry = atomic_shared_ptr<tlm_detail::instance_tracker<T>>;
@@ -194,6 +197,16 @@ template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::operator bool() const
 {
 	return true;
+}
+template<class T, class Allocator>
+inline T& thread_local_member<T, Allocator>::get()
+{
+	return (T&)*this;
+}
+template<class T, class Allocator>
+inline const T& thread_local_member<T, Allocator>::get() const
+{
+	return (const T&)*this;
 }
 template<class T, class Allocator>
 inline void thread_local_member<T, Allocator>::check_for_invalidation() const
