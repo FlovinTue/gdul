@@ -158,54 +158,59 @@ int main()
 		threada.join();
 		threadb.join();
 
-		const std::uint32_t testArraySize(32);
-		const std::uint32_t numThreads(8);
-		tester<std::uint64_t, testArraySize, numThreads> tester(true, rand());
-
-		const bool
-			doassign(true),
-			doreassign(true),
-			doCAStest(true
-			),
-			doreferencetest(false);
-
-		uint32_t arraySweeps(10000);
-		uint32_t runs(32);
-		float time(0.f);
-		for (std::uint32_t i = 0; i < runs; ++i) {
-			time += tester.execute(arraySweeps, doassign, doreassign, doCAStest, doreferencetest);
-		}
-		if (runs)
 		{
+
+			const std::uint32_t testArraySize(32);
+			const std::uint32_t numThreads(8);
+			tester<std::uint64_t, testArraySize, numThreads> tester(true, rand());
+
+			const bool
+				doassign(false),
+				doreassign(false),
+				doCAStest(false),
+				doreferencetest(false),
+				testAba(true);
+
+			uint32_t arraySweeps(100000);
+			uint32_t runs(4000);
+			float time(0.f);
+			for (std::uint32_t i = 0; i < runs; ++i)
+			{
+				time += tester.execute(arraySweeps, doassign, doreassign, doCAStest, doreferencetest, testAba);
+			}
+			if (runs)
+			{
 #ifdef _DEBUG
-			std::string config("DEBUG");
+				std::string config("DEBUG");
 #else
-			std::string config("RELEASE");
+				std::string config("RELEASE");
 #endif
-			std::string assign(doassign ? ", assign" : "");
-			std::string reassign(doreassign ? ", reassign" : "");
-			std::string referencetest(doreferencetest ? ", referencetest" : "");
+				std::string assign(doassign ? ", assign" : "");
+				std::string reassign(doreassign ? ", reassign" : "");
+				std::string referencetest(doreferencetest ? ", referencetest" : "");
 
-			std::cout
-				<< "Executed "
-				<< runs
-				<< " runs with "
-				<< arraySweeps
-				<< " array sweeps over "
-				<< time
-				<< " seconds averaging "
-				<< time / runs
-				<< " seconds per run in "
-				<< config
-				<< " mode"
-				<< " using tests "
-				<< assign
-				<< reassign
-				<< referencetest
-				<< ". The number of threads used were "
-				<< numThreads
-				<< std::endl;
+				std::cout
+					<< "Executed "
+					<< runs
+					<< " runs with "
+					<< arraySweeps
+					<< " array sweeps over "
+					<< time
+					<< " seconds averaging "
+					<< time / runs
+					<< " seconds per run in "
+					<< config
+					<< " mode"
+					<< " using tests "
+					<< assign
+					<< reassign
+					<< referencetest
+					<< ". The number of threads used were "
+					<< numThreads
+					<< std::endl;
 
+			}
 		}
+		std::cout << "Final alloc'd " << s_allocated << std::endl;
 		return 0;
 }
