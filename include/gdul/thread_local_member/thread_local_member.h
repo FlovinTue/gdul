@@ -183,7 +183,7 @@ inline thread_local_member<T, Allocator>::operator const T& () const
 template<class T, class Allocator>
 inline bool thread_local_member<T, Allocator>::operator==(const T& t) const
 {
-	return (operator const T&()).operator==(t);
+	return ((const T&)*this) == t;
 }
 template<class T, class Allocator>
 inline bool thread_local_member<T, Allocator>::operator!=(const T& t) const
