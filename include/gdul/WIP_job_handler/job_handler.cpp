@@ -83,6 +83,11 @@ worker job_handler::make_worker()
 	return worker(&m_workers[index]);
 }
 
+std::size_t job_handler::num_workers() const
+{
+	return m_workerCount;
+}
+
 std::size_t job_handler::num_enqueued() const
 {
 	std::size_t accum(0);

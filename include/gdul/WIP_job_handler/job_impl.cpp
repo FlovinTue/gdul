@@ -21,7 +21,7 @@
 #include <gdul\WIP_job_handler\job_impl.h>
 #include <gdul\WIP_job_handler\job_handler.h>
 #include <gdul\concurrent_object_pool\concurrent_object_pool.h>
-#include "../../Testers/Common/util.h"
+
 namespace gdul
 {
 namespace job_handler_detail
@@ -72,15 +72,13 @@ std::uint8_t job_impl::get_priority() const
 {
 	return m_priority;
 }
-void job_impl::add_dependencies(std::uint16_t n)
+void job_impl::add_dependencies(std::uint32_t n)
 {
-	GDUL_ASSERT(m_dependencies != 0);
-
 	m_dependencies.fetch_add(n, std::memory_order_relaxed);
 }
-std::uint16_t job_impl::remove_dependencies(std::uint16_t n)
+std::uint32_t job_impl::remove_dependencies(std::uint32_t n)
 {
-	std::uint16_t result(m_dependencies.fetch_sub(n, std::memory_order_relaxed));
+	std::uint32_t result(m_dependencies.fetch_sub(n, std::memory_order_acq_rel));
 	return result - n;
 }
 bool job_impl::enable()
@@ -104,9 +102,10 @@ void job_impl::detach_children()
 	job_impl_shared_ptr child(m_firstChild.exchange(nullptr, std::memory_order_relaxed));
 
 	while (child) {
-		job_impl_shared_ptr next(child->m_firstSibling.unsafe_load(std::memory_order_relaxed));
+		job_impl_shared_ptr next(nullptr);
 
 		if (!child->remove_dependencies(1)) {
+			next = child->m_firstSibling.unsafe_exchange(nullptr, std::memory_order_relaxed);
 			job_handler* const nativeHandler(child->get_handler());
 			nativeHandler->enqueue_job(std::move(child));
 		}

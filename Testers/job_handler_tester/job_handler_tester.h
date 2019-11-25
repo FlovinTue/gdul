@@ -27,6 +27,7 @@ public:
 	void setup_workers();
 
 	float run_consumption_parallel_test(std::size_t numInserts, void(*workfunc)(void));
+	float run_consumption_strand_parallel_test(std::size_t numInserts, void(*workfunc)(void));
 	float run_construction_parallel_test(std::size_t numInserts, void(*workfunc)(void));
 	float run_mixed_parallel_test(std::size_t numInserts, void(*workfunc)(void));
 	float run_consumption_strand_test(std::size_t numInserts, void(*workfunc)(void));

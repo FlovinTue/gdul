@@ -30,7 +30,7 @@ typedef void* thread_handle;
 
 namespace job_handler_detail
 {
-constexpr std::uint16_t Job_Max_Dependencies = std::numeric_limits<std::uint16_t>::max() / 2;
+constexpr std::uint32_t Job_Max_Dependencies = std::numeric_limits<std::uint32_t>::max() / 2;
 
 // The number of internal job queues. 
 constexpr std::uint8_t Priority_Granularity = 4;

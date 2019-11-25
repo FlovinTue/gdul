@@ -71,7 +71,7 @@ public:
 	template <class Callable>
 	job make_job(Callable&& callable);
 
-
+	std::size_t num_workers() const;
 	std::size_t num_enqueued() const;
 private:
 	static thread_local job_handler_detail::worker_impl* this_worker_impl;

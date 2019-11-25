@@ -57,8 +57,8 @@ public:
 
 	std::uint8_t get_priority() const;
 
-	void add_dependencies(std::uint16_t n = 1);
-	std::uint16_t remove_dependencies(std::uint16_t n = 1);
+	void add_dependencies(std::uint32_t n = 1);
+	std::uint32_t remove_dependencies(std::uint32_t n = 1);
 
 	bool enable();
 
@@ -87,7 +87,7 @@ private:
 	job_impl_atomic_shared_ptr m_firstSibling;
 	job_impl_atomic_shared_ptr m_firstChild;
 
-	std::atomic<std::uint16_t> m_dependencies;
+	std::atomic<std::uint32_t> m_dependencies;
 
 	std::atomic<bool> m_finished;
 
