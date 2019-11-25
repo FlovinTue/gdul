@@ -7,7 +7,7 @@
 
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 
-namespace Tester
+namespace tester
 {
 TEST_CLASS(UnitTest1)
 {
