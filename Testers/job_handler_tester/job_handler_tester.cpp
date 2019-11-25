@@ -40,6 +40,9 @@ void job_handler_tester::setup_workers()
 		staticWorkers = maxWorkers / 2;
 	}
 
+	dynamicWorkers = 1;
+	staticWorkers = 0;
+	
 	for (std::size_t i = 0; i < dynamicWorkers; ++i) {
 		worker wrk(m_handler.make_worker());
 		wrk.set_core_affinity(job_handler_detail::Worker_Auto_Affinity);
@@ -61,8 +64,13 @@ void job_handler_tester::setup_workers()
 float job_handler_tester::run_consumption_parallel_test(std::size_t numInserts, void(*workfunc)(void))
 {
 	job root(m_handler.make_job(workfunc, 0));	
+	job end(m_handler.make_job([this]() { std::cout << "Finished run_consumption_parallel_test. Numer of enqueued jobs: " << m_handler.num_enqueued() << std::endl; }));
+	end.add_dependency(root);
+	end.enable();
+
 	job next[8]{};
 	next[0] = m_handler.make_job(workfunc, 0);
+	end.add_dependency(next[0]);
 
 	next[0].add_dependency(root);
 	next[0].enable();
@@ -71,11 +79,12 @@ float job_handler_tester::run_consumption_parallel_test(std::size_t numInserts, 
 
 	for (std::size_t i = 0; i < numInserts; ++i) {
 
-		uint8_t children(rand() % 8);
+		uint8_t children(1 + (rand() % 8));
 		job intermediate[8]{};
 		for (std::uint8_t j = 0; j < children; ++j, ++i) {
 			intermediate[j] = m_handler.make_job(workfunc, (j + i) % job_handler_detail::Priority_Granularity);
-			
+			end.add_dependency(intermediate[j]);
+
 			for (std::uint8_t dependencies = 0; dependencies < nextNum; ++dependencies) {
 				intermediate[j].add_dependency(next[dependencies]);
 			}
@@ -87,9 +96,6 @@ float job_handler_tester::run_consumption_parallel_test(std::size_t numInserts, 
 		}
 		nextNum = children;
 	}
-
-	job end(m_handler.make_job([this]() {std::cout << "Finished run_consumption_parallel_test. Numer of enqueued jobs: " << m_handler.num_enqueued() << std::endl; }));
-	end.enable();
 
 	timer<float> timer;
 
@@ -140,22 +146,30 @@ float job_handler_tester::run_mixed_parallel_test(std::size_t numInserts, void(*
 
 float job_handler_tester::run_consumption_strand_test(std::size_t numInserts, void(*workfunc)(void))
 {
-	numInserts; workfunc;
+	// Need to add check to make sure only one job is active at a time
+	job root(m_handler.make_job(workfunc, 0));
+	job previous(m_handler.make_job(workfunc, 0));
+	previous.add_dependency(root);
+	previous.enable();
 
-	// Reset
-	// Init ( max threads )
+	for (std::size_t i = 0; i < numInserts; ++i)
+	{
+		job next = m_handler.make_job(workfunc, i % job_handler_detail::Priority_Granularity);
+		next.add_dependency(previous);
+		next.enable();
 
-	// Create root
+		previous = std::move(next);
+	}
+	job end(m_handler.make_job([this]() { std::cout << "Finished run_consumption_strand_test. Numer of enqueued jobs: " << m_handler.num_enqueued() << std::endl; }));
+	end.add_dependency(previous);
+	end.enable();
 
-	// LOOP
-	// Create 1 children
-	// ------
-	// Create end
+	timer<float> timer;
 
-	// Enable root
-	// Wait for end
+	root.enable();
+	end.wait_for_finish();
 
-	return 0.0f;
+	return timer.get();
 }
 
 }

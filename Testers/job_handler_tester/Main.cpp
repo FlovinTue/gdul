@@ -29,7 +29,7 @@ int main()
 	tester.init(info);
 
 	for (uint32_t i = 0; i < 50; ++i) {
-		tester.run_consumption_parallel_test(500, workFunc);
+		tester.run_mixed_parallel_test(50, workFunc);
 	}
 
 	std::cout << "Hello World!\n";

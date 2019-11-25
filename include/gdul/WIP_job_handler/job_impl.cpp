@@ -21,7 +21,7 @@
 #include <gdul\WIP_job_handler\job_impl.h>
 #include <gdul\WIP_job_handler\job_handler.h>
 #include <gdul\concurrent_object_pool\concurrent_object_pool.h>
-
+#include "../../Testers/Common/util.h"
 namespace gdul
 {
 namespace job_handler_detail
@@ -36,6 +36,7 @@ job_impl::~job_impl()
 		m_allocFields.m_allocator.deallocate(m_allocFields.m_callableBegin, m_allocFields.m_allocated);
 		m_allocFields.m_allocator.~allocator_type();
 	}
+	m_callable = nullptr;
 
 	std::uninitialized_fill_n(m_storage, Callable_Max_Size_No_Heap_Alloc, std::uint8_t(0));
 }
@@ -73,6 +74,8 @@ std::uint8_t job_impl::get_priority() const
 }
 void job_impl::add_dependencies(std::uint16_t n)
 {
+	GDUL_ASSERT(m_dependencies != 0);
+
 	m_dependencies.fetch_add(n, std::memory_order_relaxed);
 }
 std::uint16_t job_impl::remove_dependencies(std::uint16_t n)
