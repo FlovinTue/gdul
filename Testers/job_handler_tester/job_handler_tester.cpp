@@ -5,7 +5,7 @@
 
 namespace gdul
 {
-
+gdul::concurrent_queue<job> debugQueue;
 job_handler_tester::job_handler_tester()
 	: m_info()
 {
@@ -91,6 +91,7 @@ float job_handler_tester::run_consumption_strand_parallel_test(std::size_t numIn
 	end.add_dependency(root);
 	end.enable();
 
+
 	job next[8]{};
 	next[0] = m_handler.make_job(workfunc, 0);
 	end.add_dependency(next[0]);
@@ -117,6 +118,10 @@ float job_handler_tester::run_consumption_strand_parallel_test(std::size_t numIn
 			intermediate[j].enable();
 		}
 
+		for (std::uint8_t j = 0; j < nextNum; ++j) {
+			debugQueue.push(std::move(next[j]));
+		}
+
 		for (std::uint8_t j = 0; j < children; ++j)
 		{
 			next[j] = std::move(intermediate[j]);
@@ -127,6 +132,7 @@ float job_handler_tester::run_consumption_strand_parallel_test(std::size_t numIn
 	timer<float> time;
 
 	root.enable();
+	debugQueue.push(std::move(root));
 	end.wait_for_finish();
 
 	return time.get();
