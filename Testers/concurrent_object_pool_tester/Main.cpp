@@ -6,28 +6,15 @@
 #include <gdul\concurrent_object_pool\concurrent_object_pool.h>
 #include <vld.h>
 
-struct test
-{
-	~test()
-	{
-		std::cout << "destructed" << std::endl;
-	}
-	std::shared_ptr<test> next;
-};
-
 int main()
 {
-	std::shared_ptr<test> next(std::make_shared<test>());
-	next->next = std::make_shared<test>();
-	next = std::move(next->next);
-
-	//std::allocator<std::uint8_t> alloc;
-	//gdul::concurrent_object_pool<int, decltype(alloc)> pool(1, alloc);
-	//int* second = pool.get_object();
-	//int* first = pool.get_object();
-	//pool.recycle_object(first);
-	//pool.unsafe_destroy();
-	//std::size_t numAvaliable = pool.avaliable();
+	std::allocator<std::uint8_t> alloc;
+	gdul::concurrent_object_pool<int, decltype(alloc)> pool(1, alloc);
+	int* second = pool.get_object();
+	int* first = pool.get_object();
+	pool.recycle_object(first);
+	pool.unsafe_destroy();
+	std::size_t numAvaliable = pool.avaliable();
 
     std::cout << "Hello World!\n"; 
 }
