@@ -16,13 +16,11 @@
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_impl.h" />
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\callable.h" />
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\callable_base.h" />
+    <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_impl_allocator.h" />
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_handler_commons.h" />
     <ClInclude Include="..\..\include\gdul\job_handler_master.h" />
     <ClInclude Include="job_handler_tester.h" />
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\worker_impl.h" />
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\worker.h" />
-    <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_dependee.h" />
-    <ClInclude Include="..\..\include\gdul\WIP_job_handler\chunk_allocator.h" />
-    <ClInclude Include="..\..\include\gdul\WIP_job_handler\chunk_pool.h" />
   </ItemGroup>
 </Project>

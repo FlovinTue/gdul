@@ -25,16 +25,15 @@
 
 #include <array>
 
-#include <gdul/concurrent_object_pool/concurrent_object_pool.h>
-#include <gdul/concurrent_queue/concurrent_queue.h>
+#include <gdul\concurrent_object_pool\concurrent_object_pool.h>
+#include <gdul\concurrent_queue\concurrent_queue.h>
 
-#include <gdul/WIP_job_handler/job.h>
-#include <gdul/WIP_job_handler/job_handler_commons.h>
-#include <gdul/WIP_job_handler/job_impl.h>
-#include <gdul/WIP_job_handler/chunk_allocator.h>
-#include <gdul/WIP_job_handler/chunk_pool.h>
-#include <gdul/WIP_job_handler/worker_impl.h>
-#include <gdul/WIP_job_handler/worker.h>
+#include <gdul\WIP_job_handler\job.h>
+#include <gdul\WIP_job_handler\job_handler_commons.h>
+#include <gdul\WIP_job_handler\job_impl.h>
+#include <gdul\WIP_job_handler\job_impl_allocator.h>
+#include <gdul\WIP_job_handler\worker_impl.h>
+#include <gdul\WIP_job_handler\worker.h>
 
 namespace gdul {
 
@@ -94,11 +93,12 @@ private:
 
 	allocator_type m_mainAllocator;
 
-	job_handler_detail::chunk_pool
 	concurrent_object_pool<job_handler_detail::job_impl_chunk_rep, job_handler_detail::allocator_type> m_jobImplChunkPool;
 
 	concurrent_queue<job_impl_shared_ptr, allocator_type> m_jobQueues[job_handler_detail::Priority_Granularity];
 	
+	job_handler_detail::job_impl_allocator<job_handler_detail::job_impl_chunk_rep> m_jobImplAllocator;
+
 	std::array<job_handler_detail::worker_impl, job_handler_detail::Job_Handler_Max_Workers> m_workers;
 
 	std::atomic<std::uint16_t> m_workerCount;
