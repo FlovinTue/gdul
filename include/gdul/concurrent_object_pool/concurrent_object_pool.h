@@ -107,7 +107,7 @@ template<class Object, class Allocator>
 inline void concurrent_object_pool<Object, Allocator>::unsafe_destroy()
 {
 	shared_ptr<block_node> next(m_lastBlock.unsafe_exchange(nullptr, std::memory_order_relaxed));
-	std::shared_ptr<int> blah;
+
 	while (next)
 	{
 		next = std::move(next->m_next);
