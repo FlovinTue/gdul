@@ -1157,6 +1157,7 @@ public:
 
 	inline size_type use_count() const noexcept;
 
+	inline void swap(ptr_base<T>& other) noexcept;
 protected:
 	inline constexpr const control_block_base<T>* get_control_block() const noexcept;
 	inline constexpr control_block_base<T>* get_control_block() noexcept;
@@ -1240,6 +1241,12 @@ inline typename ptr_base<T>::size_type ptr_base<T>::use_count() const noexcept
 	}
 
 	return get_control_block()->use_count();
+}
+
+template<class T>
+inline void ptr_base<T>::swap(ptr_base<T>& other) noexcept
+{
+	std::swap(this->m_controlBlockStorage, other.m_controlBlockStorage);
 }
 
 template <class T>
@@ -1354,6 +1361,8 @@ public:
 	shared_ptr<T>& operator=(const shared_ptr<T>& other) noexcept;
 	shared_ptr<T>& operator=(shared_ptr<T>&& other) noexcept;
 
+	inline void swap(shared_ptr<T>& other) noexcept;
+
 	// Adjusts the amount of local refs kept for fast copies. Setting this to 1
 	// means a copy operation will not attempt to modify local state, and thus is
 	// concurrency safe(so long as the object remains unaltered). 
@@ -1430,7 +1439,10 @@ template<class T>
 inline shared_ptr<T>::shared_ptr(shared_ptr<T>&& other) noexcept
 	: shared_ptr<T>()
 {
-	operator=(std::move(other));
+	this->m_controlBlockStorage = other.m_controlBlockStorage;
+	this->m_ptr = other.m_ptr;
+	other.m_controlBlockStorage = compressed_storage();
+	other.m_ptr = nullptr;
 }
 template<class T>
 inline shared_ptr<T>::shared_ptr(const shared_ptr<T>& other) noexcept
@@ -1686,9 +1698,16 @@ inline shared_ptr<T>& shared_ptr<T>::operator=(const shared_ptr<T>& other) noexc
 template<class T>
 inline shared_ptr<T>& shared_ptr<T>::operator=(shared_ptr<T>&& other) noexcept
 {
-	std::swap(this->m_controlBlockStorage, other.m_controlBlockStorage);
-	std::swap(this->m_ptr, other.m_ptr);
+	shared_ptr<T>(std::move(other)).swap(*this);
+
 	return *this;
+}
+
+template<class T>
+inline void shared_ptr<T>::swap(shared_ptr<T>& other) noexcept
+{
+	aspdetail::ptr_base<T>::swap(other);
+	std::swap(this->m_ptr, other.m_ptr);
 }
 
 // raw_ptr does not share in ownership of the object
@@ -1724,6 +1743,8 @@ public:
 
 	inline const decayed_type& operator[](aspdetail::size_type index) const;
 	inline decayed_type& operator[](aspdetail::size_type index);
+
+	inline void swap(raw_ptr<T>& other) noexcept;
 
 	constexpr raw_ptr<T>& operator=(const raw_ptr<T>& other) noexcept;
 	constexpr raw_ptr<T>& operator=(raw_ptr<T>&& other) noexcept;
@@ -1851,6 +1872,11 @@ template <class T>
 inline typename raw_ptr<T>::decayed_type& raw_ptr<T>::operator[](aspdetail::size_type index)
 {
 	return get()[index];
+}
+template<class T>
+inline void raw_ptr<T>::swap(raw_ptr<T>& other) noexcept
+{
+	this->swap(other);
 }
 template<class T>
 inline constexpr raw_ptr<T>::raw_ptr(compressed_storage from) noexcept
