@@ -51,12 +51,12 @@ void job_impl::operator()()
 }
 bool job_impl::try_attach_child(job_impl_shared_ptr child)
 {
-	job_impl_shared_ptr firstChild(nullptr);
-	job_impl_raw_ptr rawRep(nullptr);
-	do {
-		firstChild = m_firstChild.load(std::memory_order_relaxed);
-		rawRep = firstChild;
+	job_impl_shared_ptr firstChild(m_firstChild.load(std::memory_order_relaxed));
+	
+	// Hmm. Maybe something wrong with parenting. Am I adding multiple parents?
+	assert(!child->has_sibling() && "child already has a parent");
 
+	do {
 		child->set_sibling(std::move(firstChild));
 
 		if (m_finished.load(std::memory_order_seq_cst)) {
@@ -64,7 +64,7 @@ bool job_impl::try_attach_child(job_impl_shared_ptr child)
 			return false;
 		}
 
-	} while (!m_firstChild.compare_exchange_strong(rawRep, std::move(child), std::memory_order_relaxed, std::memory_order_relaxed));
+	} while (!m_firstChild.compare_exchange_strong(firstChild, std::move(child), std::memory_order_relaxed, std::memory_order_relaxed));
 
 	return true;
 }
@@ -84,6 +84,10 @@ std::uint32_t job_impl::remove_dependencies(std::uint32_t n)
 bool job_impl::enable()
 {
 	return !remove_dependencies(Job_Max_Dependencies);
+}
+bool job_impl::has_sibling() const
+{
+	return m_firstSibling;
 }
 job_handler * job_impl::get_handler() const
 {

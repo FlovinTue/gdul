@@ -91,7 +91,6 @@ float job_handler_tester::run_consumption_strand_parallel_test(std::size_t numIn
 	end.add_dependency(root);
 	end.enable();
 
-
 	job next[8]{};
 	next[0] = m_handler.make_job(workfunc, 0);
 	end.add_dependency(next[0]);
@@ -106,7 +105,7 @@ float job_handler_tester::run_consumption_strand_parallel_test(std::size_t numIn
 
 		uint8_t children(1 + (rand() % 8));
 		job intermediate[8]{};
-		for (std::uint8_t j = 0; j < children; ++j, ++i)
+		for (std::uint8_t j = 0; j < children; ++j)
 		{
 			intermediate[j] = m_handler.make_job(workfunc, (j + i) % job_handler_detail::Priority_Granularity);
 			end.add_dependency(intermediate[j]);
@@ -132,7 +131,6 @@ float job_handler_tester::run_consumption_strand_parallel_test(std::size_t numIn
 	timer<float> time;
 
 	root.enable();
-	debugQueue.push(std::move(root));
 	end.wait_for_finish();
 
 	return time.get();

@@ -22,11 +22,10 @@
 #pragma warning(push)
 #pragma warning(disable : 4324)
 
-#include <gdul\WIP_job_handler\job_handler_commons.h>
-#include <gdul\WIP_job_handler\callable.h>
-#include <gdul\WIP_job_handler\job_impl_allocator.h>
-#include <gdul\atomic_shared_ptr\atomic_shared_ptr.h>
-
+#include <gdul/WIP_job_handler/job_handler_commons.h>
+#include <gdul/WIP_job_handler/callable.h>
+#include <gdul/WIP_job_handler/chunk_allocator.h>
+#include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
 
 namespace gdul{
 
@@ -42,7 +41,8 @@ public:
 	using job_impl_shared_ptr = shared_ptr<job_impl>;
 	using job_impl_atomic_shared_ptr = atomic_shared_ptr<job_impl>;
 	using job_impl_raw_ptr = raw_ptr<job_impl>;
-
+	using chunk_pool_type = chunk_pool<alloc_size_make_shared<job_impl, chunk_allocator<job_impl, chunk_pool<>>()
+		
 	job_impl() = default;
 
 	template <class Callable, std::enable_if_t<!(Callable_Max_Size_No_Heap_Alloc < sizeof(Callable))>* = nullptr>
@@ -61,6 +61,7 @@ public:
 	std::uint32_t remove_dependencies(std::uint32_t n = 1);
 
 	bool enable();
+	bool has_sibling() const;
 
 	job_handler* get_handler() const;
 
@@ -83,9 +84,6 @@ private:
 
 	callable_base* m_callable;
 	job_handler* const m_handler;
-
-	job_impl_atomic_shared_ptr m_firstSibling;
-	job_impl_atomic_shared_ptr m_firstChild;
 
 	std::atomic<std::uint32_t> m_dependencies;
 
@@ -122,7 +120,6 @@ inline job_impl::job_impl(job_handler* handler, Callable && callable, std::uint8
 	const std::size_t offset(mod ? alignof(Callable) - mod : 0);
 
 	m_callable = new (m_allocFields.m_callableBegin + offset) gdul::job_handler_detail::callable(std::forward<Callable&&>(callable));
-	(*m_callable)();
 }
 
 template<class Callable, std::enable_if_t<!(Callable_Max_Size_No_Heap_Alloc < sizeof(Callable))>*>
@@ -137,21 +134,7 @@ inline job_impl::job_impl(job_handler* handler, Callable && callable, std::uint8
 	, m_dependencies(Job_Max_Dependencies)
 {
 	m_callable = new (&m_storage[0]) gdul::job_handler_detail::callable<Callable>(std::forward<Callable&&>(callable));
-	(*m_callable)();
 }
-
-
-
-// Memory chunk representation of job_impl
-struct alignas(log2align(Callable_Max_Size_No_Heap_Alloc)) job_impl_chunk_rep
-{
-	job_impl_chunk_rep() : dummy{} {}
-	operator uint8_t*()
-	{
-		return reinterpret_cast<uint8_t*>(this);
-	}
-	uint8_t dummy[alloc_size_make_shared<job_impl, job_impl_allocator<job_handler_detail::job_impl_chunk_rep>>()];
-};
 }
 }
 

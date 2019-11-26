@@ -20,62 +20,58 @@
 
 #pragma once
 
-#include <gdul\WIP_job_handler\job_handler_commons.h>
+#include <gdul/WIP_job_handler/job_handler_commons.h>
+#include <gdul/WIP_job_handler/chunk_pool.h>
 
 namespace gdul
 {
-template <class Object, class Allocator>
-class concurrent_object_pool;
 
 namespace job_handler_detail
 {
-// Defined in job_impl.h
-struct alignas(log2align(Callable_Max_Size_No_Heap_Alloc)) job_impl_chunk_rep;
-
-// Wrapper to get / recycle chunks from object pool
-template <class Dummy>
-class job_impl_allocator
+// Wrapper to get / recycle chunks from pool
+template <class T, class ChunkPoolType>
+class chunk_allocator
 {
 public:
-	using value_type = Dummy;
+	using value_type = T;
 	using allocator_type = job_handler_detail::allocator_type;
 
 	template <typename U>
 	struct rebind
 	{
-		using other = job_impl_allocator<U>;
+		using other = chunk_allocator<U>;
 	};
 
 
-	job_impl_allocator(concurrent_object_pool<job_impl_chunk_rep, allocator_type>* chunkSrc);
+	chunk_allocator(ChunkPoolType* pool);
 
-	template <class Dummy_>
-	job_impl_allocator(const job_impl_allocator<Dummy_>& other);
+	template <class U>
+	chunk_allocator(const chunk_allocator<U, ChunkPoolType>& other);
 
 	value_type* allocate(std::size_t);
 	void deallocate(value_type* chunk, std::size_t);
 
-	concurrent_object_pool<job_impl_chunk_rep, allocator_type>* m_chunks;
+	ChunkPoolType* m_chunks;
 };
 
-template<class Dummy>
-inline job_impl_allocator<Dummy>::job_impl_allocator(concurrent_object_pool<job_impl_chunk_rep, allocator_type>* chunkSrc)
+template<class T, class ChunkPoolType>
+inline chunk_allocator<T, ChunkPoolType>::chunk_allocator(ChunkPoolType* chunkSrc)
 	: m_chunks(chunkSrc)
 {
 }
-template<class Dummy>
-inline typename job_impl_allocator<Dummy>::value_type* job_impl_allocator<Dummy>::allocate(std::size_t)
+template<class T, class ChunkPoolType>
+inline typename chunk_allocator<T, ChunkPoolType>::value_type* chunk_allocator<T, ChunkPoolType>::allocate(std::size_t)
 {
 	return (value_type*)m_chunks->get_object();
 }
-template<class Dummy>
-inline void job_impl_allocator<Dummy>::deallocate(value_type* chunk, std::size_t)
+template<class T, class ChunkPoolType>
+inline void chunk_allocator<T, ChunkPoolType>::deallocate(value_type* chunk, std::size_t)
 {
-	m_chunks->recycle_object((job_impl_chunk_rep*)chunk);
+	m_chunks->recycle_object((ChunkType*)chunk);
 }
-template<class Dummy>
-template<class Dummy_>
-inline job_impl_allocator<Dummy>::job_impl_allocator(const job_impl_allocator<Dummy_>& other)
+template<class T, class ChunkPoolType>
+template<class U>
+inline chunk_allocator<T, ChunkPoolType>::chunk_allocator(const chunk_allocator<U, ChunkPoolType>& other)
 	: m_chunks(other.m_chunks)
 {
 }
