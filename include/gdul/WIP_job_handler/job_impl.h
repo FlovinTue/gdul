@@ -41,7 +41,6 @@ public:
 	using job_impl_shared_ptr = shared_ptr<job_impl>;
 	using job_impl_atomic_shared_ptr = atomic_shared_ptr<job_impl>;
 	using job_impl_raw_ptr = raw_ptr<job_impl>;
-	using chunk_pool_type = chunk_pool<alloc_size_make_shared<job_impl, chunk_allocator<job_impl, chunk_pool<>>()
 		
 	job_impl() = default;
 

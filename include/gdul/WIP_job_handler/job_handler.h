@@ -94,28 +94,22 @@ private:
 
 	allocator_type m_mainAllocator;
 
-	job_handler_detail::chunk_pool
-	concurrent_object_pool<job_handler_detail::job_impl_chunk_rep, job_handler_detail::allocator_type> m_jobImplChunkPool;
-
 	concurrent_queue<job_impl_shared_ptr, allocator_type> m_jobQueues[job_handler_detail::Priority_Granularity];
 	
 	std::array<job_handler_detail::worker_impl, job_handler_detail::Job_Handler_Max_Workers> m_workers;
 
 	std::atomic<std::uint16_t> m_workerCount;
 };
-
 template<class Callable>
 inline job job_handler::make_job(Callable && callable, std::uint8_t priority)
 {
 	return job(make_job_impl(std::forward<Callable&&>(callable), priority));
 }
-
 template<class Callable>
 inline job job_handler::make_job(Callable && callable)
 {
 	return make_job(std::forward<Callable&&>(callable), job_handler_detail::Default_Job_Priority);
 }
-
 template<class Callable>
 inline job_handler::job_impl_shared_ptr job_handler::make_job_impl(Callable&& callable, std::uint8_t priority)
 {
@@ -123,9 +117,9 @@ inline job_handler::job_impl_shared_ptr job_handler::make_job_impl(Callable&& ca
 
 	const uint8_t _priority(priority < job_handler_detail::Priority_Granularity ? priority : job_handler_detail::Priority_Granularity - 1);
 
-	return make_shared<job_handler_detail::job_impl, decltype(m_jobImplAllocator)>
+	return make_shared<job_handler_detail::job_impl, allocator_type>
 		(
-			m_jobImplAllocator, 
+			m_mainAllocator, 
 			this, 
 			std::forward<Callable&&>(callable), 
 			_priority, 
