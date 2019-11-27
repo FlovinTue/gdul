@@ -10,12 +10,12 @@
     <ClCompile Include="..\..\include\gdul\WIP_job_handler\worker.cpp" />
     <ClCompile Include="..\..\include\gdul\WIP_job_handler\job_handler_impl.cpp" />
     <ClCompile Include="..\..\include\gdul\WIP_job_handler\job_handler.cpp" />
+    <ClCompile Include="..\..\include\gdul\WIP_job_handler\callable.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\job.h" />
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_impl.h" />
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\callable.h" />
-    <ClInclude Include="..\..\include\gdul\WIP_job_handler\callable_base.h" />
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_handler_commons.h" />
     <ClInclude Include="..\..\include\gdul\job_handler_master.h" />
     <ClInclude Include="job_handler_tester.h" />

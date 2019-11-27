@@ -47,9 +47,9 @@ public:
 	job_impl() = default;
 
 	template <class Callable, std::enable_if_t<!(Callable_Max_Size_No_Heap_Alloc < sizeof(Callable))>* = nullptr>
-	job_impl(job_handler_impl* handler, Callable&& callable, std::uint8_t priority, allocator_type);
+	job_impl(job_handler_impl* handler, Callable&& callable_impl, std::uint8_t priority, allocator_type);
 	template <class Callable, std::enable_if_t<(Callable_Max_Size_No_Heap_Alloc < sizeof(Callable))>* = nullptr>
-	job_impl(job_handler_impl* handler, Callable&& callable, std::uint8_t priority, allocator_type alloc);
+	job_impl(job_handler_impl* handler, Callable&& callable_impl, std::uint8_t priority, allocator_type alloc);
 	~job_impl();
 	
 	void operator()();
@@ -93,7 +93,7 @@ private:
 	const std::uint8_t m_priority;
 };
 template<class Callable, std::enable_if_t<(Callable_Max_Size_No_Heap_Alloc < sizeof(Callable))>*>
-inline job_impl::job_impl(job_handler_impl* handler, Callable && callable, std::uint8_t priority, allocator_type alloc)
+inline job_impl::job_impl(job_handler_impl* handler, Callable && callable_impl, std::uint8_t priority, allocator_type alloc)
 	: m_storage{}
 	, m_callable(nullptr)
 	, m_finished(false)
@@ -118,11 +118,11 @@ inline job_impl::job_impl(job_handler_impl* handler, Callable && callable, std::
 	const std::uintptr_t mod(callableBeginAsInt % alignof(Callable));
 	const std::size_t offset(mod ? alignof(Callable) - mod : 0);
 
-	m_callable = new (m_allocFields.m_callableBegin + offset) gdul::jh_detail::callable(std::forward<Callable&&>(callable));
+	m_callable = new (m_allocFields.m_callableBegin + offset) gdul::jh_detail::callable_impl(std::forward<Callable&&>(callable_impl));
 }
 
 template<class Callable, std::enable_if_t<!(Callable_Max_Size_No_Heap_Alloc < sizeof(Callable))>*>
-inline job_impl::job_impl(job_handler_impl* handler, Callable && callable, std::uint8_t priority, allocator_type)
+inline job_impl::job_impl(job_handler_impl* handler, Callable && callable_impl, std::uint8_t priority, allocator_type)
 	: m_storage{}
 	, m_callable(nullptr)
 	, m_finished(false)
@@ -131,7 +131,7 @@ inline job_impl::job_impl(job_handler_impl* handler, Callable && callable, std::
 	, m_priority(priority)
 	, m_dependencies(Job_Max_Dependencies)
 {
-	m_callable = new (&m_storage[0]) gdul::jh_detail::callable<Callable>(std::forward<Callable&&>(callable));
+	m_callable = new (&m_storage[0]) gdul::jh_detail::callable_impl<Callable>(std::forward<Callable&&>(callable_impl));
 }
 
 

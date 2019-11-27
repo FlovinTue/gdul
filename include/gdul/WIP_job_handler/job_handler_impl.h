@@ -58,10 +58,10 @@ public:
 	worker make_worker();
 
 	template <class Callable>
-	job make_job(Callable&& callable, std::uint8_t priority);
+	job make_job(Callable&& callable_impl, std::uint8_t priority);
 
 	template <class Callable>
-	job make_job(Callable&& callable);
+	job make_job(Callable&& callable_impl);
 
 	std::size_t num_workers() const;
 	std::size_t num_enqueued() const;
@@ -73,7 +73,7 @@ private:
 	friend class job;
 
 	template <class Callable>
-	job_impl_shared_ptr make_job_impl(Callable&& callable, std::uint8_t priority);
+	job_impl_shared_ptr make_job_impl(Callable&& callable_impl, std::uint8_t priority);
 
 	void enqueue_job(job_impl_shared_ptr job);
 
@@ -97,19 +97,19 @@ private:
 };
 
 template<class Callable>
-inline job job_handler_impl::make_job(Callable && callable, std::uint8_t priority)
+inline job job_handler_impl::make_job(Callable && callable_impl, std::uint8_t priority)
 {
-	return job(make_job_impl(std::forward<Callable&&>(callable), priority));
+	return job(make_job_impl(std::forward<Callable&&>(callable_impl), priority));
 }
 
 template<class Callable>
-inline job job_handler_impl::make_job(Callable && callable)
+inline job job_handler_impl::make_job(Callable && callable_impl)
 {
-	return make_job(std::forward<Callable&&>(callable), ::Default_Job_Priority);
+	return make_job(std::forward<Callable&&>(callable_impl), ::Default_Job_Priority);
 }
 
 template<class Callable>
-inline job_handler_impl::job_impl_shared_ptr job_handler_impl::make_job_impl(Callable&& callable, std::uint8_t priority)
+inline job_handler_impl::job_impl_shared_ptr job_handler_impl::make_job_impl(Callable&& callable_impl, std::uint8_t priority)
 {
 	assert(priority < Priority_Granularity && "Priority value out of bounds");
 
@@ -119,7 +119,7 @@ inline job_handler_impl::job_impl_shared_ptr job_handler_impl::make_job_impl(Cal
 		(
 			m_jobImplAllocator, 
 			this, 
-			std::forward<Callable&&>(callable), 
+			std::forward<Callable&&>(callable_impl), 
 			_priority, 
 			m_mainAllocator
 			);

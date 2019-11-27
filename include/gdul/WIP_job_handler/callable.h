@@ -20,16 +20,26 @@
 
 #pragma once
 
-#include <gdul\WIP_job_handler\callable_base.h>
+#include <gdul/WIP_job_handler/job_handler_commons.h>
 
-namespace gdul {
-namespace jh_detail {
+namespace gdul
+{
+namespace jh_detail
+{
 
-template <class Callable>
-class callable : public callable_base
+class callable_base
 {
 public:
-	callable(Callable&& callable);
+	virtual ~callable_base() = default;
+
+	virtual void operator()() = 0;
+};
+
+template <class Callable>
+class callable_impl : public callable_base
+{
+public:
+	callable_impl(Callable&& callable_impl);
 
 	void operator()() override;
 
@@ -37,14 +47,68 @@ private:
 	Callable m_callable;
 };
 template<class Callable>
-inline callable<Callable>::callable(Callable && callable)
-	: m_callable(std::forward<Callable&&>(callable))
+inline callable_impl<Callable>::callable_impl(Callable && callable_impl)
+	: m_callable(std::forward<Callable&&>(callable_impl))
 {
 }
 template<class Callable>
-inline void callable<Callable>::operator()()
+inline void callable_impl<Callable>::operator()()
 {
 	m_callable();
+}
+class callable
+{
+public:
+	template <class Callable, std::enable_if_t<!(Callable_Max_Size_No_Heap_Alloc < sizeof(callable_impl<Callable>))>* = nullptr>
+	callable(Callable&& callable, allocator_type);
+	template <class Callable, std::enable_if_t<(Callable_Max_Size_No_Heap_Alloc < sizeof(callable_impl<Callable>))>* = nullptr>
+	callable(Callable&& callable, allocator_type alloc);
+
+	~callable() noexcept;
+
+private:
+	union
+	{
+		std::uint8_t m_storage[Callable_Max_Size_No_Heap_Alloc];
+		struct
+		{
+			allocator_type m_allocator;
+			std::uint8_t* m_callableBegin;
+			std::size_t m_allocated;
+		}m_allocFields;
+	};
+
+	callable_base* m_callable;
+};
+template<class Callable, std::enable_if_t<(Callable_Max_Size_No_Heap_Alloc < sizeof(callable_impl<Callable>))>*>
+inline callable::callable(Callable && callable, allocator_type)
+	: m_storage
+{
+	static_assert(!(Callable_Max_Size_No_Heap_Alloc < sizeof(m_allocFields)), "too high size / alignment on allocator_type");
+
+	m_allocFields.m_allocator = alloc;
+
+	if (16 < alignof(Callable))
+	{
+		m_allocFields.m_allocated = sizeof(Callable) + alignof(Callable);
+	}
+	else
+	{
+		m_allocFields.m_allocated = sizeof(Callable);
+	}
+	m_allocFields.m_callableBegin = m_allocFields.m_allocator.allocate(m_allocFields.m_allocated);
+
+	const std::uintptr_t callableBeginAsInt(reinterpret_cast<std::uintptr_t>(m_allocFields.m_callableBegin));
+	const std::uintptr_t mod(callableBeginAsInt % alignof(Callable));
+	const std::size_t offset(mod ? alignof(Callable) - mod : 0);
+
+	m_callable = new (m_allocFields.m_callableBegin + offset) gdul::jh_detail::callable_impl(std::forward<Callable&&>(callable));
+}
+template<class Callable, std::enable_if_t<!(Callable_Max_Size_No_Heap_Alloc < sizeof(callable_impl<Callable>))>*>
+inline callable::callable(Callable && callable, allocator_type)
+	: m_storage
+{
+	m_callable = new (&m_storage[0]) gdul::jh_detail::callable_impl<Callable>(std::forward<Callable&&>(callable));
 }
 }
 }

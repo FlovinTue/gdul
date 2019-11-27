@@ -50,12 +50,12 @@ public:
 	// Priority corresponds to the internal queue it will be placed in. Priority 0 -> highest. 
 	// jh_detail::Priority_Granularity defines the number of queueus
 	template <class Callable>
-	job make_job(Callable&& callable, std::uint8_t priority);
+	job make_job(Callable&& callable_impl, std::uint8_t priority);
 
 	// Callable will allocate if size is above ::Callable_Max_Size_No_Heap_Alloc
 	// It needs to have operator() defined with signature void(void). 
 	template <class Callable>
-	job make_job(Callable&& callable);
+	job make_job(Callable&& callable_impl);
 
 	std::size_t num_workers() const;
 	std::size_t num_enqueued() const;
@@ -65,13 +65,13 @@ private:
 
 // Make sure to abstract Callable, to avoid needing job_handler_impl include..
 template<class Callable>
-inline job job_handler::make_job(Callable && callable, std::uint8_t priority)
+inline job job_handler::make_job(Callable && callable_impl, std::uint8_t priority)
 {
-	return m_impl->make_job(std::forward<Callable&&>(callable), priority);
+	return m_impl->make_job(std::forward<Callable&&>(callable_impl), priority);
 }
 template<class Callable>
-inline job job_handler::make_job(Callable && callable)
+inline job job_handler::make_job(Callable && callable_impl)
 {
-	return m_impl->make_job(std::forward<Callable&&>(callable), jh_detail::Default_Job_Priority);
+	return m_impl->make_job(std::forward<Callable&&>(callable_impl), jh_detail::Default_Job_Priority);
 }
 }
