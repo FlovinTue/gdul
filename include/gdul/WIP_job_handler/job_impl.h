@@ -118,7 +118,6 @@ inline job_impl::job_impl(job_handler* handler, Callable && callable, std::uint8
 	const std::size_t offset(mod ? alignof(Callable) - mod : 0);
 
 	m_callable = new (m_allocFields.m_callableBegin + offset) gdul::jh_detail::callable(std::forward<Callable&&>(callable));
-	(*m_callable)();
 }
 
 template<class Callable, std::enable_if_t<!(Callable_Max_Size_No_Heap_Alloc < sizeof(Callable))>*>
@@ -132,7 +131,6 @@ inline job_impl::job_impl(job_handler* handler, Callable && callable, std::uint8
 	, m_dependencies(Job_Max_Dependencies)
 {
 	m_callable = new (&m_storage[0]) gdul::jh_detail::callable<Callable>(std::forward<Callable&&>(callable));
-	(*m_callable)();
 }
 
 

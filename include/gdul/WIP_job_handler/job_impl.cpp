@@ -100,15 +100,14 @@ void job_impl::detach_children()
 	job_dependee_shared_ptr dependee(m_firstDependee.exchange(nullptr, std::memory_order_relaxed));
 
 	while (dependee) {
-		job_dependee_shared_ptr next(nullptr);
-		// hmm
-		//if (!dependee->m_job->remove_dependencies(1)) {
-		//	next = child->m_firstSibling.unsafe_exchange(nullptr, std::memory_order_relaxed);
-		//	job_handler* const nativeHandler(child->get_handler());
-		//	nativeHandler->enqueue_job(std::move(child));
-		//}
+		job_dependee_shared_ptr next(std::move(dependee->m_sibling));
 
-		//child = std::move(next);
+		if (!dependee->m_job->remove_dependencies(1)) {
+			job_handler* const nativeHandler(dependee->m_job->get_handler());
+			nativeHandler->enqueue_job(std::move(dependee->m_job));
+		}
+
+		dependee = std::move(next);
 	}
 }
 }
