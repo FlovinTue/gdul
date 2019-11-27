@@ -58,7 +58,7 @@ public:
 	bool is_active() const;
 
 private:
-	friend class job_handler;
+	friend class job_handler_impl;
 
 	jh_detail::worker_impl* m_impl;
 };

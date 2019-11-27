@@ -19,8 +19,9 @@
 // SOFTWARE.
 
 #include <cassert>
-#include <gdul\WIP_job_handler\Job.h>
-#include <gdul\WIP_job_handler\job_handler.h>
+#include <gdul/WIP_job_handler/Job.h>
+#include <gdul/WIP_job_handler/job_handler_impl.h>
+#include <gdul/WIP_job_handler/job_impl.h>
 
 namespace gdul
 {
@@ -71,11 +72,11 @@ void job::wait_for_finish()
 	assert(m_impl && "Job not set");
 
 	while (!is_finished()) {
-		job_handler::this_worker_impl->refresh_sleep_timer();
-		job_handler::this_worker_impl->idle();
+		jh_detail::job_handler_impl::this_worker_impl->refresh_sleep_timer();
+		jh_detail::job_handler_impl::this_worker_impl->idle();
 	}
 }
-job::job(job_impl_shared_ptr impl)
+job::job(gdul::shared_ptr<jh_detail::job_impl> impl)
 	: m_impl(std::move(impl))
 	, m_enabled(false)
 {

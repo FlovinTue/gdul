@@ -30,11 +30,11 @@
 #include <gdul\WIP_job_handler\job_handler_commons.h>
 
 namespace gdul {
-
-class job_handler;
-
 namespace jh_detail
 {
+
+class job_handler_impl;
+
 class alignas(64) worker_impl
 {
 public:

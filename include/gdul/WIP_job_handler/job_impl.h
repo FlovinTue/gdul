@@ -30,10 +30,11 @@
 
 namespace gdul{
 
-class job_handler;
 namespace jh_detail {
 
+class job_handler_impl;
 class callable_base;
+
 class alignas(log2align(Callable_Max_Size_No_Heap_Alloc)) job_impl
 {
 public:
@@ -46,9 +47,9 @@ public:
 	job_impl() = default;
 
 	template <class Callable, std::enable_if_t<!(Callable_Max_Size_No_Heap_Alloc < sizeof(Callable))>* = nullptr>
-	job_impl(job_handler* handler, Callable&& callable, std::uint8_t priority, allocator_type);
+	job_impl(job_handler_impl* handler, Callable&& callable, std::uint8_t priority, allocator_type);
 	template <class Callable, std::enable_if_t<(Callable_Max_Size_No_Heap_Alloc < sizeof(Callable))>* = nullptr>
-	job_impl(job_handler* handler, Callable&& callable, std::uint8_t priority, allocator_type alloc);
+	job_impl(job_handler_impl* handler, Callable&& callable, std::uint8_t priority, allocator_type alloc);
 	~job_impl();
 	
 	void operator()();
@@ -62,7 +63,7 @@ public:
 
 	bool enable();
 
-	job_handler* get_handler() const;
+	job_handler_impl* get_handler() const;
 
 	bool is_finished() const;
 private:
@@ -81,7 +82,7 @@ private:
 	};
 
 	callable_base* m_callable;
-	job_handler* const m_handler;
+	job_handler_impl* const m_handler;
 
 	atomic_shared_ptr<job_dependee> m_firstDependee;
 
@@ -92,7 +93,7 @@ private:
 	const std::uint8_t m_priority;
 };
 template<class Callable, std::enable_if_t<(Callable_Max_Size_No_Heap_Alloc < sizeof(Callable))>*>
-inline job_impl::job_impl(job_handler* handler, Callable && callable, std::uint8_t priority, allocator_type alloc)
+inline job_impl::job_impl(job_handler_impl* handler, Callable && callable, std::uint8_t priority, allocator_type alloc)
 	: m_storage{}
 	, m_callable(nullptr)
 	, m_finished(false)
@@ -121,7 +122,7 @@ inline job_impl::job_impl(job_handler* handler, Callable && callable, std::uint8
 }
 
 template<class Callable, std::enable_if_t<!(Callable_Max_Size_No_Heap_Alloc < sizeof(Callable))>*>
-inline job_impl::job_impl(job_handler* handler, Callable && callable, std::uint8_t priority, allocator_type)
+inline job_impl::job_impl(job_handler_impl* handler, Callable && callable, std::uint8_t priority, allocator_type)
 	: m_storage{}
 	, m_callable(nullptr)
 	, m_finished(false)

@@ -96,6 +96,7 @@
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\callable_base.h" />
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_dependee.h" />
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_handler.h" />
+    <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_handler_impl.h" />
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_handler_commons.h" />
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_impl.h" />
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\chunk_allocator.h" />
@@ -106,6 +107,7 @@
   <ItemGroup>
     <ClCompile Include="..\..\include\gdul\WIP_job_handler\job.cpp" />
     <ClCompile Include="..\..\include\gdul\WIP_job_handler\job_handler.cpp" />
+    <ClCompile Include="..\..\include\gdul\WIP_job_handler\job_handler_impl.cpp" />
     <ClCompile Include="..\..\include\gdul\WIP_job_handler\job_handler_commons.cpp" />
     <ClCompile Include="..\..\include\gdul\WIP_job_handler\job_impl.cpp" />
     <ClCompile Include="..\..\include\gdul\WIP_job_handler\worker.cpp" />

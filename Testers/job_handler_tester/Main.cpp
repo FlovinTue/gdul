@@ -3,6 +3,7 @@
 
 #include "job_handler_tester.h"
 #include <iostream>
+
 namespace gdul
 {
 thread_local double testSum = static_cast<double>(rand() % 100);

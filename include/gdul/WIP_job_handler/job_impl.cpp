@@ -19,7 +19,7 @@
 // SOFTWARE.
 
 #include <gdul\WIP_job_handler\job_impl.h>
-#include <gdul\WIP_job_handler\job_handler.h>
+#include <gdul\WIP_job_handler\job_handler_impl.h>
 #include <gdul\concurrent_object_pool\concurrent_object_pool.h>
 
 namespace gdul
@@ -87,7 +87,7 @@ bool job_impl::enable()
 {
 	return !remove_dependencies(Job_Max_Dependencies);
 }
-job_handler * job_impl::get_handler() const
+job_handler_impl * job_impl::get_handler() const
 {
 	return m_handler;
 }
@@ -103,7 +103,7 @@ void job_impl::detach_children()
 		job_dependee_shared_ptr next(std::move(dependee->m_sibling));
 
 		if (!dependee->m_job->remove_dependencies(1)) {
-			job_handler* const nativeHandler(dependee->m_job->get_handler());
+			job_handler_impl* const nativeHandler(dependee->m_job->get_handler());
 			nativeHandler->enqueue_job(std::move(dependee->m_job));
 		}
 

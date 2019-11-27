@@ -20,19 +20,19 @@
 
 #pragma once
 
-#include <gdul\WIP_job_handler\job_impl.h>
+#include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
 
 namespace gdul {
 
-class job_handler;
 
 namespace jh_detail {
 
+class job_handler_impl;
+class job_impl;
 }
 class job
 {
 public:
-	using job_impl_shared_ptr = jh_detail::job_impl::job_impl_shared_ptr;
 	job();
 	job(job&& other);
 	job& operator=(job&& other);
@@ -54,11 +54,12 @@ public:
 	operator bool() const noexcept;
 
 private:
-	friend class job_handler;
+	friend class jh_detail::job_handler_impl;
 
-	job(job_impl_shared_ptr impl);
+	job(gdul::shared_ptr<jh_detail::job_impl> impl);
 
-	job_impl_shared_ptr m_impl;
+	gdul::shared_ptr<jh_detail::job_impl> m_impl;
+
 	std::atomic_bool m_enabled;
 };
 }
