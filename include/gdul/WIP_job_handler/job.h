@@ -26,13 +26,13 @@ namespace gdul {
 
 class job_handler;
 
-namespace job_handler_detail {
+namespace jh_detail {
 
 }
 class job
 {
 public:
-	using job_impl_shared_ptr = job_handler_detail::job_impl::job_impl_shared_ptr;
+	using job_impl_shared_ptr = jh_detail::job_impl::job_impl_shared_ptr;
 	job();
 	job(job&& other);
 	job& operator=(job&& other);

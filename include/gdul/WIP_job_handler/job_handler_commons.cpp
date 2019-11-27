@@ -29,7 +29,7 @@
 #endif
 namespace gdul
 {
-namespace job_handler_detail
+namespace jh_detail
 {
 #if defined(_WIN64) | defined(_WIN32)
 namespace thread_naming

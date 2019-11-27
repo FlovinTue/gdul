@@ -33,7 +33,7 @@ namespace gdul {
 
 class job_handler;
 
-namespace job_handler_detail
+namespace jh_detail
 {
 class alignas(64) worker_impl
 {

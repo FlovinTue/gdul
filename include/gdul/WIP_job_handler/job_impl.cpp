@@ -24,7 +24,7 @@
 
 namespace gdul
 {
-namespace job_handler_detail
+namespace jh_detail
 {
 
 
@@ -51,20 +51,22 @@ void job_impl::operator()()
 }
 bool job_impl::try_attach_child(job_impl_shared_ptr child)
 {
-	job_impl_shared_ptr firstChild(nullptr);
-	job_impl_raw_ptr rawRep(nullptr);
-	do {
-		firstChild = m_firstChild.load(std::memory_order_relaxed);
-		rawRep = firstChild;
+	job_dependee_shared_ptr dependee(make_shared<job_dependee>());
+	dependee->m_job = std::move(child);
 
-		child->set_sibling(std::move(firstChild));
+	job_dependee_shared_ptr firstDependee(nullptr);
+	job_dependee_raw_ptr rawRep(nullptr);
+	do {
+		firstDependee = m_firstDependee.load(std::memory_order_relaxed);
+		rawRep = firstDependee;
+
+		dependee->m_sibling = std::move(firstDependee);
 
 		if (m_finished.load(std::memory_order_seq_cst)) {
-			child->m_firstSibling.unsafe_store(nullptr, std::memory_order_relaxed);
 			return false;
 		}
 
-	} while (!m_firstChild.compare_exchange_strong(rawRep, std::move(child), std::memory_order_relaxed, std::memory_order_relaxed));
+	} while (!m_firstDependee.compare_exchange_strong(rawRep, std::move(dependee), std::memory_order_relaxed, std::memory_order_relaxed));
 
 	return true;
 }
@@ -93,24 +95,20 @@ bool job_impl::is_finished() const
 {
 	return m_finished.load(std::memory_order_relaxed);
 }
-void job_impl::set_sibling(job_impl_shared_ptr sibling)
-{
-	m_firstSibling.unsafe_store(std::move(sibling));
-}
 void job_impl::detach_children()
 {
-	job_impl_shared_ptr child(m_firstChild.exchange(nullptr, std::memory_order_relaxed));
+	job_dependee_shared_ptr dependee(m_firstDependee.exchange(nullptr, std::memory_order_relaxed));
 
-	while (child) {
-		job_impl_shared_ptr next(nullptr);
+	while (dependee) {
+		job_dependee_shared_ptr next(nullptr);
+		// hmm
+		//if (!dependee->m_job->remove_dependencies(1)) {
+		//	next = child->m_firstSibling.unsafe_exchange(nullptr, std::memory_order_relaxed);
+		//	job_handler* const nativeHandler(child->get_handler());
+		//	nativeHandler->enqueue_job(std::move(child));
+		//}
 
-		if (!child->remove_dependencies(1)) {
-			next = child->m_firstSibling.unsafe_exchange(nullptr, std::memory_order_relaxed);
-			job_handler* const nativeHandler(child->get_handler());
-			nativeHandler->enqueue_job(std::move(child));
-		}
-
-		child = std::move(next);
+		//child = std::move(next);
 	}
 }
 }

@@ -42,16 +42,16 @@ void job_handler_tester::setup_workers()
 	
 	for (std::size_t i = 0; i < dynamicWorkers; ++i) {
 		worker wrk(m_handler.make_worker());
-		wrk.set_core_affinity(job_handler_detail::Worker_Auto_Affinity);
-		wrk.set_queue_affinity(job_handler_detail::Worker_Auto_Affinity);
+		wrk.set_core_affinity(jh_detail::Worker_Auto_Affinity);
+		wrk.set_queue_affinity(jh_detail::Worker_Auto_Affinity);
 		wrk.set_execution_priority(4);
 		wrk.set_name(std::string(std::string("DynamicWorker#") + std::to_string(i + 1)).c_str());
 		wrk.activate();
 	}
 	for (std::size_t i = 0; i < staticWorkers; ++i) {
 		worker wrk(m_handler.make_worker());
-		wrk.set_core_affinity(job_handler_detail::Worker_Auto_Affinity);
-		wrk.set_queue_affinity(i % job_handler_detail::Priority_Granularity);
+		wrk.set_core_affinity(jh_detail::Worker_Auto_Affinity);
+		wrk.set_queue_affinity(i % jh_detail::Priority_Granularity);
 		wrk.set_execution_priority(4);
 		wrk.set_name(std::string(std::string("StaticWorker#") + std::to_string(i + 1)).c_str());
 		wrk.activate();
@@ -67,7 +67,7 @@ float job_handler_tester::run_consumption_parallel_test(std::size_t numInserts, 
 	{
 		for (std::size_t j = 0; j < m_handler.num_workers(); ++j)
 		{
-			job jb(m_handler.make_job(workfunc, (j + i) % job_handler_detail::Priority_Granularity));
+			job jb(m_handler.make_job(workfunc, (j + i) % jh_detail::Priority_Granularity));
 
 			end.add_dependency(jb);
 
@@ -107,7 +107,7 @@ float job_handler_tester::run_consumption_strand_parallel_test(std::size_t numIn
 		job intermediate[8]{};
 		for (std::uint8_t j = 0; j < children; ++j, ++i)
 		{
-			intermediate[j] = m_handler.make_job(workfunc, (j + i) % job_handler_detail::Priority_Granularity);
+			intermediate[j] = m_handler.make_job(workfunc, (j + i) % jh_detail::Priority_Granularity);
 			end.add_dependency(intermediate[j]);
 
 			for (std::uint8_t dependencies = 0; dependencies < nextNum; ++dependencies)
@@ -181,7 +181,7 @@ float job_handler_tester::run_consumption_strand_test(std::size_t numInserts, vo
 
 	for (std::size_t i = 0; i < numInserts; ++i)
 	{
-		job next = m_handler.make_job(workfunc, i % job_handler_detail::Priority_Granularity);
+		job next = m_handler.make_job(workfunc, i % jh_detail::Priority_Granularity);
 		next.add_dependency(previous);
 		next.enable();
 

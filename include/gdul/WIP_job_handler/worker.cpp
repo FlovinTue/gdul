@@ -23,7 +23,7 @@
 
 namespace gdul
 {
-worker::worker(job_handler_detail::worker_impl * impl)
+worker::worker(jh_detail::worker_impl * impl)
 	: m_impl(impl)
 {
 }

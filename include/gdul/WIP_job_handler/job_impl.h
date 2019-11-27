@@ -22,22 +22,22 @@
 #pragma warning(push)
 #pragma warning(disable : 4324)
 
-#include <gdul\WIP_job_handler\job_handler_commons.h>
-#include <gdul\WIP_job_handler\callable.h>
-#include <gdul\WIP_job_handler\job_impl_allocator.h>
-#include <gdul\atomic_shared_ptr\atomic_shared_ptr.h>
-
+#include <gdul/WIP_job_handler/job_handler_commons.h>
+#include <gdul/WIP_job_handler/callable.h>
+#include <gdul/WIP_job_handler/chunk_allocator.h>
+#include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
+#include <gdul/WIP_job_handler/job_dependee.h>
 
 namespace gdul{
 
 class job_handler;
-namespace job_handler_detail {
+namespace jh_detail {
 
 class callable_base;
 class alignas(log2align(Callable_Max_Size_No_Heap_Alloc)) job_impl
 {
 public:
-	using allocator_type = gdul::job_handler_detail::allocator_type; 
+	using allocator_type = gdul::jh_detail::allocator_type; 
 
 	using job_impl_shared_ptr = shared_ptr<job_impl>;
 	using job_impl_atomic_shared_ptr = atomic_shared_ptr<job_impl>;
@@ -66,7 +66,6 @@ public:
 
 	bool is_finished() const;
 private:
-	void set_sibling(job_impl_shared_ptr sibling);
 
 	void detach_children();
 
@@ -84,8 +83,7 @@ private:
 	callable_base* m_callable;
 	job_handler* const m_handler;
 
-	job_impl_atomic_shared_ptr m_firstSibling;
-	job_impl_atomic_shared_ptr m_firstChild;
+	atomic_shared_ptr<job_dependee> m_firstDependee;
 
 	std::atomic<std::uint32_t> m_dependencies;
 
@@ -93,14 +91,12 @@ private:
 
 	const std::uint8_t m_priority;
 };
-
 template<class Callable, std::enable_if_t<(Callable_Max_Size_No_Heap_Alloc < sizeof(Callable))>*>
 inline job_impl::job_impl(job_handler* handler, Callable && callable, std::uint8_t priority, allocator_type alloc)
 	: m_storage{}
 	, m_callable(nullptr)
 	, m_finished(false)
-	, m_firstChild(nullptr)
-	, m_firstSibling(nullptr)
+	, m_firstDependee(nullptr)
 	, m_priority(priority)
 	, m_handler(handler)
 	, m_dependencies(Job_Max_Dependencies)
@@ -121,7 +117,7 @@ inline job_impl::job_impl(job_handler* handler, Callable && callable, std::uint8
 	const std::uintptr_t mod(callableBeginAsInt % alignof(Callable));
 	const std::size_t offset(mod ? alignof(Callable) - mod : 0);
 
-	m_callable = new (m_allocFields.m_callableBegin + offset) gdul::job_handler_detail::callable(std::forward<Callable&&>(callable));
+	m_callable = new (m_allocFields.m_callableBegin + offset) gdul::jh_detail::callable(std::forward<Callable&&>(callable));
 	(*m_callable)();
 }
 
@@ -130,13 +126,12 @@ inline job_impl::job_impl(job_handler* handler, Callable && callable, std::uint8
 	: m_storage{}
 	, m_callable(nullptr)
 	, m_finished(false)
-	, m_firstChild(nullptr)
-	, m_firstSibling(nullptr)
+	, m_firstDependee(nullptr)
 	, m_handler(handler)
 	, m_priority(priority)
 	, m_dependencies(Job_Max_Dependencies)
 {
-	m_callable = new (&m_storage[0]) gdul::job_handler_detail::callable<Callable>(std::forward<Callable&&>(callable));
+	m_callable = new (&m_storage[0]) gdul::jh_detail::callable<Callable>(std::forward<Callable&&>(callable));
 	(*m_callable)();
 }
 
@@ -150,7 +145,7 @@ struct alignas(log2align(Callable_Max_Size_No_Heap_Alloc)) job_impl_chunk_rep
 	{
 		return reinterpret_cast<uint8_t*>(this);
 	}
-	uint8_t dummy[alloc_size_make_shared<job_impl, job_impl_allocator<job_handler_detail::job_impl_chunk_rep>>()];
+	uint8_t dummy[alloc_size_make_shared<job_impl, chunk_allocator<jh_detail::job_impl_chunk_rep, job_impl_chunk_rep>>()];
 };
 }
 }

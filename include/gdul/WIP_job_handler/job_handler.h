@@ -31,13 +31,13 @@
 #include <gdul\WIP_job_handler\job.h>
 #include <gdul\WIP_job_handler\job_handler_commons.h>
 #include <gdul\WIP_job_handler\job_impl.h>
-#include <gdul\WIP_job_handler\job_impl_allocator.h>
+#include <gdul\WIP_job_handler\chunk_allocator.h>
 #include <gdul\WIP_job_handler\worker_impl.h>
 #include <gdul\WIP_job_handler\worker.h>
 
 namespace gdul {
 
-namespace job_handler_detail {
+namespace jh_detail {
 
 class job_impl;
 }
@@ -45,8 +45,8 @@ class job_impl;
 class job_handler
 {
 public:
-	using allocator_type = job_handler_detail::allocator_type;
-	using job_impl_shared_ptr = job_handler_detail::job_impl::job_impl_shared_ptr;
+	using allocator_type = jh_detail::allocator_type;
+	using job_impl_shared_ptr = jh_detail::job_impl::job_impl_shared_ptr;
 
 	static thread_local job this_job;
 	static thread_local worker this_worker;
@@ -59,14 +59,14 @@ public:
 
 	worker make_worker();
 
-	// Callable will allocate if size is above job_handler_detail::Callable_Max_Size_No_Heap_Alloc
+	// Callable will allocate if size is above jh_detail::Callable_Max_Size_No_Heap_Alloc
 	// It needs to have operator() defined with signature void(void). 
 	// Priority corresponds to the internal queue it will be placed in. Priority 0 -> highest. 
-	// job_handler_detail::Priority_Granularity defines the number of queueus
+	// jh_detail::Priority_Granularity defines the number of queueus
 	template <class Callable>
 	job make_job(Callable&& callable, std::uint8_t priority);
 
-	// Callable will allocate if size is above job_handler_detail::Callable_Max_Size_No_Heap_Alloc
+	// Callable will allocate if size is above jh_detail::Callable_Max_Size_No_Heap_Alloc
 	// It needs to have operator() defined with signature void(void). 
 	template <class Callable>
 	job make_job(Callable&& callable);
@@ -74,10 +74,10 @@ public:
 	std::size_t num_workers() const;
 	std::size_t num_enqueued() const;
 private:
-	static thread_local job_handler_detail::worker_impl* this_worker_impl;
-	static thread_local job_handler_detail::worker_impl ourImplicitWorker;
+	static thread_local jh_detail::worker_impl* this_worker_impl;
+	static thread_local jh_detail::worker_impl ourImplicitWorker;
 
-	friend class job_handler_detail::job_impl;
+	friend class jh_detail::job_impl;
 	friend class job;
 
 	template <class Callable>
@@ -93,13 +93,13 @@ private:
 
 	allocator_type m_mainAllocator;
 
-	concurrent_object_pool<job_handler_detail::job_impl_chunk_rep, job_handler_detail::allocator_type> m_jobImplChunkPool;
+	concurrent_object_pool<jh_detail::job_impl_chunk_rep, jh_detail::allocator_type> m_jobImplChunkPool;
 
-	concurrent_queue<job_impl_shared_ptr, allocator_type> m_jobQueues[job_handler_detail::Priority_Granularity];
+	concurrent_queue<job_impl_shared_ptr, allocator_type> m_jobQueues[jh_detail::Priority_Granularity];
 	
-	job_handler_detail::job_impl_allocator<job_handler_detail::job_impl_chunk_rep> m_jobImplAllocator;
+	jh_detail::chunk_allocator<jh_detail::job_impl, jh_detail::job_impl_chunk_rep> m_jobImplAllocator;
 
-	std::array<job_handler_detail::worker_impl, job_handler_detail::Job_Handler_Max_Workers> m_workers;
+	std::array<jh_detail::worker_impl, jh_detail::Job_Handler_Max_Workers> m_workers;
 
 	std::atomic<std::uint16_t> m_workerCount;
 };
@@ -113,17 +113,17 @@ inline job job_handler::make_job(Callable && callable, std::uint8_t priority)
 template<class Callable>
 inline job job_handler::make_job(Callable && callable)
 {
-	return make_job(std::forward<Callable&&>(callable), job_handler_detail::Default_Job_Priority);
+	return make_job(std::forward<Callable&&>(callable), jh_detail::Default_Job_Priority);
 }
 
 template<class Callable>
 inline job_handler::job_impl_shared_ptr job_handler::make_job_impl(Callable&& callable, std::uint8_t priority)
 {
-	assert(priority < job_handler_detail::Priority_Granularity && "Priority value out of bounds");
+	assert(priority < jh_detail::Priority_Granularity && "Priority value out of bounds");
 
-	const uint8_t _priority(priority < job_handler_detail::Priority_Granularity ? priority : job_handler_detail::Priority_Granularity - 1);
+	const uint8_t _priority(priority < jh_detail::Priority_Granularity ? priority : jh_detail::Priority_Granularity - 1);
 
-	return make_shared<job_handler_detail::job_impl, decltype(m_jobImplAllocator)>
+	return make_shared<jh_detail::job_impl, decltype(m_jobImplAllocator)>
 		(
 			m_jobImplAllocator, 
 			this, 

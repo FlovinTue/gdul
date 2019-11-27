@@ -1,7 +1,7 @@
 #pragma once
 
 namespace gdul {
-namespace job_handler_detail {
+namespace jh_detail {
 class callable_base
 {
 public:

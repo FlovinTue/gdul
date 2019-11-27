@@ -23,7 +23,7 @@
 #include <gdul\WIP_job_handler\callable_base.h>
 
 namespace gdul {
-namespace job_handler_detail {
+namespace jh_detail {
 
 template <class Callable>
 class callable : public callable_base

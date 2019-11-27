@@ -24,14 +24,14 @@
 
 namespace gdul
 {
-namespace job_handler_detail
+namespace jh_detail
 {
 class worker_impl;
 }
 class worker
 {
 public:
-	worker(job_handler_detail::worker_impl* impl);
+	worker(jh_detail::worker_impl* impl);
 	worker(const worker&) = default;
 	worker(worker&&) = default;
 	worker& operator=(const worker&) = default;
@@ -39,12 +39,12 @@ public:
 
 	~worker();
 
-	// Sets core affinity. job_handler_detail::Worker_Auto_Affinity represents automatic setting
-	void set_core_affinity(std::uint8_t core = job_handler_detail::Worker_Auto_Affinity);
+	// Sets core affinity. jh_detail::Worker_Auto_Affinity represents automatic setting
+	void set_core_affinity(std::uint8_t core = jh_detail::Worker_Auto_Affinity);
 
-	// Sets which job queue to consume from. job_handler_detail::Worker_Auto_Affinity represents
+	// Sets which job queue to consume from. jh_detail::Worker_Auto_Affinity represents
 	// dynamic runtime selection
-	void set_queue_affinity(std::uint8_t queue = job_handler_detail::Worker_Auto_Affinity);
+	void set_queue_affinity(std::uint8_t queue = jh_detail::Worker_Auto_Affinity);
 
 	// Thread priority as defined in WinBase.h
 	void set_execution_priority(std::int32_t priority);
@@ -60,6 +60,6 @@ public:
 private:
 	friend class job_handler;
 
-	job_handler_detail::worker_impl* m_impl;
+	jh_detail::worker_impl* m_impl;
 };
 }

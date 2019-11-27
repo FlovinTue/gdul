@@ -28,7 +28,7 @@ namespace gdul
 {
 typedef void* thread_handle;
 
-namespace job_handler_detail
+namespace jh_detail
 {
 constexpr std::uint32_t Job_Max_Dependencies = std::numeric_limits<std::uint32_t>::max() / 2;
 

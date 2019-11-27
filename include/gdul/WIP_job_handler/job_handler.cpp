@@ -35,11 +35,11 @@ namespace gdul
 
 thread_local job job_handler::this_job(nullptr);
 thread_local worker job_handler::this_worker(&job_handler::ourImplicitWorker);
-thread_local job_handler_detail::worker_impl* job_handler::this_worker_impl(&job_handler::ourImplicitWorker);
-thread_local job_handler_detail::worker_impl job_handler::ourImplicitWorker;
+thread_local jh_detail::worker_impl* job_handler::this_worker_impl(&job_handler::ourImplicitWorker);
+thread_local jh_detail::worker_impl job_handler::ourImplicitWorker;
 
 job_handler::job_handler()
-	: m_jobImplChunkPool(job_handler_detail::Job_Impl_Allocator_Block_Size, m_mainAllocator)
+	: m_jobImplChunkPool(jh_detail::Job_Impl_Allocator_Block_Size, m_mainAllocator)
 	, m_jobImplAllocator(&m_jobImplChunkPool)
 	, m_workerCount(0)
 {
@@ -47,7 +47,7 @@ job_handler::job_handler()
 
 job_handler::job_handler(allocator_type & allocator)
 	: m_mainAllocator(allocator)
-	, m_jobImplChunkPool(job_handler_detail::Job_Impl_Allocator_Block_Size, m_mainAllocator)
+	, m_jobImplChunkPool(jh_detail::Job_Impl_Allocator_Block_Size, m_mainAllocator)
 	, m_jobImplAllocator(&m_jobImplChunkPool)
 	, m_workerCount(0)
 {
@@ -76,7 +76,7 @@ worker job_handler::make_worker()
 	
 	std::thread thread(&job_handler::launch_worker, this, index);
 
-	job_handler_detail::worker_impl impl(std::move(thread), coreAffinity);
+	jh_detail::worker_impl impl(std::move(thread), coreAffinity);
 
 	m_workers[index] = std::move(impl);
 
@@ -92,7 +92,7 @@ std::size_t job_handler::num_enqueued() const
 {
 	std::size_t accum(0);
 
-	for (std::uint8_t i = 0; i < job_handler_detail::Priority_Granularity; ++i) {
+	for (std::uint8_t i = 0; i < jh_detail::Priority_Granularity; ++i) {
 		accum += m_jobQueues[i].size();
 	}
 
@@ -149,7 +149,7 @@ job_handler::job_impl_shared_ptr job_handler::fetch_job()
 
 	for (uint8_t i = 0; i < this_worker_impl->get_fetch_retries(); ++i) {
 
-		const uint8_t index((queueIndex + i) % job_handler_detail::Priority_Granularity);
+		const uint8_t index((queueIndex + i) % jh_detail::Priority_Granularity);
 
 		if (m_jobQueues[index].try_pop(out)) {
 			return out;

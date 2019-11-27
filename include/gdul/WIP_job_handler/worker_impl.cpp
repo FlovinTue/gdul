@@ -30,7 +30,7 @@
 
 namespace gdul
 {
-namespace job_handler_detail
+namespace jh_detail
 {
 
 worker_impl::worker_impl()
@@ -40,7 +40,7 @@ worker_impl::worker_impl()
 	, m_priorityDistributionIteration(0)
 	, m_queueAffinity(Worker_Auto_Affinity)
 	, m_sleepThreshhold(std::numeric_limits<std::uint16_t>::max())
-	, m_threadHandle(job_handler_detail::create_thread_handle())
+	, m_threadHandle(jh_detail::create_thread_handle())
 	, m_isActive(false)
 {
 }
@@ -55,7 +55,7 @@ worker_impl::worker_impl(std::thread&& thread, std::uint8_t coreAffinity)
 	, m_threadHandle(m_thread.native_handle())
 	, m_isActive(false)
 {
-	job_handler_detail::set_thread_core_affinity(coreAffinity, m_threadHandle);
+	jh_detail::set_thread_core_affinity(coreAffinity, m_threadHandle);
 
 	m_isActive.store(true, std::memory_order_release);
 }
@@ -96,13 +96,13 @@ void worker_impl::set_core_affinity(std::uint8_t core)
 
 	m_coreAffinity = core;
 
-	if (m_coreAffinity == job_handler_detail::Worker_Auto_Affinity) {
+	if (m_coreAffinity == jh_detail::Worker_Auto_Affinity) {
 		m_coreAffinity = m_autoCoreAffinity;
 	}
 
 	const uint8_t core_(m_coreAffinity % std::thread::hardware_concurrency());
 
-	job_handler_detail::set_thread_core_affinity(core_, m_threadHandle);
+	jh_detail::set_thread_core_affinity(core_, m_threadHandle);
 }
 void worker_impl::set_queue_affinity(std::uint8_t queue)
 {
@@ -112,7 +112,7 @@ void worker_impl::set_execution_priority(std::uint32_t priority)
 {
 	assert(is_active() && "Cannot set execution priority to inactive worker");
 
-	job_handler_detail::set_thread_priority(priority, m_threadHandle);
+	jh_detail::set_thread_priority(priority, m_threadHandle);
 }
 void worker_impl::set_sleep_threshhold(std::uint16_t ms)
 {
@@ -158,11 +158,11 @@ void worker_impl::idle()
 // Also, maybe avoid retrying at a failed index twice in a row.
 std::uint8_t worker_impl::get_queue_target()
 {
-	if (m_queueAffinity != job_handler_detail::Worker_Auto_Affinity) {
+	if (m_queueAffinity != jh_detail::Worker_Auto_Affinity) {
 		return m_queueAffinity;
 	}
 
-	constexpr std::size_t totalDistributionChunks(job_handler_detail::pow2summation(1, job_handler_detail::Priority_Granularity));
+	constexpr std::size_t totalDistributionChunks(jh_detail::pow2summation(1, jh_detail::Priority_Granularity));
 
 	const std::size_t iteration(++m_priorityDistributionIteration);
 
@@ -171,8 +171,8 @@ std::uint8_t worker_impl::get_queue_target()
 
 	// Find way to remove loop.
 	// Maybe find the highest mod in one check somehow?
-	for (uint8_t i = 1; i < job_handler_detail::Priority_Granularity; ++i) {
-		const std::uint8_t power(((job_handler_detail::Priority_Granularity) - (i + 1)));
+	for (uint8_t i = 1; i < jh_detail::Priority_Granularity; ++i) {
+		const std::uint8_t power(((jh_detail::Priority_Granularity) - (i + 1)));
 		const float fdesiredSlice(std::powf((float)2, (float)power));
 		const std::size_t desiredSlice((std::size_t)fdesiredSlice);
 		const std::size_t awardedSlice((totalDistributionChunks) / desiredSlice);
@@ -186,13 +186,13 @@ std::uint8_t worker_impl::get_queue_target()
 }
 std::uint8_t worker_impl::get_fetch_retries() const
 {
-	return m_queueAffinity == job_handler_detail::Worker_Auto_Affinity ? job_handler_detail::Priority_Granularity : 1;
+	return m_queueAffinity == jh_detail::Worker_Auto_Affinity ? jh_detail::Priority_Granularity : 1;
 }
 void worker_impl::set_name(const char * name)
 {
 	assert(is_active() && "Cannot set name to inactive worker");
 
-	job_handler_detail::set_thread_name(name, m_threadHandle);
+	jh_detail::set_thread_name(name, m_threadHandle);
 }
 }
 }
