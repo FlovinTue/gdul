@@ -4,6 +4,10 @@ namespace gdul
 {
 namespace jh_detail
 {
+void callable::operator()()
+{
+	(*m_callable)();
+}
 callable::~callable() noexcept
 {
 	m_callable->~callable_base();

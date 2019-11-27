@@ -26,24 +26,26 @@ namespace gdul
 {
 namespace jh_detail
 {
-
-
+job_impl::job_impl()
+	: job_impl(callable([]() {}, allocator_type()), nullptr, 0)
+{
+}
+job_impl::job_impl(const callable& call, job_handler_impl* handler, std::uint8_t priority)
+	: m_callable(call)
+	, m_finished(false)
+	, m_firstDependee(nullptr)
+	, m_priority(priority)
+	, m_handler(handler)
+	, m_dependencies(Job_Max_Dependencies)
+{
+}
 job_impl::~job_impl()
 {
-	m_callable->~callable_base();
-
-	if ((void*)m_callable != (void*)&m_storage[0]) {
-		m_allocFields.m_allocator.deallocate(m_allocFields.m_callableBegin, m_allocFields.m_allocated);
-		m_allocFields.m_allocator.~allocator_type();
-	}
-	m_callable = nullptr;
-
-	std::uninitialized_fill_n(m_storage, Callable_Max_Size_No_Heap_Alloc, std::uint8_t(0));
 }
 
 void job_impl::operator()()
 {
-	(*m_callable)();
+	m_callable();
 
 	m_finished.store(true, std::memory_order_seq_cst);
 

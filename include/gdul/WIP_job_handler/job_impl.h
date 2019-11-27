@@ -27,6 +27,7 @@
 #include <gdul/WIP_job_handler/chunk_allocator.h>
 #include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
 #include <gdul/WIP_job_handler/job_dependee.h>
+#include <gdul/WIP_job_handler/callable.h>
 
 namespace gdul{
 
@@ -35,7 +36,7 @@ namespace jh_detail {
 class job_handler_impl;
 class callable_base;
 
-class alignas(log2align(Callable_Max_Size_No_Heap_Alloc)) job_impl
+class job_impl
 {
 public:
 	using allocator_type = gdul::jh_detail::allocator_type; 
@@ -44,12 +45,9 @@ public:
 	using job_impl_atomic_shared_ptr = atomic_shared_ptr<job_impl>;
 	using job_impl_raw_ptr = raw_ptr<job_impl>;
 
-	job_impl() = default;
+	job_impl();
 
-	template <class Callable, std::enable_if_t<!(Callable_Max_Size_No_Heap_Alloc < sizeof(Callable))>* = nullptr>
-	job_impl(job_handler_impl* handler, Callable&& callable_impl, std::uint8_t priority, allocator_type);
-	template <class Callable, std::enable_if_t<(Callable_Max_Size_No_Heap_Alloc < sizeof(Callable))>* = nullptr>
-	job_impl(job_handler_impl* handler, Callable&& callable_impl, std::uint8_t priority, allocator_type alloc);
+	job_impl(const callable & call, job_handler_impl* handler, std::uint8_t priority);
 	~job_impl();
 	
 	void operator()();
@@ -70,18 +68,8 @@ private:
 
 	void detach_children();
 
-	union
-	{
-		std::uint8_t m_storage[Callable_Max_Size_No_Heap_Alloc];
-		struct
-		{
-			allocator_type m_allocator;
-			std::uint8_t* m_callableBegin;
-			std::size_t m_allocated;
-		}m_allocFields;
-	};
+	callable m_callable;
 
-	callable_base* m_callable;
 	job_handler_impl* const m_handler;
 
 	atomic_shared_ptr<job_dependee> m_firstDependee;
@@ -92,52 +80,9 @@ private:
 
 	const std::uint8_t m_priority;
 };
-template<class Callable, std::enable_if_t<(Callable_Max_Size_No_Heap_Alloc < sizeof(Callable))>*>
-inline job_impl::job_impl(job_handler_impl* handler, Callable && callable_impl, std::uint8_t priority, allocator_type alloc)
-	: m_storage{}
-	, m_callable(nullptr)
-	, m_finished(false)
-	, m_firstDependee(nullptr)
-	, m_priority(priority)
-	, m_handler(handler)
-	, m_dependencies(Job_Max_Dependencies)
-{
-	static_assert(!(Callable_Max_Size_No_Heap_Alloc < sizeof(m_allocFields)), "too high size / alignment on allocator_type");
-
-	m_allocFields.m_allocator = alloc;
-
-	if (16 < alignof(Callable)) {
-		m_allocFields.m_allocated = sizeof(Callable) + alignof(Callable);
-	}
-	else {
-		m_allocFields.m_allocated = sizeof(Callable);
-	}
-	m_allocFields.m_callableBegin = m_allocFields.m_allocator.allocate(m_allocFields.m_allocated);
-
-	const std::uintptr_t callableBeginAsInt(reinterpret_cast<std::uintptr_t>(m_allocFields.m_callableBegin));
-	const std::uintptr_t mod(callableBeginAsInt % alignof(Callable));
-	const std::size_t offset(mod ? alignof(Callable) - mod : 0);
-
-	m_callable = new (m_allocFields.m_callableBegin + offset) gdul::jh_detail::callable_impl(std::forward<Callable&&>(callable_impl));
-}
-
-template<class Callable, std::enable_if_t<!(Callable_Max_Size_No_Heap_Alloc < sizeof(Callable))>*>
-inline job_impl::job_impl(job_handler_impl* handler, Callable && callable_impl, std::uint8_t priority, allocator_type)
-	: m_storage{}
-	, m_callable(nullptr)
-	, m_finished(false)
-	, m_firstDependee(nullptr)
-	, m_handler(handler)
-	, m_priority(priority)
-	, m_dependencies(Job_Max_Dependencies)
-{
-	m_callable = new (&m_storage[0]) gdul::jh_detail::callable_impl<Callable>(std::forward<Callable&&>(callable_impl));
-}
-
-
 
 // Memory chunk representation of job_impl
-struct alignas(log2align(Callable_Max_Size_No_Heap_Alloc)) job_impl_chunk_rep
+struct alignas(alignof(job_impl)) job_impl_chunk_rep
 {
 	job_impl_chunk_rep() : dummy{} {}
 	operator uint8_t*()

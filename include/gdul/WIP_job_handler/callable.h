@@ -56,13 +56,15 @@ inline void callable_impl<Callable>::operator()()
 {
 	m_callable();
 }
-class callable
+class alignas(log2align(Callable_Max_Size_No_Heap_Alloc)) callable
 {
 public:
 	template <class Callable, std::enable_if_t<!(Callable_Max_Size_No_Heap_Alloc < sizeof(callable_impl<Callable>))>* = nullptr>
 	callable(Callable&& callable, allocator_type);
 	template <class Callable, std::enable_if_t<(Callable_Max_Size_No_Heap_Alloc < sizeof(callable_impl<Callable>))>* = nullptr>
 	callable(Callable&& callable, allocator_type alloc);
+
+	void operator()();
 
 	~callable() noexcept;
 
