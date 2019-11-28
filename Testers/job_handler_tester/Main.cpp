@@ -3,6 +3,7 @@
 
 #include "job_handler_tester.h"
 #include <iostream>
+#include <functional>
 #include "../Common/Timer.h"
 namespace gdul
 {
@@ -22,9 +23,9 @@ void workFunc()
 }
 
 
+uint32_t global = 0;
 int main()
 {
-uint32_t global = 0;
 	//gdul::job_handler_tester tester;
 
 	//gdul::job_handler_tester_info info;
@@ -36,13 +37,19 @@ uint32_t global = 0;
 	//	tester.run_consumption_strand_parallel_test(500, workFunc);
 	//}
 
-auto lam = [&global]() { global += 12; };
+auto lam = []() {
 
+	global += 12;
+};
+
+
+	//void (*toCall) () = lam;
 	gdul::jh_detail::callable toCall(lam, std::allocator<uint8_t>());
+	//std::function<void()> toCall(lam);
 
 	gdul::timer<float> time;
 
-	for (uint32_t i = 0; i < 1000000; ++i)
+	for (uint32_t i = 0; i < 1000000000; ++i)
 	{
 		toCall();
 	}

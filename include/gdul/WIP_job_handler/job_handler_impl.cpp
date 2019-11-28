@@ -41,7 +41,9 @@ thread_local jh_detail::worker_impl job_handler_impl::ourImplicitWorker;
 
 job_handler_impl::job_handler_impl()
 	: m_jobImplChunkPool(jh_detail::Job_Impl_Allocator_Block_Size, m_mainAllocator)
+	, m_jobDependeeChunkPool(jh_detail::Job_Impl_Allocator_Block_Size, m_mainAllocator)
 	, m_jobImplAllocator(&m_jobImplChunkPool)
+	, m_jobDependeeAllocator(&m_jobDependeeChunkPool)
 	, m_workerCount(0)
 {
 }
@@ -49,7 +51,9 @@ job_handler_impl::job_handler_impl()
 job_handler_impl::job_handler_impl(allocator_type & allocator)
 	: m_mainAllocator(allocator)
 	, m_jobImplChunkPool(jh_detail::Job_Impl_Allocator_Block_Size, m_mainAllocator)
+	, m_jobDependeeChunkPool(jh_detail::Job_Impl_Allocator_Block_Size, m_mainAllocator)
 	, m_jobImplAllocator(&m_jobImplChunkPool)
+	, m_jobDependeeAllocator(&m_jobDependeeChunkPool)
 	, m_workerCount(0)
 {
 }

@@ -23,7 +23,7 @@
 #include <cstdint>
 #include <limits>
 #include <memory>
-#include <gdul/WIP_job_handler/job_handler_constants.h>
+
 
 namespace gdul
 {
@@ -31,6 +31,21 @@ typedef void* thread_handle;
 
 namespace jh_detail
 {
+constexpr std::uint32_t Job_Max_Dependencies = std::numeric_limits<std::uint32_t>::max() / 2;
+
+// The number of internal job queues. 
+constexpr std::uint8_t Priority_Granularity = 4;
+constexpr std::uint8_t Default_Job_Priority = 0;
+constexpr std::uint8_t Callable_Max_Size_No_Heap_Alloc = 24;
+constexpr std::uint16_t Job_Handler_Max_Workers = 32;
+
+constexpr std::uint8_t Worker_Auto_Affinity = std::numeric_limits<std::uint8_t>::max();
+
+// The number of job chunks that the Job_Impl block allocator will allocate
+// when empty
+constexpr std::size_t Job_Impl_Allocator_Block_Size = 128;
+
+using allocator_type = std::allocator<uint8_t>;
 
 constexpr std::size_t pow2(std::size_t n)
 {

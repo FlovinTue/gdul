@@ -69,9 +69,6 @@
     <ClInclude Include="..\..\include\gdul\job_handler_master.h">
       <Filter>implementation</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_handler_constants.h">
-      <Filter>implementation</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="implementation">

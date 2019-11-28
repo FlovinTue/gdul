@@ -30,18 +30,10 @@ callable::callable() noexcept
 }
 callable::callable(const callable& other)
 	: m_storage{}
+	, m_callable(other.m_callable->copy_construct_at(!other.has_allocated() ?
+		&m_storage[0] :
+		put_allocated_storage(other.m_allocFields.m_allocated, other.m_allocFields.m_allocator)))
 {
-	uint8_t* storage(nullptr);
-
-	if (!other.has_allocated())
-	{
-		storage = &m_storage[0];
-	}
-	else
-	{
-		storage = put_allocated_storage(other.m_allocFields.m_allocated, other.m_allocFields.m_allocator);
-	}
-	m_callable = other.m_callable->copy_construct_at(storage);
 }
 void callable::operator()()
 {
@@ -56,7 +48,6 @@ callable::~callable() noexcept
 		m_allocFields.m_allocator.deallocate(m_allocFields.m_callableBegin, m_allocFields.m_allocated);
 		m_allocFields.m_allocator.~allocator_type();
 	}
-	m_callable = nullptr;
 
 	std::uninitialized_fill_n(m_storage, Callable_Max_Size_No_Heap_Alloc, std::uint8_t(0));
 }

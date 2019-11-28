@@ -20,7 +20,7 @@
 
 #pragma once
 
-#include <gdul/WIP_job_handler/job_handler_constants.h>
+#include <gdul/WIP_job_handler/job_handler_commons.h>
 
 namespace gdul
 {
@@ -32,7 +32,7 @@ class callable_base
 public:
 	virtual ~callable_base() = default;
 
-	virtual void operator()() = 0;
+	__forceinline virtual void operator()() = 0;
 
 	virtual callable_base* copy_construct_at(uint8_t* storage) = 0;
 };
@@ -43,12 +43,12 @@ class callable_impl : public callable_base
 public:
 	callable_impl(Callable callable_impl);
 
-	void operator()() override final;
+	__forceinline void operator()() override final;
 
 	callable_base* copy_construct_at(uint8_t* storage) override final;
 
 private:
-	Callable m_callable;
+	const Callable m_callable;
 };
 template<class Callable>
 inline callable_impl<Callable>::callable_impl(Callable callable_impl)
@@ -97,25 +97,21 @@ private:
 			std::size_t m_allocated;
 		}m_allocFields;
 	};
-
-	callable_base* m_callable;
+	callable_base* const m_callable;
 };
 template<class Callable, std::enable_if_t<(Callable_Max_Size_No_Heap_Alloc < sizeof(callable_impl<Callable>))>*>
 	inline callable::callable(Callable && call, allocator_type alloc)
 		: m_storage{}
+		, m_callable(new (put_allocated_storage(sizeof(Callable), alloc)) gdul::jh_detail::callable_impl(std::forward<Callable&&>(call)))
 {
 	static_assert(!(Callable_Max_Size_No_Heap_Alloc < sizeof(m_allocFields)), "too high size / alignment on allocator_type");
 	static_assert(!(alignof(std::max_align_t) < alignof(Callable)), "Custom align callables unsupported");
-
-	std::uint8_t* const storage(put_allocated_storage(sizeof(Callable), alloc));
-
-	m_callable = new (storage) gdul::jh_detail::callable_impl(std::forward<Callable&&>(call));
 }
 template<class Callable, std::enable_if_t<!(Callable_Max_Size_No_Heap_Alloc < sizeof(callable_impl<Callable>))>*>
 	inline callable::callable(Callable && call, allocator_type)
 		: m_storage{}
+		, m_callable(new (&m_storage[0]) gdul::jh_detail::callable_impl<Callable>(std::forward<Callable&&>(call)))
 {
-	m_callable = new (&m_storage[0]) gdul::jh_detail::callable_impl<Callable>(std::forward<Callable&&>(call));
 }
 }
 }
