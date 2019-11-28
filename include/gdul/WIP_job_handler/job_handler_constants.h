@@ -20,28 +20,24 @@
 
 #pragma once
 
-#include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
+namespace gdul{
+namespace jh_detail{
 
-namespace gdul
-{
-namespace jh_detail
-{
-class job_impl;
+constexpr std::uint32_t Job_Max_Dependencies = std::numeric_limits<std::uint32_t>::max() / 2;
 
-struct job_dependee
-{
-	gdul::shared_ptr<job_dependee> m_sibling;
-	gdul::shared_ptr<job_impl> m_job;
-};
+// The number of internal job queues. 
+constexpr std::uint8_t Priority_Granularity = 4;
+constexpr std::uint8_t Default_Job_Priority = 0;
+constexpr std::uint8_t Callable_Max_Size_No_Heap_Alloc = 24;
+constexpr std::uint16_t Job_Handler_Max_Workers = 32;
 
-// Memory chunk representation of job_dependee
-struct alignas(alignof(job_dependee)) job_dependee_chunk_rep
-{
-	job_dependee_chunk_rep() : dummy{} {}
-	uint8_t dummy[alloc_size_make_shared<job_dependee, chunk_allocator<jh_detail::job_dependee, job_dependee_chunk_rep>>()];
-};
-using job_dependee_shared_ptr = gdul::shared_ptr<job_dependee>;
-using job_dependee_atomic_shared_ptr = gdul::atomic_shared_ptr<job_dependee>;
-using job_dependee_raw_ptr = gdul::raw_ptr<job_dependee>;
+constexpr std::uint8_t Worker_Auto_Affinity = std::numeric_limits<std::uint8_t>::max();
+
+// The number of job chunks that the Job_Impl block allocator will allocate
+// when empty
+constexpr std::size_t Job_Impl_Allocator_Block_Size = 128;
+
+using allocator_type = std::allocator<uint8_t>;
+
 }
 }

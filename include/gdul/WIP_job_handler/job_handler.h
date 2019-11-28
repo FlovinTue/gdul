@@ -19,8 +19,8 @@
 // SOFTWARE.
 
 #include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
+#include <gdul/WIP_job_handler/job_handler_constants.h>
 #include <gdul/WIP_job_handler/callable.h>
-#include <gdul/WIP_job_handler/job_handler_commons.h>
 #include <gdul/WIP_job_handler/worker.h>
 #include <gdul/WIP_job_handler/job.h>
 

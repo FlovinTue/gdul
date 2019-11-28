@@ -3,6 +3,7 @@
 #include <iostream>
 #include <algorithm>
 #include <thread>
+#include "../Common/Timer.h"
 
 namespace gdul
 {
@@ -78,7 +79,7 @@ float job_handler_tester::run_consumption_parallel_test(std::size_t numInserts, 
 	}
 	end.enable();
 
-	timer<float> time;
+	gdul::timer<float> time;
 	root.enable();
 	end.wait_for_finish();
 
@@ -125,7 +126,7 @@ float job_handler_tester::run_consumption_strand_parallel_test(std::size_t numIn
 		nextNum = children;
 	}
 
-	timer<float> time;
+	gdul::timer<float> time;
 
 	root.enable();
 	end.wait_for_finish();
@@ -192,7 +193,7 @@ float job_handler_tester::run_consumption_strand_test(std::size_t numInserts, vo
 	end.add_dependency(previous);
 	end.enable();
 
-	timer<float> time;
+	gdul::timer<float> time;
 
 	root.enable();
 	end.wait_for_finish();

@@ -85,11 +85,7 @@ private:
 struct alignas(alignof(job_impl)) job_impl_chunk_rep
 {
 	job_impl_chunk_rep() : dummy{} {}
-	operator uint8_t*()
-	{
-		return reinterpret_cast<uint8_t*>(this);
-	}
-	uint8_t dummy[alloc_size_make_shared<job_impl, chunk_allocator<jh_detail::job_impl_chunk_rep, job_impl_chunk_rep>>()];
+	uint8_t dummy[alloc_size_make_shared<job_impl, chunk_allocator<jh_detail::job_impl, job_impl_chunk_rep>>()];
 };
 }
 }

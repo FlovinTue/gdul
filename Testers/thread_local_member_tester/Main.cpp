@@ -29,7 +29,7 @@ int int_iter::iters = 0;
 
 int main()
 {
-	timer<float> time;
+	gdul::timer<float> time;
 
 	for(uint32_t i =0; i < 200; ++i)
 	{

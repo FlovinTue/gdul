@@ -95,6 +95,7 @@
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\callable.h" />
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_dependee.h" />
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_handler.h" />
+    <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_handler_constants.h" />
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_handler_impl.h" />
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_handler_commons.h" />
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_impl.h" />

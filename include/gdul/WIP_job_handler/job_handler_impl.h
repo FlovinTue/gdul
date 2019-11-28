@@ -80,10 +80,12 @@ private:
 	allocator_type m_mainAllocator;
 
 	concurrent_object_pool<job_impl_chunk_rep, allocator_type> m_jobImplChunkPool;
+	concurrent_object_pool<job_dependee_chunk_rep, allocator_type> m_jobDependeeChunkPool;
 
 	concurrent_queue<job_impl_shared_ptr, allocator_type> m_jobQueues[Priority_Granularity];
 	
 	chunk_allocator<job_impl, job_impl_chunk_rep> m_jobImplAllocator;
+	chunk_allocator<job_dependee_chunk_rep, job_dependee_chunk_rep> m_jobDependeeAllocator;
 
 	std::array<worker_impl, Job_Handler_Max_Workers> m_workers;
 

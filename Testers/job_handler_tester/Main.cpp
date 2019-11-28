@@ -3,7 +3,7 @@
 
 #include "job_handler_tester.h"
 #include <iostream>
-
+#include "../Common/Timer.h"
 namespace gdul
 {
 thread_local double testSum = static_cast<double>(rand() % 100);
@@ -20,19 +20,35 @@ void workFunc()
 		}
 	}
 }
+
+
 int main()
 {
-	gdul::job_handler_tester tester;
+uint32_t global = 0;
+	//gdul::job_handler_tester tester;
 
-	gdul::job_handler_tester_info info;
-	info.affinity = gdul::JOB_HANDLER_TESTER_WORKER_AFFINITY_DYNAMIC;
+	//gdul::job_handler_tester_info info;
+	//info.affinity = gdul::JOB_HANDLER_TESTER_WORKER_AFFINITY_DYNAMIC;
 
-	tester.init(info);
+	//tester.init(info);
 
-	for (uint32_t i = 0; i < 50; ++i) {
-		tester.run_consumption_strand_parallel_test(500, workFunc);
+	//for (uint32_t i = 0; i < 50; ++i) {
+	//	tester.run_consumption_strand_parallel_test(500, workFunc);
+	//}
+
+auto lam = [&global]() { global += 12; };
+
+	gdul::jh_detail::callable toCall(lam, std::allocator<uint8_t>());
+
+	gdul::timer<float> time;
+
+	for (uint32_t i = 0; i < 1000000; ++i)
+	{
+		toCall();
 	}
+	float time_ = time.get();
 
-
-	std::cout << "Hello World!\n";
+	std::cout << time_ << std::endl;
+	std::cout << global << std::endl;
+	//std::cout << "Hello World!\n";
 }

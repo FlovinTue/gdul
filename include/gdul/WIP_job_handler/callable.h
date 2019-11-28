@@ -20,7 +20,7 @@
 
 #pragma once
 
-#include <gdul/WIP_job_handler/job_handler_commons.h>
+#include <gdul/WIP_job_handler/job_handler_constants.h>
 
 namespace gdul
 {
@@ -68,6 +68,7 @@ inline callable_base* callable_impl<Callable>::copy_construct_at(uint8_t* storag
 class alignas(log2align(Callable_Max_Size_No_Heap_Alloc)) callable
 {
 public:
+	callable() noexcept;
 	callable(const callable & other);
 
 	callable& operator=(const callable&) = delete;
