@@ -63,11 +63,12 @@ private:
 	job make_job_internal(const jh_detail::callable& call, std::uint8_t priority);
 
 	gdul::shared_ptr<jh_detail::job_handler_impl> m_impl;
+	jh_detail::allocator_type m_allocator;
 };
 template<class Callable>
 inline job job_handler::make_job(Callable && call, std::uint8_t priority)
 {
-	return make_job_internal(jh_detail::callable(std::forward<Callable&&>(call)), priority);
+	return make_job_internal(jh_detail::callable(std::forward<Callable&&>(call), m_allocator), priority);
 }
 template<class Callable>
 inline job job_handler::make_job(Callable && call)

@@ -1,29 +1,81 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="Main.cpp" />
-    <ClCompile Include="..\..\include\gdul\WIP_job_handler\job.cpp" />
-    <ClCompile Include="..\..\include\gdul\WIP_job_handler\job_impl.cpp" />
-    <ClCompile Include="..\..\include\gdul\WIP_job_handler\job_handler_commons.cpp" />
-    <ClCompile Include="job_handler_tester.cpp" />
-    <ClCompile Include="..\..\include\gdul\WIP_job_handler\worker_impl.cpp" />
-    <ClCompile Include="..\..\include\gdul\WIP_job_handler\worker.cpp" />
-    <ClCompile Include="..\..\include\gdul\WIP_job_handler\job_handler_impl.cpp" />
-    <ClCompile Include="..\..\include\gdul\WIP_job_handler\job_handler.cpp" />
-    <ClCompile Include="..\..\include\gdul\WIP_job_handler\callable.cpp" />
+    <ClCompile Include="..\..\include\gdul\WIP_job_handler\callable.cpp">
+      <Filter>implementation</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\gdul\WIP_job_handler\job.cpp">
+      <Filter>implementation</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\gdul\WIP_job_handler\job_handler.cpp">
+      <Filter>implementation</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\gdul\WIP_job_handler\job_handler_commons.cpp">
+      <Filter>implementation</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\gdul\WIP_job_handler\job_handler_impl.cpp">
+      <Filter>implementation</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\gdul\WIP_job_handler\job_impl.cpp">
+      <Filter>implementation</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\gdul\WIP_job_handler\worker.cpp">
+      <Filter>implementation</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\gdul\WIP_job_handler\worker_impl.cpp">
+      <Filter>implementation</Filter>
+    </ClCompile>
+    <ClCompile Include="Main.cpp">
+      <Filter>other</Filter>
+    </ClCompile>
+    <ClCompile Include="job_handler_tester.cpp">
+      <Filter>other</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\include\gdul\WIP_job_handler\job.h" />
-    <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_impl.h" />
-    <ClInclude Include="..\..\include\gdul\WIP_job_handler\callable.h" />
-    <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_handler_commons.h" />
-    <ClInclude Include="..\..\include\gdul\job_handler_master.h" />
-    <ClInclude Include="job_handler_tester.h" />
-    <ClInclude Include="..\..\include\gdul\WIP_job_handler\worker_impl.h" />
-    <ClInclude Include="..\..\include\gdul\WIP_job_handler\worker.h" />
-    <ClInclude Include="..\..\include\gdul\WIP_job_handler\chunk_allocator.h" />
-    <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_dependee.h" />
-    <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_handler_impl.h" />
-    <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_handler.h" />
+    <ClInclude Include="..\..\include\gdul\WIP_job_handler\callable.h">
+      <Filter>implementation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\gdul\WIP_job_handler\chunk_allocator.h">
+      <Filter>implementation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\gdul\WIP_job_handler\job.h">
+      <Filter>implementation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_dependee.h">
+      <Filter>implementation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_handler.h">
+      <Filter>implementation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_handler_commons.h">
+      <Filter>implementation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_handler_impl.h">
+      <Filter>implementation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_impl.h">
+      <Filter>implementation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\gdul\WIP_job_handler\worker.h">
+      <Filter>implementation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\gdul\WIP_job_handler\worker_impl.h">
+      <Filter>implementation</Filter>
+    </ClInclude>
+    <ClInclude Include="job_handler_tester.h">
+      <Filter>other</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\gdul\job_handler_master.h">
+      <Filter>implementation</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="implementation">
+      <UniqueIdentifier>{5dd5a2aa-17b8-45d9-8cda-ad64190e5496}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="other">
+      <UniqueIdentifier>{2d2d466c-81e7-4bba-ac6a-7ed64a6c73c7}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
 </Project>

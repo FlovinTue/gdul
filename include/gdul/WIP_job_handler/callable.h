@@ -83,8 +83,8 @@ private:
 	callable_base* m_callable;
 };
 template<class Callable, std::enable_if_t<(Callable_Max_Size_No_Heap_Alloc < sizeof(callable_impl<Callable>))>*>
-inline callable::callable(Callable && callable, allocator_type)
-	: m_storage
+	inline callable::callable(Callable && callable, allocator_type alloc)
+		: m_storage{}
 {
 	static_assert(!(Callable_Max_Size_No_Heap_Alloc < sizeof(m_allocFields)), "too high size / alignment on allocator_type");
 
@@ -107,8 +107,8 @@ inline callable::callable(Callable && callable, allocator_type)
 	m_callable = new (m_allocFields.m_callableBegin + offset) gdul::jh_detail::callable_impl(std::forward<Callable&&>(callable));
 }
 template<class Callable, std::enable_if_t<!(Callable_Max_Size_No_Heap_Alloc < sizeof(callable_impl<Callable>))>*>
-inline callable::callable(Callable && callable, allocator_type)
-	: m_storage
+	inline callable::callable(Callable && callable, allocator_type)
+		: m_storage{}
 {
 	m_callable = new (&m_storage[0]) gdul::jh_detail::callable_impl<Callable>(std::forward<Callable&&>(callable));
 }

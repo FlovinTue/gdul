@@ -84,6 +84,23 @@ worker job_handler_impl::make_worker()
 	return worker(&m_workers[index]);
 }
 
+job job_handler_impl::make_job(const callable & call, std::uint8_t priority)
+{
+	assert(priority < Priority_Granularity && "Priority value out of bounds");
+
+	const uint8_t _priority(priority < Priority_Granularity ? priority : Priority_Granularity - 1);
+
+	const job_impl_shared_ptr jobImpl(make_shared<job_impl, decltype(m_jobImplAllocator)>
+		(
+			m_jobImplAllocator,
+			call,
+			this,
+			_priority
+			));
+	
+	return job(jobImpl);
+}
+
 std::size_t job_handler_impl::num_workers() const
 {
 	return m_workerCount;
