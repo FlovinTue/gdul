@@ -22,16 +22,17 @@ void workFunc()
 }
 int main()
 {
-	//gdul::job_handler_tester tester;
+	gdul::job_handler_tester tester;
 
-	//gdul::job_handler_tester_info info;
-	//info.affinity = gdul::JOB_HANDLER_TESTER_WORKER_AFFINITY_DYNAMIC;
+	gdul::job_handler_tester_info info;
+	info.affinity = gdul::JOB_HANDLER_TESTER_WORKER_AFFINITY_DYNAMIC;
 
-	//tester.init(info);
+	tester.init(info);
 
-	//for (uint32_t i = 0; i < 50; ++i) {
-	//	tester.run_consumption_strand_parallel_test(500, workFunc);
-	//}
+	for (uint32_t i = 0; i < 50; ++i) {
+		tester.run_consumption_strand_parallel_test(500, workFunc);
+	}
+
 
 	std::cout << "Hello World!\n";
 }
