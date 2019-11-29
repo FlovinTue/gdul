@@ -25,14 +25,14 @@ utility wrapper class for 128 bit atomic operations.
 ## concurrent_queue
 Multi producer multi consumer unbounded lock-free queue. FIFO is respected within the context of single producers. Basic exception safety may be enabled at the price of a slight performance decrease.
 
-Includes needed are concurrent_queue.h and atomic_shared_ptr.h. concurrent_queue.natvis and atomic_shared_ptr.natvis may be added to projects for additional debug information in Visual Studio
+Depends on atomic_shared_ptr.h
 
 -------------------------------------------------------------------------------------------------------------------------------------------
 
 ## concurrent_object_pool
 Allocates chunks of objects and makes them avaliable for usage via get_object. Return objects using recycle_object. Concurrency safe & lock-free.
 
-Includes needed are concurrent_object_pool.h, concurrent_queue_.h
+Depends on concurrent_queue.h, atomic_shared_ptr.h
 
 -------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -47,3 +47,5 @@ If the number of tlm instances of one type does not exceed gdul::tlm_detail::Sta
 For sanity's sake, use alias tlm<T> instead of thread_local_member<T>
 
 New operators may be added to the interface using the implicit conversion operators as accessors.
+
+Depends on atomic_shared_ptr.h
