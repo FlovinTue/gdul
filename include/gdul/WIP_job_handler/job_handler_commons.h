@@ -24,6 +24,7 @@
 #include <limits>
 #include <memory>
 
+#include "../../Testers/Common/tracking_allocator.h"
 
 namespace gdul
 {
@@ -45,7 +46,8 @@ constexpr std::uint8_t Worker_Auto_Affinity = std::numeric_limits<std::uint8_t>:
 // when empty
 constexpr std::size_t Job_Impl_Allocator_Block_Size = 128;
 
-using allocator_type = std::allocator<uint8_t>;
+//using allocator_type = std::allocator<uint8_t>;
+using allocator_type = tracking_allocator<uint8_t>;
 
 constexpr std::size_t pow2(std::size_t n)
 {

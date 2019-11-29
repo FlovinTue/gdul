@@ -89,7 +89,7 @@ float job_handler_tester::run_consumption_parallel_test(std::size_t numInserts, 
 float job_handler_tester::run_consumption_strand_parallel_test(std::size_t numInserts, void(*workfunc)(void))
 {
 	job root(m_handler.make_job(workfunc, 0));
-	job end(m_handler.make_job([this]() { std::cout << "Finished run_consumption_strand_parallel_test. Number of enqueued jobs: " << m_handler.num_enqueued() << std::endl; }));
+	job end(m_handler.make_job([this, numInserts]() { std::cout << "Finished run_consumption_strand_parallel_test. Number of enqueued jobs: " << m_handler.num_enqueued() << " out of " << numInserts << " initial" << std::endl; }));
 	end.add_dependency(root);
 	end.enable();
 

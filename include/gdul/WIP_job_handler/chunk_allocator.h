@@ -44,7 +44,6 @@ public:
 		using other = chunk_allocator<U, ChunkRep>;
 	};
 
-
 	chunk_allocator(concurrent_object_pool<ChunkRep, allocator_type>* chunkSrc);
 
 	template <class U>
