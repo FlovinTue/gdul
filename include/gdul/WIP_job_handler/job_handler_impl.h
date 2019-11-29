@@ -59,19 +59,23 @@ public:
 
 	job make_job(const callable& call, std::uint8_t priority);
 
-	std::size_t num_workers() const;
-	std::size_t num_enqueued() const;
+	std::size_t num_workers() const noexcept;
+	std::size_t num_enqueued() const noexcept;
 private:
-	static thread_local worker_impl* this_worker_impl;
-	static thread_local worker_impl ourImplicitWorker;
-
 	friend class job_impl;
 	friend class job;
 
+	static thread_local worker_impl* this_worker_impl;
+	static thread_local worker_impl ourImplicitWorker;
+
+	using job_impl_allocator = chunk_allocator<job_impl, job_impl_chunk_rep>;
+	using job_dependee_allocator = chunk_allocator<job_dependee, job_dependee_chunk_rep>;
+
+	job_dependee_allocator get_job_dependee_allocator() const noexcept;
 
 	void enqueue_job(job_impl_shared_ptr job);
 
-	void launch_worker(std::uint16_t index);
+	void launch_worker(std::uint16_t index) noexcept;
 
 	void work();
 
@@ -84,8 +88,8 @@ private:
 
 	concurrent_queue<job_impl_shared_ptr, allocator_type> m_jobQueues[Priority_Granularity];
 	
-	chunk_allocator<job_impl, job_impl_chunk_rep> m_jobImplAllocator;
-	chunk_allocator<job_dependee_chunk_rep, job_dependee_chunk_rep> m_jobDependeeAllocator;
+	job_impl_allocator m_jobImplAllocator;
+	job_dependee_allocator m_jobDependeeAllocator;
 
 	std::array<worker_impl, Job_Handler_Max_Workers> m_workers;
 

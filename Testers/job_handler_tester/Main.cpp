@@ -5,7 +5,6 @@
 #include <iostream>
 #include <functional>
 #include "../Common/Timer.h"
-#include <srutil/delegate/delegate.hpp>
 #include <vld.h>
 #include "../Common/tracking_allocator.h"
 

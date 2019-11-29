@@ -94,7 +94,7 @@ job job_handler_impl::make_job(const callable & call, std::uint8_t priority)
 
 	const uint8_t _priority(priority < Priority_Granularity ? priority : Priority_Granularity - 1);
 
-	const job_impl_shared_ptr jobImpl(make_shared<job_impl, decltype(m_jobImplAllocator)>
+	const job_impl_shared_ptr jobImpl(make_shared<job_impl, job_impl_allocator>
 		(
 			m_jobImplAllocator,
 			call,
@@ -105,12 +105,12 @@ job job_handler_impl::make_job(const callable & call, std::uint8_t priority)
 	return job(jobImpl);
 }
 
-std::size_t job_handler_impl::num_workers() const
+std::size_t job_handler_impl::num_workers() const noexcept
 {
 	return m_workerCount;
 }
 
-std::size_t job_handler_impl::num_enqueued() const
+std::size_t job_handler_impl::num_enqueued() const noexcept
 {
 	std::size_t accum(0);
 
@@ -121,6 +121,11 @@ std::size_t job_handler_impl::num_enqueued() const
 	return accum;
 }
 
+typename job_handler_impl::job_dependee_allocator job_handler_impl::get_job_dependee_allocator() const noexcept
+{
+	return m_jobDependeeAllocator;
+}
+
 void job_handler_impl::enqueue_job(job_impl_shared_ptr job)
 {
 	const std::uint8_t priority(job->get_priority());
@@ -128,7 +133,7 @@ void job_handler_impl::enqueue_job(job_impl_shared_ptr job)
 	m_jobQueues[priority].push(std::move(job));
 }
 
-void job_handler_impl::launch_worker(std::uint16_t index)
+void job_handler_impl::launch_worker(std::uint16_t index) noexcept
 {
 	this_worker_impl = &m_workers[index];
 	this_worker = worker(this_worker_impl);
