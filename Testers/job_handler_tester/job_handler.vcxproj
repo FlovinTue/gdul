@@ -101,6 +101,7 @@
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\chunk_allocator.h" />
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\worker.h" />
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\worker_impl.h" />
+    <ClInclude Include="dynamic_work.h" />
     <ClInclude Include="job_handler_tester.h" />
   </ItemGroup>
   <ItemGroup>
@@ -112,6 +113,7 @@
     <ClCompile Include="..\..\include\gdul\WIP_job_handler\job_impl.cpp" />
     <ClCompile Include="..\..\include\gdul\WIP_job_handler\worker.cpp" />
     <ClCompile Include="..\..\include\gdul\WIP_job_handler\worker_impl.cpp" />
+    <ClCompile Include="dynamic_work.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="job_handler_tester.cpp" />
   </ItemGroup>

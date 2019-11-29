@@ -31,6 +31,9 @@
     <ClCompile Include="job_handler_tester.cpp">
       <Filter>other</Filter>
     </ClCompile>
+    <ClCompile Include="dynamic_work.cpp">
+      <Filter>other</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\callable.h">
@@ -68,6 +71,9 @@
     </ClInclude>
     <ClInclude Include="..\..\include\gdul\job_handler_master.h">
       <Filter>implementation</Filter>
+    </ClInclude>
+    <ClInclude Include="dynamic_work.h">
+      <Filter>other</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

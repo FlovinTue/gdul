@@ -10,6 +10,7 @@ namespace gdul
 
 job_handler_tester::job_handler_tester()
 	: m_info()
+	, m_work(1.0f)
 {
 }
 
@@ -60,16 +61,17 @@ void job_handler_tester::setup_workers()
 	}
 }
 
-float job_handler_tester::run_consumption_parallel_test(std::size_t numInserts, void(*workfunc)(void))
+float job_handler_tester::run_consumption_parallel_test(std::size_t jobs, float overDuration)
 {
-	job root(m_handler.make_job(workfunc, 0));
+	auto wrap = []() {}; overDuration;
+	job root(m_handler.make_job(wrap, 0));
 	job end(m_handler.make_job([this]() { std::cout << "Finished run_consumption_parallel_test. Number of enqueued jobs: " << m_handler.num_enqueued() << std::endl; }));
 
-	for (std::size_t i = 0; i < numInserts; ++i)
+	for (std::size_t i = 0; i < jobs; ++i)
 	{
 		for (std::size_t j = 0; j < m_handler.num_workers(); ++j)
 		{
-			job jb(m_handler.make_job(workfunc, (j + i) % jh_detail::Priority_Granularity));
+			job jb(m_handler.make_job(wrap, (j + i) % jh_detail::Priority_Granularity));
 
 			end.add_dependency(jb);
 
@@ -86,15 +88,21 @@ float job_handler_tester::run_consumption_parallel_test(std::size_t numInserts, 
 	return time.get();
 }
 
-float job_handler_tester::run_consumption_strand_parallel_test(std::size_t numInserts, void(*workfunc)(void))
+float job_handler_tester::run_consumption_strand_parallel_test(std::size_t jobs, float overDuration)
 {
-	job root(m_handler.make_job(workfunc, 0));
-	job end(m_handler.make_job([this, numInserts]() { std::cout << "Finished run_consumption_strand_parallel_test. Number of enqueued jobs: " << m_handler.num_enqueued() << " out of " << numInserts << " initial" << std::endl; }));
+	overDuration;
+
+	auto begin = [this]() {m_work.begin_work(); };
+	auto main = [this]() {m_work.main_work(); };
+	auto last = [this, jobs]() {m_work.end_work(); std::cout << "Finished run_consumption_strand_parallel_test. Number of enqueued jobs: " << m_handler.num_enqueued() << " out of " << jobs << " initial" << std::endl; };
+
+	job root(m_handler.make_job(begin));
+	job end(m_handler.make_job(last));
 	end.add_dependency(root);
 	end.enable();
 
 	job next[8]{};
-	next[0] = m_handler.make_job(workfunc, 0);
+	next[0] = m_handler.make_job(main, 0);
 	end.add_dependency(next[0]);
 
 	next[0].add_dependency(root);
@@ -102,14 +110,14 @@ float job_handler_tester::run_consumption_strand_parallel_test(std::size_t numIn
 
 	std::uint8_t nextNum(1);
 
-	for (std::size_t i = 0; i < numInserts; ++i)
+	for (std::size_t i = 0; i < jobs; ++i)
 	{
 
 		uint8_t children(1 + (rand() % 8));
 		job intermediate[8]{};
 		for (std::uint8_t j = 0; j < children; ++j, ++i)
 		{
-			intermediate[j] = m_handler.make_job(workfunc, (j + i) % jh_detail::Priority_Granularity);
+			intermediate[j] = m_handler.make_job(main, (j + i) % jh_detail::Priority_Granularity);
 			end.add_dependency(intermediate[j]);
 
 			for (std::uint8_t dependencies = 0; dependencies < nextNum; ++dependencies)
@@ -134,9 +142,9 @@ float job_handler_tester::run_consumption_strand_parallel_test(std::size_t numIn
 	return time.get();
 }
 
-float job_handler_tester::run_construction_parallel_test(std::size_t numInserts, void(*workfunc)(void))
+float job_handler_tester::run_construction_parallel_test(std::size_t jobs, float overDuration)
 {
-	numInserts; workfunc;
+	jobs; overDuration;
 
 	// Hmm still something about concurrency when depending on other job during possible moving operation... Argh. Needs ASP ?
 	// Reset
@@ -153,9 +161,9 @@ float job_handler_tester::run_construction_parallel_test(std::size_t numInserts,
 	return 0.0f;
 }
 
-float job_handler_tester::run_mixed_parallel_test(std::size_t numInserts, void(*workfunc)(void))
+float job_handler_tester::run_mixed_parallel_test(std::size_t jobs, float overDuration)
 {
-	numInserts; workfunc;
+	jobs; overDuration;
 
 	// Reset
 	// Init ( max threads )
@@ -173,23 +181,27 @@ float job_handler_tester::run_mixed_parallel_test(std::size_t numInserts, void(*
 	return 0.0f;
 }
 
-float job_handler_tester::run_consumption_strand_test(std::size_t numInserts, void(*workfunc)(void))
+float job_handler_tester::run_consumption_strand_test(std::size_t jobs, float overDuration)
 {
-	// Need to add check to make sure only one job is active at a time
-	job root(m_handler.make_job(workfunc, 0));
-	job previous(m_handler.make_job(workfunc, 0));
+	overDuration;
+	auto begin = [this]() {m_work.begin_work(); };
+	auto main = [this]() {m_work.main_work(); };
+	auto last = [this]() {m_work.end_work();  std::cout << "Finished run_consumption_strand_test. Number of enqueued jobs: " << m_handler.num_enqueued() << std::endl; };
+
+	job root(m_handler.make_job(begin, 0));
+	job previous(m_handler.make_job(main, 0));
 	previous.add_dependency(root);
 	previous.enable();
 
-	for (std::size_t i = 0; i < numInserts; ++i)
+	for (std::size_t i = 0; i < jobs; ++i)
 	{
-		job next = m_handler.make_job(workfunc, i % jh_detail::Priority_Granularity);
+		job next = m_handler.make_job(main, i % jh_detail::Priority_Granularity);
 		next.add_dependency(previous);
 		next.enable();
 
 		previous = std::move(next);
 	}
-	job end(m_handler.make_job([this]() { std::cout << "Finished run_consumption_strand_test. Number of enqueued jobs: " << m_handler.num_enqueued() << std::endl; }));
+	job end(m_handler.make_job(last));
 	end.add_dependency(previous);
 	end.enable();
 

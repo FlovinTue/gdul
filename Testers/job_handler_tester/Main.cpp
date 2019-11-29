@@ -7,25 +7,7 @@
 #include "../Common/Timer.h"
 #include <vld.h>
 #include "../Common/tracking_allocator.h"
-
-namespace gdul
-{
-thread_local double testSum = static_cast<double>(rand() % 100);
-}
-void workFunc()
-{
-	std::size_t random((std::size_t)(rand() % 200) + 1000ull);
-
-	for (std::size_t i = 0; i < random;)
-	{
-		double toAdd(std::sqrt(gdul::testSum));
-		gdul::testSum += toAdd;
-		if (gdul::testSum)
-		{
-			++i;
-		}
-	}
-}
+#include <tuple>
 
 int main()
 {
@@ -39,7 +21,7 @@ int main()
 
 		for (uint32_t i = 0; i < 5000; ++i)
 		{
-			tester.run_consumption_strand_parallel_test(5000, workFunc);
+			tester.run_consumption_strand_parallel_test(3000, 1.0f);
 		}
 	}
 

@@ -65,6 +65,8 @@ inline callable_base* callable_impl<Callable>::copy_construct_at(uint8_t* storag
 {
 	return new (storage) gdul::jh_detail::callable_impl<Callable>(m_callable);
 }
+
+// Hmm.. convert callable to fnptr + arguments stored as tuple... ? 
 class alignas(log2align(Callable_Max_Size_No_Heap_Alloc)) callable
 {
 public:

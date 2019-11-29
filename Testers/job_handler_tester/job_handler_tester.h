@@ -1,6 +1,7 @@
 #pragma once
 
 #include <gdul\job_handler_master.h>
+#include "dynamic_work.h"
 #include "Timer.h"
 
 namespace gdul
@@ -26,15 +27,17 @@ public:
 
 	void setup_workers();
 
-	float run_consumption_parallel_test(std::size_t numInserts, void(*workfunc)(void));
-	float run_consumption_strand_parallel_test(std::size_t numInserts, void(*workfunc)(void));
-	float run_construction_parallel_test(std::size_t numInserts, void(*workfunc)(void));
-	float run_mixed_parallel_test(std::size_t numInserts, void(*workfunc)(void));
-	float run_consumption_strand_test(std::size_t numInserts, void(*workfunc)(void));
+	float run_consumption_parallel_test(std::size_t jobs, float overDuration);
+	float run_consumption_strand_parallel_test(std::size_t jobs, float overDuration);
+	float run_construction_parallel_test(std::size_t jobs, float overDuration);
+	float run_mixed_parallel_test(std::size_t jobs, float overDuration);
+	float run_consumption_strand_test(std::size_t jobs, float overDuration);
 
 	job_handler_tester_info m_info;
 
 	gdul::job_handler m_handler;
+
+	gdul::dynamic_work m_work;
 };
 
 }
