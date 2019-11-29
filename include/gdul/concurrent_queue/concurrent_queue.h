@@ -461,8 +461,9 @@ inline bool concurrent_queue<T, Allocator>::relocate_consumer()
 			continue;
 		}
 
-		if (!producerBuffer->is_valid() | !producerBuffer->size()) {
-			assert(producerBuffer->is_valid() && "An invalid buffer should not exist in the queue structure. Rogue 'unsafe_reset()' ?");
+		assert(producerBuffer->is_valid() && "An invalid buffer should not exist in the queue structure. Rogue 'unsafe_reset()' ?");
+
+		if (!producerBuffer->size()){
 			continue;
 		}
 
