@@ -27,6 +27,18 @@ namespace gdul
 namespace jh_detail
 {
 
+template<class Callable, class Tuple, std::size_t ...IndexSeq>
+constexpr void _expand_tuple_in_apply(Callable&& call, Tuple&& tup, std::index_sequence<IndexSeq...>)
+{
+	std::forward<Callable&&>(call)(std::get<IndexSeq>(std::forward<Tuple&&>(tup))...); tup;
+}
+template<class Callable, class Tuple>
+constexpr void expand_tuple_in(Callable&& call, Tuple&& tup)
+{
+	using Indices = std::make_index_sequence<std::tuple_size<std::decay_t<Tuple>>::value>;
+	_expand_tuple_in_apply(std::forward<Callable&&>(call), std::forward<Tuple&&>(tup), Indices());
+}
+
 class callable_base
 {
 public:
@@ -36,12 +48,48 @@ public:
 
 	virtual callable_base* copy_construct_at(uint8_t* storage) = 0;
 };
-
-template <class Callable>
+template <class Callable, class ...Args>
 class callable_impl : public callable_base
 {
 public:
-	callable_impl(Callable callable_impl);
+	callable_impl(Callable call, Args&& ... args);
+	callable_impl(Callable call, const std::tuple<Args...>& args);
+
+	__forceinline void operator()() override final;
+
+	callable_base* copy_construct_at(uint8_t* storage) override final;
+
+private:
+	const std::tuple<Args...> m_args;
+	const Callable m_callable;
+};
+template<class Callable, class ...Args>
+inline callable_impl<Callable, Args...>::callable_impl(Callable call, Args&& ...args)
+	: m_callable(std::forward<Callable&&>(call))
+	, m_args(std::forward<Args&&>(args)...)
+{
+}
+template<class Callable, class ...Args>
+inline callable_impl<Callable, Args...>::callable_impl(Callable call, const std::tuple<Args...>& args)
+	: m_callable(std::forward<Callable&&>(call))
+	, m_args(args)
+{
+}
+template<class Callable, class ...Args>
+inline void callable_impl<Callable, Args...>::operator()()
+{
+	expand_tuple_in(m_callable, m_args);
+}
+template<class Callable, class ...Args>
+inline callable_base* callable_impl<Callable, Args...>::copy_construct_at(uint8_t* storage)
+{
+	return new (storage) gdul::jh_detail::callable_impl<Callable, Args...>(this->m_callable, m_args);
+}
+template <class Callable>
+class callable_impl<Callable> : public callable_base
+{
+public:
+	callable_impl(Callable call);
 
 	__forceinline void operator()() override final;
 
@@ -51,8 +99,8 @@ private:
 	const Callable m_callable;
 };
 template<class Callable>
-inline callable_impl<Callable>::callable_impl(Callable callable_impl)
-	: m_callable(std::forward<Callable&&>(callable_impl))
+inline callable_impl<Callable>::callable_impl(Callable call)
+	: m_callable(std::forward<Callable&&>(call))
 {
 }
 template<class Callable>
@@ -66,8 +114,7 @@ inline callable_base* callable_impl<Callable>::copy_construct_at(uint8_t* storag
 	return new (storage) gdul::jh_detail::callable_impl<Callable>(m_callable);
 }
 
-// Hmm.. convert callable to fnptr + arguments stored as tuple... ? 
-class alignas(log2align(Callable_Max_Size_No_Heap_Alloc)) callable
+class alignas(std::max_align_t) callable
 {
 public:
 	callable() noexcept;
@@ -76,10 +123,8 @@ public:
 	callable& operator=(const callable&) = delete;
 	callable& operator=(callable&&) = delete;
 
-	template <class Callable, std::enable_if_t<!(Callable_Max_Size_No_Heap_Alloc < sizeof(callable_impl<Callable>))>* = nullptr>
-	callable(Callable&& call, allocator_type);
-	template <class Callable, std::enable_if_t<(Callable_Max_Size_No_Heap_Alloc < sizeof(callable_impl<Callable>))>* = nullptr>
-	callable(Callable&& call, allocator_type alloc);
+	template <class Callable, class ...Args>
+	callable(Callable && call, allocator_type alloc, Args && ... args);
 
 	void operator()();
 
@@ -87,6 +132,12 @@ public:
 
 private:
 	bool has_allocated() const noexcept;
+
+	template <std::size_t Size, std::enable_if_t<(Callable_Max_Size_No_Heap_Alloc < Size)> * = nullptr>
+	uint8_t* fetch_storage(allocator_type alloc);
+	template <std::size_t Size, std::enable_if_t<!(Callable_Max_Size_No_Heap_Alloc < Size)> * = nullptr>
+	uint8_t* fetch_storage(allocator_type);
+
 	uint8_t* put_allocated_storage(std::size_t size, allocator_type alloc);
 
 	union
@@ -101,19 +152,24 @@ private:
 	};
 	callable_base* const m_callable;
 };
-template<class Callable, std::enable_if_t<(Callable_Max_Size_No_Heap_Alloc < sizeof(callable_impl<Callable>))>*>
-	inline callable::callable(Callable && call, allocator_type alloc)
-		: m_storage{}
-		, m_callable(new (put_allocated_storage(sizeof(Callable), alloc)) gdul::jh_detail::callable_impl(std::forward<Callable&&>(call)))
+template<class Callable, class ...Args>
+	inline callable::callable(Callable&& call, allocator_type alloc, Args&& ... args)
+		: m_storage {}
+		, m_callable(new (fetch_storage<sizeof(callable_impl<Callable, Args...>)>(alloc)) callable_impl<Callable, Args...>(std::forward<Callable&&>(call), std::forward<Args&&>(args)...))
 {
 	static_assert(!(Callable_Max_Size_No_Heap_Alloc < sizeof(m_allocFields)), "too high size / alignment on allocator_type");
 	static_assert(!(alignof(std::max_align_t) < alignof(Callable)), "Custom align callables unsupported");
 }
-template<class Callable, std::enable_if_t<!(Callable_Max_Size_No_Heap_Alloc < sizeof(callable_impl<Callable>))>*>
-	inline callable::callable(Callable && call, allocator_type)
-		: m_storage{}
-		, m_callable(new (&m_storage[0]) gdul::jh_detail::callable_impl<Callable>(std::forward<Callable&&>(call)))
+template<std::size_t Size, std::enable_if_t<(Callable_Max_Size_No_Heap_Alloc < Size)>*>
+inline uint8_t* callable::fetch_storage(allocator_type alloc)
 {
+	return put_allocated_storage(Size, alloc);
+}
+template<std::size_t Size, std::enable_if_t<!(Callable_Max_Size_No_Heap_Alloc < Size)>*>
+inline uint8_t* callable::fetch_storage(allocator_type)
+{
+	const std::size_t size(Size);
+	return &m_storage[0];
 }
 }
 }

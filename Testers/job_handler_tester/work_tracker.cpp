@@ -1,21 +1,21 @@
-#include "dynamic_work.h"
+#include "work_tracker.h"
 
 namespace gdul {
 thread_local double testSum = static_cast<double>(rand() % 100);
 
 
-dynamic_work::dynamic_work(float targetTime)
+work_tracker::work_tracker(float targetTime)
 	: m_targetTime(targetTime)
 	, m_spinCount(100) // arbitrary initial value
 {
 }
 
-void dynamic_work::begin_work()
+void work_tracker::begin_work()
 {
 	m_workTime.reset();
 }
 
-void dynamic_work::main_work()
+void work_tracker::main_work()
 {
 	std::size_t count(m_spinCount);
 
@@ -30,12 +30,12 @@ void dynamic_work::main_work()
 	}
 }
 
-void dynamic_work::end_work()
+void work_tracker::end_work()
 {
 	evaluate_spin_count();
 }
 
-void dynamic_work::evaluate_spin_count()
+void work_tracker::evaluate_spin_count()
 {
 	const float time(m_workTime.get());
 	const float fraction(m_targetTime / time);

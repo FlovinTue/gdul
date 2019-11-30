@@ -80,7 +80,6 @@ private:
 
 	const std::uint8_t m_priority;
 };
-
 // Memory chunk representation of job_impl
 struct alignas(alignof(job_impl)) job_impl_chunk_rep
 {

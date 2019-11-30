@@ -1,7 +1,7 @@
 #pragma once
 
 #include <gdul\job_handler_master.h>
-#include "dynamic_work.h"
+#include "work_tracker.h"
 #include "Timer.h"
 
 namespace gdul
@@ -37,7 +37,7 @@ public:
 
 	gdul::job_handler m_handler;
 
-	gdul::dynamic_work m_work;
+	gdul::work_tracker m_work;
 };
 
 }

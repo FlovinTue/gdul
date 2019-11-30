@@ -4,10 +4,10 @@
 
 namespace gdul {
 
-class dynamic_work
+class work_tracker
 {
 public:
-	dynamic_work(float targetTime);
+	work_tracker(float targetTime);
 
 	void begin_work();
 	void main_work();

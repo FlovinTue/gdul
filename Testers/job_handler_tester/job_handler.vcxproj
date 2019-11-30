@@ -80,7 +80,7 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <AdditionalIncludeDirectories>$(SolutionDir)External\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp14</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -101,7 +101,7 @@
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\chunk_allocator.h" />
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\worker.h" />
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\worker_impl.h" />
-    <ClInclude Include="dynamic_work.h" />
+    <ClInclude Include="work_tracker.h" />
     <ClInclude Include="job_handler_tester.h" />
   </ItemGroup>
   <ItemGroup>
@@ -113,7 +113,7 @@
     <ClCompile Include="..\..\include\gdul\WIP_job_handler\job_impl.cpp" />
     <ClCompile Include="..\..\include\gdul\WIP_job_handler\worker.cpp" />
     <ClCompile Include="..\..\include\gdul\WIP_job_handler\worker_impl.cpp" />
-    <ClCompile Include="dynamic_work.cpp" />
+    <ClCompile Include="work_tracker.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="job_handler_tester.cpp" />
   </ItemGroup>
