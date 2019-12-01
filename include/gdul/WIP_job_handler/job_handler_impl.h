@@ -25,16 +25,16 @@
 
 #include <array>
 
-#include <gdul\concurrent_object_pool\concurrent_object_pool.h>
-#include <gdul\concurrent_queue\concurrent_queue.h>
+#include <gdul/concurrent_object_pool/concurrent_object_pool.h>
+#include <gdul/concurrent_queue/concurrent_queue.h>
 
-#include <gdul\WIP_job_handler\job.h>
-#include <gdul\WIP_job_handler\job_handler_commons.h>
-#include <gdul\WIP_job_handler\job_impl.h>
-#include <gdul\WIP_job_handler\chunk_allocator.h>
-#include <gdul\WIP_job_handler\worker_impl.h>
-#include <gdul\WIP_job_handler\worker.h>
-
+#include <gdul/WIP_job_handler/job.h>
+#include <gdul/WIP_job_handler/job_handler_commons.h>
+#include <gdul/WIP_job_handler/job_impl.h>
+#include <gdul/WIP_job_handler/chunk_allocator.h>
+#include <gdul/WIP_job_handler/worker_impl.h>
+#include <gdul/WIP_job_handler/worker.h>
+#include <gdul/WIP_job_handler/job_delegate.h>
 namespace gdul {
 
 namespace  jh_detail{
@@ -57,7 +57,7 @@ public:
 
 	worker make_worker();
 
-	job make_job(const callable& call, std::uint8_t priority);
+	job make_job(const job_delegate& call, std::uint8_t priority);
 
 	std::size_t num_workers() const noexcept;
 	std::size_t num_enqueued() const noexcept;

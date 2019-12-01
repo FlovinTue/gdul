@@ -88,7 +88,7 @@ worker job_handler_impl::make_worker()
 	return worker(&m_workers[index]);
 }
 
-job job_handler_impl::make_job(const callable & call, std::uint8_t priority)
+job job_handler_impl::make_job(const job_delegate & call, std::uint8_t priority)
 {
 	assert(priority < Priority_Granularity && "Priority value out of bounds");
 

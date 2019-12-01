@@ -31,9 +31,12 @@ namespace gdul
 namespace jh_detail
 {
 class job_handler_impl;
-class callable;
+class job_delegate;
 }
 
+
+
+// Should think about the way delegates & jobs are created. Want to keep creation intuitive & simple
 class job_handler
 {
 public:
@@ -62,7 +65,7 @@ public:
 	std::size_t num_workers() const;
 	std::size_t num_enqueued() const;
 private:
-	job make_job_internal(const jh_detail::callable& call, std::uint8_t priority);
+	job make_job_internal(const jh_detail::job_delegate& call, std::uint8_t priority);
 
 	gdul::shared_ptr<jh_detail::job_handler_impl> m_impl;
 	jh_detail::allocator_type m_allocator;
@@ -70,7 +73,7 @@ private:
 template<class Callable, class ...Args>
 inline job job_handler::make_job(Callable && call, std::uint8_t priority, Args&& ...args)
 {
-	return make_job_internal(jh_detail::callable(std::forward<Callable&&>(call), m_allocator, std::forward<Args&&>(args)...), priority);
+	return make_job_internal(jh_detail::job_delegate(std::forward<Callable&&>(call), m_allocator, std::forward<Args&&>(args)...), priority);
 }
 template<class Callable, class ...Args>
 inline job job_handler::make_job(Callable && call, Args&& ...args)

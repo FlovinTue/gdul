@@ -18,30 +18,30 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include "callable.h"
+#include "job_delegate.h"
 
 namespace gdul
 {
 namespace jh_detail
 {
-callable::callable() noexcept
-	: callable([]() {}, allocator_type())
+job_delegate::job_delegate() noexcept
+	: job_delegate([]() {}, allocator_type())
 {
 }
-callable::callable(const callable& other)
+job_delegate::job_delegate(const job_delegate& other)
 	: m_storage{}
 	, m_callable(other.m_callable->copy_construct_at(!other.has_allocated() ?
 		&m_storage[0] :
 		put_allocated_storage(other.m_allocFields.m_allocated, other.m_allocFields.m_allocator)))
 {
 }
-void callable::operator()()
+void job_delegate::operator()()
 {
 	(*m_callable)();
 }
-callable::~callable() noexcept
+job_delegate::~job_delegate() noexcept
 {
-	m_callable->~callable_base();
+	m_callable->~job_delegate_base();
 
 	if (has_allocated())
 	{
@@ -51,11 +51,11 @@ callable::~callable() noexcept
 
 	std::uninitialized_fill_n(m_storage, Callable_Max_Size_No_Heap_Alloc, std::uint8_t(0));
 }
-bool callable::has_allocated() const noexcept
+bool job_delegate::has_allocated() const noexcept
 {
 	return (void*)m_callable != (void*)&m_storage[0];
 }
-uint8_t* callable::put_allocated_storage(std::size_t size, allocator_type alloc)
+uint8_t* job_delegate::put_allocated_storage(std::size_t size, allocator_type alloc)
 {
 	m_allocFields.m_allocator = alloc;
 	m_allocFields.m_allocated = size;

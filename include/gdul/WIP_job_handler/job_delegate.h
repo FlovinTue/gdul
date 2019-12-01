@@ -39,96 +39,96 @@ constexpr void expand_tuple_in(Callable&& call, Tuple&& tup)
 	_expand_tuple_in_apply(std::forward<Callable&&>(call), std::forward<Tuple&&>(tup), Indices());
 }
 
-class callable_base
+class job_delegate_base
 {
 public:
-	virtual ~callable_base() = default;
+	virtual ~job_delegate_base() = default;
 
 	__forceinline virtual void operator()() = 0;
 
-	virtual callable_base* copy_construct_at(uint8_t* storage) = 0;
+	virtual job_delegate_base* copy_construct_at(uint8_t* storage) = 0;
 };
 template <class Callable, class ...Args>
-class callable_impl : public callable_base
+class job_delegate_impl : public job_delegate_base
 {
 public:
-	callable_impl(Callable call, Args&& ... args);
-	callable_impl(Callable call, const std::tuple<Args...>& args);
+	job_delegate_impl(Callable call, Args&& ... args);
+	job_delegate_impl(Callable call, const std::tuple<Args...>& args);
 
 	__forceinline void operator()() override final;
 
-	callable_base* copy_construct_at(uint8_t* storage) override final;
+	job_delegate_base* copy_construct_at(uint8_t* storage) override final;
 
 private:
 	const std::tuple<Args...> m_args;
 	const Callable m_callable;
 };
 template<class Callable, class ...Args>
-inline callable_impl<Callable, Args...>::callable_impl(Callable call, Args&& ...args)
+inline job_delegate_impl<Callable, Args...>::job_delegate_impl(Callable call, Args&& ...args)
 	: m_callable(std::forward<Callable&&>(call))
 	, m_args(std::forward<Args&&>(args)...)
 {
 }
 template<class Callable, class ...Args>
-inline callable_impl<Callable, Args...>::callable_impl(Callable call, const std::tuple<Args...>& args)
+inline job_delegate_impl<Callable, Args...>::job_delegate_impl(Callable call, const std::tuple<Args...>& args)
 	: m_callable(std::forward<Callable&&>(call))
 	, m_args(args)
 {
 }
 template<class Callable, class ...Args>
-inline void callable_impl<Callable, Args...>::operator()()
+inline void job_delegate_impl<Callable, Args...>::operator()()
 {
 	expand_tuple_in(m_callable, m_args);
 }
 template<class Callable, class ...Args>
-inline callable_base* callable_impl<Callable, Args...>::copy_construct_at(uint8_t* storage)
+inline job_delegate_base* job_delegate_impl<Callable, Args...>::copy_construct_at(uint8_t* storage)
 {
-	return new (storage) gdul::jh_detail::callable_impl<Callable, Args...>(this->m_callable, m_args);
+	return new (storage) gdul::jh_detail::job_delegate_impl<Callable, Args...>(this->m_callable, m_args);
 }
 template <class Callable>
-class callable_impl<Callable> : public callable_base
+class job_delegate_impl<Callable> : public job_delegate_base
 {
 public:
-	callable_impl(Callable call);
+	job_delegate_impl(Callable call);
 
 	__forceinline void operator()() override final;
 
-	callable_base* copy_construct_at(uint8_t* storage) override final;
+	job_delegate_base* copy_construct_at(uint8_t* storage) override final;
 
 private:
 	const Callable m_callable;
 };
 template<class Callable>
-inline callable_impl<Callable>::callable_impl(Callable call)
+inline job_delegate_impl<Callable>::job_delegate_impl(Callable call)
 	: m_callable(std::forward<Callable&&>(call))
 {
 }
 template<class Callable>
-inline void callable_impl<Callable>::operator()()
+inline void job_delegate_impl<Callable>::operator()()
 {
 	m_callable();
 }
 template<class Callable>
-inline callable_base* callable_impl<Callable>::copy_construct_at(uint8_t* storage)
+inline job_delegate_base* job_delegate_impl<Callable>::copy_construct_at(uint8_t* storage)
 {
-	return new (storage) gdul::jh_detail::callable_impl<Callable>(m_callable);
+	return new (storage) gdul::jh_detail::job_delegate_impl<Callable>(m_callable);
 }
 
-class alignas(std::max_align_t) callable
+class alignas(std::max_align_t) job_delegate
 {
 public:
-	callable() noexcept;
-	callable(const callable & other);
+	job_delegate() noexcept;
+	job_delegate(const job_delegate & other);
 
-	callable& operator=(const callable&) = delete;
-	callable& operator=(callable&&) = delete;
+	job_delegate& operator=(const job_delegate&) = delete;
+	job_delegate& operator=(job_delegate&&) = delete;
 
 	template <class Callable, class ...Args>
-	callable(Callable && call, allocator_type alloc, Args && ... args);
+	job_delegate(Callable && call, allocator_type alloc, Args && ... args);
 
 	void operator()();
 
-	~callable() noexcept;
+	~job_delegate() noexcept;
 
 private:
 	bool has_allocated() const noexcept;
@@ -150,23 +150,23 @@ private:
 			std::size_t m_allocated;
 		}m_allocFields;
 	};
-	callable_base* const m_callable;
+	job_delegate_base* const m_callable;
 };
 template<class Callable, class ...Args>
-	inline callable::callable(Callable&& call, allocator_type alloc, Args&& ... args)
+	inline job_delegate::job_delegate(Callable&& call, allocator_type alloc, Args&& ... args)
 		: m_storage {}
-		, m_callable(new (fetch_storage<sizeof(callable_impl<Callable, Args...>)>(alloc)) callable_impl<Callable, Args...>(std::forward<Callable&&>(call), std::forward<Args&&>(args)...))
+		, m_callable(new (fetch_storage<sizeof(job_delegate_impl<Callable, Args...>)>(alloc)) callable_impl<Callable, Args...>(std::forward<Callable&&>(call), std::forward<Args&&>(args)...))
 {
 	static_assert(!(Callable_Max_Size_No_Heap_Alloc < sizeof(m_allocFields)), "too high size / alignment on allocator_type");
 	static_assert(!(alignof(std::max_align_t) < alignof(Callable)), "Custom align callables unsupported");
 }
 template<std::size_t Size, std::enable_if_t<(Callable_Max_Size_No_Heap_Alloc < Size)>*>
-inline uint8_t* callable::fetch_storage(allocator_type alloc)
+inline uint8_t* job_delegate::fetch_storage(allocator_type alloc)
 {
 	return put_allocated_storage(Size, alloc);
 }
 template<std::size_t Size, std::enable_if_t<!(Callable_Max_Size_No_Heap_Alloc < Size)>*>
-inline uint8_t* callable::fetch_storage(allocator_type)
+inline uint8_t* job_delegate::fetch_storage(allocator_type)
 {
 	const std::size_t size(Size);
 	return &m_storage[0];

@@ -34,7 +34,7 @@ namespace gdul{
 namespace jh_detail {
 
 class job_handler_impl;
-class callable_base;
+class job_delegate_base;
 
 class job_impl
 {
@@ -47,7 +47,7 @@ public:
 
 	job_impl();
 
-	job_impl(const callable & call, job_handler_impl* handler, std::uint8_t priority);
+	job_impl(const job_delegate & call, job_handler_impl* handler, std::uint8_t priority);
 	~job_impl();
 	
 	void operator()();
@@ -68,7 +68,7 @@ private:
 
 	void detach_children();
 
-	callable m_callable;
+	job_delegate m_callable;
 
 	job_handler_impl* const m_handler;
 

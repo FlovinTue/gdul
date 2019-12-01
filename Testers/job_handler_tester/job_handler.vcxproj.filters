@@ -1,9 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="..\..\include\gdul\WIP_job_handler\callable.cpp">
-      <Filter>implementation</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\include\gdul\WIP_job_handler\job.cpp">
       <Filter>implementation</Filter>
     </ClCompile>
@@ -34,11 +31,11 @@
     <ClCompile Include="work_tracker.cpp">
       <Filter>other</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\include\gdul\WIP_job_handler\job_delegate.cpp">
+      <Filter>implementation</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\include\gdul\WIP_job_handler\callable.h">
-      <Filter>implementation</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\chunk_allocator.h">
       <Filter>implementation</Filter>
     </ClInclude>
@@ -74,6 +71,9 @@
     </ClInclude>
     <ClInclude Include="work_tracker.h">
       <Filter>other</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_delegate.h">
+      <Filter>implementation</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
