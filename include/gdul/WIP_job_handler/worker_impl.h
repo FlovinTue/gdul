@@ -27,19 +27,19 @@
 #include <atomic>
 #include <thread>
 
-#include <gdul\WIP_job_handler\job_handler_commons.h>
+#include <gdul/WIP_job_handler/job_handler_commons.h>
+#include <gdul/WIP_job_handler/job_delegate.h>
 
 namespace gdul {
 namespace jh_detail
 {
-
 class job_handler_impl;
 
 class alignas(64) worker_impl
 {
 public:
 	worker_impl();
-	worker_impl(std::thread&& thread, std::uint8_t coreAffinity);
+	worker_impl(std::thread&& thread, allocator_type allocator, std::uint8_t coreAffinity);
 	~worker_impl();
 
 	worker_impl& operator=(worker_impl&& other) noexcept;
@@ -48,7 +48,7 @@ public:
 	void set_queue_affinity(std::uint8_t queue);
 	void set_execution_priority(std::uint32_t priority);
 	void set_sleep_threshhold(std::uint16_t ms);
-	void set_name(const char* name);
+	void set_name(const std::string & name);
 
 	void activate();
 
@@ -60,23 +60,33 @@ public:
 	bool is_active() const;
 	bool is_enabled() const;
 
+	void run_on_enable(job_delegate && del);
+	void run_on_disable(job_delegate && del);
+
 	void idle();
 
 	std::uint8_t get_queue_target();
 	std::uint8_t get_fetch_retries() const;
 
+	allocator_type get_allocator() const;
+
 private:
 	std::thread m_thread;
+	std::string m_name;
 
 	thread_handle m_threadHandle;
 	
 	std::size_t m_priorityDistributionIteration;
 
+	job_delegate m_onEnable;
+	job_delegate m_onDisable;
+
 	std::chrono::high_resolution_clock::time_point m_lastJobTimepoint;
+	std::chrono::high_resolution_clock m_sleepTimer;
 
 	std::uint16_t m_sleepThreshhold;
 
-	std::chrono::high_resolution_clock m_sleepTimer;
+	allocator_type m_allocator;
 
 	std::uint8_t m_autoCoreAffinity;
 	std::uint8_t m_coreAffinity;

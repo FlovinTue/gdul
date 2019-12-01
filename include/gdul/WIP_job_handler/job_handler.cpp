@@ -32,8 +32,8 @@ std::size_t job_handler::num_enqueued() const
 {
 	return m_impl->num_enqueued();
 }
-job job_handler::make_job_internal(const jh_detail::job_delegate& call, std::uint8_t priority)
+job job_handler::make_job_internal(job_delegate&& del)
 {
-	return m_impl->make_job(call, priority);
+	return m_impl->make_job(std::move(del));
 }
 }

@@ -49,6 +49,10 @@ void job::add_dependency(job & dependency)
 		m_impl->add_dependencies(1);
 	}
 }
+void job::set_priority(std::uint8_t priority)
+{
+	m_impl->set_priority(priority);
+}
 void job::enable()
 {
 	if (m_enabled.exchange(true ,std::memory_order_relaxed)) {

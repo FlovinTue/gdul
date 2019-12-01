@@ -18,7 +18,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <gdul\WIP_job_handler\worker_impl.h>
+#include <gdul/WIP_job_handler/worker_impl.h>
+#include <gdul/WIP_job_handler/job_delegate.h>
 #include <cassert>
 #include <cmath>
 
@@ -38,18 +39,20 @@ worker_impl::worker_impl()
 	, m_coreAffinity(Worker_Auto_Affinity)
 	, m_isEnabled(false)
 	, m_priorityDistributionIteration(0)
+	, m_allocator(allocator_type())
 	, m_queueAffinity(Worker_Auto_Affinity)
 	, m_sleepThreshhold(std::numeric_limits<std::uint16_t>::max())
 	, m_threadHandle(jh_detail::create_thread_handle())
 	, m_isActive(false)
 {
 }
-worker_impl::worker_impl(std::thread&& thread, std::uint8_t coreAffinity)
+worker_impl::worker_impl(std::thread&& thread, allocator_type allocator, std::uint8_t coreAffinity)
 	: m_autoCoreAffinity(coreAffinity)
 	, m_thread(std::move(thread))
 	, m_coreAffinity(Worker_Auto_Affinity)
 	, m_isEnabled(false)
 	, m_priorityDistributionIteration(0)
+	, m_allocator(allocator)
 	, m_queueAffinity(Worker_Auto_Affinity)
 	, m_sleepThreshhold(250)
 	, m_threadHandle(m_thread.native_handle())
@@ -145,6 +148,14 @@ bool worker_impl::is_enabled() const
 {
 	return m_isEnabled.load(std::memory_order_relaxed);
 }
+void worker_impl::run_on_enable(job_delegate&& del)
+{
+	m_onEnable = std::move(del);
+}
+void worker_impl::run_on_disable(job_delegate&& del)
+{
+	m_onDisable = std::move(del);
+}
 void worker_impl::idle()
 {
 	if (is_sleepy()) {
@@ -188,11 +199,16 @@ std::uint8_t worker_impl::get_fetch_retries() const
 {
 	return m_queueAffinity == jh_detail::Worker_Auto_Affinity ? jh_detail::Priority_Granularity : 1;
 }
-void worker_impl::set_name(const char * name)
+allocator_type worker_impl::get_allocator() const
+{
+	return m_allocator;
+}
+void worker_impl::set_name(const std::string& name)
 {
 	assert(is_active() && "Cannot set name to inactive worker");
 
-	jh_detail::set_thread_name(name, m_threadHandle);
+	jh_detail::set_thread_name(name.c_str(), m_threadHandle);
+	m_name = name;
 }
 }
 }

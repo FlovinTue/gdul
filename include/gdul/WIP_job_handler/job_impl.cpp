@@ -27,14 +27,14 @@ namespace gdul
 namespace jh_detail
 {
 job_impl::job_impl()
-	: job_impl(job_delegate([]() {}, allocator_type()), nullptr, 0)
+	: job_impl(job_delegate([]() {}, allocator_type()), nullptr)
 {
 }
-job_impl::job_impl(const job_delegate& call, job_handler_impl* handler, std::uint8_t priority)
+job_impl::job_impl(const job_delegate& call, job_handler_impl* handler)
 	: m_callable(call)
 	, m_finished(false)
 	, m_firstDependee(nullptr)
-	, m_priority(priority)
+	, m_priority(Default_Job_Priority)
 	, m_handler(handler)
 	, m_dependencies(Job_Max_Dependencies)
 {
@@ -77,6 +77,10 @@ bool job_impl::try_attach_child(job_impl_shared_ptr child)
 std::uint8_t job_impl::get_priority() const
 {
 	return m_priority;
+}
+void job_impl::set_priority(std::uint8_t priority)
+{
+	m_priority = priority;
 }
 void job_impl::add_dependencies(std::uint32_t n)
 {

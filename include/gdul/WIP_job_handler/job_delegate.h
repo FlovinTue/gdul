@@ -24,9 +24,10 @@
 
 namespace gdul
 {
+class job_delegate;
+
 namespace jh_detail
 {
-
 template<class Callable, class Tuple, std::size_t ...IndexSeq>
 constexpr void _expand_tuple_in_apply(Callable&& call, Tuple&& tup, std::index_sequence<IndexSeq...>)
 {
@@ -113,18 +114,18 @@ inline job_delegate_base* job_delegate_impl<Callable>::copy_construct_at(uint8_t
 {
 	return new (storage) gdul::jh_detail::job_delegate_impl<Callable>(m_callable);
 }
-
+}
 class alignas(std::max_align_t) job_delegate
 {
 public:
 	job_delegate() noexcept;
 	job_delegate(const job_delegate & other);
 
-	job_delegate& operator=(const job_delegate&) = delete;
-	job_delegate& operator=(job_delegate&&) = delete;
+	job_delegate& operator=(const job_delegate& other);
+	job_delegate& operator=(job_delegate&& other);
 
 	template <class Callable, class ...Args>
-	job_delegate(Callable && call, allocator_type alloc, Args && ... args);
+	job_delegate(Callable && call, jh_detail::allocator_type alloc, Args && ... args);
 
 	void operator()();
 
@@ -133,43 +134,42 @@ public:
 private:
 	bool has_allocated() const noexcept;
 
-	template <std::size_t Size, std::enable_if_t<(Callable_Max_Size_No_Heap_Alloc < Size)> * = nullptr>
-	uint8_t* fetch_storage(allocator_type alloc);
-	template <std::size_t Size, std::enable_if_t<!(Callable_Max_Size_No_Heap_Alloc < Size)> * = nullptr>
-	uint8_t* fetch_storage(allocator_type);
+	template <std::size_t Size, std::enable_if_t<(jh_detail::Callable_Max_Size_No_Heap_Alloc < Size)> * = nullptr>
+	uint8_t* fetch_storage(jh_detail::allocator_type alloc);
+	template <std::size_t Size, std::enable_if_t<!(jh_detail::Callable_Max_Size_No_Heap_Alloc < Size)> * = nullptr>
+	uint8_t* fetch_storage(jh_detail::allocator_type);
 
-	uint8_t* put_allocated_storage(std::size_t size, allocator_type alloc);
+	uint8_t* put_allocated_storage(std::size_t size, jh_detail::allocator_type alloc);
 
 	union
 	{
-		std::uint8_t m_storage[Callable_Max_Size_No_Heap_Alloc];
+		std::uint8_t m_storage[jh_detail::Callable_Max_Size_No_Heap_Alloc];
 		struct
 		{
-			allocator_type m_allocator;
+			jh_detail::allocator_type m_allocator;
 			std::uint8_t* m_callableBegin;
 			std::size_t m_allocated;
 		}m_allocFields;
 	};
-	job_delegate_base* const m_callable;
+	jh_detail::job_delegate_base* m_callable;
 };
 template<class Callable, class ...Args>
-	inline job_delegate::job_delegate(Callable&& call, allocator_type alloc, Args&& ... args)
+	inline job_delegate::job_delegate(Callable&& call, jh_detail::allocator_type alloc, Args&& ... args)
 		: m_storage {}
-		, m_callable(new (fetch_storage<sizeof(job_delegate_impl<Callable, Args...>)>(alloc)) callable_impl<Callable, Args...>(std::forward<Callable&&>(call), std::forward<Args&&>(args)...))
+		, m_callable(new (fetch_storage<sizeof(jh_detail::job_delegate_impl<Callable, Args...>)>(alloc)) jh_detail::job_delegate_impl<Callable, Args...>(std::forward<Callable&&>(call), std::forward<Args&&>(args)...))
 {
-	static_assert(!(Callable_Max_Size_No_Heap_Alloc < sizeof(m_allocFields)), "too high size / alignment on allocator_type");
+	static_assert(!(jh_detail::Callable_Max_Size_No_Heap_Alloc < sizeof(m_allocFields)), "too high size / alignment on allocator_type");
 	static_assert(!(alignof(std::max_align_t) < alignof(Callable)), "Custom align callables unsupported");
 }
-template<std::size_t Size, std::enable_if_t<(Callable_Max_Size_No_Heap_Alloc < Size)>*>
-inline uint8_t* job_delegate::fetch_storage(allocator_type alloc)
+template<std::size_t Size, std::enable_if_t<(jh_detail::Callable_Max_Size_No_Heap_Alloc < Size)>*>
+inline uint8_t* job_delegate::fetch_storage(jh_detail::allocator_type alloc)
 {
 	return put_allocated_storage(Size, alloc);
 }
-template<std::size_t Size, std::enable_if_t<!(Callable_Max_Size_No_Heap_Alloc < Size)>*>
-inline uint8_t* job_delegate::fetch_storage(allocator_type)
+template<std::size_t Size, std::enable_if_t<!(jh_detail::Callable_Max_Size_No_Heap_Alloc < Size)>*>
+inline uint8_t* job_delegate::fetch_storage(jh_detail::allocator_type)
 {
 	const std::size_t size(Size);
 	return &m_storage[0];
-}
 }
 }

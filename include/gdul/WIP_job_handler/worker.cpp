@@ -47,7 +47,7 @@ void worker::set_execution_priority(std::int32_t priority)
 	m_impl->set_execution_priority(priority);
 }
 
-void worker::set_name(const char * name)
+void worker::set_name(const std::string& name)
 {
 	m_impl->set_name(name);
 }
@@ -58,6 +58,14 @@ void worker::activate()
 bool worker::deactivate()
 {
 	return m_impl->deactivate();
+}
+void worker::run_on_enable(job_delegate&& del)
+{
+	m_impl->run_on_enable(std::move(del));
+}
+void worker::run_on_disable(job_delegate&& del)
+{
+	m_impl->run_on_disable(std::move(del));
 }
 bool worker::is_active() const
 {

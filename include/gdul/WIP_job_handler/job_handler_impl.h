@@ -57,7 +57,7 @@ public:
 
 	worker make_worker();
 
-	job make_job(const job_delegate& call, std::uint8_t priority);
+	job make_job(job_delegate&& call);
 
 	std::size_t num_workers() const noexcept;
 	std::size_t num_enqueued() const noexcept;

@@ -27,14 +27,12 @@
 
 namespace gdul
 {
+class job_delegate;
 
 namespace jh_detail
 {
 class job_handler_impl;
-class job_delegate;
 }
-
-
 
 // Should think about the way delegates & jobs are created. Want to keep creation intuitive & simple
 class job_handler
@@ -51,33 +49,29 @@ public:
 	// Callable will allocate if size (Callable + stored arguments) is above 
 	// jh_detail::Callable_Max_Size_No_Heap_Alloc
 	// It needs to have operator() defined with signature void(void). 
-	// Priority corresponds to the internal queue it will be placed in. Priority 0 -> highest. 
-	// jh_detail::Priority_Granularity defines the number of queueus
-	template <class Callable, class ...Args>
-	job make_job(Callable&& call, std::uint8_t priority, Args&& ...args);
-
-	// Callable will allocate if size (Callable + stored arguments) is above 
-	// jh_detail::Callable_Max_Size_No_Heap_Alloc
-	// It needs to have operator() defined with signature void(void). 
 	template <class Callable, class ...Args>
 	job make_job(Callable&& call, Args&& ...args);
 
 	std::size_t num_workers() const;
 	std::size_t num_enqueued() const;
+
+	template <class Callable, class ...Args>
+	job_delegate make_delegate(Callable&& callable, Args&& ...args);
+
 private:
-	job make_job_internal(const jh_detail::job_delegate& call, std::uint8_t priority);
+	job make_job_internal(job_delegate&& del);
 
 	gdul::shared_ptr<jh_detail::job_handler_impl> m_impl;
 	jh_detail::allocator_type m_allocator;
 };
 template<class Callable, class ...Args>
-inline job job_handler::make_job(Callable && call, std::uint8_t priority, Args&& ...args)
+inline job job_handler::make_job(Callable && callable, Args&& ...args)
 {
-	return make_job_internal(jh_detail::job_delegate(std::forward<Callable&&>(call), m_allocator, std::forward<Args&&>(args)...), priority);
+	return make_job_internal(make_delegate(std::forward<Callable&&>(callable), std::forward<Args&&>(args)...));
 }
 template<class Callable, class ...Args>
-inline job job_handler::make_job(Callable && call, Args&& ...args)
+inline job_delegate job_handler::make_delegate(Callable&& callable, Args&& ...args)
 {
-	return make_job(std::forward<Callable&&>(call), jh_detail::Default_Job_Priority, std::forward<Args&&>(args)...);
+	return job_delegate(std::forward<Callable&&>(callable), m_allocator, std::forward<Args&&>(args)...);
 }
 }

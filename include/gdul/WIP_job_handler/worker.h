@@ -20,7 +20,8 @@
 
 #pragma once
 
-#include <gdul\WIP_job_handler\job_handler_commons.h>
+#include <gdul/WIP_job_handler/job_handler_commons.h>
+#include <gdul/WIP_job_handler/job_delegate.h>
 
 namespace gdul
 {
@@ -46,14 +47,15 @@ public:
 	// dynamic runtime selection
 	void set_queue_affinity(std::uint8_t queue = jh_detail::Worker_Auto_Affinity);
 
-	// Thread priority as defined in WinBase.h
 	void set_execution_priority(std::int32_t priority);
 
-	// Thread name
-	void set_name(const char* name);
+	void set_name(const std::string& name);
 
 	void activate();
 	bool deactivate();
+
+	void run_on_enable(job_delegate&& del);
+	void run_on_disable(job_delegate&& del);
 
 	bool is_active() const;
 

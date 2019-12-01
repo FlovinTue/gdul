@@ -81,25 +81,20 @@ worker job_handler_impl::make_worker()
 	
 	std::thread thread(&job_handler_impl::launch_worker, this, index);
 
-	jh_detail::worker_impl impl(std::move(thread), coreAffinity);
+	jh_detail::worker_impl impl(std::move(thread), m_mainAllocator, coreAffinity);
 
 	m_workers[index] = std::move(impl);
 
 	return worker(&m_workers[index]);
 }
 
-job job_handler_impl::make_job(const job_delegate & call, std::uint8_t priority)
+job job_handler_impl::make_job(job_delegate&& del)
 {
-	assert(priority < Priority_Granularity && "Priority value out of bounds");
-
-	const uint8_t _priority(priority < Priority_Granularity ? priority : Priority_Granularity - 1);
-
 	const job_impl_shared_ptr jobImpl(make_shared<job_impl, job_impl_allocator>
 		(
 			m_jobImplAllocator,
-			call,
-			this,
-			_priority
+			std::move(del),
+			this
 			));
 	
 	return job(jobImpl);

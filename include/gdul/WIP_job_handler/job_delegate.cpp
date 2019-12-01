@@ -22,10 +22,8 @@
 
 namespace gdul
 {
-namespace jh_detail
-{
 job_delegate::job_delegate() noexcept
-	: job_delegate([]() {}, allocator_type())
+	: job_delegate([]() {}, jh_detail::allocator_type())
 {
 }
 job_delegate::job_delegate(const job_delegate& other)
@@ -35,33 +33,56 @@ job_delegate::job_delegate(const job_delegate& other)
 		put_allocated_storage(other.m_allocFields.m_allocated, other.m_allocFields.m_allocator)))
 {
 }
+job_delegate& job_delegate::operator=(const job_delegate& other)
+{
+	this->~job_delegate();
+	new (this) job_delegate(other);
+
+	return *this;
+}
+job_delegate& job_delegate::operator=(job_delegate&& other)
+{
+	if (other.has_allocated()) {
+		std::swap(m_allocFields.m_allocated, other.m_allocFields.m_allocated);
+		std::swap(m_allocFields.m_allocator, other.m_allocFields.m_allocator);
+		std::swap(m_allocFields.m_callableBegin, other.m_allocFields.m_callableBegin);
+		std::swap(m_callable, other.m_callable);
+
+		return *this;
+	}
+	else{
+		return operator=(other);
+	}
+}
 void job_delegate::operator()()
 {
 	(*m_callable)();
 }
 job_delegate::~job_delegate() noexcept
 {
-	m_callable->~job_delegate_base();
+	if (m_callable) {
+		m_callable->~job_delegate_base();
 
-	if (has_allocated())
-	{
-		m_allocFields.m_allocator.deallocate(m_allocFields.m_callableBegin, m_allocFields.m_allocated);
-		m_allocFields.m_allocator.~allocator_type();
+		if (has_allocated())
+		{
+			m_allocFields.m_allocator.deallocate(m_allocFields.m_callableBegin, m_allocFields.m_allocated);
+			using allocator_type = jh_detail::allocator_type;
+			m_allocFields.m_allocator.~allocator_type();
+		}
 	}
 
-	std::uninitialized_fill_n(m_storage, Callable_Max_Size_No_Heap_Alloc, std::uint8_t(0));
+	std::uninitialized_fill_n(m_storage, jh_detail::Callable_Max_Size_No_Heap_Alloc, std::uint8_t(0));
 }
 bool job_delegate::has_allocated() const noexcept
 {
 	return (void*)m_callable != (void*)&m_storage[0];
 }
-uint8_t* job_delegate::put_allocated_storage(std::size_t size, allocator_type alloc)
+uint8_t* job_delegate::put_allocated_storage(std::size_t size, jh_detail::allocator_type alloc)
 {
 	m_allocFields.m_allocator = alloc;
 	m_allocFields.m_allocated = size;
 	m_allocFields.m_callableBegin = m_allocFields.m_allocator.allocate(m_allocFields.m_allocated);
 
 	return m_allocFields.m_callableBegin;
-}
 }
 }

@@ -43,6 +43,7 @@ public:
 	job& operator=(const job&) = delete;
 
 	void add_dependency(job& dependency);
+	void set_priority(std::uint8_t priority);
 
 	// when enable has been run, this object may be discarded
 	void enable();

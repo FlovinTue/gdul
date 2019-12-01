@@ -23,11 +23,10 @@
 #pragma warning(disable : 4324)
 
 #include <gdul/WIP_job_handler/job_handler_commons.h>
-#include <gdul/WIP_job_handler/callable.h>
 #include <gdul/WIP_job_handler/chunk_allocator.h>
 #include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
 #include <gdul/WIP_job_handler/job_dependee.h>
-#include <gdul/WIP_job_handler/callable.h>
+#include <gdul/WIP_job_handler/job_delegate.h>
 
 namespace gdul{
 
@@ -47,7 +46,7 @@ public:
 
 	job_impl();
 
-	job_impl(const job_delegate & call, job_handler_impl* handler, std::uint8_t priority);
+	job_impl(const job_delegate & call, job_handler_impl* handler);
 	~job_impl();
 	
 	void operator()();
@@ -55,6 +54,7 @@ public:
 	bool try_attach_child(job_impl_shared_ptr child);
 
 	std::uint8_t get_priority() const;
+	void set_priority(std::uint8_t priority);
 
 	void add_dependencies(std::uint32_t n = 1);
 	std::uint32_t remove_dependencies(std::uint32_t n = 1);
@@ -78,7 +78,7 @@ private:
 
 	std::atomic<bool> m_finished;
 
-	const std::uint8_t m_priority;
+	std::uint8_t m_priority;
 };
 // Memory chunk representation of job_impl
 struct alignas(alignof(job_impl)) job_impl_chunk_rep
