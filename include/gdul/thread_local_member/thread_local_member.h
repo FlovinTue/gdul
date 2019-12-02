@@ -64,10 +64,13 @@ public:
 
 	~thread_local_member() noexcept;
 
-	// Main accessor. Use this to implement any additional methods/operators
 	inline operator T& ();
-	// Main accessor. Use this to implement any additional methods/operators
 	inline operator const T& () const;
+
+	// Main accessor. Use this to implement any additional methods/operators
+	inline T& get();
+	// Main accessor. Use this to implement any additional methods/operators
+	inline const T& get() const;
 
 	inline T& operator=(T&& other);
 	inline T& operator=(const T& other);
@@ -75,10 +78,13 @@ public:
 	inline bool operator==(const T& t) const;
 	inline bool operator!=(const T& t) const;
 
+	inline bool operator==(const tlm<T>& other) const;
+	inline bool operator!=(const tlm<T>& other) const;
+
 	inline operator bool() const;
 
-	inline T& get();
-	inline const T& get() const;
+	inline T* operator->();
+	inline const T* operator->() const;
 
 private:
 	using instance_tracker_entry = shared_ptr<tlm_detail::instance_tracker<T>>;
@@ -174,14 +180,12 @@ inline thread_local_member<T, Allocator>::~thread_local_member() noexcept
 template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::operator T& ()
 {
-	check_for_invalidation();
-	return s_tl_container.m_items[m_index];
+	return get();
 }
 template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::operator const T& () const
 {
-	check_for_invalidation();
-	return s_tl_container.m_items[m_index];
+	return get();
 }
 template<class T, class Allocator>
 inline bool thread_local_member<T, Allocator>::operator==(const T& t) const
@@ -194,6 +198,16 @@ inline bool thread_local_member<T, Allocator>::operator!=(const T& t) const
 	return !operator==(t);
 }
 template<class T, class Allocator>
+inline bool thread_local_member<T, Allocator>::operator==(const tlm<T>& other) const
+{
+	return false;
+}
+template<class T, class Allocator>
+inline bool thread_local_member<T, Allocator>::operator!=(const tlm<T>& other) const
+{
+	return false;
+}
+template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::operator bool() const
 {
 	return true;
@@ -201,12 +215,24 @@ inline thread_local_member<T, Allocator>::operator bool() const
 template<class T, class Allocator>
 inline T& thread_local_member<T, Allocator>::get()
 {
-	return (T&)*this;
+	check_for_invalidation();
+	return s_tl_container.m_items[m_index];
 }
 template<class T, class Allocator>
 inline const T& thread_local_member<T, Allocator>::get() const
 {
-	return (const T&)*this;
+	check_for_invalidation();
+	return s_tl_container.m_items[m_index];
+}
+template<class T, class Allocator>
+inline T* thread_local_member<T, Allocator>::operator->()
+{
+	return get().operator->();
+}
+template<class T, class Allocator>
+inline const T* thread_local_member<T, Allocator>::operator->() const
+{
+	return get().operator->();
 }
 template<class T, class Allocator>
 inline void thread_local_member<T, Allocator>::check_for_invalidation() const
@@ -264,7 +290,7 @@ inline void thread_local_member<T, Allocator>::refresh() const
 		if (instance 
 			&& ((s_tl_container.m_iteration < instance->m_iteration) 
 			& !(m_iteration < instance->m_iteration))) {
-			s_tl_container.m_items.reconstruct(i, instance->m_initArgs);
+			s_tl_container.m_items.reconstruct(i, instance->m_init);
 		}
 	}
 
@@ -314,16 +340,16 @@ inline void thread_local_member<T, Allocator>::grow_instance_tracker_array() con
 template<class T, class Allocator>
 inline T& thread_local_member<T, Allocator>::operator=(const T& other)
 {
-	T& myval(*this);
-	myval = other;
-	return *this;
+	T& accessor(get());
+	get() = other;
+	return accessor;
 }
 template<class T, class Allocator>
 inline T& thread_local_member<T, Allocator>::operator=(T&& other)
 {
-	T& myval(*this);
-	myval = std::move(other);
-	return *this;
+	T& accessor(get());
+	accessor = std::move(other);
+	return accessor;
 }
 template <class T, class Allocator>
 bool operator==(const tlm<T, Allocator>& tl, const T& t) {
@@ -624,12 +650,12 @@ struct instance_tracker
 {
 	template <class ...Args>
 	instance_tracker(std::uint64_t iteration, Args&&... args)
-		: m_initArgs(std::forward<Args&&>(args)...)
+		: m_init(std::forward<Args&&>(args)...)
 		, m_iteration(iteration)
 	{
 	}
 
-	const T m_initArgs;
+	const T m_init;
 	std::uint64_t m_iteration;
 };
 
