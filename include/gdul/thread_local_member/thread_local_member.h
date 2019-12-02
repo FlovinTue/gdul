@@ -48,6 +48,7 @@ class thread_local_member
 {
 public:
 	using value_type = T;
+	using deref_type = std::remove_pointer_t<T>;
 	using size_type = typename tlm_detail::size_type;
 
 	thread_local_member();
@@ -83,8 +84,11 @@ public:
 
 	inline operator bool() const;
 
-	inline T* operator->();
-	inline const T* operator->() const;
+	inline deref_type* operator->();
+	inline const deref_type* operator->() const;
+
+	inline deref_type& operator*();
+	inline const deref_type& operator*() const;
 
 private:
 	using instance_tracker_entry = shared_ptr<tlm_detail::instance_tracker<T>>;
@@ -190,7 +194,7 @@ inline thread_local_member<T, Allocator>::operator const T& () const
 template<class T, class Allocator>
 inline bool thread_local_member<T, Allocator>::operator==(const T& t) const
 {
-	return ((const T&)*this) == t;
+	return get() == t;
 }
 template<class T, class Allocator>
 inline bool thread_local_member<T, Allocator>::operator!=(const T& t) const
@@ -200,17 +204,17 @@ inline bool thread_local_member<T, Allocator>::operator!=(const T& t) const
 template<class T, class Allocator>
 inline bool thread_local_member<T, Allocator>::operator==(const tlm<T>& other) const
 {
-	return false;
+	return get() == other.get();
 }
 template<class T, class Allocator>
 inline bool thread_local_member<T, Allocator>::operator!=(const tlm<T>& other) const
 {
-	return false;
+	return get() != other.get();
 }
 template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::operator bool() const
 {
-	return true;
+	return get();
 }
 template<class T, class Allocator>
 inline T& thread_local_member<T, Allocator>::get()
@@ -225,14 +229,24 @@ inline const T& thread_local_member<T, Allocator>::get() const
 	return s_tl_container.m_items[m_index];
 }
 template<class T, class Allocator>
-inline T* thread_local_member<T, Allocator>::operator->()
+inline typename tlm<T, Allocator>::deref_type* thread_local_member<T, Allocator>::operator->()
 {
-	return get().operator->();
+	return get();
 }
 template<class T, class Allocator>
-inline const T* thread_local_member<T, Allocator>::operator->() const
+inline const typename tlm<T, Allocator>::deref_type* thread_local_member<T, Allocator>::operator->() const
 {
-	return get().operator->();
+	return get();
+}
+template<class T, class Allocator>
+inline typename tlm<T, Allocator>::deref_type& thread_local_member<T, Allocator>::operator*()
+{
+	return *get();
+}
+template<class T, class Allocator>
+inline const typename tlm<T, Allocator>::deref_type& thread_local_member<T, Allocator>::operator*() const
+{
+	return *get();
 }
 template<class T, class Allocator>
 inline void thread_local_member<T, Allocator>::check_for_invalidation() const
@@ -352,11 +366,11 @@ inline T& thread_local_member<T, Allocator>::operator=(T&& other)
 	return accessor;
 }
 template <class T, class Allocator>
-bool operator==(const tlm<T, Allocator>& tl, const T& t) {
+bool operator==(const T& t, const tlm<T, Allocator>& tl) {
 	return tl.operator==(t);
 }
 template <class T, class Allocator>
-bool operator!=(const tlm<T, Allocator>& tl, const T& t) {
+bool operator!=(const T& t, const tlm<T, Allocator>& tl) {
 	return tl.operator!=(t);
 }
 // detail

@@ -47,6 +47,5 @@ int main()
 
 	gdul::doPrint = true;
 
-
 	return 0;
 }

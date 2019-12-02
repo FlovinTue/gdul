@@ -150,8 +150,8 @@ inline void tester<T>::assert_base_functionality()
 	tlm<char> boolOpFalse(0);
 	tlm<char> boolOpTrue(1);
 
-	GDUL_ASSERT(!boolOpFalse);
-	GDUL_ASSERT(boolOpTrue);
+	GDUL_ASSERT(!(bool)boolOpFalse);
+	GDUL_ASSERT((bool)boolOpTrue);
 
 	tlm<int> implicit(5);
 	int& accessImpl(implicit);
@@ -164,9 +164,33 @@ inline void tester<T>::assert_base_functionality()
 	const tlm<int> equalA(8);
 	const int equalB(8);
 	GDUL_ASSERT(equalA == equalB);
+	GDUL_ASSERT(equalB == equalA);
 
 	const tlm<int> nequalA(9);
 	const int nequalB(10);
 	GDUL_ASSERT(nequalA != nequalB);
+	GDUL_ASSERT(nequalB != nequalA);
+
+	tlm<int> assign(0);
+	assign = 5;
+
+	GDUL_ASSERT(assign.get() == 5);
+
+	struct src
+	{
+		int mem = 0;
+	}sr;
+
+	tlm<src*> ref(&sr);
+	const tlm<src*> cref(&sr);
+	ref->mem = 5;
+
+	GDUL_ASSERT(cref->mem == 5);
+	
+	src out = *ref;
+	const src out2 = *cref;
+
+	GDUL_ASSERT(out.mem == 5);
+	GDUL_ASSERT(out2.mem == 5);
 }
 }
