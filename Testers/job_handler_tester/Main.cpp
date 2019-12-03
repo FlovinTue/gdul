@@ -9,9 +9,9 @@
 #include "../Common/tracking_allocator.h"
 #include <tuple>
 
+
 int main()
 {
-
 	{
 		gdul::job_handler_tester tester;
 

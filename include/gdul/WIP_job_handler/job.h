@@ -33,9 +33,9 @@ class job_impl;
 class job
 {
 public:
-	job();
-	job(job&& other);
-	job& operator=(job&& other);
+	job() noexcept;
+	job(job&& other) noexcept;
+	job& operator=(job&& other) noexcept;
 
 	~job() = default;
 
@@ -43,21 +43,21 @@ public:
 	job& operator=(const job&) = delete;
 
 	void add_dependency(job& dependency);
-	void set_priority(std::uint8_t priority);
+	void set_priority(std::uint8_t priority) noexcept;
 
 	// when enable has been run, this object may be discarded
 	void enable();
 
-	bool is_finished() const;
+	bool is_finished() const noexcept;
 
-	void wait_for_finish();
+	void wait_for_finish() noexcept;
 
 	operator bool() const noexcept;
 
 private:
 	friend class jh_detail::job_handler_impl;
 
-	job(gdul::shared_ptr<jh_detail::job_impl> impl);
+	job(gdul::shared_ptr<jh_detail::job_impl> impl) noexcept;
 
 	gdul::shared_ptr<jh_detail::job_impl> m_impl;
 

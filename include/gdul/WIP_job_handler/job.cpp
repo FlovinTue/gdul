@@ -25,15 +25,15 @@
 
 namespace gdul
 {
-job::job()
+job::job() noexcept
 	: m_enabled(false)
 {
 }
-job::job(job && other)
+job::job(job && other) noexcept
 {
 	operator=(std::move(other));
 }
-job & job::operator=(job && other)
+job & job::operator=(job && other) noexcept
 {
 	m_enabled.store(other.m_enabled.load(std::memory_order_relaxed), std::memory_order_relaxed);
 	m_impl = std::move(other.m_impl);
@@ -49,7 +49,7 @@ void job::add_dependency(job & dependency)
 		m_impl->add_dependencies(1);
 	}
 }
-void job::set_priority(std::uint8_t priority)
+void job::set_priority(std::uint8_t priority) noexcept
 {
 	m_impl->set_priority(priority);
 }
@@ -65,13 +65,13 @@ void job::enable()
 		m_impl->get_handler()->enqueue_job(m_impl);
 	}
 }
-bool job::is_finished() const
+bool job::is_finished() const noexcept
 {
 	assert(m_impl && "Job not set");
 
 	return m_impl->is_finished();
 }
-void job::wait_for_finish()
+void job::wait_for_finish() noexcept
 {
 	assert(m_impl && "Job not set");
 
@@ -80,7 +80,7 @@ void job::wait_for_finish()
 		jh_detail::job_handler_impl::this_worker_impl->idle();
 	}
 }
-job::job(gdul::shared_ptr<jh_detail::job_impl> impl)
+job::job(gdul::shared_ptr<jh_detail::job_impl> impl) noexcept
 	: m_impl(std::move(impl))
 	, m_enabled(false)
 {
