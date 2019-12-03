@@ -75,6 +75,9 @@
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_delegate.h">
       <Filter>implementation</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\include\gdul\WIP_job_handler\scatter_job.h">
+      <Filter>implementation</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="implementation">

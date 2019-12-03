@@ -169,7 +169,6 @@ inline uint8_t* job_delegate::fetch_storage(jh_detail::allocator_type alloc)
 template<std::size_t Size, std::enable_if_t<!(jh_detail::Callable_Max_Size_No_Heap_Alloc < Size)>*>
 inline uint8_t* job_delegate::fetch_storage(jh_detail::allocator_type)
 {
-	const std::size_t size(Size);
 	return &m_storage[0];
 }
 }
