@@ -31,7 +31,7 @@ private:
 
 	std::vector<std::thread> m_threads;
 
-	gdul::concurrent_queue<std::function<void()>> m_taskQueue;
+	concurrency::concurrent_queue<std::function<void()>> m_taskQueue;
 
 	std::atomic<bool> m_inCommission;
 

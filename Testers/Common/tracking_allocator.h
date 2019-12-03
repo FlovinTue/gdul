@@ -6,7 +6,7 @@
 namespace gdul{
 	
 static std::atomic_flag s_spin{ ATOMIC_FLAG_INIT };
-static std::atomic_bool doPrint(false);
+static std::atomic_bool doPrint(true);
 static std::atomic<int64_t> s_allocated(0);
 template <class T>
 class tracking_allocator : public std::allocator<T>

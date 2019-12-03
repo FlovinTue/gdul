@@ -42,7 +42,7 @@ public:
 	std::queue<T> m_queue;
 };
 
-const std::uint32_t Writes = 2048;
+const std::uint32_t Writes = 8192;
 const std::uint32_t Writers = std::thread::hardware_concurrency() / 2;
 const std::uint32_t Readers = std::thread::hardware_concurrency() / 2;
 const std::uint32_t WritesPerThread(Writes / Writers);
@@ -127,6 +127,7 @@ inline double tester<T, Allocator>::ExecuteConcurrent(std::uint32_t runs)
 
 	for (std::uint32_t i = 0; i < runs; ++i) {
 
+
 		for (std::uint32_t j = 0; j < Writers; ++j)
 			m_writer.add_task(std::bind(&tester::Write, this, WritesPerThread));
 		for (std::uint32_t j = 0; j < Readers; ++j)
@@ -208,7 +209,7 @@ inline double tester<T, Allocator>::ExecuteSingleProducerSingleConsumer(std::uin
 
 	for (std::uint32_t i = 0; i < runs; ++i) {
 
-		m_waiting = Readers + Writers;
+		m_waiting = Readers + Writers - 2;
 
 		m_writer.add_task(std::bind(&tester::Write, this, Writes));
 		m_reader.add_task(std::bind(&tester::Read, this, Writes));
@@ -257,6 +258,8 @@ inline double tester<T, Allocator>::ExecuteRead(std::uint32_t runs)
 
 		m_isRunning = false;
 
+		m_waiting = Writers;
+
 		for (std::uint32_t j = 0; j < Readers; ++j)
 			m_reader.add_task(std::bind(&tester::Read, this, ReadsPerThread));
 
@@ -295,7 +298,7 @@ inline double tester<T, Allocator>::ExecuteWrite(std::uint32_t runs)
 
 	for (std::uint32_t i = 0; i < runs; ++i) {
 
-		m_waiting = Readers + Writers;
+		m_waiting = Writers;
 
 		for (std::uint32_t j = 0; j < Writers; ++j)
 			m_writer.add_task(std::bind(&tester::Write, this, WritesPerThread));
@@ -309,7 +312,7 @@ inline double tester<T, Allocator>::ExecuteWrite(std::uint32_t runs)
 		result += timer.GetTotalTime();
 
 #ifdef GDUL
-		Read(WritesPerThread * Writers);
+		m_queue.unsafe_clear();
 #elif defined(MSC_RUNTIME)
 		m_queue.clear();
 #elif defined(MOODYCAMEL)
@@ -345,6 +348,13 @@ inline void tester<T, Allocator>::Write(std::uint32_t writes)
 	m_queue.reserve(writes);
 #endif
 
+	++m_waiting;
+
+	while (m_waiting < (Writers + Readers))
+	{
+		std::this_thread::yield();
+	}
+
 	while (!m_isRunning);
 
 	uint32_t sum(0);
@@ -365,8 +375,8 @@ inline void tester<T, Allocator>::Write(std::uint32_t writes)
 	}
 #else
 	for (std::uint32_t j = 0; j < writes; ++j) {
-		T in(seed % (j + 1));
-		in.count = j;
+		T in;
+		in.count = seed % (j + 1);
 		sum += in.count;
 #ifndef MOODYCAMEL
 		m_queue.push(in);
@@ -377,17 +387,18 @@ inline void tester<T, Allocator>::Write(std::uint32_t writes)
 #endif
 
 	m_writtenSum += sum;
-
-	++m_waiting;
-
-	while (m_waiting < (Writers + Readers)) {
-		std::this_thread::yield();
-	}
 }
 
 template<class T, class Allocator>
 inline void tester<T, Allocator>::Read(std::uint32_t reads)
 {
+	++m_waiting;
+
+	while (m_waiting < (Writers + Readers))
+	{
+		std::this_thread::yield();
+	}
+
 	while (!m_isRunning);
 	
 	uint32_t sum(0);
@@ -427,11 +438,5 @@ inline void tester<T, Allocator>::Read(std::uint32_t reads)
 		}
 #endif
 	m_readSum += sum;
-
-	++m_waiting;
-
-	while (m_waiting < (Writers + Readers)) {
-		std::this_thread::yield();
-	}
 	}
 
