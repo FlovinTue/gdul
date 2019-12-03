@@ -57,11 +57,11 @@ public:
 	// Initialize with default T value
 	thread_local_member(const T& init);
 	// Initialize with allocator
-	thread_local_member(const Allocator& allocator);
+	thread_local_member(Allocator allocator);
 	// Initialize with allocator and default T value (move)
-	thread_local_member(const Allocator& allocator, T&& init);
+	thread_local_member(T&& init, Allocator allocator);
 	// Initialize with allocator and default T value
-	thread_local_member(const Allocator& allocator, const T& init);
+	thread_local_member(const T& init, Allocator allocator);
 
 	~thread_local_member() noexcept;
 
@@ -147,28 +147,28 @@ inline thread_local_member<T, Allocator>::thread_local_member()
 }
 template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::thread_local_member(T&& init)
-	: thread_local_member<T, Allocator>::thread_local_member(Allocator(), std::move(init))
+	: thread_local_member<T, Allocator>::thread_local_member(std::move(init), Allocator())
 {
 }
 template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::thread_local_member(const T& init)
-	: thread_local_member<T, Allocator>::thread_local_member(Allocator(), init)
+	: thread_local_member<T, Allocator>::thread_local_member(init, Allocator())
 {
 }
 template<class T, class Allocator>
-inline thread_local_member<T, Allocator>::thread_local_member(const Allocator& allocator)
-	: thread_local_member<T, Allocator>::thread_local_member(allocator, T())
+inline thread_local_member<T, Allocator>::thread_local_member(Allocator allocator)
+	: thread_local_member<T, Allocator>::thread_local_member(T(), allocator)
 {
 }
 template<class T, class Allocator>
-inline thread_local_member<T, Allocator>::thread_local_member(const Allocator& allocator, T&& init)
+inline thread_local_member<T, Allocator>::thread_local_member(T&& init, Allocator allocator)
 	: m_allocator(allocator)
 	, m_index(s_st_container.m_indexPool.get(allocator))
 	, m_iteration(initialize_instance_tracker(std::forward<T&&>(init)))
 {
 }
 template<class T, class Allocator>
-inline thread_local_member<T, Allocator>::thread_local_member(const Allocator& allocator, const T& init)
+inline thread_local_member<T, Allocator>::thread_local_member(const T& init, Allocator allocator)
 	: m_allocator(allocator)
 	, m_index(s_st_container.m_indexPool.get(allocator))
 	, m_iteration(initialize_instance_tracker(std::forward<const T&>(init)))
