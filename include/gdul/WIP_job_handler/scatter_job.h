@@ -24,17 +24,23 @@ template <class T>
 class scatter_job
 {
 public:
-	scatter_job(std::vector<T>& dataSource, std::vector<T>& dataTarget, std::size_t chunkSize, job_delegate process);
+	scatter_job(const std::vector<T>& dataSource, std::vector<T*>& dataTarget, std::size_t batchSize, job_delegate process);
+
+	using input_vector_type = std::vector<T>;
+	using output_vector_type = std::vector<T*>;
 
 private:
-	void prepare_data();
+	void prepare_output();
 	void work_func(std::uint32_t begin, std::uint32_t end);
 	void enqueue_jobs();
 	void collect();
 
-	std::vector<T>& m_scatter;
-	std::vector<T*>& m_gather;
-	job_delegate m_process;
+	const job_delegate m_process;
+
+	const input_vector_type& m_input;
+	output_vector_type& m_output;
+	const std::size_t m_batchSize;
+	const std::size_t m_batches;
 };
 
 template<class T>
@@ -47,33 +53,46 @@ inline void scatter_job<T>::enqueue_jobs()
 template<class T>
 inline void scatter_job<T>::collect()
 {
-	std::vector<T>::iterator fIter(m_gather.begin());
-	std::vector<T>::reverse_iterator rIter(m_gather.end());
+	std::vector<T>::reverse_iterator rIter(m_output.rbegin());
+	std::uintptr_t collected((std::uintptr_t)(*rIter));
 
-	for (; fIter != rIter; ++fIter){
-		if (*fIter){
-			continue;
-		}
-		if (*rIter){
-			std::swap(*fIter, *rIter);
-		}
+	for (std::size_t i = 1; i < m_batches; ++i) {
+		std::size_t batchIndex(i * m_batchSize);
+		++rIter;
+		std::uintptr_t next((std::uintptr_t)(*rIter));
 
-		--rIter;
+		std::vector<T>::iterator first(m_output.begin() + batchIndex);
+		std::vector<T>::iterator second(m_output.begin() + (batchIndex + next));
+
+		std::copy(first, second, m_output.begin() + collected);
+
+		collected += next;
 	}
+
+	m_output.resize(collected);
 }
 template<class T>
-inline void scatter_job<T>::prepare_data()
+inline void scatter_job<T>::prepare_output()
 {
-	m_gather.resize(m_scatter.size());
-	std::uninitialized_fill(m_gather.begin(), m_gather.end(), nullptr);
+	m_output.resize(m_input.size() + m_chunks);
+	std::uninitialized_fill(m_output.begin(), m_output.end(), nullptr);
 }
 template<class T>
 inline void scatter_job<T>::work_func(std::uint32_t begin, std::uint32_t end)
 {
+	std::uintptr_t done(0);
+
 	for (std::uint32_t i = begin; i < end; ++i){
-		if (m_process(m_scatter[i])){
-			m_gather[i] = &m_scatter[i];
+		if (m_process(m_input[i])){
+			++done;
+			m_output[begin + done] = m_input[i];
 		}
 	}
+
+	const std::size_t batch((std::size_t)begin / m_batchSize);
+
+	output_vector_type::reverse_iterator rIter(m_output.rend() + batch);
+
+	*rIter = (T*)done;
 }
 }

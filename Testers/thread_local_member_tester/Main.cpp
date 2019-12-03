@@ -45,8 +45,5 @@ int main()
 	std::cout << "allocated" << gdul::s_allocated << " and " << time.get() << " total time" << std::endl;
 	}
 
-	gdul::doPrint = true;
-
-
 	return 0;
 }
