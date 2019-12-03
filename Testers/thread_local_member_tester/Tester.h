@@ -44,9 +44,9 @@ tester<T>::tester(const T& init)
 template <class T>
 void tester<T>::execute()
 {
-	test_assignment(100);
-	test_construction(100);
-	test_index_pool(100);
+	test_assignment(10000);
+	test_construction(10000);
+	test_index_pool(10000);
 
 	while (m_worker.has_unfinished_tasks()) {
 		std::this_thread::yield();

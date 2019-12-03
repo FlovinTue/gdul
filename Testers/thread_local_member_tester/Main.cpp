@@ -31,7 +31,7 @@ int main()
 {
 	timer<float> time;
 
-	for(uint32_t i =0; i < 200; ++i)
+	for(uint32_t i =0; i < 20; ++i)
 	{
 		{
 			gdul::tester<int_iter> tester(int_iter{ 5 });
