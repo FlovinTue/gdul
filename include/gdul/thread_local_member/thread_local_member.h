@@ -676,7 +676,7 @@ struct instance_tracker
 template<class T, size_type ...Ix, typename ...Args>
 constexpr std::array<T, sizeof ...(Ix)> repeat(std::index_sequence<Ix...>, Args&&... args)
 {
-	return { {((void)Ix, T(std::forward<Args&&>(args)...))...} };
+	return std::array<T, sizeof ...(Ix)>{ {((void)Ix, T(std::forward<Args&&>(args)...))...} };
 }
 template <class T, size_type N, class ...Args>
 constexpr std::array<T, N> make_array(Args&&... args)
