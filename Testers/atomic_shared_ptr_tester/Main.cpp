@@ -165,14 +165,14 @@ int main()
 			tester<std::uint64_t, testArraySize, numThreads> tester(true, rand());
 
 			const bool
-				doassign(false),
-				doreassign(false),
-				doCAStest(false),
+				doassign(true),
+				doreassign(true),
+				doCAStest(true),
 				doreferencetest(false),
-				testAba(true);
+				testAba(false);
 
-			uint32_t arraySweeps(100000);
-			uint32_t runs(4000);
+			uint32_t arraySweeps(10000);
+			uint32_t runs(10);
 			float time(0.f);
 			for (std::uint32_t i = 0; i < runs; ++i)
 			{
