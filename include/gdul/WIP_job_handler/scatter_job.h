@@ -3,6 +3,7 @@
 #include <gdul/WIP_job_handler/job_handler_commons.h>
 #include <gdul/WIP_job_handler/job_delegate.h>
 #include <gdul/WIP_job_handler/job_handler.h>
+#include <gdul/WIP_job_handler/job.h>
 #include <vector>
 
 namespace gdul
@@ -19,21 +20,33 @@ namespace gdul
 // ALSO. Processing
 // Callable with signature bool(T& obj) ? 
 
+// Output vector adaptive? 
+// Will be output
+// Store counter at the end of each batch? 
+// And keep propagating the 'new end' every time a pack happens? << sounds nice.
 
+// Still need to have some ideas as to the macro handling of scatter jobs. Also need to figure out how to deal with 
+// boolean return values from delegate.
 template <class T>
-class scatter_job
+class scatter_job : public job
 {
 public:
-	scatter_job(const std::vector<T>& dataSource, std::vector<T*>& dataTarget, std::size_t batchSize, job_delegate process);
+	using value_type = T;
+	using deref_value_type = std::remove_pointer_t<T>;
+	using input_vector_type = std::vector<value_type>;
+	using output_vector_type = std::vector<deref_value_type>;
 
-	using input_vector_type = std::vector<T>;
-	using output_vector_type = std::vector<T*>;
+	scatter_job(const input_vector_type& dataSource, output_vector_type& dataTarget, std::size_t batchSize, job_delegate process);
+
 
 private:
+	void finalize();
+
 	void prepare_output();
-	void work_func(std::uint32_t begin, std::uint32_t end);
-	void enqueue_jobs();
-	void collect();
+	void make_jobs();
+	job make_process_job();
+	void pack_batch(std::size_t batch);
+	void process_batch(std::size_t begin, std::size_t end);
 
 	const job_delegate m_process;
 
@@ -44,17 +57,45 @@ private:
 };
 
 template<class T>
-inline void scatter_job<T>::enqueue_jobs()
+inline scatter_job<T>::scatter_job(const input_vector_type& dataSource, output_vector_type& dataTarget, std::size_t batchSize, job_delegate process)
+	: m_process(process)
+	, m_input(dataSource)
+	, m_output(dataTarget)
+	, m_batchSize(batchSize)
+	, m_batches(m_input.size() / batchSize + ((bool)m_input.size() % batchSize))
 {
-	std::uint32_t begin;
-	std::uint32_t end;
-	job newjob(job_handler::make_job(&scatter_job::work_func, this, begin, end));
 }
 template<class T>
-inline void scatter_job<T>::collect()
+inline void scatter_job<T>::make_jobs()
+{
+	job first(make_process_job());
+
+	if (1 < m_batches){
+		job second;
+
+	}
+
+	for (std::size_t i = 1; i < m_batches; ++i){
+		job next(make_process_job());
+
+	}
+
+}
+template<class T>
+inline job scatter_job<T>::make_process_job()
+{
+	std::size_t begin(i * m_batchSize);
+	std::size_t end(begin + m_batchSize < m_input.size() ? begin + m_batchSize : m_input.size());
+
+	job newjob(job_handler::make_job(&scatter_job::process_batch, this, begin, end));
+
+	return newJob;
+}
+template<class T>
+inline void scatter_job<T>::pack_batch(std::size_t batch)
 {
 	std::vector<T>::reverse_iterator rIter(m_output.rbegin());
-	std::uintptr_t collected((std::uintptr_t)(*rIter));
+	std::uintptr_t gathered((std::uintptr_t)(*rIter));
 
 	for (std::size_t i = 1; i < m_batches; ++i) {
 		std::size_t batchIndex(i * m_batchSize);
@@ -64,12 +105,24 @@ inline void scatter_job<T>::collect()
 		std::vector<T>::iterator first(m_output.begin() + batchIndex);
 		std::vector<T>::iterator second(m_output.begin() + (batchIndex + next));
 
-		std::copy(first, second, m_output.begin() + collected);
+		std::copy(first, second, m_output.begin() + gathered);
 
-		collected += next;
+		gathered += next;
 	}
 
-	m_output.resize(collected);
+	m_output.resize(gathered);
+}
+template<class T>
+inline void scatter_job<T>::finalize()
+{
+	std::vector<T>::reverse_iterator rIter(m_output.rbegin());
+	std::uintptr_t gathered(0);
+
+	for (std::size_t i = 0; i < m_batches; ++i, ++rIter){
+		gathered += (std::uintptr_t)(*rIter);
+	}
+
+	m_output.resize(gathered);
 }
 template<class T>
 inline void scatter_job<T>::prepare_output()
@@ -78,7 +131,7 @@ inline void scatter_job<T>::prepare_output()
 	std::uninitialized_fill(m_output.begin(), m_output.end(), nullptr);
 }
 template<class T>
-inline void scatter_job<T>::work_func(std::uint32_t begin, std::uint32_t end)
+inline void scatter_job<T>::process_batch(std::size_t begin, std::size_t end)
 {
 	std::uintptr_t done(0);
 
@@ -89,7 +142,7 @@ inline void scatter_job<T>::work_func(std::uint32_t begin, std::uint32_t end)
 		}
 	}
 
-	const std::size_t batch((std::size_t)begin / m_batchSize);
+	const std::size_t batch(begin / m_batchSize);
 
 	output_vector_type::reverse_iterator rIter(m_output.rend() + batch);
 
