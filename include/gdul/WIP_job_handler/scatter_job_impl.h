@@ -33,8 +33,14 @@ namespace gdul
 
 
 // Hmm. Maybe not make this a 'job' type object. As lifetime needs to persist.
+// So. Where in memory will the scatter_job live ? Object pool is always an option.
+// Should scatter_job be its own, discreet job type ? . No. Can't be enqueued then.
+// scatter_job needs to be referenced by batch jobs.
+// Since it involves atleast one user defined type, it cannot live in implementation.
+// Maybe only allow pointers as type, and cast to void* ?. Will not work with m_process callable... for that 
+// matter. Neither will current implementation. job_delegate::operator() does not take arguments. 
 template <class T>
-class scatter_job
+class scatter_job_impl
 {
 public:
 	using value_type = T;
@@ -42,7 +48,7 @@ public:
 	using input_vector_type = std::vector<value_type>;
 	using output_vector_type = std::vector<deref_value_type*>;
 
-	scatter_job(const input_vector_type& dataSource, output_vector_type& dataTarget, std::size_t batchSize, job_delegate process);
+	scatter_job_impl(const input_vector_type& dataSource, output_vector_type& dataTarget, std::size_t batchSize, job_delegate process);
 
 	
 
@@ -71,7 +77,7 @@ private:
 };
 
 template<class T>
-inline scatter_job<T>::scatter_job(const input_vector_type& dataSource, output_vector_type& dataTarget, std::size_t batchSize, job_delegate process)
+inline scatter_job_impl<T>::scatter_job_impl(const input_vector_type& dataSource, output_vector_type& dataTarget, std::size_t batchSize, job_delegate process)
 	: m_process(process)
 	, m_input(dataSource)
 	, m_output(dataTarget)
@@ -80,7 +86,7 @@ inline scatter_job<T>::scatter_job(const input_vector_type& dataSource, output_v
 {
 }
 template<class T>
-inline void scatter_job<T>::make_jobs()
+inline void scatter_job_impl<T>::make_jobs()
 {
 	job currentProcessJob(make_process_job());
 	currentProcessJob.enable();
@@ -100,29 +106,29 @@ inline void scatter_job<T>::make_jobs()
 		currentPackJob = std::move(nextPackJob);
 	}
 
-	job finalizer(m_handler->make_job(&scatter_job<T>::finalize_batches, this));
+	job finalizer(m_handler->make_job(&scatter_job_impl<T>::finalize_batches, this));
 	finalizer.add_dependency(currentPackJob);
 	finalizer.enable();
 
 	//*this->add_dependency(finalizer);
 }
 template<class T>
-inline job scatter_job<T>::make_process_job()
+inline job scatter_job_impl<T>::make_process_job()
 {
 	std::size_t begin(i * m_batchSize);
 	std::size_t end(begin + m_batchSize < m_input.size() ? begin + m_batchSize : m_input.size());
 
-	job newjob(job_handler::make_job(&scatter_job::process_batch, this, begin, end));
+	job newjob(job_handler::make_job(&scatter_job_impl::process_batch, this, begin, end));
 
 	return newJob;
 }
 template<class T>
-inline job scatter_job<T>::make_pack_job()
+inline job scatter_job_impl<T>::make_pack_job()
 {
 	return job();
 }
 template<class T>
-inline void scatter_job<T>::pack_batch(std::size_t begin, std::size_t end)
+inline void scatter_job_impl<T>::pack_batch(std::size_t begin, std::size_t end)
 {
 	assert(begin != 0 && "Illegal to pack batch#0");
 	assert(!(m_output.size() < end) && "End going past vector limits");
@@ -141,19 +147,19 @@ inline void scatter_job<T>::pack_batch(std::size_t begin, std::size_t end)
 	*batchEndStorage = (T*)(lastBatchEnd + batchSize);
 }
 template<class T>
-inline void scatter_job<T>::finalize_batches()
+inline void scatter_job_impl<T>::finalize_batches()
 {
 	const std::uintptr_t batchesEnd((std::uintptr_t)(m_output.back()));
 	m_output.resize(batchesEnd);
 }
 template<class T>
-inline void scatter_job<T>::initialize()
+inline void scatter_job_impl<T>::initialize()
 {
 	m_output.resize(m_input.size() + m_chunks);
 	std::uninitialized_fill(m_output.begin(), m_output.end(), nullptr);
 }
 template<class T>
-inline void scatter_job<T>::process_batch(std::size_t begin, std::size_t end)
+inline void scatter_job_impl<T>::process_batch(std::size_t begin, std::size_t end)
 {
 	std::uintptr_t batchOutputSize(0);
 

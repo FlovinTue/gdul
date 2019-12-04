@@ -97,6 +97,7 @@ bool job_impl::enable()
 	if (m_enabled.exchange(true, std::memory_order_relaxed)){
 		return !remove_dependencies(Job_Max_Dependencies);
 	}
+	return false;
 }
 job_handler_impl * job_impl::get_handler() const
 {
