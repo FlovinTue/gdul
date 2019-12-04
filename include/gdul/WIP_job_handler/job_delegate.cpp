@@ -54,9 +54,9 @@ job_delegate& job_delegate::operator=(job_delegate&& other)
 		return operator=(other);
 	}
 }
-void job_delegate::operator()()
+bool job_delegate::operator()()
 {
-	(*m_callable)();
+	return (*m_callable)();
 }
 job_delegate::~job_delegate() noexcept
 {

@@ -29,15 +29,15 @@ class job_delegate;
 namespace jh_detail
 {
 template<class Callable, class Tuple, std::size_t ...IndexSeq>
-constexpr void _expand_tuple_in_apply(Callable&& call, Tuple&& tup, std::index_sequence<IndexSeq...>)
+constexpr auto _expand_tuple_in_apply(Callable&& call, Tuple&& tup, std::index_sequence<IndexSeq...>)
 {
-	std::forward<Callable&&>(call)(std::get<IndexSeq>(std::forward<Tuple&&>(tup))...); tup;
+	return std::forward<Callable&&>(call)(std::get<IndexSeq>(std::forward<Tuple&&>(tup))...); tup;
 }
 template<class Callable, class Tuple>
-constexpr void expand_tuple_in(Callable&& call, Tuple&& tup)
+constexpr auto expand_tuple_in(Callable&& call, Tuple&& tup)
 {
 	using Indices = std::make_index_sequence<std::tuple_size<std::decay_t<Tuple>>::value>;
-	_expand_tuple_in_apply(std::forward<Callable&&>(call), std::forward<Tuple&&>(tup), Indices());
+	return _expand_tuple_in_apply(std::forward<Callable&&>(call), std::forward<Tuple&&>(tup), Indices());
 }
 
 class job_delegate_base
@@ -45,7 +45,7 @@ class job_delegate_base
 public:
 	virtual ~job_delegate_base() = default;
 
-	__forceinline virtual void operator()() = 0;
+	__forceinline virtual bool operator()() = 0;
 
 	virtual job_delegate_base* copy_construct_at(uint8_t* storage) = 0;
 };
@@ -56,11 +56,16 @@ public:
 	job_delegate_impl(Callable call, Args&& ... args);
 	job_delegate_impl(Callable call, const std::tuple<Args...>& args);
 
-	__forceinline void operator()() override final;
+	__forceinline bool operator()() override final;
 
 	job_delegate_base* copy_construct_at(uint8_t* storage) override final;
 
 private:
+	template <class  U = Callable, std::enable_if_t<std::is_convertible_v<std::invoke_result_t<U, Args...>, bool>>* = nullptr>
+	inline bool call_enforce_boolean_return();
+	template <class  U = Callable, std::enable_if_t<!std::is_convertible_v<std::invoke_result_t<U, Args...>, bool>> * = nullptr>
+	inline bool call_enforce_boolean_return();
+
 	const std::tuple<Args...> m_args;
 	const Callable m_callable;
 };
@@ -77,14 +82,27 @@ inline job_delegate_impl<Callable, Args...>::job_delegate_impl(Callable call, co
 {
 }
 template<class Callable, class ...Args>
-inline void job_delegate_impl<Callable, Args...>::operator()()
+inline bool job_delegate_impl<Callable, Args...>::operator()()
 {
-	expand_tuple_in(m_callable, m_args);
+	return call_enforce_boolean_return();
 }
 template<class Callable, class ...Args>
 inline job_delegate_base* job_delegate_impl<Callable, Args...>::copy_construct_at(uint8_t* storage)
 {
 	return new (storage) gdul::jh_detail::job_delegate_impl<Callable, Args...>(this->m_callable, m_args);
+}
+template<class Callable, class ...Args>
+template <class  U, std::enable_if_t<std::is_convertible_v<std::invoke_result_t<U, Args...>, bool>>*>
+inline bool job_delegate_impl<Callable, Args...>::call_enforce_boolean_return()
+{
+	return expand_tuple_in(m_callable, m_args);
+}
+template<class Callable, class ...Args>
+template <class  U, std::enable_if_t<!std::is_convertible_v<std::invoke_result_t<U, Args...>, bool>>*>
+inline bool job_delegate_impl<Callable, Args...>::call_enforce_boolean_return()
+{
+	expand_tuple_in(m_callable, m_args);
+	return true;
 }
 template <class Callable>
 class job_delegate_impl<Callable> : public job_delegate_base
@@ -92,11 +110,16 @@ class job_delegate_impl<Callable> : public job_delegate_base
 public:
 	job_delegate_impl(Callable call);
 
-	__forceinline void operator()() override final;
+	__forceinline bool operator()() override final;
 
 	job_delegate_base* copy_construct_at(uint8_t* storage) override final;
 
 private:
+	template <class  U = Callable, std::enable_if_t<std::is_convertible_v<std::invoke_result_t<U>, bool>> * = nullptr>
+	inline bool call_enforce_boolean_return();
+	template <class  U = Callable, std::enable_if_t<!std::is_convertible_v<std::invoke_result_t<U>, bool>> * = nullptr>
+	inline bool call_enforce_boolean_return();
+
 	const Callable m_callable;
 };
 template<class Callable>
@@ -105,9 +128,22 @@ inline job_delegate_impl<Callable>::job_delegate_impl(Callable call)
 {
 }
 template<class Callable>
-inline void job_delegate_impl<Callable>::operator()()
+inline bool job_delegate_impl<Callable>::operator()()
+{
+	return call_enforce_boolean_return();
+}
+template<class Callable>
+template <class  U, std::enable_if_t<std::is_convertible_v<std::invoke_result_t<U>, bool>>*>
+inline bool job_delegate_impl<Callable>::call_enforce_boolean_return()
+{
+	return m_callable();
+}
+template<class Callable>
+template <class  U, std::enable_if_t<!std::is_convertible_v<std::invoke_result_t<U>, bool>>*>
+inline bool job_delegate_impl<Callable>::call_enforce_boolean_return()
 {
 	m_callable();
+	return true;
 }
 template<class Callable>
 inline job_delegate_base* job_delegate_impl<Callable>::copy_construct_at(uint8_t* storage)
@@ -127,7 +163,7 @@ public:
 	template <class Callable, class ...Args>
 	job_delegate(Callable && call, jh_detail::allocator_type alloc, Args && ... args);
 
-	void operator()();
+	bool operator()();
 
 	~job_delegate() noexcept;
 

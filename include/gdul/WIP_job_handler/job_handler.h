@@ -34,7 +34,6 @@ namespace jh_detail
 class job_handler_impl;
 }
 
-// Should think about the way delegates & jobs are created. Want to keep creation intuitive & simple
 class job_handler
 {
 public:
@@ -46,9 +45,6 @@ public:
 
 	worker make_worker();
 
-	// Callable will allocate if size (Callable + stored arguments) is above 
-	// jh_detail::Callable_Max_Size_No_Heap_Alloc
-	// It needs to have operator() defined with signature void(void). 
 	template <class Callable, class ...Args>
 	job make_job(Callable&& call, Args&& ...args);
 
