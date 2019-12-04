@@ -16,6 +16,8 @@ public:
 	tester(const T& init);
 	void execute();
 
+	void assert_base_functionality();
+
 	void test_index_pool(uint32_t tasks);
 	void test_construction(uint32_t tasks);
 	void test_assignment(uint32_t tasks);
@@ -37,11 +39,7 @@ tester<T>::tester(const T& init)
 	: m_init(init)
 	, m_worker()
 {
-	tlm<char> boolOpFalse(0);
-	tlm<char> boolOpTrue(1);
-
-	GDUL_ASSERT(!boolOpFalse);
-	GDUL_ASSERT(boolOpTrue);
+	assert_base_functionality();
 }
 template <class T>
 void tester<T>::execute()
@@ -56,6 +54,7 @@ void tester<T>::execute()
 	
 	std::cout << "final: " << gdul::s_allocated << std::endl;
 }
+
 template<class T>
 inline void tester<T>::test_index_pool(uint32_t tasks)
 {
@@ -144,5 +143,54 @@ inline void tester<T>::test_assignment(uint32_t tasks)
 	{
 		m_worker.add_task(lam);
 	}
+}
+template<class T>
+inline void tester<T>::assert_base_functionality()
+{
+	tlm<char> boolOpFalse(0);
+	tlm<char> boolOpTrue(1);
+
+	GDUL_ASSERT(!(bool)boolOpFalse);
+	GDUL_ASSERT((bool)boolOpTrue);
+
+	tlm<int> implicit(5);
+	int& accessImpl(implicit);
+	GDUL_ASSERT(accessImpl == 5);
+
+	const tlm<int> implicitConst(6);
+	const int& accessImplConst(implicitConst);
+	GDUL_ASSERT(accessImplConst == 6);
+
+	const tlm<int> equalA(8);
+	const int equalB(8);
+	GDUL_ASSERT(equalA == equalB);
+	GDUL_ASSERT(equalB == equalA);
+
+	const tlm<int> nequalA(9);
+	const int nequalB(10);
+	GDUL_ASSERT(nequalA != nequalB);
+	GDUL_ASSERT(nequalB != nequalA);
+
+	tlm<int> assign(0);
+	assign = 5;
+
+	GDUL_ASSERT(assign.get() == 5);
+
+	struct src
+	{
+		int mem = 0;
+	}sr;
+
+	tlm<src*> ref(&sr);
+	const tlm<src*> cref(&sr);
+	ref->mem = 5;
+
+	GDUL_ASSERT(cref->mem == 5);
+	
+	src out = *ref;
+	const src out2 = *cref;
+
+	GDUL_ASSERT(out.mem == 5);
+	GDUL_ASSERT(out2.mem == 5);
 }
 }

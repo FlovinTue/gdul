@@ -68,6 +68,7 @@ class thread_local_member
 {
 public:
 	using value_type = T;
+	using deref_type = std::remove_pointer_t<T>;
 	using size_type = typename tlm_detail::size_type;
 
 	thread_local_member();
@@ -76,18 +77,21 @@ public:
 	// Initialize with default T value
 	thread_local_member(const T& init);
 	// Initialize with allocator
-	thread_local_member(const Allocator& allocator);
+	thread_local_member(Allocator allocator);
 	// Initialize with allocator and default T value (move)
-	thread_local_member(const Allocator& allocator, T&& init);
+	thread_local_member(T&& init, Allocator allocator);
 	// Initialize with allocator and default T value
-	thread_local_member(const Allocator& allocator, const T& init);
+	thread_local_member(const T& init, Allocator allocator);
 
 	~thread_local_member() noexcept;
 
-	// Main accessor. Use this to implement any additional methods/operators
 	inline operator T& ();
-	// Main accessor. Use this to implement any additional methods/operators
 	inline operator const T& () const;
+
+	// Main accessor. Use this to implement any additional methods/operators
+	inline T& get();
+	// Main accessor. Use this to implement any additional methods/operators
+	inline const T& get() const;
 
 	inline T& operator=(T&& other);
 	inline T& operator=(const T& other);
@@ -95,10 +99,16 @@ public:
 	inline bool operator==(const T& t) const;
 	inline bool operator!=(const T& t) const;
 
+	inline bool operator==(const tlm<T>& other) const;
+	inline bool operator!=(const tlm<T>& other) const;
+
 	inline operator bool() const;
 
-	inline T& get();
-	inline const T& get() const;
+	inline deref_type* operator->();
+	inline const deref_type* operator->() const;
+
+	inline deref_type& operator*();
+	inline const deref_type& operator*() const;
 
 private:
 	using instance_tracker_entry = shared_ptr<tlm_detail::instance_tracker<T>>;
@@ -157,28 +167,28 @@ inline thread_local_member<T, Allocator>::thread_local_member()
 }
 template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::thread_local_member(T&& init)
-	: thread_local_member<T, Allocator>::thread_local_member(Allocator(), std::move(init))
+	: thread_local_member<T, Allocator>::thread_local_member(std::move(init), Allocator())
 {
 }
 template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::thread_local_member(const T& init)
-	: thread_local_member<T, Allocator>::thread_local_member(Allocator(), init)
+	: thread_local_member<T, Allocator>::thread_local_member(init, Allocator())
 {
 }
 template<class T, class Allocator>
-inline thread_local_member<T, Allocator>::thread_local_member(const Allocator& allocator)
-	: thread_local_member<T, Allocator>::thread_local_member(allocator, T())
+inline thread_local_member<T, Allocator>::thread_local_member(Allocator allocator)
+	: thread_local_member<T, Allocator>::thread_local_member(T(), allocator)
 {
 }
 template<class T, class Allocator>
-inline thread_local_member<T, Allocator>::thread_local_member(const Allocator& allocator, T&& init)
+inline thread_local_member<T, Allocator>::thread_local_member(T&& init, Allocator allocator)
 	: m_allocator(allocator)
 	, m_index(s_st_container.m_indexPool.get(allocator))
 	, m_iteration(initialize_instance_tracker(std::forward<T&&>(init)))
 {
 }
 template<class T, class Allocator>
-inline thread_local_member<T, Allocator>::thread_local_member(const Allocator& allocator, const T& init)
+inline thread_local_member<T, Allocator>::thread_local_member(const T& init, Allocator allocator)
 	: m_allocator(allocator)
 	, m_index(s_st_container.m_indexPool.get(allocator))
 	, m_iteration(initialize_instance_tracker(std::forward<const T&>(init)))
@@ -194,19 +204,17 @@ inline thread_local_member<T, Allocator>::~thread_local_member() noexcept
 template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::operator T& ()
 {
-	check_for_invalidation();
-	return s_tl_container.m_items[m_index];
+	return get();
 }
 template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::operator const T& () const
 {
-	check_for_invalidation();
-	return s_tl_container.m_items[m_index];
+	return get();
 }
 template<class T, class Allocator>
 inline bool thread_local_member<T, Allocator>::operator==(const T& t) const
 {
-	return ((const T&)*this) == t;
+	return get() == t;
 }
 template<class T, class Allocator>
 inline bool thread_local_member<T, Allocator>::operator!=(const T& t) const
@@ -214,19 +222,51 @@ inline bool thread_local_member<T, Allocator>::operator!=(const T& t) const
 	return !operator==(t);
 }
 template<class T, class Allocator>
+inline bool thread_local_member<T, Allocator>::operator==(const tlm<T>& other) const
+{
+	return get() == other.get();
+}
+template<class T, class Allocator>
+inline bool thread_local_member<T, Allocator>::operator!=(const tlm<T>& other) const
+{
+	return get() != other.get();
+}
+template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::operator bool() const
 {
-	return true;
+	return get();
 }
 template<class T, class Allocator>
 inline T& thread_local_member<T, Allocator>::get()
 {
-	return (T&)*this;
+	check_for_invalidation();
+	return s_tl_container.m_items[m_index];
 }
 template<class T, class Allocator>
 inline const T& thread_local_member<T, Allocator>::get() const
 {
-	return (const T&)*this;
+	check_for_invalidation();
+	return s_tl_container.m_items[m_index];
+}
+template<class T, class Allocator>
+inline typename tlm<T, Allocator>::deref_type* thread_local_member<T, Allocator>::operator->()
+{
+	return get();
+}
+template<class T, class Allocator>
+inline const typename tlm<T, Allocator>::deref_type* thread_local_member<T, Allocator>::operator->() const
+{
+	return get();
+}
+template<class T, class Allocator>
+inline typename tlm<T, Allocator>::deref_type& thread_local_member<T, Allocator>::operator*()
+{
+	return *get();
+}
+template<class T, class Allocator>
+inline const typename tlm<T, Allocator>::deref_type& thread_local_member<T, Allocator>::operator*() const
+{
+	return *get();
 }
 template<class T, class Allocator>
 inline void thread_local_member<T, Allocator>::check_for_invalidation() const
@@ -284,7 +324,7 @@ inline void thread_local_member<T, Allocator>::refresh() const
 		if (instance 
 			&& ((s_tl_container.m_iteration < instance->m_iteration) 
 			& !(m_iteration < instance->m_iteration))) {
-			s_tl_container.m_items.reconstruct(i, instance->m_initArgs);
+			s_tl_container.m_items.reconstruct(i, instance->m_init);
 		}
 	}
 
@@ -334,23 +374,23 @@ inline void thread_local_member<T, Allocator>::grow_instance_tracker_array() con
 template<class T, class Allocator>
 inline T& thread_local_member<T, Allocator>::operator=(const T& other)
 {
-	T& myval(*this);
-	myval = other;
-	return *this;
+	T& accessor(get());
+	get() = other;
+	return accessor;
 }
 template<class T, class Allocator>
 inline T& thread_local_member<T, Allocator>::operator=(T&& other)
 {
-	T& myval(*this);
-	myval = std::move(other);
-	return *this;
+	T& accessor(get());
+	accessor = std::move(other);
+	return accessor;
 }
 template <class T, class Allocator>
-bool operator==(const tlm<T, Allocator>& tl, const T& t) {
+bool operator==(const T& t, const tlm<T, Allocator>& tl) {
 	return tl.operator==(t);
 }
 template <class T, class Allocator>
-bool operator!=(const tlm<T, Allocator>& tl, const T& t) {
+bool operator!=(const T& t, const tlm<T, Allocator>& tl) {
 	return tl.operator!=(t);
 }
 // detail
@@ -644,19 +684,19 @@ struct instance_tracker
 {
 	template <class ...Args>
 	instance_tracker(std::uint64_t iteration, Args&&... args)
-		: m_initArgs(std::forward<Args&&>(args)...)
+		: m_init(std::forward<Args&&>(args)...)
 		, m_iteration(iteration)
 	{
 	}
 
-	const T m_initArgs;
+	const T m_init;
 	std::uint64_t m_iteration;
 };
 
 template<class T, size_type ...Ix, typename ...Args>
 constexpr std::array<T, sizeof ...(Ix)> repeat(std::index_sequence<Ix...>, Args&&... args)
 {
-	return { {((void)Ix, T(std::forward<Args&&>(args)...))...} };
+	return std::array<T, sizeof ...(Ix)>{ {((void)Ix, T(std::forward<Args&&>(args)...))...} };
 }
 template <class T, size_type N, class ...Args>
 constexpr std::array<T, N> make_array(Args&&... args)

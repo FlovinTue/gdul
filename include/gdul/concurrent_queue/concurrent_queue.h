@@ -1588,9 +1588,6 @@ inline dummy_container<T, Allocator>::dummy_container()
 {
 	Allocator alloc;
 	m_dummyBuffer = shared_ptr_slot_type(&m_dummyRawBuffer, alloc, [](buffer_type*, Allocator&) {});
-
-	// Make copying the dummy (shared_ptr) buffer concurrency safe
-	m_dummyBuffer.set_local_refs(1);
 }
 template <class T>
 class index_pool
