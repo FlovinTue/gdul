@@ -34,13 +34,8 @@ class job
 {
 public:
 	job() noexcept;
-	job(job&& other) noexcept;
-	job& operator=(job&& other) noexcept;
 
 	~job() = default;
-
-	job(const job&) = delete;
-	job& operator=(const job&) = delete;
 
 	void add_dependency(job& dependency);
 	void set_priority(std::uint8_t priority) noexcept;
@@ -60,7 +55,5 @@ private:
 	job(gdul::shared_ptr<jh_detail::job_impl> impl) noexcept;
 
 	gdul::shared_ptr<jh_detail::job_impl> m_impl;
-
-	std::atomic_bool m_enabled;
 };
 }

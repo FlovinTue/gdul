@@ -76,10 +76,13 @@ private:
 
 	std::atomic<std::uint32_t> m_dependencies;
 
-	std::atomic<bool> m_finished;
+	std::atomic_bool m_finished;
+	std::atomic_bool m_enabled;
 
 	std::uint8_t m_priority;
 };
+
+constexpr size_t blah = sizeof(job_impl);
 // Memory chunk representation of job_impl
 struct alignas(alignof(job_impl)) job_impl_chunk_rep
 {

@@ -26,27 +26,19 @@
 namespace gdul
 {
 job::job() noexcept
-	: m_enabled(false)
 {
 }
-job::job(job && other) noexcept
-{
-	operator=(std::move(other));
-}
-job & job::operator=(job && other) noexcept
-{
-	m_enabled.store(other.m_enabled.load(std::memory_order_relaxed), std::memory_order_relaxed);
-	m_impl = std::move(other.m_impl);
-
-	return *this;
-}
-
 void job::add_dependency(job & dependency)
 {
 	assert(m_impl && "Job not set");
 
-	if (dependency.m_impl->try_attach_child(m_impl)) {
-		m_impl->add_dependencies(1);
+	// Preemptively add to not cause race condition
+	m_impl->add_dependencies(1);
+
+	if (!dependency.m_impl->try_attach_child(m_impl)) {
+		if (m_impl->remove_dependencies(1)){
+			m_impl->get_handler()->enqueue_job(m_impl);
+		}
 	}
 }
 void job::set_priority(std::uint8_t priority) noexcept
@@ -55,10 +47,6 @@ void job::set_priority(std::uint8_t priority) noexcept
 }
 void job::enable()
 {
-	if (m_enabled.exchange(true ,std::memory_order_relaxed)) {
-		return;
-	}
-
 	assert(m_impl && "Job not set");
 
 	if (m_impl->enable()) {
@@ -82,7 +70,6 @@ void job::wait_for_finish() noexcept
 }
 job::job(gdul::shared_ptr<jh_detail::job_impl> impl) noexcept
 	: m_impl(std::move(impl))
-	, m_enabled(false)
 {
 }
 job::operator bool() const noexcept 

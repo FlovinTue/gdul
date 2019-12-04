@@ -10,7 +10,7 @@
 #include <vector>
 #include "tester.h"
 #include "../Common/Timer.h"
-
+#include <type_traits>
 struct int_iter
 {
 	int_iter()

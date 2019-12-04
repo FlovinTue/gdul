@@ -33,6 +33,7 @@ job_impl::job_impl()
 job_impl::job_impl(const job_delegate& call, job_handler_impl* handler)
 	: m_callable(call)
 	, m_finished(false)
+	, m_enabled(false)
 	, m_firstDependee(nullptr)
 	, m_priority(Default_Job_Priority)
 	, m_handler(handler)
@@ -93,7 +94,9 @@ std::uint32_t job_impl::remove_dependencies(std::uint32_t n)
 }
 bool job_impl::enable()
 {
-	return !remove_dependencies(Job_Max_Dependencies);
+	if (m_enabled.exchange(true, std::memory_order_relaxed)){
+		return !remove_dependencies(Job_Max_Dependencies);
+	}
 }
 job_handler_impl * job_impl::get_handler() const
 {

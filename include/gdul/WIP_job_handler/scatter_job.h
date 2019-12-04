@@ -27,33 +27,47 @@ namespace gdul
 
 // Still need to have some ideas as to the macro handling of scatter jobs. Also need to figure out how to deal with 
 // boolean return values from delegate.
+
+
+
+
+
+// Hmm. Maybe not make this a 'job' type object. As lifetime needs to persist.
 template <class T>
-class scatter_job : public job
+class scatter_job
 {
 public:
 	using value_type = T;
 	using deref_value_type = std::remove_pointer_t<T>;
 	using input_vector_type = std::vector<value_type>;
-	using output_vector_type = std::vector<deref_value_type>;
+	using output_vector_type = std::vector<deref_value_type*>;
 
 	scatter_job(const input_vector_type& dataSource, output_vector_type& dataTarget, std::size_t batchSize, job_delegate process);
 
+	
 
 private:
-	void finalize();
 
-	void prepare_output();
+	void initialize();
+
 	void make_jobs();
+
 	job make_process_job();
-	void pack_batch(std::size_t batch);
+	job make_pack_job();
+
 	void process_batch(std::size_t begin, std::size_t end);
+	void pack_batch(std::size_t begin, std::size_t end);
+	void finalize_batches();
 
 	const job_delegate m_process;
 
 	const input_vector_type& m_input;
 	output_vector_type& m_output;
+
 	const std::size_t m_batchSize;
-	const std::size_t m_batches;
+	const std::size_t m_batchCount;
+	
+	job_handler* const m_handler;
 };
 
 template<class T>
@@ -62,24 +76,35 @@ inline scatter_job<T>::scatter_job(const input_vector_type& dataSource, output_v
 	, m_input(dataSource)
 	, m_output(dataTarget)
 	, m_batchSize(batchSize)
-	, m_batches(m_input.size() / batchSize + ((bool)m_input.size() % batchSize))
+	, m_batchCount(m_input.size() / batchSize + ((bool)m_input.size() % batchSize))
 {
 }
 template<class T>
 inline void scatter_job<T>::make_jobs()
 {
-	job first(make_process_job());
+	job currentProcessJob(make_process_job());
+	currentProcessJob.enable();
 
-	if (1 < m_batches){
-		job second;
+	job currentPackJob(currentProcessJob);
 
+	for(std::size_t i = 1; i < m_batchCount; ++i){
+		job nextProcessJob(make_process_job());
+		nextProcessJob.enable();
+
+		job nextPackJob(make_pack_job());
+		nextPackJob.add_dependency(currentPackJob);
+		nextPackJob.add_dependency(nextProcessJob);
+		nextPackJob.enable();
+
+		currentProcessJob = std::move(nextProcessJob);
+		currentPackJob = std::move(nextPackJob);
 	}
 
-	for (std::size_t i = 1; i < m_batches; ++i){
-		job next(make_process_job());
+	job finalizer(m_handler->make_job(&scatter_job<T>::finalize_batches, this));
+	finalizer.add_dependency(currentPackJob);
+	finalizer.enable();
 
-	}
-
+	//*this->add_dependency(finalizer);
 }
 template<class T>
 inline job scatter_job<T>::make_process_job()
@@ -92,40 +117,37 @@ inline job scatter_job<T>::make_process_job()
 	return newJob;
 }
 template<class T>
-inline void scatter_job<T>::pack_batch(std::size_t batch)
+inline job scatter_job<T>::make_pack_job()
 {
-	std::vector<T>::reverse_iterator rIter(m_output.rbegin());
-	std::uintptr_t gathered((std::uintptr_t)(*rIter));
-
-	for (std::size_t i = 1; i < m_batches; ++i) {
-		std::size_t batchIndex(i * m_batchSize);
-		++rIter;
-		std::uintptr_t next((std::uintptr_t)(*rIter));
-
-		std::vector<T>::iterator first(m_output.begin() + batchIndex);
-		std::vector<T>::iterator second(m_output.begin() + (batchIndex + next));
-
-		std::copy(first, second, m_output.begin() + gathered);
-
-		gathered += next;
-	}
-
-	m_output.resize(gathered);
+	return job();
 }
 template<class T>
-inline void scatter_job<T>::finalize()
+inline void scatter_job<T>::pack_batch(std::size_t begin, std::size_t end)
 {
-	std::vector<T>::reverse_iterator rIter(m_output.rbegin());
-	std::uintptr_t gathered(0);
+	assert(begin != 0 && "Illegal to pack batch#0");
+	assert(!(m_output.size() < end) && "End going past vector limits");
 
-	for (std::size_t i = 0; i < m_batches; ++i, ++rIter){
-		gathered += (std::uintptr_t)(*rIter);
-	}
+	std::vector<T>::iterator batchEndStorageItr(m_output.at(end - 1));
 
-	m_output.resize(gathered);
+	std::uintptr_t lastBatchEnd((std::uintptr_t)m_output[begin - 1]);
+	const std::uintptr_t batchSize((std::uintptr_t)(*batchEndStorageItr));
+
+	std::vector<T>::iterator copyBegin(m_output.at(begin));
+	std::vector<T>::iterator copyEnd(first + batchSize);
+	std::vector<T>::iterator copyTarget(m_output.at(lastBatchEnd));
+
+	std::copy(copyBegin, copyEnd, copyTarget);
+
+	*batchEndStorage = (T*)(lastBatchEnd + batchSize);
 }
 template<class T>
-inline void scatter_job<T>::prepare_output()
+inline void scatter_job<T>::finalize_batches()
+{
+	const std::uintptr_t batchesEnd((std::uintptr_t)(m_output.back()));
+	m_output.resize(batchesEnd);
+}
+template<class T>
+inline void scatter_job<T>::initialize()
 {
 	m_output.resize(m_input.size() + m_chunks);
 	std::uninitialized_fill(m_output.begin(), m_output.end(), nullptr);
@@ -133,19 +155,15 @@ inline void scatter_job<T>::prepare_output()
 template<class T>
 inline void scatter_job<T>::process_batch(std::size_t begin, std::size_t end)
 {
-	std::uintptr_t done(0);
+	std::uintptr_t batchOutputSize(0);
 
 	for (std::uint32_t i = begin; i < end; ++i){
 		if (m_process(m_input[i])){
-			++done;
-			m_output[begin + done] = m_input[i];
+			m_output[begin + batchOutputSize] = m_input[i];
+			++batchOutputSize;
 		}
 	}
 
-	const std::size_t batch(begin / m_batchSize);
-
-	output_vector_type::reverse_iterator rIter(m_output.rend() + batch);
-
-	*rIter = (T*)done;
+	m_output[end - 1] = (T*)batchOutputSize;
 }
 }
