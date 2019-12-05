@@ -33,6 +33,7 @@ namespace gdul{
 namespace jh_detail {
 
 class job_handler_impl;
+template <class InputArg>
 class job_delegate_base;
 
 class job_impl

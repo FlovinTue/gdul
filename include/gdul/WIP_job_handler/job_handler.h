@@ -51,11 +51,12 @@ public:
 	std::size_t num_workers() const;
 	std::size_t num_enqueued() const;
 
+	// Hmmmm............
 	template <class Callable, class ...Args>
 	job_delegate make_delegate(Callable&& callable, Args&& ...args);
 
 private:
-	job make_job_internal(job_delegate&& del);
+	job make_job_internal(job_delegate<void, void>&& del);
 
 	gdul::shared_ptr<jh_detail::job_handler_impl> m_impl;
 	jh_detail::allocator_type m_allocator;

@@ -59,6 +59,15 @@ namespace gdul
 // Since it involves atleast one user defined type, it cannot live in implementation.
 // Maybe only allow pointers as type, and cast to void* ?. Will not work with m_process callable... for that 
 // matter. Neither will current implementation. job_delegate::operator() does not take arguments. 
+
+
+// scatter_job needs to live in 'user space'.
+// Need to remake job_delegate somehow. Maybe job needs to own reference to job_delegate_impl ? 
+// Maybe SOMETHING needs to own a reference to job_delegate_impl.....
+// Maybe do job_delegate_base templated ? with <void> being default
+// And then use that as argument? ? 
+
+//  That could work.. Maybe ? 
 template <class T>
 class scatter_job_impl
 {
@@ -70,6 +79,8 @@ public:
 
 	scatter_job_impl(const input_vector_type& dataSource, output_vector_type& dataTarget, std::size_t batchSize, job_delegate process);
 
+	void set_priority(std::uint8_t priority);
+	void enable();
 	
 
 private:
