@@ -27,6 +27,8 @@
 
 namespace gdul
 {
+
+template <class Callable, class InputArg>
 class job_delegate;
 
 namespace jh_detail
@@ -45,30 +47,22 @@ public:
 
 	worker make_worker();
 
-	template <class Callable, class ...Args>
-	job make_job(Callable&& call, Args&& ...args);
+	job make_job(job_delegate<void, void>&& del);
 
 	std::size_t num_workers() const;
 	std::size_t num_enqueued() const;
 
-	// Hmmmm............
-	template <class Callable, class ...Args>
-	job_delegate make_delegate(Callable&& callable, Args&& ...args);
+	template <class Callable, class ...BoundArgs>
+	job_delegate<std::result_of_t<Callable>, void> make_delegate(Callable&& callable, BoundArgs&& ...args);
 
 private:
-	job make_job_internal(job_delegate<void, void>&& del);
 
 	gdul::shared_ptr<jh_detail::job_handler_impl> m_impl;
 	jh_detail::allocator_type m_allocator;
 };
-template<class Callable, class ...Args>
-inline job job_handler::make_job(Callable && callable, Args&& ...args)
+template<class Callable, class ...BoundArgs>
+inline job_delegate<std::result_of_t<Callable>, void> job_handler::make_delegate(Callable&& callable, BoundArgs&& ...args)
 {
-	return make_job_internal(make_delegate(std::forward<Callable&&>(callable), std::forward<Args&&>(args)...));
-}
-template<class Callable, class ...Args>
-inline job_delegate job_handler::make_delegate(Callable&& callable, Args&& ...args)
-{
-	return job_delegate(std::forward<Callable&&>(callable), m_allocator, std::forward<Args&&>(args)...);
+	return job_delegate<std::result_of_t<Callable>, void>(std::forward<Callable&&>(callable), m_allocator, std::forward<BoundArgs&&>(args)...);
 }
 }
