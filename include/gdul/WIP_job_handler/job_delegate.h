@@ -50,53 +50,46 @@ public:
 
 	__forceinline virtual ReturnType operator()(InputArg) = 0;
 
-	virtual job_delegate_base* copy_construct_at(uint8_t* storage) = 0;
+	virtual job_delegate_base<ReturnType, InputArg>* copy_construct_at(uint8_t* storage) = 0;
 };
-template <class Callable, class RetVal, class InputArg, class ...StaticArgs>
+template <class Callable, class RetVal, class BoundArgs, class InputArg>
 class job_delegate_impl : public job_delegate_base<RetVal, InputArg>
 {
 public:
-	job_delegate_impl(Callable call, StaticArgs&& ... args);
-	job_delegate_impl(Callable call, const std::tuple<StaticArgs...>& args);
+	job_delegate_impl(Callable call, BoundArgs&& args);
 
-	__forceinline bool operator()() override final;
+	__forceinline RetVal operator()(InputArg) override final;
 
 	job_delegate_base<RetVal, InputArg>* copy_construct_at(uint8_t* storage) override final;
 
 private:
 
-	const std::tuple<StaticArgs...> m_staticArgs;
+	const BoundArgs m_boundArgs;
 	const Callable m_callable;
 };
-template<class Callable, class RetVal, class InputArg, class ...StaticArgs>
-inline job_delegate_impl<Callable, RetVal, InputArg, StaticArgs...>::job_delegate_impl(Callable call, StaticArgs&& ...args)
+template<class Callable, class RetVal, class BoundArgs, class InputArg>
+inline job_delegate_impl<Callable, RetVal, BoundArgs, InputArg>::job_delegate_impl(Callable call, BoundArgs&& args)
 	: m_callable(std::forward<Callable&&>(call))
-	, m_staticArgs(std::forward<StaticArgs&&>(args)...)
+	, m_boundArgs(std::forward<BoundArgs&&>(args)...)
 {
 }
-template<class Callable, class RetVal, class InputArg, class ...StaticArgs>
-inline job_delegate_impl<Callable, RetVal, InputArg, StaticArgs...>::job_delegate_impl(Callable call, const std::tuple<StaticArgs...>& args)
-	: m_callable(std::forward<Callable&&>(call))
-	, m_staticArgs(args)
-{
-}
-template<class Callable, class RetVal, class InputArg, class ...StaticArgs>
-inline bool job_delegate_impl<Callable, RetVal, InputArg, StaticArgs...>::operator()()
+template<class Callable, class RetVal, class BoundArgs, class InputArg>
+inline RetVal job_delegate_impl<Callable, RetVal, BoundArgs, InputArg>::operator()(InputArg)
 {
 	return m_callable();
 }
-template<class Callable, class RetVal, class InputArg, class ...StaticArgs>
-inline job_delegate_base<RetVal, InputArg>* job_delegate_impl<Callable, RetVal, InputArg, StaticArgs...>::copy_construct_at(uint8_t* storage)
+template<class Callable, class RetVal, class BoundArgs, class InputArg>
+inline job_delegate_base<RetVal, InputArg>* job_delegate_impl<Callable, RetVal, BoundArgs, InputArg>::copy_construct_at(uint8_t* storage)
 {
-	return new (storage) gdul::jh_detail::job_delegate_impl<Callable, RetVal, InputArg, StaticArgs...>(this->m_callable, m_staticArgs);
+	return new (storage) gdul::jh_detail::job_delegate_impl<Callable, RetVal, BoundArgs, InputArg>(this->m_callable, m_boundArgs);
 }
 template <class Callable, class RetVal, class InputArg>
-class job_delegate_impl<Callable, RetVal, InputArg> : public job_delegate_base<RetVal, InputArg>
+class job_delegate_impl<Callable, RetVal, std::tuple<void>, InputArg> : public job_delegate_base<RetVal, InputArg>
 {
 public:
 	job_delegate_impl(Callable call);
 
-	__forceinline bool operator()() override final;
+	__forceinline RetVal operator()(InputArg) override final;
 
 	job_delegate_base<RetVal, InputArg>* copy_construct_at(uint8_t* storage) override final;
 
@@ -104,19 +97,19 @@ private:
 	const Callable m_callable;
 };
 template<class Callable, class RetVal, class InputArg>
-inline job_delegate_impl<Callable, RetVal, InputArg>::job_delegate_impl(Callable call)
+inline job_delegate_impl<Callable, RetVal, std::tuple<void>, InputArg>::job_delegate_impl(Callable call)
 	: m_callable(std::forward<Callable&&>(call))
 {
 }
 template<class Callable, class RetVal, class InputArg>
-inline bool job_delegate_impl<Callable, RetVal, InputArg>::operator()()
+inline RetVal job_delegate_impl<Callable, RetVal, std::tuple<void>, InputArg>::operator()(InputArg)
 {
 	return m_callable();
 }
 template<class Callable, class RetVal, class InputArg>
-inline job_delegate_base<RetVal, InputArg>* job_delegate_impl<Callable, RetVal, InputArg>::copy_construct_at(uint8_t* storage)
+inline job_delegate_base<RetVal, InputArg>* job_delegate_impl<Callable, RetVal, std::tuple<void>, InputArg>::copy_construct_at(uint8_t* storage)
 {
-	return new (storage) gdul::jh_detail::job_delegate_impl<Callable, RetVal, InputArg>(m_callable);
+	return new (storage) gdul::jh_detail::job_delegate_impl<Callable, RetVal, std::tuple<void>, InputArg>(m_callable);
 }
 }
 template <class RetVal, class InputArg>
@@ -124,15 +117,18 @@ class alignas(std::max_align_t) job_delegate
 {
 public:
 	job_delegate() noexcept;
-	job_delegate(const job_delegate & other);
+	job_delegate(const job_delegate<RetVal, InputArg> & other);
 
-	job_delegate& operator=(const job_delegate& other);
-	job_delegate& operator=(job_delegate&& other);
+	job_delegate& operator=(const job_delegate<RetVal, InputArg>& other);
+	job_delegate& operator=(job_delegate<RetVal, InputArg> && other);
 
-	template <class Callable, class ...StaticArgs>
-	job_delegate(Callable && call, jh_detail::allocator_type alloc, StaticArgs && ... StaticArgs);
+	template <class Callable, class BoundArgs>
+	job_delegate(Callable && call, BoundArgs && BoundArgs, jh_detail::allocator_type alloc);
 
-	bool operator()();
+	template <class Callable>
+	job_delegate(Callable && call, jh_detail::allocator_type alloc);
+
+	RetVal operator()(InputArg);
 
 	~job_delegate() noexcept;
 
@@ -156,13 +152,23 @@ private:
 			std::size_t m_allocated;
 		}m_allocFields;
 	};
-	jh_detail::job_delegate_base<void, void>* m_callable;
+	jh_detail::job_delegate_base<RetVal, InputArg>* m_callable;
 };
 template <class RetVal, class InputArg>
-template<class Callable, class ...StaticArgs>
-	inline job_delegate<RetVal, InputArg>::job_delegate(Callable&& call, jh_detail::allocator_type alloc, StaticArgs&& ... args)
+template<class Callable, class BoundArgs>
+	inline job_delegate<RetVal, InputArg>::job_delegate(Callable&& call, BoundArgs&& args, jh_detail::allocator_type alloc)
 		: m_storage {}
-		, m_callable(new (fetch_storage<sizeof(jh_detail::job_delegate_impl<void, void, Callable, args...>)>(alloc)) jh_detail::job_delegate_impl<void, Callable, args...>(std::forward<Callable&&>(call), std::forward<StaticArgs&&>(args)...))
+		, m_callable(new (fetch_storage<sizeof(jh_detail::job_delegate_impl<Callable, RetVal, BoundArgs, InputArg>)>(alloc)) jh_detail::job_delegate_impl<Callable, RetVal, BoundArgs, InputArg, args...>(std::forward<Callable&&>(call), std::forward<BoundArgs&&>(args)))
+{
+	static_assert(!(jh_detail::Callable_Max_Size_No_Heap_Alloc < sizeof(m_allocFields)), "too high size / alignment on allocator_type");
+	static_assert(!(alignof(std::max_align_t) < alignof(Callable)), "Custom align callables unsupported");
+}
+template<class RetVal, class InputArg>
+template<class Callable>
+inline job_delegate<RetVal, InputArg>::job_delegate(Callable&& call, jh_detail::allocator_type alloc)
+	: m_storage{}
+	, m_callable(new (fetch_storage<sizeof(jh_detail::job_delegate_impl<Callable, RetVal, std::tuple<void>, InputArg>)>(alloc)) jh_detail::job_delegate_impl<Callable, RetVal, std::tuple<void>, InputArg, args...>(std::forward<Callable&&>(call)))
+
 {
 	static_assert(!(jh_detail::Callable_Max_Size_No_Heap_Alloc < sizeof(m_allocFields)), "too high size / alignment on allocator_type");
 	static_assert(!(alignof(std::max_align_t) < alignof(Callable)), "Custom align callables unsupported");
@@ -185,7 +191,7 @@ job_delegate<RetVal, InputArg>::job_delegate() noexcept
 {
 }
 template <class RetVal, class InputArg>
-job_delegate<RetVal, InputArg>::job_delegate(const job_delegate& other)
+job_delegate<RetVal, InputArg>::job_delegate(const job_delegate<RetVal, InputArg>& other)
 	: m_storage{}
 	, m_callable(other.m_callable->copy_construct_at(!other.has_allocated() ?
 		&m_storage[0] :
@@ -218,7 +224,7 @@ job_delegate<RetVal, InputArg>& job_delegate<RetVal, InputArg>::operator=(job_de
 	}
 }
 template <class RetVal, class InputArg>
-bool job_delegate<RetVal, InputArg>::operator()()
+RetVal job_delegate<RetVal, InputArg>::operator()(InputArg)
 {
 	return (*m_callable)();
 }

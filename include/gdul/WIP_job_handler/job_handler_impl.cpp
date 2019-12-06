@@ -88,7 +88,7 @@ worker job_handler_impl::make_worker()
 	return worker(&m_workers[index]);
 }
 
-job job_handler_impl::make_job(job_delegate&& del)
+job job_handler_impl::make_job(job_delegate<void, void>&& del)
 {
 	const job_impl_shared_ptr jobImpl(make_shared<job_impl, job_impl_allocator>
 		(

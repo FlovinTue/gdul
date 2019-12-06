@@ -60,8 +60,8 @@ public:
 	bool is_active() const;
 	bool is_enabled() const;
 
-	void run_on_enable(job_delegate && del);
-	void run_on_disable(job_delegate && del);
+	void run_on_enable(job_delegate<void, void> && del);
+	void run_on_disable(job_delegate<void, void> && del);
 
 	void idle();
 
@@ -78,8 +78,8 @@ private:
 	
 	std::size_t m_priorityDistributionIteration;
 
-	job_delegate m_onEnable;
-	job_delegate m_onDisable;
+	job_delegate<void, void> m_onEnable;
+	job_delegate<void, void> m_onDisable;
 
 	std::chrono::high_resolution_clock::time_point m_lastJobTimepoint;
 	std::chrono::high_resolution_clock m_sleepTimer;

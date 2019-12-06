@@ -53,7 +53,7 @@ public:
 	std::size_t num_enqueued() const;
 
 	template <class Callable, class ...BoundArgs>
-	job_delegate<std::result_of_t<Callable>, void> make_delegate(Callable&& callable, BoundArgs&& ...args);
+	job_delegate<std::invoke_result_t<Callable>, void> make_delegate(Callable&& callable, BoundArgs&& ...args);
 
 private:
 
@@ -61,8 +61,8 @@ private:
 	jh_detail::allocator_type m_allocator;
 };
 template<class Callable, class ...BoundArgs>
-inline job_delegate<std::result_of_t<Callable>, void> job_handler::make_delegate(Callable&& callable, BoundArgs&& ...args)
+inline job_delegate<std::invoke_result_t<Callable>, void> job_handler::make_delegate(Callable&& callable, BoundArgs&& ...args)
 {
-	return job_delegate<std::result_of_t<Callable>, void>(std::forward<Callable&&>(callable), m_allocator, std::forward<BoundArgs&&>(args)...);
+	return job_delegate<std::invoke_result_t<Callable>, void>(std::forward<Callable&&>(callable), m_allocator, std::tuple(std::forward<BoundArgs&&>(args)...));
 }
 }

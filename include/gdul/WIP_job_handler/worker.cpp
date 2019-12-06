@@ -59,11 +59,11 @@ bool worker::deactivate()
 {
 	return m_impl->deactivate();
 }
-void worker::run_on_enable(job_delegate&& del)
+void worker::run_on_enable(job_delegate<void, void>&& del)
 {
 	m_impl->run_on_enable(std::move(del));
 }
-void worker::run_on_disable(job_delegate&& del)
+void worker::run_on_disable(job_delegate<void, void>&& del)
 {
 	m_impl->run_on_disable(std::move(del));
 }

@@ -33,8 +33,6 @@ namespace gdul{
 namespace jh_detail {
 
 class job_handler_impl;
-template <class InputArg>
-class job_delegate_base;
 
 class job_impl
 {
@@ -47,7 +45,7 @@ public:
 
 	job_impl();
 
-	job_impl(const job_delegate & call, job_handler_impl* handler);
+	job_impl(const job_delegate<void, void>& call, job_handler_impl* handler);
 	~job_impl();
 	
 	void operator()();
@@ -69,7 +67,7 @@ private:
 
 	void detach_children();
 
-	job_delegate m_callable;
+	job_delegate<void, void> m_callable;
 
 	job_handler_impl* const m_handler;
 

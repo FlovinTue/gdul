@@ -148,11 +148,11 @@ bool worker_impl::is_enabled() const
 {
 	return m_isEnabled.load(std::memory_order_relaxed);
 }
-void worker_impl::run_on_enable(job_delegate&& del)
+void worker_impl::run_on_enable(job_delegate<void, void>&& del)
 {
 	m_onEnable = std::move(del);
 }
-void worker_impl::run_on_disable(job_delegate&& del)
+void worker_impl::run_on_disable(job_delegate<void, void>&& del)
 {
 	m_onDisable = std::move(del);
 }

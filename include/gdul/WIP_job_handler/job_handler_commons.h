@@ -28,6 +28,9 @@
 
 namespace gdul
 {
+template <class RetVal, class InputArg>
+class job_delegate;
+
 typedef void* thread_handle;
 
 namespace jh_detail

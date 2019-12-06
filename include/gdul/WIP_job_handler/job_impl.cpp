@@ -27,10 +27,10 @@ namespace gdul
 namespace jh_detail
 {
 job_impl::job_impl()
-	: job_impl(job_delegate([]() {}, allocator_type()), nullptr)
+	: job_impl(job_delegate<void, void>([]() {}, allocator_type()), nullptr)
 {
 }
-job_impl::job_impl(const job_delegate& call, job_handler_impl* handler)
+job_impl::job_impl(const job_delegate<void, void>& call, job_handler_impl* handler)
 	: m_callable(call)
 	, m_finished(false)
 	, m_enabled(false)

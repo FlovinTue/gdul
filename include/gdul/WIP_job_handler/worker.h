@@ -54,8 +54,8 @@ public:
 	void activate();
 	bool deactivate();
 
-	void run_on_enable(job_delegate&& del);
-	void run_on_disable(job_delegate&& del);
+	void run_on_enable(job_delegate<void, void>&& del);
+	void run_on_disable(job_delegate<void, void>&& del);
 
 	bool is_active() const;
 

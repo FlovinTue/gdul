@@ -64,15 +64,15 @@ void job_handler_tester::setup_workers()
 float job_handler_tester::run_consumption_parallel_test(std::size_t jobs, float overDuration)
 {
 	auto wrap = []() {}; overDuration;
-	job root(m_handler.make_job(wrap));
+	job root(m_handler.make_job(m_handler.make_delegate(wrap)));
 	root.set_priority(0);
-	job end(m_handler.make_job([this]() { std::cout << "Finished run_consumption_parallel_test. Number of enqueued jobs: " << m_handler.num_enqueued() << std::endl; }));
+	job end(m_handler.make_job(m_handler.make_delegate([this]() { std::cout << "Finished run_consumption_parallel_test. Number of enqueued jobs: " << m_handler.num_enqueued() << std::endl; })));
 
 	for (std::size_t i = 0; i < jobs; ++i)
 	{
 		for (std::size_t j = 0; j < m_handler.num_workers(); ++j)
 		{
-			job jb(m_handler.make_job(wrap));
+			job jb(m_handler.make_job(m_handler.make_delegate(wrap)));
 			jb.set_priority((j + i) % jh_detail::Priority_Granularity);
 
 			end.add_dependency(jb);
@@ -98,13 +98,13 @@ float job_handler_tester::run_consumption_strand_parallel_test(std::size_t jobs,
 	auto main = [this]() {m_work.main_work(); };
 	auto last = [this, jobs]() {m_work.end_work(); std::cout << "Finished run_consumption_strand_parallel_test. Number of enqueued jobs: " << m_handler.num_enqueued() << " out of " << jobs << " initial" << std::endl; };
 
-	job root(m_handler.make_job(begin));
-	job end(m_handler.make_job(last));
+	job root(m_handler.make_job(m_handler.make_delegate(begin)));
+	job end(m_handler.make_job(m_handler.make_delegate(last)));
 	end.add_dependency(root);
 	end.enable();
 
 	job next[8]{};
-	next[0] = m_handler.make_job(main);
+	next[0] = m_handler.make_job(m_handler.make_delegate(main));
 	end.add_dependency(next[0]);
 
 	next[0].add_dependency(root);
@@ -119,7 +119,7 @@ float job_handler_tester::run_consumption_strand_parallel_test(std::size_t jobs,
 		job intermediate[8]{};
 		for (std::uint8_t j = 0; j < children; ++j, ++i)
 		{
-			intermediate[j] = m_handler.make_job(main);
+			intermediate[j] = m_handler.make_job(m_handler.make_delegate(main));
 			intermediate[j].set_priority((j + i) % jh_detail::Priority_Granularity);
 			end.add_dependency(intermediate[j]);
 
@@ -191,14 +191,14 @@ float job_handler_tester::run_consumption_strand_test(std::size_t jobs, float ov
 	auto main = [this]() {m_work.main_work(); };
 	auto last = [this]() {m_work.end_work();  std::cout << "Finished run_consumption_strand_test. Number of enqueued jobs: " << m_handler.num_enqueued() << std::endl; };
 
-	job root(m_handler.make_job(begin));
-	job previous(m_handler.make_job(main));
+	job root(m_handler.make_job((m_handler.make_delegate(begin))));
+	job previous(m_handler.make_job(m_handler.make_delegate(main)));
 	previous.add_dependency(root);
 	previous.enable();
 
 	for (std::size_t i = 0; i < jobs; ++i)
 	{
-		job next = m_handler.make_job(main);
+		job next = m_handler.make_job(m_handler.make_delegate(main));
 		next.set_priority(i % jh_detail::Priority_Granularity);
 
 		next.add_dependency(previous);
@@ -206,7 +206,7 @@ float job_handler_tester::run_consumption_strand_test(std::size_t jobs, float ov
 
 		previous = std::move(next);
 	}
-	job end(m_handler.make_job(last));
+	job end(m_handler.make_job(m_handler.make_delegate(last)));
 	end.add_dependency(previous);
 	end.enable();
 

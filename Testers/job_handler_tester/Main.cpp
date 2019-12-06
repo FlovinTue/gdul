@@ -12,6 +12,9 @@
 
 int main()
 {	
+	//gdul::job_delegate<int, float> test([](float) {std::cout << "test" << std::endl; return 5; }, gdul::jh_detail::allocator_type());
+	//int integer = test(1.f);
+	//integer;
 	{
 		gdul::job_handler_tester tester;
 	

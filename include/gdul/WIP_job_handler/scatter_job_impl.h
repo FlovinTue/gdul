@@ -77,7 +77,7 @@ public:
 	using input_vector_type = std::vector<value_type>;
 	using output_vector_type = std::vector<deref_value_type*>;
 
-	scatter_job_impl(const input_vector_type& dataSource, output_vector_type& dataTarget, std::size_t batchSize, job_delegate process);
+	scatter_job_impl(const input_vector_type& dataSource, output_vector_type& dataTarget, std::size_t batchSize, job_delegate<bool, deref_value_type> process);
 
 	void set_priority(std::uint8_t priority);
 	void enable();
@@ -96,7 +96,7 @@ private:
 	void pack_batch(std::size_t begin, std::size_t end);
 	void finalize_batches();
 
-	const job_delegate m_process;
+	const job_delegate<bool, deref_value_type> m_process;
 
 	const input_vector_type& m_input;
 	output_vector_type& m_output;
@@ -108,7 +108,7 @@ private:
 };
 
 template<class T>
-inline scatter_job_impl<T>::scatter_job_impl(const input_vector_type& dataSource, output_vector_type& dataTarget, std::size_t batchSize, job_delegate process)
+inline scatter_job_impl<T>::scatter_job_impl(const input_vector_type& dataSource, output_vector_type& dataTarget, std::size_t batchSize, job_delegate<bool, deref_value_type> process)
 	: m_process(process)
 	, m_input(dataSource)
 	, m_output(dataTarget)
