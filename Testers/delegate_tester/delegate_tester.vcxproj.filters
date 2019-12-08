@@ -4,6 +4,6 @@
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\include\gdul\WIP_delegate\delegate.h" />
+    <ClInclude Include="..\..\include\gdul\delegate\delegate.h" />
   </ItemGroup>
 </Project>

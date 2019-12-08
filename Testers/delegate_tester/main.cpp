@@ -2,7 +2,7 @@
 //
 
 #include <iostream>
-#include <gdul/WIP_delegate/delegate.h>
+#include <gdul/delegate/delegate.h>
 #include <functional>
 #include <vld.h>
 
@@ -28,15 +28,15 @@ int main()
 	three();
 	delegate<void(float, int)> four(argCall);
 	four(1.f, 1);
-	delegate<void(int)> five(argCall, std::make_tuple(1.f));
+	delegate<void(int)> five(argCall, 1.f);
 	five(1);
-	delegate<void()> six(argCall, std::make_tuple(1.f, 1));
+	delegate<void()> six(argCall, 1.f, 1);
 	six();
-	delegate<void()> seven(largeCall, customAlloc);
+	delegate<void()> seven(std::pair<decltype(largeCall), decltype(customAlloc)>( largeCall, customAlloc ));
 	seven();
-	delegate<void(int)> eight(largeCallArg, std::make_tuple(1.f));
+	delegate<void(int)> eight(largeCallArg, 1.f);
 	eight(1);
-	delegate<void()> nine(largeCallArg, std::make_tuple(1.f, 1));
+	delegate<void()> nine(largeCallArg, 1.f, 1);
 	nine();
 	delegate<void(float,int)> ten(largeCallArg);
 	ten(1.f, 1);
@@ -44,6 +44,9 @@ int main()
 	eleven();
 	delegate<int()> twelve(smallCallRet);
 	twelve();
+
+	delegate<void()> thirteen(std::pair<decltype(largeCallArg), decltype(customAlloc)>(largeCallArg, customAlloc), 1.f, 1);
+	thirteen();
 
     std::cout << "Hello World!\n";
 }

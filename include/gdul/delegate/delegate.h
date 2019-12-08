@@ -254,16 +254,16 @@ public:
 		this->construct_call(std::move(callable), del_detail::default_allocator());
 	}
 	template <class Callable, class Allocator>
-	delegate(Callable callable, Allocator alloc) {
-		this->construct_call(std::move(callable), alloc);
+	delegate(std::pair<Callable, Allocator>&& callableAllocPair) {
+		this->construct_call(std::move(callableAllocPair.first), callableAllocPair.second);
 	}
 	template <class Callable, class ...Args>
-	delegate(Callable callable, std::tuple<Args...>&& args) {
-		this->construct_call_bind(std::move(callable), del_detail::default_allocator(), std::forward<std::tuple<Args...>>(args));
+	delegate(Callable callable, Args&&... args) {
+		this->construct_call_bind(std::move(callable), del_detail::default_allocator(), std::make_tuple(std::forward<Args>(args)...));
 	}
 	template <class Callable, class Allocator, class ...Args>
-	delegate(Callable callable, Allocator alloc, std::tuple<Args...>&& args) {
-		this->construct_call_bind(std::move(callable), alloc, std::forward<std::tuple<Args>>(args));
+	delegate(std::pair<Callable, Allocator>&& callableAllocPair, Args&&... args) {
+		this->construct_call_bind(std::move(callableAllocPair.first), std::move(callableAllocPair.second), std::make_tuple(std::forward<Args>(args)...));
 	}
 };
 
