@@ -4,12 +4,46 @@
 #include <iostream>
 #include <gdul/WIP_delegate/delegate.h>
 #include <functional>
+#include <vld.h>
+
 int main()
 {
-	auto callable = []() {};
+	using namespace gdul;
+	uint64_t cap1(1), cap2(2), cap3(3), cap4(4), cap5(5);
+	auto defaultCall = []() {};
+	auto largeCall = [cap1, cap2, cap3, cap4]() {};
+	auto returnCall = []() {return 1.0; };
+	auto argCall = [](float f, int i) {std::cout << f << " " << i << std::endl; };
+	auto largeCallArg = [cap1, cap2, cap3, cap4](float f, int i) { std::cout << f << " " << i << std::endl; };
+	auto largeCallRet = [cap1, cap2, cap3, cap4]() {return 1; };
+	auto smallCallRet = []() {return 1; };
 
-	gdul::delegate<void()> one(callable);
+	std::allocator<double> customAlloc;
+
+	delegate<void()> one(defaultCall);
 	one();
+	delegate<void()> two(largeCall);
+	two();
+	delegate<double()> three(returnCall);
+	three();
+	delegate<void(float, int)> four(argCall);
+	four(1.f, 1);
+	delegate<void(int)> five(argCall, std::make_tuple(1.f));
+	five(1);
+	delegate<void()> six(argCall, std::make_tuple(1.f, 1));
+	six();
+	delegate<void()> seven(largeCall, customAlloc);
+	seven();
+	delegate<void(int)> eight(largeCallArg, std::make_tuple(1.f));
+	eight(1);
+	delegate<void()> nine(largeCallArg, std::make_tuple(1.f, 1));
+	nine();
+	delegate<void(float,int)> ten(largeCallArg);
+	ten(1.f, 1);
+	delegate<int()> eleven(largeCallRet);
+	eleven();
+	delegate<int()> twelve(smallCallRet);
+	twelve();
 
     std::cout << "Hello World!\n";
 }

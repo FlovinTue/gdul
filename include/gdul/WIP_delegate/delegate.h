@@ -23,6 +23,10 @@
 #include <stdint.h>
 #include <type_traits>
 #include <memory>
+#include <cassert>
+#include <tuple>
+
+#define GDUL_ENABLE_IF_SIZE(type, size, op) template <class U = type, std::enable_if_t<sizeof(U) op size>* = nullptr>
 
 namespace gdul
 {
@@ -30,15 +34,15 @@ namespace gdul
 namespace del_detail {
 
 template<class Callable, class Tuple, std::size_t ...IndexSeq>
-constexpr auto _expand_tuple_in_apply(Callable&& call, Tuple&& tup, std::index_sequence<IndexSeq...>)
+constexpr auto apply_tuple_expansion(Callable&& call, Tuple&& tup, std::index_sequence<IndexSeq...>)
 {
-	return std::forward<Callable&&>(call)(std::get<IndexSeq>(std::forward<Tuple&&>(tup))...); tup;
+	return std::forward<Callable>(call)(std::get<IndexSeq>(std::forward<Tuple>(tup))...); tup;
 }
 template<class Callable, class Tuple>
-constexpr auto expand_tuple_in(Callable&& call, Tuple&& tup)
+constexpr auto call_with_tuple(Callable&& call, Tuple&& tup)
 {
 	using Indices = std::make_index_sequence<std::tuple_size<std::decay_t<Tuple>>::value>;
-	return _expand_tuple_in_apply(std::forward<Callable&&>(call), std::forward<Tuple&&>(tup), Indices());
+	return apply_tuple_expansion(std::forward<Callable>(call), std::forward<Tuple>(tup), Indices());
 }
 
 using default_allocator = std::allocator<std::uint8_t>;
@@ -49,65 +53,82 @@ struct callable_wrapper_base
 	inline virtual Ret operator()(Args&&... args) = 0;
 
 	virtual ~callable_wrapper_base() = default;
-	virtual std::uint8_t* allocate(std::size_t) { return nullptr; }
-	virtual void deallocate(std::uint8_t*, std::size_t) {}
+	virtual std::uint8_t* allocate(std::size_t) { assert(false); return nullptr; }
+	virtual void destruct_allocated(callable_wrapper_base<Ret, Args...>*) { assert(false); }
 	virtual void copy_construct_at(std::uint8_t*) = 0;
 };
-template <class Callable, class ...Args>
-struct callable_wrapper_impl_call : public callable_wrapper_base<std::result_of_t<Callable(Args...)>, Args...>
+template <class Ret, class Callable,class ...Args>
+struct callable_wrapper_impl_call : public callable_wrapper_base<Ret, Args...>
 {
 	callable_wrapper_impl_call(Callable&& callable)
-		: m_callable(std::forward<Callable&&>(callable)) {}
+		: m_callable(std::forward<Callable>(callable)) {}
 
-	inline std::result_of_t<Callable(Args...)> operator()(Args&&... args) override {
-		return m_callable(std::forward<Args&&>(args)...);
+	inline Ret operator()(Args&&... args) override {
+		return m_callable(std::forward<Args>(args)...);
 	}
 
-	void copy_construct_at(std::uint8_t* block) override{
-		new ((decltype(this))block) 
-			(callable_wrapper_impl_call<Callable, Args...>)(m_callable);
+	void copy_construct_at(std::uint8_t* block) override {
+		new (block) (callable_wrapper_impl_call<Ret, Callable, Args...>)(Callable(m_callable));
 	}
 
 	const Callable m_callable;
 };
 
-template <class Callable, class Allocator, class ...Args>
-struct callable_wrapper_impl_call_alloc : public callable_wrapper_impl_call<Callable, Args...>
+template <class Ret, class Callable,class Allocator, class ...Args>
+struct callable_wrapper_impl_call_alloc : public callable_wrapper_impl_call<Ret, Callable, Args...>
 {
 	callable_wrapper_impl_call_alloc(Callable&& callable, Allocator alloc)
-		: callable_wrapper_impl_call<Callable, Args...>(std::forward<Callable&&>(callable))
+		: callable_wrapper_impl_call<Ret, Callable, Args...>(std::forward<Callable>(callable))
 		, m_allocator(alloc) {}
 
-	std::uint8_t* allocate(std::size_t n) override { return m_allocator.allocate(n); }
-	void deallocate(std::uint8_t* block, std::size_t n) override { m_allocator.deallocate(block, n); }
-
-	const Allocator m_allocator;
-};
-
-template <class Callable, class BindTuple, class ...Args>
-struct callable_wrapper_impl_call_bind : public callable_wrapper_impl_call<Callable, Args...>
-{
-	callable_wrapper_impl_call_bind(Callable&& callable, BindTuple&& bind)
-		: callable_wrapper_impl_call<Callable, Args...>(std::forward<Callable&&>(callable))
-		, m_boundArgs(std::forward<BindTuple&&>(bind)) {}
-
-	inline std::result_of_t<Callable(Args...)> operator()(Args&&... args) override {
-		return expand_tuple_in(this->m_callable, m_boundArgs);
+	std::uint8_t* allocate(std::size_t n) override { 
+		return m_allocator.allocate(n);
+	}
+	void destruct_allocated(callable_wrapper_base<Ret, Args...>* obj) override { 
+		Allocator alloc(m_allocator);
+		constexpr std::size_t size(sizeof(decltype(*this)));
+		obj->~callable_wrapper_base();
+		alloc.deallocate((std::uint8_t*)obj, size);
 	}
 
-	const BindTuple m_boundArgs;
+	Allocator m_allocator;
 };
-template <class Callable, class Allocator, class BindTuple, class ...Args>
-struct callable_wrapper_impl_call_bind_alloc : public callable_wrapper_impl_call_bind<Callable, Args...>
+
+template <class Ret, class Callable,class BindTuple, class ...Args>
+struct callable_wrapper_impl_call_bind : public callable_wrapper_base<Ret, Args...>
+{
+	callable_wrapper_impl_call_bind(Callable&& callable, BindTuple&& bind)
+		: m_callable(std::forward<Callable>(callable))
+		, m_boundTuple(std::forward<BindTuple>(bind)) {}
+
+	inline Ret operator()(Args&&... args) override {
+		return call_with_tuple(this->m_callable, std::tuple_cat(m_boundTuple, std::make_tuple(std::forward<Args>(args)...)));
+	}
+
+	void copy_construct_at(std::uint8_t* block) override {
+		new (block) (callable_wrapper_impl_call_bind<Ret, Callable, BindTuple, Args...>)(Callable(m_callable), BindTuple(m_boundTuple));
+	}
+
+	const Callable m_callable;
+	const BindTuple m_boundTuple;
+};
+template <class Ret, class Callable,class Allocator, class BindTuple, class ...Args>
+struct callable_wrapper_impl_call_bind_alloc : public callable_wrapper_impl_call_bind<Ret, Callable, BindTuple, Args...>
 {
 	callable_wrapper_impl_call_bind_alloc(Callable&& callable, BindTuple&& bind, Allocator alloc)
-		: callable_wrapper_impl_call_bind<Callable, Args...>(std::forward<Callable&&>(callable), std::forward<BindTuple&&>(bind))
+		: callable_wrapper_impl_call_bind<Ret, Callable, BindTuple, Args...>(std::forward<Callable>(callable), std::forward<BindTuple>(bind))
 		, m_allocator(alloc) {}
 
-	std::uint8_t* allocate(std::size_t n) override { return m_allocator.allocate(n); }
-	void deallocate(std::uint8_t* block, std::size_t n) override { m_allocator.deallocate(block, n); }
-
-	const Allocator m_allocator;
+	std::uint8_t* allocate(std::size_t n) override { 
+		return m_allocator.allocate(n); 
+	}
+	void destruct_allocated(callable_wrapper_base<Ret, Args...>* obj) override {
+		Allocator alloc(m_allocator);
+		constexpr std::size_t size(sizeof(decltype(*this)));
+		obj->~callable_wrapper_base();
+		alloc.deallocate((std::uint8_t*)obj, size);
+	}
+	Allocator m_allocator;
 };
 
 constexpr std::size_t Delegate_Storage = 32;
@@ -117,23 +138,36 @@ class alignas (alignof(std::max_align_t)) delegate_impl
 {
 public:
 	delegate_impl() noexcept;
+	~delegate_impl() noexcept;
 
-	Ret operator()(Args&& ...args);
+	Ret operator()(Args && ...args);
 
 protected:
-	template <class Callable>
-	void construct_call(Callable && callable);
+	template <class Callable, class Allocator, std::size_t Compare = sizeof(del_detail::callable_wrapper_impl_call<Ret, Callable, Args...>), std::enable_if_t<!(del_detail::Delegate_Storage < Compare)>* = nullptr>
+	void construct_call(Callable && callable, Allocator);
+
+	template <class Callable, class Allocator, std::size_t Compare = sizeof(del_detail::callable_wrapper_impl_call<Ret, Callable, Args...>), std::enable_if_t<(del_detail::Delegate_Storage < Compare)> * = nullptr>
+	void construct_call(Callable && callable, Allocator alloc);
+
+	template <class Callable, class Allocator, class BindTuple, std::size_t Compare = sizeof(del_detail::callable_wrapper_impl_call_bind<Ret, Callable, BindTuple, Args...>), std::enable_if_t<!(del_detail::Delegate_Storage < Compare)> * = nullptr>
+	void construct_call_bind(Callable && callable, Allocator, BindTuple&& args);
+
+	template <class Callable, class Allocator, class BindTuple, std::size_t Compare = sizeof(del_detail::callable_wrapper_impl_call_bind<Ret, Callable, BindTuple, Args...>), std::enable_if_t<(del_detail::Delegate_Storage < Compare)> * = nullptr>
+	void construct_call_bind(Callable && callable, Allocator alloc, BindTuple && args);
 
 private:
-	template <std::size_t Size, class Allocator>
-	std::uint8_t* fetch_appropriate_storage(Allocator alloc);
+	template <class Callable, class Allocator>
+	void construct_call_alloc(Callable && callable, Allocator alloc);
 
-	union
-	{
-		std::uint8_t m_storage[del_detail::Delegate_Storage];
-		std::size_t m_allocated;
-	};
+	template <class Callable, class BindTuple, class Allocator>
+	void construct_call_bind_alloc(Callable && callable, Allocator alloc, BindTuple && bound);
+
+private:
+	bool has_allocated();
+	
 	del_detail::callable_wrapper_base<Ret, Args...>* m_callable;
+
+	std::uint8_t m_storage[del_detail::Delegate_Storage];
 };
 
 template <class Signature>
@@ -146,38 +180,90 @@ delegate_impl<Ret, Args...>::delegate_impl() noexcept
 	, m_storage{}
 {}
 template<class Ret, class ...Args>
-inline Ret delegate_impl<Ret, Args...>::operator()(Args&& ... args)
+inline delegate_impl<Ret, Args...>::~delegate_impl() noexcept
 {
-	return m_callable->operator()(std::forward<Args&&>(args)...);
-}
-template<class Ret, class ...Args>
-template<class Callable>
-void delegate_impl<Ret, Args...>::construct_call(Callable&& callable)
-{
-	using type = del_detail::callable_wrapper_impl_call<Callable, Args...>;
-	std::uint8_t* const storage(fetch_appropriate_storage<sizeof(type), del_detail::default_allocator>(del_detail::default_allocator()));
-	m_callable = new (storage) type((std::forward<Callable&&>(callable)));
-}
-template<class Ret, class ...Args>
-template<std::size_t Size, class Allocator>
-std::uint8_t* delegate_impl<Ret, Args...>::fetch_appropriate_storage(Allocator alloc)
-{
-	if (!(del_detail::Delegate_Storage < Size)) {
-		return &m_storage[0];
+	if (!has_allocated()) {
+		m_callable->~callable_wrapper_base();
 	}
 	else {
-		return alloc.allocate(Size);
+		m_callable->destruct_allocated(m_callable);
 	}
+}
+template<class Ret, class ...Args>
+inline Ret delegate_impl<Ret, Args...>::operator()(Args&& ... args)
+{
+	return m_callable->operator()(std::forward<Args>(args)...);
+}
+template<class Ret, class ...Args>
+inline bool delegate_impl<Ret, Args...>::has_allocated()
+{
+	return ((std::uint8_t*)m_callable < &m_storage[0]) | (&m_storage[del_detail::Delegate_Storage - 1] < (std::uint8_t*)m_callable);
+}
+template<class Ret, class ...Args>
+template<class Callable, class Allocator, std::size_t Compare, std::enable_if_t<!(del_detail::Delegate_Storage < Compare)>*>
+void delegate_impl<Ret, Args...>::construct_call(Callable&& callable, Allocator)
+{
+	using type = del_detail::callable_wrapper_impl_call<Ret, Callable, Args...>;
+	m_callable = new (&m_storage[0]) type((std::forward<Callable>(callable)));
+}
+template<class Ret, class ...Args>
+template<class Callable, class Allocator, std::size_t Compare, std::enable_if_t<(del_detail::Delegate_Storage < Compare)>*>
+void delegate_impl<Ret, Args...>::construct_call(Callable&& callable, Allocator alloc)
+{
+	construct_call_alloc(std::forward<Callable>(callable), alloc);
+}
+template<class Ret, class ...Args>
+template<class Callable, class Allocator, class BindTuple, std::size_t Compare, std::enable_if_t<(del_detail::Delegate_Storage < Compare)>* >
+inline void delegate_impl<Ret, Args...>::construct_call_bind(Callable&& callable, Allocator alloc, BindTuple&& bind)
+{
+	construct_call_bind_alloc(std::forward<Callable>(callable), alloc, std::forward<BindTuple>(bind));
+}
+template<class Ret, class ...Args>
+template<class Callable, class Allocator, class BindTuple, std::size_t Compare, std::enable_if_t<!(del_detail::Delegate_Storage < Compare)>* >
+inline void delegate_impl<Ret, Args...>::construct_call_bind(Callable&& callable, Allocator, BindTuple&& bound)
+{
+	using type = del_detail::callable_wrapper_impl_call_bind<Ret, Callable, BindTuple, Args...>;
+	m_callable = new (&m_storage[0]) type(std::forward<Callable>(callable), std::forward<BindTuple>(bound));
+}
+template<class Ret, class ...Args>
+template<class Callable, class Allocator>
+inline void delegate_impl<Ret, Args...>::construct_call_alloc(Callable&& callable, Allocator alloc)
+{
+	using allocator_type = typename std::allocator_traits<Allocator>::template rebind_alloc<std::uint8_t>;
+	using type = del_detail::callable_wrapper_impl_call_alloc<Ret, Callable, allocator_type, Args...>;
+	allocator_type rebound(alloc);
+	m_callable = new (rebound.allocate(sizeof(type))) type(std::forward<Callable>(callable), rebound);
+}
+template<class Ret, class ...Args>
+template<class Callable, class BindTuple, class Allocator>
+inline void delegate_impl<Ret, Args...>::construct_call_bind_alloc(Callable&& callable, Allocator alloc, BindTuple&& bind)
+{
+	using allocator_type = typename std::allocator_traits<Allocator>::template rebind_alloc<std::uint8_t>;
+	using type = del_detail::callable_wrapper_impl_call_bind_alloc<Ret, Callable, allocator_type, BindTuple, Args...>;
+	allocator_type rebound(alloc);
+	m_callable = new (rebound.allocate(sizeof(type))) type(std::forward<Callable>(callable), std::forward<BindTuple>(bind), rebound);
 }
 }
 template <class Signature>
-class delegate : public del_detail::delegate_sig_def<Signature>::impl 
+class delegate : public del_detail::delegate_sig_def<Signature>::impl
 {
 public:
 
 	template <class Callable>
-	delegate(Callable&& callable) {
-		this->construct_call(std::forward<Callable&&>(callable));
+	delegate(Callable callable) {
+		this->construct_call(std::move(callable), del_detail::default_allocator());
+	}
+	template <class Callable, class Allocator>
+	delegate(Callable callable, Allocator alloc) {
+		this->construct_call(std::move(callable), alloc);
+	}
+	template <class Callable, class ...Args>
+	delegate(Callable callable, std::tuple<Args...>&& args) {
+		this->construct_call_bind(std::move(callable), del_detail::default_allocator(), std::forward<std::tuple<Args...>>(args));
+	}
+	template <class Callable, class Allocator, class ...Args>
+	delegate(Callable callable, Allocator alloc, std::tuple<Args...>&& args) {
+		this->construct_call_bind(std::move(callable), alloc, std::forward<std::tuple<Args>>(args));
 	}
 };
 
