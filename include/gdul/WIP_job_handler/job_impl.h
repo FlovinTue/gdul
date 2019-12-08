@@ -26,7 +26,7 @@
 #include <gdul/WIP_job_handler/chunk_allocator.h>
 #include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
 #include <gdul/WIP_job_handler/job_dependee.h>
-#include <gdul/WIP_job_handler/job_delegate.h>
+#include <gdul/delegate/delegate.h>
 
 namespace gdul{
 
@@ -45,7 +45,7 @@ public:
 
 	job_impl();
 
-	job_impl(const job_delegate<void, void>& call, job_handler_impl* handler);
+	job_impl(delegate<void()>&& workUnit, job_handler_impl* handler);
 	~job_impl();
 	
 	void operator()();
@@ -67,7 +67,7 @@ private:
 
 	void detach_children();
 
-	job_delegate<void, void> m_callable;
+	delegate<void()> m_workUnit;
 
 	job_handler_impl* const m_handler;
 

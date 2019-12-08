@@ -27,11 +27,11 @@ namespace gdul
 namespace jh_detail
 {
 job_impl::job_impl()
-	: job_impl(job_delegate<void, void>([]() {}, allocator_type()), nullptr)
+	: job_impl(delegate<void()>([]() {}, allocator_type()), nullptr)
 {
 }
-job_impl::job_impl(const job_delegate<void, void>& call, job_handler_impl* handler)
-	: m_callable(call)
+job_impl::job_impl(delegate<void()>&& workUnit, job_handler_impl* handler)
+	: m_workUnit(std::forward<delegate<void()>>(workUnit))
 	, m_finished(false)
 	, m_enabled(false)
 	, m_firstDependee(nullptr)
@@ -46,7 +46,7 @@ job_impl::~job_impl()
 
 void job_impl::operator()()
 {
-	m_callable();
+	m_workUnit();
 
 	m_finished.store(true, std::memory_order_seq_cst);
 

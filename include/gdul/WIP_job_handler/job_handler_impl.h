@@ -34,7 +34,8 @@
 #include <gdul/WIP_job_handler/chunk_allocator.h>
 #include <gdul/WIP_job_handler/worker_impl.h>
 #include <gdul/WIP_job_handler/worker.h>
-#include <gdul/WIP_job_handler/job_delegate.h>
+#include <gdul/delegate/delegate.h>
+
 namespace gdul {
 
 namespace  jh_detail{
@@ -57,7 +58,7 @@ public:
 
 	worker make_worker();
 
-	job make_job(job_delegate<void, void>&& call);
+	job make_job(delegate<void()>&& workUnit);
 
 	std::size_t num_workers() const noexcept;
 	std::size_t num_enqueued() const noexcept;

@@ -27,9 +27,8 @@
 
 namespace gdul
 {
-
-template <class Callable, class InputArg>
-class job_delegate;
+template <class Signature>
+class delegate;
 
 namespace jh_detail
 {
@@ -47,22 +46,13 @@ public:
 
 	worker make_worker();
 
-	job make_job(job_delegate<void, void>&& del);
+	job make_job(gdul::delegate<void()>&& workUnit);
 
 	std::size_t num_workers() const;
 	std::size_t num_enqueued() const;
-
-	template <class Callable, class ...BoundArgs>
-	job_delegate<std::invoke_result_t<Callable>, void> make_delegate(Callable&& callable, BoundArgs&& ...args);
-
 private:
 
 	gdul::shared_ptr<jh_detail::job_handler_impl> m_impl;
 	jh_detail::allocator_type m_allocator;
 };
-template<class Callable, class ...BoundArgs>
-inline job_delegate<std::invoke_result_t<Callable>, void> job_handler::make_delegate(Callable&& callable, BoundArgs&& ...args)
-{
-	return job_delegate<std::invoke_result_t<Callable>, void>(std::forward<Callable&&>(callable), m_allocator, std::tuple(std::forward<BoundArgs&&>(args)...));
-}
 }

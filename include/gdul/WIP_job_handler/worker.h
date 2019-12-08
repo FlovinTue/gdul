@@ -21,10 +21,12 @@
 #pragma once
 
 #include <gdul/WIP_job_handler/job_handler_commons.h>
-#include <gdul/WIP_job_handler/job_delegate.h>
 
 namespace gdul
 {
+template <class Signature>
+class delegate;
+
 namespace jh_detail
 {
 class worker_impl;
@@ -54,8 +56,8 @@ public:
 	void activate();
 	bool deactivate();
 
-	void run_on_enable(job_delegate<void, void>&& del);
-	void run_on_disable(job_delegate<void, void>&& del);
+	void run_on_enable(delegate<void()>&& toCall);
+	void run_on_disable(delegate<void()>&& toCall);
 
 	bool is_active() const;
 

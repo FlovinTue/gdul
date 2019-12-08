@@ -92,7 +92,6 @@
   <ItemGroup>
     <ClInclude Include="..\..\include\gdul\job_handler_master.h" />
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\job.h" />
-    <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_delegate.h" />
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_dependee.h" />
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_handler.h" />
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_handler_impl.h" />
@@ -106,7 +105,6 @@
     <ClInclude Include="job_handler_tester.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\include\gdul\WIP_job_handler\job_delegate.cpp" />
     <ClCompile Include="..\..\include\gdul\WIP_job_handler\job.cpp" />
     <ClCompile Include="..\..\include\gdul\WIP_job_handler\job_handler.cpp" />
     <ClCompile Include="..\..\include\gdul\WIP_job_handler\job_handler_impl.cpp" />

@@ -21,7 +21,6 @@
 #pragma once
 
 #include <gdul/WIP_job_handler/job_handler_commons.h>
-#include <gdul/WIP_job_handler/job_delegate.h>
 #include <gdul/WIP_job_handler/job_handler.h>
 #include <gdul/WIP_job_handler/job.h>
 #include <vector>

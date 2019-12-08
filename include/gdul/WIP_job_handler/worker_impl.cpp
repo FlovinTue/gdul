@@ -19,7 +19,6 @@
 // SOFTWARE.
 
 #include <gdul/WIP_job_handler/worker_impl.h>
-#include <gdul/WIP_job_handler/job_delegate.h>
 #include <cassert>
 #include <cmath>
 
@@ -148,13 +147,13 @@ bool worker_impl::is_enabled() const
 {
 	return m_isEnabled.load(std::memory_order_relaxed);
 }
-void worker_impl::run_on_enable(job_delegate<void, void>&& del)
+void worker_impl::run_on_enable(delegate<void()>&& toCall)
 {
-	m_onEnable = std::move(del);
+	m_onEnable = std::forward<delegate<void()>>(toCall);
 }
-void worker_impl::run_on_disable(job_delegate<void, void>&& del)
+void worker_impl::run_on_disable(delegate<void()>&& toCall)
 {
-	m_onDisable = std::move(del);
+	m_onDisable = std::forward<delegate<void()>>(toCall);
 }
 void worker_impl::idle()
 {

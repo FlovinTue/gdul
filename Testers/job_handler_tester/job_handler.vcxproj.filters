@@ -31,9 +31,6 @@
     <ClCompile Include="work_tracker.cpp">
       <Filter>other</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\include\gdul\WIP_job_handler\job_delegate.cpp">
-      <Filter>implementation</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\chunk_allocator.h">
@@ -71,9 +68,6 @@
     </ClInclude>
     <ClInclude Include="work_tracker.h">
       <Filter>other</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_delegate.h">
-      <Filter>implementation</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\scatter_job_impl.h">
       <Filter>implementation</Filter>

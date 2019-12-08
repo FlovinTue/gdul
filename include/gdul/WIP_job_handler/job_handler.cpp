@@ -32,8 +32,8 @@ std::size_t job_handler::num_enqueued() const
 {
 	return m_impl->num_enqueued();
 }
-job job_handler::make_job(job_delegate<void, void>&& del)
+job job_handler::make_job(gdul::delegate<void()>&& workUnit)
 {
-	return m_impl->make_job(std::move(del));
+	return m_impl->make_job(std::forward<delegate<void()>>(workUnit));
 }
 }
