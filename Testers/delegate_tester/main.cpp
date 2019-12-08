@@ -48,6 +48,23 @@ int main()
 	delegate<void()> thirteen(std::pair<decltype(largeCallArg), decltype(customAlloc)>(largeCallArg, customAlloc), 1.f, 1);
 	thirteen();
 
+	delegate<void()> moveconstruct(std::move(thirteen));
+	moveconstruct();
+	delegate<void()> moveAssign;
+	moveAssign = std::move(moveconstruct);
+	moveAssign();
+
+	delegate<void()> copyAlloc(moveAssign);
+	copyAlloc();
+	delegate<void()> copyAllocAssign;
+	copyAllocAssign = copyAlloc;
+	copyAllocAssign();
+
+	delegate<void()> constructStatic(one);
+	constructStatic();
+	delegate<void()> assignStatic;
+	assignStatic = constructStatic;
+
     std::cout << "Hello World!\n";
 }
 
