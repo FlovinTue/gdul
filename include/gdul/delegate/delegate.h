@@ -53,9 +53,9 @@ struct callable_wrapper_base
 	inline virtual Ret operator()(Args&&... args) = 0;
 
 	virtual ~callable_wrapper_base() = default;
-	virtual std::uint8_t* allocate(std::size_t) { assert(false); return nullptr; }
+	virtual std::uint8_t* allocate() { assert(false); return nullptr; }
 	virtual void destruct_allocated(callable_wrapper_base<Ret, Args...>*) { assert(false); }
-	virtual void copy_construct_at(std::uint8_t*) = 0;
+	virtual callable_wrapper_base<Ret, Args...>* copy_construct_at(std::uint8_t*) = 0;
 };
 template <class Ret, class Callable,class ...Args>
 struct callable_wrapper_impl_call : public callable_wrapper_base<Ret, Args...>
@@ -67,8 +67,8 @@ struct callable_wrapper_impl_call : public callable_wrapper_base<Ret, Args...>
 		return m_callable(std::forward<Args>(args)...);
 	}
 
-	void copy_construct_at(std::uint8_t* block) override {
-		new (block) (callable_wrapper_impl_call<Ret, Callable, Args...>)(Callable(m_callable));
+	callable_wrapper_base<Ret, Args...>* copy_construct_at(std::uint8_t* block) override {
+		return new (block) (callable_wrapper_impl_call<Ret, Callable, Args...>)(Callable(m_callable));
 	}
 
 	const Callable m_callable;
@@ -81,14 +81,17 @@ struct callable_wrapper_impl_call_alloc : public callable_wrapper_impl_call<Ret,
 		: callable_wrapper_impl_call<Ret, Callable, Args...>(std::forward<Callable>(callable))
 		, m_allocator(alloc) {}
 
-	std::uint8_t* allocate(std::size_t n) override { 
-		return m_allocator.allocate(n);
+	std::uint8_t* allocate() override { 
+		return m_allocator.allocate(sizeof(decltype(*this)));
 	}
 	void destruct_allocated(callable_wrapper_base<Ret, Args...>* obj) override { 
 		Allocator alloc(m_allocator);
 		constexpr std::size_t size(sizeof(decltype(*this)));
 		obj->~callable_wrapper_base();
 		alloc.deallocate((std::uint8_t*)obj, size);
+	}
+	callable_wrapper_base<Ret, Args...>* copy_construct_at(std::uint8_t* block) override {
+		return new (block) (callable_wrapper_impl_call_alloc<Ret, Callable, Allocator, Args...>)(Callable(this->m_callable), m_allocator);
 	}
 
 	Allocator m_allocator;
@@ -105,8 +108,8 @@ struct callable_wrapper_impl_call_bind : public callable_wrapper_base<Ret, Args.
 		return call_with_tuple(this->m_callable, std::tuple_cat(m_boundTuple, std::make_tuple(std::forward<Args>(args)...)));
 	}
 
-	void copy_construct_at(std::uint8_t* block) override {
-		new (block) (callable_wrapper_impl_call_bind<Ret, Callable, BindTuple, Args...>)(Callable(m_callable), BindTuple(m_boundTuple));
+	callable_wrapper_base<Ret, Args...>* copy_construct_at(std::uint8_t* block) override {
+		return new (block) (callable_wrapper_impl_call_bind<Ret, Callable, BindTuple, Args...>)(Callable(m_callable), BindTuple(m_boundTuple));
 	}
 
 	const Callable m_callable;
@@ -119,14 +122,17 @@ struct callable_wrapper_impl_call_bind_alloc : public callable_wrapper_impl_call
 		: callable_wrapper_impl_call_bind<Ret, Callable, BindTuple, Args...>(std::forward<Callable>(callable), std::forward<BindTuple>(bind))
 		, m_allocator(alloc) {}
 
-	std::uint8_t* allocate(std::size_t n) override { 
-		return m_allocator.allocate(n); 
+	std::uint8_t* allocate() override {
+		return m_allocator.allocate(sizeof(decltype(*this)));
 	}
 	void destruct_allocated(callable_wrapper_base<Ret, Args...>* obj) override {
 		Allocator alloc(m_allocator);
 		constexpr std::size_t size(sizeof(decltype(*this)));
 		obj->~callable_wrapper_base();
 		alloc.deallocate((std::uint8_t*)obj, size);
+	}
+	callable_wrapper_base<Ret, Args...>* copy_construct_at(std::uint8_t* block) override {
+		return new (block) (callable_wrapper_impl_call_bind_alloc<Ret, Callable, Allocator, BindTuple, Args...>)(Callable(this->m_callable), BindTuple(this->m_boundTuple), m_allocator);
 	}
 	Allocator m_allocator;
 };
@@ -155,6 +161,8 @@ protected:
 	template <class Callable, class Allocator, class BindTuple, std::size_t Compare = sizeof(del_detail::callable_wrapper_impl_call_bind<Ret, Callable, BindTuple, Args...>), std::enable_if_t<(del_detail::Delegate_Storage < Compare)> * = nullptr>
 	void construct_call_bind(Callable && callable, Allocator alloc, BindTuple && args);
 
+	void copy_from(const delegate_impl<Ret, Args...> & other);
+	void move_from(delegate_impl<Ret, Args...> & other);
 private:
 	template <class Callable, class Allocator>
 	void construct_call_alloc(Callable && callable, Allocator alloc);
@@ -163,7 +171,7 @@ private:
 	void construct_call_bind_alloc(Callable && callable, Allocator alloc, BindTuple && bound);
 
 private:
-	bool has_allocated();
+	bool has_allocated() const;
 	
 	del_detail::callable_wrapper_base<Ret, Args...>* m_callable;
 
@@ -182,11 +190,13 @@ delegate_impl<Ret, Args...>::delegate_impl() noexcept
 template<class Ret, class ...Args>
 inline delegate_impl<Ret, Args...>::~delegate_impl() noexcept
 {
-	if (!has_allocated()) {
-		m_callable->~callable_wrapper_base();
-	}
-	else {
-		m_callable->destruct_allocated(m_callable);
+	if (m_callable) {
+		if (!has_allocated()) {
+			m_callable->~callable_wrapper_base();
+		}
+		else {
+			m_callable->destruct_allocated(m_callable);
+		}
 	}
 }
 template<class Ret, class ...Args>
@@ -195,7 +205,30 @@ inline Ret delegate_impl<Ret, Args...>::operator()(Args&& ... args)
 	return m_callable->operator()(std::forward<Args>(args)...);
 }
 template<class Ret, class ...Args>
-inline bool delegate_impl<Ret, Args...>::has_allocated()
+inline void delegate_impl<Ret, Args...>::copy_from(const delegate_impl<Ret, Args...>& other)
+{
+	if (other.has_allocated()) {
+		std::uint8_t* const storage(other.m_callable->allocate());
+		other.m_callable->copy_construct_at(storage);
+		m_callable = (callable_wrapper_base<Ret, Args...>*)storage;
+	}
+	else {
+		m_callable = other.m_callable->copy_construct_at(&m_storage[0]);
+	}
+}
+template<class Ret, class ...Args>
+inline void delegate_impl<Ret, Args...>::move_from(delegate_impl<Ret, Args...>& other)
+{
+	if (other.has_allocated()) {
+		m_callable = other.m_callable;
+		other.m_callable = nullptr;
+	}
+	else {
+		copy_from(other);
+	}
+}
+template<class Ret, class ...Args>
+inline bool delegate_impl<Ret, Args...>::has_allocated() const
 {
 	return ((std::uint8_t*)m_callable < &m_storage[0]) | (&m_storage[del_detail::Delegate_Storage - 1] < (std::uint8_t*)m_callable);
 }
@@ -248,6 +281,22 @@ template <class Signature>
 class delegate : public del_detail::delegate_sig_def<Signature>::impl
 {
 public:
+	delegate() noexcept = default;
+
+	delegate(const delegate<Signature>& other) {
+		this->copy_from(other);
+	}
+	delegate(delegate<Signature>&& other) {
+		this->move_from(other);
+	}
+	delegate& operator=(const delegate<Signature>& other) {
+		this->copy_from(other);
+		return *this;
+	}
+	delegate& operator=(delegate<Signature>&& other) {
+		this->move_from(other);
+		return *this;
+	}
 
 	template <class Callable>
 	delegate(Callable callable) {
