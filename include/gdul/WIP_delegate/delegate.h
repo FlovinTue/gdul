@@ -22,6 +22,7 @@
 
 #include <stdint.h>
 #include <type_traits>
+#include <memory>
 
 namespace gdul
 {
@@ -47,19 +48,24 @@ struct callable_wrapper_base
 {
 	inline virtual Ret operator()(Args&&... args) = 0;
 
-	virtual ~callable_wrapper_base() = 0;
+	virtual ~callable_wrapper_base() = default;
 	virtual std::uint8_t* allocate(std::size_t) { return nullptr; }
-	virtual std::uint8_t* allocate(std::uint8_t*, std::size_t) {}
+	virtual void deallocate(std::uint8_t*, std::size_t) {}
 	virtual void copy_construct_at(std::uint8_t*) = 0;
 };
 template <class Callable, class ...Args>
-struct callable_wrapper_impl_call : public callable_wrapper_base<std::result_of_t<Callable>, Args...>
+struct callable_wrapper_impl_call : public callable_wrapper_base<std::result_of_t<Callable(Args...)>, Args...>
 {
 	callable_wrapper_impl_call(Callable&& callable)
 		: m_callable(std::forward<Callable&&>(callable)) {}
 
-	inline std::result_of_t<Callable> operator()(Args&&... args) override {
+	inline std::result_of_t<Callable(Args...)> operator()(Args&&... args) override {
 		return m_callable(std::forward<Args&&>(args)...);
+	}
+
+	void copy_construct_at(std::uint8_t* block) override{
+		new ((decltype(this))block) 
+			(callable_wrapper_impl_call<Callable, Args...>)(m_callable);
 	}
 
 	const Callable m_callable;
@@ -85,7 +91,7 @@ struct callable_wrapper_impl_call_bind : public callable_wrapper_impl_call<Calla
 		: callable_wrapper_impl_call<Callable, Args...>(std::forward<Callable&&>(callable))
 		, m_boundArgs(std::forward<BindTuple&&>(bind)) {}
 
-	inline std::result_of_t<Callable> operator()(Args&&... args) override {
+	inline std::result_of_t<Callable(Args...)> operator()(Args&&... args) override {
 		return expand_tuple_in(this->m_callable, m_boundArgs);
 	}
 
@@ -112,13 +118,15 @@ class alignas (alignof(std::max_align_t)) delegate_impl
 public:
 	delegate_impl() noexcept;
 
-	template <class Callable>
-	delegate_impl(Callable && callable);
+	Ret operator()(Args&& ...args);
 
+protected:
+	template <class Callable>
+	void construct_call(Callable && callable);
 
 private:
 	template <std::size_t Size, class Allocator>
-	void put_storage_at_callable(Allocator alloc);
+	std::uint8_t* fetch_appropriate_storage(Allocator alloc);
 
 	union
 	{
@@ -128,7 +136,7 @@ private:
 	del_detail::callable_wrapper_base<Ret, Args...>* m_callable;
 };
 
-template <class Sig>
+template <class Signature>
 struct delegate_sig_def;
 template <class Ret, class ...Args>
 struct delegate_sig_def<Ret(Args...)> { using impl = delegate_impl<Ret, Args...>; };
@@ -136,30 +144,41 @@ template<class Ret, class ...Args>
 delegate_impl<Ret, Args...>::delegate_impl() noexcept
 	: m_callable(nullptr)
 	, m_storage{}
+{}
+template<class Ret, class ...Args>
+inline Ret delegate_impl<Ret, Args...>::operator()(Args&& ... args)
 {
+	return m_callable->operator()(std::forward<Args&&>(args)...);
 }
 template<class Ret, class ...Args>
 template<class Callable>
-delegate_impl<Ret, Args...>::delegate_impl(Callable&& callable)
-	: delegate_impl()
+void delegate_impl<Ret, Args...>::construct_call(Callable&& callable)
 {
 	using type = del_detail::callable_wrapper_impl_call<Callable, Args...>;
-	put_storage_at_callable<sizeof(type), del_detail::default_allocator>(del_detail::default_allocator());
-	new (&m_callable) type((std::forward<Callable&&>(callable)));
+	std::uint8_t* const storage(fetch_appropriate_storage<sizeof(type), del_detail::default_allocator>(del_detail::default_allocator()));
+	m_callable = new (storage) type((std::forward<Callable&&>(callable)));
 }
 template<class Ret, class ...Args>
 template<std::size_t Size, class Allocator>
-void delegate_impl<Ret, Args...>::put_storage_at_callable(Allocator alloc)
+std::uint8_t* delegate_impl<Ret, Args...>::fetch_appropriate_storage(Allocator alloc)
 {
-	if (del_detail::Delegate_Storage < Size) {
-		m_callable = (del_detail::callable_wrapper_base<Ret, Args...>*) & m_storage[0];
+	if (!(del_detail::Delegate_Storage < Size)) {
+		return &m_storage[0];
 	}
 	else {
-		m_callable = (del_detail::callable_wrapper_base<Ret, Args...>*) alloc.allocate(Size);
+		return alloc.allocate(Size);
 	}
 }
 }
-template <class Sig>
-class delegate : public del_detail::delegate_sig_def<Sig>::impl {};
+template <class Signature>
+class delegate : public del_detail::delegate_sig_def<Signature>::impl 
+{
+public:
+
+	template <class Callable>
+	delegate(Callable&& callable) {
+		this->construct_call(std::forward<Callable&&>(callable));
+	}
+};
 
 }
