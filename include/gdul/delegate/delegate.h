@@ -26,8 +26,6 @@
 #include <cassert>
 #include <tuple>
 
-#define GDUL_ENABLE_IF_SIZE(type, size, op) template <class U = type, std::enable_if_t<sizeof(U) op size>* = nullptr>
-
 namespace gdul
 {
 
