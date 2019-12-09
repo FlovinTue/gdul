@@ -64,86 +64,87 @@ void job_handler_tester::setup_workers()
 
 float job_handler_tester::run_consumption_parallel_test(std::size_t jobs, float overDuration)
 {
-	auto wrap = []() {}; overDuration;
-	job root(m_handler.make_job(gdul::delegate<void()>(wrap)));
-	root.set_priority(0);
-	job end(m_handler.make_job(gdul::delegate<void()>([this]() { std::cout << "Finished run_consumption_parallel_test. Number of enqueued jobs: " << m_handler.num_enqueued() << std::endl; })));
+	//auto wrap = []() {}; overDuration;
+	//job root(m_handler.make_job(gdul::delegate<void()>(wrap)));
+	//root.set_priority(0);
+	//job end(m_handler.make_job(gdul::delegate<void()>([this]() { std::cout << "Finished run_consumption_parallel_test. Number of enqueued jobs: " << m_handler.num_enqueued() << std::endl; })));
 
-	for (std::size_t i = 0; i < jobs; ++i)
-	{
-		for (std::size_t j = 0; j < m_handler.num_workers(); ++j)
-		{
-			job jb(m_handler.make_job(gdul::delegate<void()>(wrap)));
-			jb.set_priority((j + i) % jh_detail::Priority_Granularity);
+	//for (std::size_t i = 0; i < jobs; ++i)
+	//{
+	//	for (std::size_t j = 0; j < m_handler.num_workers(); ++j)
+	//	{
+	//		job jb(m_handler.make_job(gdul::delegate<void()>(wrap)));
+	//		jb.set_priority((j + i) % jh_detail::Priority_Granularity);
 
-			end.add_dependency(jb);
+	//		end.add_dependency(jb);
 
-			jb.add_dependency(root);
-			jb.enable();
-		}
-	}
-	end.enable();
+	//		jb.add_dependency(root);
+	//		jb.enable();
+	//	}
+	//}
+	//end.enable();
 
-	gdul::timer<float> time;
-	root.enable();
-	end.wait_for_finish();
+	//gdul::timer<float> time;
+	//root.enable();
+	//end.wait_for_finish();
 
-	return time.get();
+	//return time.get();
+	overDuration;
+	jobs;
+	return 0.f;
 }
 
 float job_handler_tester::run_consumption_strand_parallel_test(std::size_t jobs, float overDuration)
 {
-	overDuration;
+	overDuration; jobs;
+	return 0.f;
+	//auto last = [this, jobs]() {m_work.end_work(); std::cout << "Finished run_consumption_strand_parallel_test. Number of enqueued jobs: " << m_handler.num_enqueued() << " out of " << jobs << " initial" << std::endl; };
 
-	auto begin = [this]() {m_work.begin_work(); };
-	auto main = [this]() {m_work.main_work(); };
-	auto last = [this, jobs]() {m_work.end_work(); std::cout << "Finished run_consumption_strand_parallel_test. Number of enqueued jobs: " << m_handler.num_enqueued() << " out of " << jobs << " initial" << std::endl; };
+	//job root(m_handler.make_job(gdul::delegate<void()>(&work_tracker::begin_work, &m_work)));
+	//job end(m_handler.make_job(gdul::delegate<void()>(last)));
+	//end.add_dependency(root);
+	//end.enable();
 
-	job root(m_handler.make_job(gdul::delegate<void()>(begin)));
-	job end(m_handler.make_job(gdul::delegate<void()>(last)));
-	end.add_dependency(root);
-	end.enable();
+	//job next[8]{};
+	//next[0] = m_handler.make_job(gdul::delegate<void()>(&work_tracker::main_work, &m_work));
+	//end.add_dependency(next[0]);
 
-	job next[8]{};
-	next[0] = m_handler.make_job(gdul::delegate<void()>(main));
-	end.add_dependency(next[0]);
+	//next[0].add_dependency(root);
+	//next[0].enable();
 
-	next[0].add_dependency(root);
-	next[0].enable();
+	//std::uint8_t nextNum(1);
 
-	std::uint8_t nextNum(1);
+	//for (std::size_t i = 0; i < jobs; ++i)
+	//{
 
-	for (std::size_t i = 0; i < jobs; ++i)
-	{
+	//	uint8_t children(1 + (rand() % 8));
+	//	job intermediate[8]{};
+	//	for (std::uint8_t j = 0; j < children; ++j, ++i)
+	//	{
+	//		intermediate[j] = m_handler.make_job(gdul::delegate<void()>(&work_tracker::main_work, &m_work));
+	//		intermediate[j].set_priority((j + i) % jh_detail::Priority_Granularity);
+	//		end.add_dependency(intermediate[j]);
 
-		uint8_t children(1 + (rand() % 8));
-		job intermediate[8]{};
-		for (std::uint8_t j = 0; j < children; ++j, ++i)
-		{
-			intermediate[j] = m_handler.make_job(gdul::delegate<void()>(main));
-			intermediate[j].set_priority((j + i) % jh_detail::Priority_Granularity);
-			end.add_dependency(intermediate[j]);
+	//		for (std::uint8_t dependencies = 0; dependencies < nextNum; ++dependencies)
+	//		{
+	//			intermediate[j].add_dependency(next[dependencies]);
+	//		}
+	//		intermediate[j].enable();
+	//	}
 
-			for (std::uint8_t dependencies = 0; dependencies < nextNum; ++dependencies)
-			{
-				intermediate[j].add_dependency(next[dependencies]);
-			}
-			intermediate[j].enable();
-		}
+	//	for (std::uint8_t j = 0; j < children; ++j)
+	//	{
+	//		next[j] = std::move(intermediate[j]);
+	//	}
+	//	nextNum = children;
+	//}
 
-		for (std::uint8_t j = 0; j < children; ++j)
-		{
-			next[j] = std::move(intermediate[j]);
-		}
-		nextNum = children;
-	}
+	//gdul::timer<float> time;
 
-	gdul::timer<float> time;
+	//root.enable();
+	//end.wait_for_finish();
 
-	root.enable();
-	end.wait_for_finish();
-
-	return time.get();
+	//return time.get();
 }
 
 float job_handler_tester::run_construction_parallel_test(std::size_t jobs, float overDuration)
@@ -187,36 +188,36 @@ float job_handler_tester::run_mixed_parallel_test(std::size_t jobs, float overDu
 
 float job_handler_tester::run_consumption_strand_test(std::size_t jobs, float overDuration)
 {
-	overDuration;
-	auto begin = [this]() {m_work.begin_work(); };
-	auto main = [this]() {m_work.main_work(); };
-	auto last = [this]() {m_work.end_work();  std::cout << "Finished run_consumption_strand_test. Number of enqueued jobs: " << m_handler.num_enqueued() << std::endl; };
+	overDuration; jobs;
+	return 0.f;
 
-	job root(m_handler.make_job((gdul::delegate<void()>(begin))));
-	job previous(m_handler.make_job(gdul::delegate<void()>(main)));
-	previous.add_dependency(root);
-	previous.enable();
+	//auto last = [this]() {m_work.end_work();  std::cout << "Finished run_consumption_strand_test. Number of enqueued jobs: " << m_handler.num_enqueued() << std::endl;};
 
-	for (std::size_t i = 0; i < jobs; ++i)
-	{
-		job next = m_handler.make_job(gdul::delegate<void()>(main));
-		next.set_priority(i % jh_detail::Priority_Granularity);
+	//job root(m_handler.make_job((gdul::delegate<void()>(&work_tracker::begin_work, &m_work))));
+	//job previous(m_handler.make_job(gdul::delegate<void()>(&work_tracker::main_work, &m_work)));
+	//previous.add_dependency(root);
+	//previous.enable();
 
-		next.add_dependency(previous);
-		next.enable();
+	//for (std::size_t i = 0; i < jobs; ++i)
+	//{
+	//	job next = m_handler.make_job(gdul::delegate<void()>(&work_tracker::main_work, &m_work));
+	//	next.set_priority(i % jh_detail::Priority_Granularity);
 
-		previous = std::move(next);
-	}
-	job end(m_handler.make_job(gdul::delegate<void()>(last)));
-	end.add_dependency(previous);
-	end.enable();
+	//	next.add_dependency(previous);
+	//	next.enable();
 
-	gdul::timer<float> time;
+	//	previous = std::move(next);
+	//}
+	//job end(m_handler.make_job(gdul::delegate<void()>(last)));
+	//end.add_dependency(previous);
+	//end.enable();
 
-	root.enable();
-	end.wait_for_finish();
+	//gdul::timer<float> time;
 
-	return time.get();
+	//root.enable();
+	//end.wait_for_finish();
+
+	//return time.get();
 }
 
 }

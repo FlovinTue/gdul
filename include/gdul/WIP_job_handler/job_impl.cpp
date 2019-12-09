@@ -27,7 +27,7 @@ namespace gdul
 namespace jh_detail
 {
 job_impl::job_impl()
-	: job_impl(delegate<void()>([]() {}, allocator_type()), nullptr)
+	: job_impl(delegate<void()>([]() {}), nullptr)
 {
 }
 job_impl::job_impl(delegate<void()>&& workUnit, job_handler_impl* handler)
