@@ -5,6 +5,11 @@
 #include <gdul/delegate/delegate.h>
 #include <functional>
 #include <vld.h>
+#include "../Common/Timer.h"
+#include <functional>
+
+uint64_t global = 0;
+
 
 int main()
 {
@@ -65,6 +70,61 @@ int main()
 	delegate<void()> assignStatic;
 	assignStatic = constructStatic;
 
+	delegate<void()> makeDel(make_delegate<void()>(largeCallArg, 1.f, 1));
+	makeDel();
+	delegate<void()> allocDel(alloc_delegate<void()>(largeCallArg, customAlloc, 1.f, 1));
+	allocDel();
+
+	auto awkwardLam = [cap1, cap2, cap3, cap4, cap5]()
+	{
+		global += cap1;
+		global += cap2;
+		global += cap3;
+		global += cap4;
+		global += cap5;
+	};
+	const size_t blah = sizeof(awkwardLam);
+
+	timer<float> time;
+
+	for (uint32_t i = 0; i < 300000000; ++i){
+		delegate<void()> constructed(awkwardLam);
+	}
+
+	const float constr(time.get());
+	
+	delegate<void()> something(awkwardLam);
+
+	time.reset();
+	
+	for (uint32_t i = 0; i < 300000000; ++i){
+		something();
+	}
+
+	const float call(time.get());
+	time.reset();
+
+	for (uint32_t i = 0; i < 300000000; ++i)
+	{
+		std::function<void()> constructed(awkwardLam);
+	}
+
+	const float constrf(time.get());
+
+	std::function<void()> somethingf(awkwardLam);
+
+	time.reset();
+
+	for (uint32_t i = 0; i < 300000000; ++i)
+	{
+		somethingf();
+	}
+
+	const float callf(time.get());
+
+	std::cout << "construct took " << constr << " seconds and call took " << call << " seconds" << std::endl;
+	std::cout << "compared to std::function, which had the following times: \n";
+	std::cout << "construct took " << constrf << " seconds and call took " << callf << " seconds" << std::endl;
     std::cout << "Hello World!\n";
 }
 
