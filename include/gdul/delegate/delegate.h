@@ -26,8 +26,6 @@
 #include <cassert>
 #include <tuple>
 
-#define GDUL_ENABLE_IF_SIZE(type, size, op) template <class U = type, std::enable_if_t<sizeof(U) op size>* = nullptr>
-
 namespace gdul
 {
 
@@ -137,16 +135,16 @@ struct callable_wrapper_impl_call_bind_alloc : public callable_wrapper_impl_call
 	Allocator m_allocator;
 };
 
-constexpr std::size_t Delegate_Storage = 32;
+constexpr std::size_t Delegate_Storage = 56;
 
 template <class Ret, class ...Args>
 class alignas (alignof(std::max_align_t)) delegate_impl
 {
 public:
-	delegate_impl() noexcept;
-	~delegate_impl() noexcept;
+	inline delegate_impl() noexcept;
+	inline ~delegate_impl() noexcept;
 
-	Ret operator()(Args && ...args);
+	inline Ret operator()(Args && ...args);
 
 protected:
 	template <class Callable, class Allocator, std::size_t Compare = sizeof(del_detail::callable_wrapper_impl_call<Ret, Callable, Args...>), std::enable_if_t<!(del_detail::Delegate_Storage < Compare)>* = nullptr>
@@ -173,9 +171,9 @@ private:
 private:
 	bool has_allocated() const;
 	
-	del_detail::callable_wrapper_base<Ret, Args...>* m_callable;
-
 	std::uint8_t m_storage[del_detail::Delegate_Storage];
+
+	del_detail::callable_wrapper_base<Ret, Args...>* m_callable;
 };
 
 template <class Signature>
@@ -190,13 +188,13 @@ delegate_impl<Ret, Args...>::delegate_impl() noexcept
 template<class Ret, class ...Args>
 inline delegate_impl<Ret, Args...>::~delegate_impl() noexcept
 {
-	if (m_callable) {
-		if (!has_allocated()) {
-			m_callable->~callable_wrapper_base();
-		}
-		else {
-			m_callable->destruct_allocated(m_callable);
-		}
+	if ((std::uint8_t*)m_callable == &m_storage[0]){
+		m_callable->~callable_wrapper_base();
+		return;
+	}
+	
+	if (m_callable){
+		m_callable->destruct_allocated(m_callable);
 	}
 }
 template<class Ret, class ...Args>
@@ -315,5 +313,17 @@ public:
 		this->construct_call_bind(std::move(callableAllocPair.first), std::move(callableAllocPair.second), std::make_tuple(std::forward<Args>(args)...));
 	}
 };
+
+template <class Signature, class Callable, class ...BoundArgs>
+delegate<Signature> make_delegate(Callable&& callable, BoundArgs&& ... boundArgs){
+	return delegate<Signature>(std::forward<Callable>(callable), std::forward<BoundArgs>(boundArgs)...);
+}
+// Despite it's name, it will not allocate unless it has to. Simply a distinction for using an explicit
+// allocator
+template <class Signature, class Callable, class Allocator, class ...BoundArgs>
+delegate<Signature> alloc_delegate(Callable&& callable, Allocator alloc, BoundArgs&& ... boundArgs)
+{
+	return delegate<Signature>(std::make_pair(std::forward<Callable>(callable), alloc), std::forward<BoundArgs>(boundArgs)...);
+}
 
 }
