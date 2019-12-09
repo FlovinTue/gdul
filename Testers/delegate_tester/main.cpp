@@ -10,6 +10,11 @@
 
 uint64_t global = 0;
 
+class cls
+{
+public:
+	void member() { std::cout << "called member" << std::endl; }
+};
 
 int main()
 {
@@ -52,6 +57,16 @@ int main()
 
 	delegate<void()> thirteen(std::pair<decltype(largeCallArg), decltype(customAlloc)>(largeCallArg, customAlloc), 1.f, 1);
 	thirteen();
+
+	cls c;
+	//delegate<void(cls*)> fourteen(&cls::member);
+	//fourteen(&c);
+	//delegate<void()> fifteen(&cls::member, &c);
+	//fifteen();
+
+	auto blah = &cls::member;
+	auto bleh = &c;
+	bleh->decltype(blah);
 
 	delegate<void()> moveconstruct(std::move(thirteen));
 	moveconstruct();

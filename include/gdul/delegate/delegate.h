@@ -31,7 +31,12 @@ namespace gdul
 
 namespace del_detail {
 
-template<class Callable, class Tuple, std::size_t ...IndexSeq>
+template<class Callable, class Tuple, std::enable_if_t<std::is_member_function_pointer_v<std::decay_t<Callable>>> * = nullptr, std::size_t ...IndexSeq>
+constexpr auto apply_tuple_expansion(Callable&& call, Tuple&& tup, std::index_sequence<IndexSeq...>)
+{
+	return std::get<0>(tup)->std::decay_t<Callable>(std::get<IndexSeq + 1>(std::forward<Tuple>(tup))...);
+}
+template<class Callable, class Tuple, std::enable_if_t<!std::is_member_function_pointer_v<std::decay_t<Callable>>>* = nullptr, std::size_t ...IndexSeq>
 constexpr auto apply_tuple_expansion(Callable&& call, Tuple&& tup, std::index_sequence<IndexSeq...>)
 {
 	return std::forward<Callable>(call)(std::get<IndexSeq>(std::forward<Tuple>(tup))...); tup;
@@ -39,7 +44,8 @@ constexpr auto apply_tuple_expansion(Callable&& call, Tuple&& tup, std::index_se
 template<class Callable, class Tuple>
 constexpr auto call_with_tuple(Callable&& call, Tuple&& tup)
 {
-	using Indices = std::make_index_sequence<std::tuple_size<std::decay_t<Tuple>>::value>;
+	constexpr std::size_t Mem_Fn_Offset(std::is_member_function_pointer_v<Callable>);
+	using Indices = std::make_index_sequence<std::tuple_size<std::decay_t<Tuple>>::value - Mem_Fn_Offset>;
 	return apply_tuple_expansion(std::forward<Callable>(call), std::forward<Tuple>(tup), Indices());
 }
 
