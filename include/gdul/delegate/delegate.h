@@ -154,7 +154,7 @@ template <class Ret, class ...Args>
 class alignas (alignof(std::max_align_t)) delegate_impl
 {
 public:
-	using return_value = Ret;
+	using return_type = Ret;
 
 	inline delegate_impl() noexcept;
 	inline ~delegate_impl() noexcept;
@@ -294,7 +294,7 @@ template <class Signature>
 class delegate : public del_detail::delegate_sig_def<Signature>::impl
 {
 public:
-	using signature = Signature;
+	using signature_type = Signature;
 
 	delegate() noexcept = default;
 
