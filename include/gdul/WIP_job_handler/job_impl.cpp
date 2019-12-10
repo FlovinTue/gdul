@@ -94,7 +94,7 @@ std::uint32_t job_impl::remove_dependencies(std::uint32_t n)
 }
 bool job_impl::enable()
 {
-	if (m_enabled.exchange(true, std::memory_order_relaxed)){
+	if (!m_enabled.exchange(true, std::memory_order_relaxed)){
 		return !remove_dependencies(Job_Max_Dependencies);
 	}
 	return false;

@@ -12,20 +12,17 @@
 
 int main()
 {	
-	//gdul::job_delegate<int, float> test([](float) {std::cout << "test" << std::endl; return 5; }, gdul::jh_detail::allocator_type());
-	//int integer = test(1.f);
-	//integer;
 	{
-		//gdul::job_handler_tester tester;
-		//
-		//gdul::job_handler_tester_info info;
-		//info.affinity = gdul::JOB_HANDLER_TESTER_WORKER_AFFINITY_DYNAMIC;
-		//
-		//tester.init(info);
+		gdul::job_handler_tester tester;
+		
+		gdul::job_handler_tester_info info;
+		info.affinity = gdul::JOB_HANDLER_TESTER_WORKER_AFFINITY_DYNAMIC;
+		
+		tester.init(info);
 	
 		for (uint32_t i = 0; i < 5000; ++i)
 		{
-			//tester.run_consumption_strand_parallel_test(20000, 1.0f);
+			tester.run_consumption_strand_parallel_test(20000, 1.0f);
 		}
 	}
 
