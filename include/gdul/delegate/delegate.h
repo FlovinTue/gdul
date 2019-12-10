@@ -31,10 +31,17 @@ namespace gdul
 
 namespace del_detail {
 
-template<class Callable, class Tuple, std::enable_if_t<std::is_member_function_pointer_v<std::decay_t<Callable>>> * = nullptr, std::size_t ...IndexSeq>
+template<class Callable, class Tuple, std::enable_if_t<std::is_member_function_pointer_v<std::decay_t<Callable>> && std::tuple_size<std::decay_t<Tuple>>::value == 1> * = nullptr, std::size_t ...IndexSeq>
 constexpr auto apply_tuple_expansion(Callable&& call, Tuple&& tup, std::index_sequence<IndexSeq...>)
 {
-	return std::get<0>(tup)->std::decay_t<Callable>(std::get<IndexSeq + 1>(std::forward<Tuple>(tup))...);
+	auto expInstPtr(std::get<0>(tup));
+	return (expInstPtr->*call)();
+}
+template<class Callable, class Tuple, std::enable_if_t<std::is_member_function_pointer_v<std::decay_t<Callable>> && std::tuple_size<std::decay_t<Tuple>>::value != 1> * = nullptr, std::size_t ...IndexSeq>
+constexpr auto apply_tuple_expansion(Callable&& call, Tuple&& tup, std::index_sequence<IndexSeq...>)
+{
+	auto expInstPtr(std::get<0>(tup));
+	return (expInstPtr->*call)(std::get<IndexSeq + 1>(std::forward<Tuple>(tup))...);
 }
 template<class Callable, class Tuple, std::enable_if_t<!std::is_member_function_pointer_v<std::decay_t<Callable>>>* = nullptr, std::size_t ...IndexSeq>
 constexpr auto apply_tuple_expansion(Callable&& call, Tuple&& tup, std::index_sequence<IndexSeq...>)
@@ -44,7 +51,7 @@ constexpr auto apply_tuple_expansion(Callable&& call, Tuple&& tup, std::index_se
 template<class Callable, class Tuple>
 constexpr auto call_with_tuple(Callable&& call, Tuple&& tup)
 {
-	constexpr std::size_t Mem_Fn_Offset(std::is_member_function_pointer_v<Callable>);
+	constexpr std::size_t Mem_Fn_Offset(std::is_member_function_pointer_v<std::decay_t<Callable>>);
 	using Indices = std::make_index_sequence<std::tuple_size<std::decay_t<Tuple>>::value - Mem_Fn_Offset>;
 	return apply_tuple_expansion(std::forward<Callable>(call), std::forward<Tuple>(tup), Indices());
 }
@@ -68,7 +75,7 @@ struct callable_wrapper_impl_call : public callable_wrapper_base<Ret, Args...>
 		: m_callable(std::forward<Callable>(callable)) {}
 
 	inline Ret operator()(Args&&... args) override {
-		return m_callable(std::forward<Args>(args)...);
+		return call_with_tuple(m_callable, std::forward_as_tuple(std::forward<Args>(args)...));
 	}
 
 	callable_wrapper_base<Ret, Args...>* copy_construct_at(std::uint8_t* block) override {
@@ -109,7 +116,7 @@ struct callable_wrapper_impl_call_bind : public callable_wrapper_base<Ret, Args.
 		, m_boundTuple(std::forward<BindTuple>(bind)) {}
 
 	inline Ret operator()(Args&&... args) override {
-		return call_with_tuple(this->m_callable, std::tuple_cat(m_boundTuple, std::make_tuple(std::forward<Args>(args)...)));
+		return call_with_tuple(this->m_callable, std::tuple_cat(m_boundTuple, std::forward_as_tuple(std::forward<Args>(args)...)));
 	}
 
 	callable_wrapper_base<Ret, Args...>* copy_construct_at(std::uint8_t* block) override {

@@ -14,6 +14,7 @@ class cls
 {
 public:
 	void member() { std::cout << "called member" << std::endl; }
+	void member_arg(float f, int i) { std::cout << "called member with args " << f << " and " << i << std::endl; };
 };
 
 int main()
@@ -59,14 +60,14 @@ int main()
 	thirteen();
 
 	cls c;
-	//delegate<void(cls*)> fourteen(&cls::member);
-	//fourteen(&c);
-	//delegate<void()> fifteen(&cls::member, &c);
-	//fifteen();
-
-	auto blah = &cls::member;
-	auto bleh = &c;
-	bleh->decltype(blah);
+	delegate<void(cls*)> fourteen(&cls::member);
+	fourteen(&c);
+	delegate<void()> fifteen(&cls::member, &c);
+	fifteen();
+	delegate<void()> sixteen(&cls::member_arg, &c, 16.f, 116);
+	sixteen();
+	delegate<void(cls*, float, int)> seventeen(&cls::member_arg);
+	seventeen(&c, 17.f, 177);
 
 	delegate<void()> moveconstruct(std::move(thirteen));
 	moveconstruct();
