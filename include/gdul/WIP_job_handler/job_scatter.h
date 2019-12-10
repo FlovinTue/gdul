@@ -25,10 +25,12 @@
 #include <gdul/WIP_job_handler/job.h>
 #include <vector>
 
+
+
 namespace gdul
 {
-template <class T, class Allocator = jh_detail::allocator_type>
-class scatter_job
+template <class T>
+class job_scatter
 {
 public:
 	using value_type = T;
@@ -36,20 +38,38 @@ public:
 	using input_vector_type = std::vector<value_type>;
 	using output_vector_type = std::vector<deref_value_type>;
 
-	scatter_job(input_vector_type& inputOutput, delegate<bool(deref_value_type)> process, std::size_t batchSize, job_handler* handler, Allocator alloc = Allocator());
-	scatter_job(const input_vector_type& input, output_vector_type& output, delegate<bool(deref_value_type)> process, std::size_t batchSize, job_handler* handler, Allocator alloc = Allocator());
+	// How to make job_scatter into a regular job?
+	// We want (maybe) : 
+	/*-------------------------------------------------------*/
+
+	void add_dependency(job& dependency);
+	
+	void set_priority(std::uint8_t priority) noexcept;
+
+	void wait_for_finish() noexcept;
+
+	operator bool() const noexcept;
+
+	void enable();
+	bool is_finished() const;
 
 private:
+	job_scatter(input_vector_type& inputOutput, delegate<bool(deref_value_type)> process, std::size_t batchSize, job_handler* handler, jh_detail::allocator_type alloc);
+	job_scatter(const input_vector_type& input, output_vector_type& output, delegate<bool(deref_value_type)> process, std::size_t batchSize, job_handler* handler, jh_detail::allocator_type alloc);
+
 	void initialize();
 
 	void make_jobs();
 
-	job make_process_job();
+	job make_process_job(std::size_t batch);
 	job make_pack_job();
 
 	void process_batch(std::size_t begin, std::size_t end);
 	void pack_batch(std::size_t begin, std::size_t end);
 	void finalize_batches();
+
+	job m_root;
+	job m_end;
 
 	const delegate<bool(deref_value_type)> m_process;
 
@@ -61,17 +81,52 @@ private:
 	
 	job_handler* const m_handler;
 
-	Allocator m_allocator;
-};
+	jh_detail::allocator_type m_allocator;
 
-template<class T, class Allocator>
-inline scatter_job<T, Allocator>::scatter_job(input_vector_type& inputOutput, delegate<bool(deref_value_type)> process, std::size_t batchSize, job_handler* handler, Allocator alloc)
-	: scatter_job<T, Allocator>::scatter_job(inputOutput, inputOutput, std::move(process), batchSize, handler, alloc)
+	std::uint8_t m_priority;
+
+	bool m_enabled;
+};
+template<class T>
+inline void job_scatter<T>::add_dependency(job & dependency)
+{
+	m_root.add_dependency(dependency);
+}
+template<class T>
+inline void job_scatter<T>::set_priority(std::uint8_t priority) noexcept
+{
+	m_priority = priority;
+}
+template<class T>
+inline void job_scatter<T>::wait_for_finish() noexcept
+{
+	m_end.wait_for_finish();
+}
+template<class T>
+inline job_scatter<T>::operator bool() const noexcept
+{
+	return true;
+}
+template<class T>
+inline void job_scatter<T>::enable()
+{
+	m_root.enable();
+}
+
+template<class T>
+inline bool job_scatter<T>::is_finished() const
+{
+	return m_end.is_finished();
+}
+
+template<class T>
+inline job_scatter<T>::job_scatter(input_vector_type& inputOutput, delegate<bool(deref_value_type)> process, std::size_t batchSize, job_handler* handler, jh_detail::allocator_type alloc)
+	: job_scatter<T>::job_scatter(inputOutput, inputOutput, std::move(process), batchSize, handler, alloc)
 {
 	static_assert(std::is_pointer_v<value_type>, "value_type must be of pointer type when working with a single inputOutput array");
 }
-template<class T, class Allocator>
-inline scatter_job<T, Allocator>::scatter_job(const input_vector_type& input, output_vector_type& output, delegate<bool(deref_value_type)> process, std::size_t batchSize, job_handler* handler, Allocator alloc)
+template<class T>
+inline job_scatter<T>::job_scatter(const input_vector_type& input, output_vector_type& output, delegate<bool(deref_value_type)> process, std::size_t batchSize, job_handler* handler, jh_detail::allocator_type alloc)
 	: m_process(process)
 	, m_input(input)
 	, m_output(output)
@@ -79,12 +134,14 @@ inline scatter_job<T, Allocator>::scatter_job(const input_vector_type& input, ou
 	, m_batchCount(m_input.size() / batchSize + ((bool)m_input.size() % batchSize))
 	, m_handler(handler)
 	, m_allocator(alloc)
+	, m_priority(jh_detail::Default_Job_Priority)
 {
 }
-template<class T, class Allocator>
-inline void scatter_job<T, Allocator>::make_jobs()
+template<class T>
+inline void job_scatter<T>::make_jobs()
 {
 	job currentProcessJob(make_process_job());
+	currentProcessJob.set_priority(m_priority);
 	currentProcessJob.enable();
 
 	job currentPackJob(currentProcessJob);
@@ -102,29 +159,29 @@ inline void scatter_job<T, Allocator>::make_jobs()
 		currentPackJob = std::move(nextPackJob);
 	}
 
-	job finalizer(m_handler->make_job(&scatter_job<T, Allocator>::finalize_batches, this));
+	job finalizer(m_handler->make_job(&job_scatter<T>::finalize_batches, this));
 	finalizer.add_dependency(currentPackJob);
 	finalizer.enable();
 
 	//*this->add_dependency(finalizer);
 }
-template<class T, class Allocator>
-inline job scatter_job<T, Allocator>::make_process_job()
+template<class T>
+inline job job_scatter<T>::make_process_job(std::size_t batch)
 {
 	std::size_t begin(i * m_batchSize);
 	std::size_t end(begin + m_batchSize < m_input.size() ? begin + m_batchSize : m_input.size());
 
-	job newjob(job_handler::make_job(&scatter_job::process_batch, this, begin, end));
+	job newjob(job_handler::make_job(&job_scatter::process_batch, this, begin, end));
 
 	return newJob;
 }
-template<class T, class Allocator>
-inline job scatter_job<T, Allocator>::make_pack_job()
+template<class T>
+inline job job_scatter<T>::make_pack_job()
 {
 	return job();
 }
-template<class T, class Allocator>
-inline void scatter_job<T, Allocator>::pack_batch(std::size_t begin, std::size_t end)
+template<class T>
+inline void job_scatter<T>::pack_batch(std::size_t begin, std::size_t end)
 {
 	assert(begin != 0 && "Illegal to pack batch#0");
 	assert(!(m_output.size() < end) && "End going past vector limits");
@@ -134,27 +191,27 @@ inline void scatter_job<T, Allocator>::pack_batch(std::size_t begin, std::size_t
 	std::uintptr_t lastBatchEnd((std::uintptr_t)m_output[begin - 1]);
 	const std::uintptr_t batchSize((std::uintptr_t)(*batchEndStorageItr));
 
-	Container::iterator copyBegin(m_output.at(begin));
-	Container::iterator copyEnd(first + batchSize);
-	Container::iterator copyTarget(m_output.at(lastBatchEnd));
+	output_vector_type::iterator copyBegin(m_output.at(begin));
+	output_vector_type::iterator copyEnd(first + batchSize);
+	output_vector_type::iterator copyTarget(m_output.at(lastBatchEnd));
 
 	std::copy(copyBegin, copyEnd, copyTarget);
 
 	*batchEndStorage = (value_type*)(lastBatchEnd + batchSize);
 }
-template<class T, class Allocator>
-inline void scatter_job<T, Allocator>::finalize_batches()
+template<class T>
+inline void job_scatter<T>::finalize_batches()
 {
 	const std::uintptr_t batchesEnd((std::uintptr_t)(m_output.back()));
 	m_output.resize(batchesEnd);
 }
-template<class T, class Allocator>
-inline void scatter_job<T, Allocator>::initialize()
+template<class T>
+inline void job_scatter<T>::initialize()
 {
-	m_input.resize(m_input.size() + m_batchCount);
+	m_output.resize(m_input.size() + m_batchCount);
 }
-template<class T, class Allocator>
-inline void scatter_job<T, Allocator>::process_batch(std::size_t begin, std::size_t end)
+template<class T>
+inline void job_scatter<T>::process_batch(std::size_t begin, std::size_t end)
 {
 	std::uintptr_t batchOutputSize(0);
 

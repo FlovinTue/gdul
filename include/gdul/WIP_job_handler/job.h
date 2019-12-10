@@ -35,12 +35,11 @@ class job
 public:
 	job() noexcept;
 
-	~job() = default;
+	~job();
 
 	void add_dependency(job& dependency);
 	void set_priority(std::uint8_t priority) noexcept;
 
-	// when enable has been run, this object may be discarded
 	void enable();
 
 	bool is_finished() const noexcept;

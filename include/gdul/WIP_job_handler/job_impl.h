@@ -55,7 +55,7 @@ public:
 	std::uint8_t get_priority() const;
 	void set_priority(std::uint8_t priority);
 
-	void add_dependencies(std::uint32_t n = 1);
+	std::uint32_t add_dependencies(std::uint32_t n = 1);
 	std::uint32_t remove_dependencies(std::uint32_t n = 1);
 
 	bool enable();
@@ -63,6 +63,7 @@ public:
 	job_handler_impl* get_handler() const;
 
 	bool is_finished() const;
+	bool is_enabled() const;
 private:
 
 	void detach_children();

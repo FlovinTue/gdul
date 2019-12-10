@@ -28,15 +28,16 @@ namespace gdul
 job::job() noexcept
 {
 }
+job::~job()
+{
+	assert(!(*this) || m_impl->is_enabled() && "Job destructor ran before enable was called");
+}
 void job::add_dependency(job & dependency)
 {
 	assert(m_impl && "Job not set");
 
-	// Preemptively add to not cause race condition
-	m_impl->add_dependencies(1);
-
-	if (!dependency.m_impl->try_attach_child(m_impl)) {
-		if (m_impl->remove_dependencies(1)){
+	if (dependency.m_impl->try_attach_child(m_impl)) {
+		if (!m_impl->add_dependencies(1)){
 			m_impl->get_handler()->enqueue_job(m_impl);
 		}
 	}

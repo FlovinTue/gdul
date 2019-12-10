@@ -83,9 +83,10 @@ void job_impl::set_priority(std::uint8_t priority)
 {
 	m_priority = priority;
 }
-void job_impl::add_dependencies(std::uint32_t n)
+std::uint32_t job_impl::add_dependencies(std::uint32_t n)
 {
-	m_dependencies.fetch_add(n, std::memory_order_relaxed);
+	std::uint32_t result(m_dependencies.fetch_add(n, std::memory_order_acq_rel));
+	return result - n;
 }
 std::uint32_t job_impl::remove_dependencies(std::uint32_t n)
 {
@@ -106,6 +107,10 @@ job_handler_impl * job_impl::get_handler() const
 bool job_impl::is_finished() const
 {
 	return m_finished.load(std::memory_order_relaxed);
+}
+bool job_impl::is_enabled() const
+{
+	return m_enabled.load(std::memory_order_relaxed);
 }
 void job_impl::detach_children()
 {
