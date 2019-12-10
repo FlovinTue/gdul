@@ -69,7 +69,7 @@
     <ClInclude Include="work_tracker.h">
       <Filter>other</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\gdul\WIP_job_handler\scatter_job_impl.h">
+    <ClInclude Include="..\..\include\gdul\WIP_job_handler\scatter_job.h">
       <Filter>implementation</Filter>
     </ClInclude>
   </ItemGroup>
