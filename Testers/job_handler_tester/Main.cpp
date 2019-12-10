@@ -4,7 +4,7 @@
 #include "job_handler_tester.h"
 #include <iostream>
 #include <functional>
-#include "../Common/Timer.h"
+#include "../Common/timer.h"
 #include <vld.h>
 #include "../Common/tracking_allocator.h"
 #include <tuple>
