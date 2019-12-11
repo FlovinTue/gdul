@@ -9,17 +9,6 @@
 #include "../Common/tracking_allocator.h"
 #include <tuple>
 
-class base
-{
-public:
-	virtual ~base() {};
-	uint64_t blaha;
-};
-class sub : public base
-{
-
-};
-
 int main()
 {	
 	{

@@ -21,18 +21,20 @@
 #pragma once
 
 #include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
-#include <gdul/WIP_job_handler/job_abstractor.h>
 
 namespace gdul {
 
 
 namespace jh_detail {
+
 class job_handler_impl;
+class job_impl;
 }
 class job
 {
 public:
 	job() noexcept;
+
 	~job();
 
 	void add_dependency(job& dependency);
@@ -49,14 +51,8 @@ public:
 private:
 	friend class jh_detail::job_handler_impl;
 
-	// Enough storage to hold job_abstractor
-	std::uint8_t m_abstractorStorage[sizeof(gdul::shared_ptr<void>) + sizeof(uintptr_t)];
-	jh_detail::job_abstractor_base* const m_impl;
+	job(gdul::shared_ptr<jh_detail::job_impl> impl) noexcept;
 
-	template <class JobImpl>
-	job(gdul::shared_ptr<JobImpl> impl) noexcept{
-		m_impl = new (&m_abstractorStorage[0]) jh_detail::job_abstractor<JobImpl>(std::move(impl));
-	}
-
+	gdul::shared_ptr<jh_detail::job_impl> m_impl;
 };
 }

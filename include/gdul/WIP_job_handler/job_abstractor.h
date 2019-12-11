@@ -3,19 +3,22 @@
 
 #include <gdul/WIP_job_handler/job_abstractor_base.h>
 #include <gdul/WIP_job_handler/job_handler_commons.h>
-#include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
 
 namespace gdul
 {
+template <class T>
+class shared_ptr;
+
 namespace jh_detail
 {
 template <class JobImpl>
 class job_abstractor : public job_abstractor_base
 {
 public:
-	job_abstractor(gdul::shared_ptr<JobImpl> impl){
+	job_abstractor(gdul::shared_ptr<JobImpl>&& impl){
 		m_impl = std::move(impl);
 	}
+	
 	void add_dependency(job& dependency) override{
 		m_impl->add_dependency(dependency);
 	}
@@ -31,9 +34,7 @@ public:
 	void wait_for_finish() noexcept override{
 		m_impl->wait_for_finish();
 	}
-	void is_enabled() = 0 const noexcept override{
-		return m_impl->is_enabled();
-	}
+
 private:
 	gdul::shared_ptr<JobImpl> m_impl;
 };

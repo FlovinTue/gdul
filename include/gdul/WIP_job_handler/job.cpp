@@ -26,8 +26,6 @@
 namespace gdul
 {
 job::job() noexcept
-	: m_abstractorStorage{}
-	, m_impl(nullptr)
 {
 }
 job::~job()
