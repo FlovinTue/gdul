@@ -1,6 +1,9 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
+    <ClCompile Include="..\..\include\gdul\WIP_job_handler\job.cpp">
+      <Filter>implementation</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\include\gdul\WIP_job_handler\job_handler.cpp">
       <Filter>implementation</Filter>
     </ClCompile>
@@ -8,6 +11,9 @@
       <Filter>implementation</Filter>
     </ClCompile>
     <ClCompile Include="..\..\include\gdul\WIP_job_handler\job_handler_impl.cpp">
+      <Filter>implementation</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\gdul\WIP_job_handler\job_impl.cpp">
       <Filter>implementation</Filter>
     </ClCompile>
     <ClCompile Include="..\..\include\gdul\WIP_job_handler\worker.cpp">
@@ -25,15 +31,15 @@
     <ClCompile Include="work_tracker.cpp">
       <Filter>other</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\include\gdul\WIP_job_handler\job.cpp">
-      <Filter>implementation\Job</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\include\gdul\WIP_job_handler\job_impl.cpp">
-      <Filter>implementation\Job</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\chunk_allocator.h">
+      <Filter>implementation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\gdul\WIP_job_handler\job.h">
+      <Filter>implementation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_dependee.h">
       <Filter>implementation</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_handler.h">
@@ -43,6 +49,9 @@
       <Filter>implementation</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_handler_impl.h">
+      <Filter>implementation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_impl.h">
       <Filter>implementation</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\worker.h">
@@ -60,23 +69,8 @@
     <ClInclude Include="work_tracker.h">
       <Filter>other</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\gdul\WIP_job_handler\job.h">
-      <Filter>implementation\Job</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_dependee.h">
-      <Filter>implementation\Job</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_impl.h">
-      <Filter>implementation\Job</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_scatter.h">
-      <Filter>implementation\Job</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_abstractor_base.h">
-      <Filter>implementation\Job</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_abstractor.h">
-      <Filter>implementation\Job</Filter>
+      <Filter>implementation</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -85,9 +79,6 @@
     </Filter>
     <Filter Include="other">
       <UniqueIdentifier>{2d2d466c-81e7-4bba-ac6a-7ed64a6c73c7}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="implementation\Job">
-      <UniqueIdentifier>{0e7a51df-e668-4c58-bcfb-eecff948f2f2}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>
