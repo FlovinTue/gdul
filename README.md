@@ -46,6 +46,6 @@ If the number of tlm instances of one type does not exceed gdul::tlm_detail::Sta
  
 For sanity's sake, use alias tlm<T> instead of thread_local_member<T>
 
-New operators may be added to the interface using the implicit conversion operators as accessors.
+New operators may be added to the interface using the get() accessors.
 
 Depends on atomic_shared_ptr.h
