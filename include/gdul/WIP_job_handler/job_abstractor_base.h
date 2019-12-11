@@ -17,6 +17,7 @@ public:
 	virtual void enable() = 0;
 	virtual bool is_finished() const noexcept = 0;
 	virtual void wait_for_finish() noexcept = 0;
+	virtual void is_enabled() const noexcept = 0;
 };
 }
 }
