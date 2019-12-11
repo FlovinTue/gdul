@@ -29,6 +29,17 @@
 
 namespace gdul
 {
+
+// Desired usage scenario would be m_handler->make_scatter_job(...bunch of stuff)
+// Which then returns .... job ? 
+// Scatter job does not need to be enqueued. Since it only has subjobs
+// If scatter_job inherits from job_impl or some hypothetical job_impl_base then we need to
+// pay the vtable costs. Undesirable, since scatter_job will only (probably) represent a fraction of 
+// the total consumed...
+
+
+// Maybe abstract the (user)job class away with job->job_abstractor->[arbitrary impl]
+
 template <class T>
 class job_scatter
 {
@@ -37,6 +48,7 @@ public:
 	using deref_value_type = std::remove_pointer_t<value_type>*;
 	using input_vector_type = std::vector<value_type>;
 	using output_vector_type = std::vector<deref_value_type>;
+
 
 	// How to make job_scatter into a regular job?
 	// We want (maybe) : 
