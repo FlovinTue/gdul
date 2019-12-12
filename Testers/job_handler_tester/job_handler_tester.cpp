@@ -60,6 +60,10 @@ void job_handler_tester::setup_workers()
 		wrk.set_name(std::string(std::string("StaticWorker#") + std::to_string(i + 1)).c_str());
 		wrk.activate();
 	}
+
+	std::vector<int> input;
+	delegate<bool(int&)> process;
+	gdul::shared_ptr<gdul::scatter_job<int>> scatter(m_handler.make_scatter_job<int>(input, process, 5));
 }
 
 float job_handler_tester::run_consumption_parallel_test(std::size_t jobs, float overDuration)

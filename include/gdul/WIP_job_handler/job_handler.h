@@ -30,6 +30,9 @@ namespace gdul
 template <class Signature>
 class delegate;
 
+template <class T>
+class scatter_job;
+
 namespace jh_detail
 {
 class job_handler_impl;
@@ -44,6 +47,19 @@ public:
 
 	void retire_workers();
 
+	template <class T>
+	shared_ptr<scatter_job<T>> make_scatter_job(
+		typename scatter_job<T>::input_vector_type& inputOutput,
+		delegate<bool(typename scatter_job<T>::ref_value_type)>&& process,
+		std::size_t batchSize);
+
+	template <class T>
+	shared_ptr<scatter_job<T>> make_scatter_job(
+		const typename scatter_job<T>::input_vector_type& input,
+		typename scatter_job<T>::output_vector_type& output,
+		delegate<bool(typename scatter_job<T>::ref_value_type)>&& process,
+		std::size_t batchSize);
+
 	worker make_worker();
 
 	job make_job(gdul::delegate<void()>&& workUnit);
@@ -55,4 +71,14 @@ private:
 	gdul::shared_ptr<jh_detail::job_handler_impl> m_impl;
 	jh_detail::allocator_type m_allocator;
 };
+template<class T>
+inline shared_ptr<scatter_job<T>> job_handler::make_scatter_job(typename scatter_job<T>::input_vector_type & inputOutput, delegate<bool(typename scatter_job<T>::ref_value_type)>&& process, std::size_t batchSize)
+{
+	return make_shared<scatter_job<T>, jh_detail::allocator_type>(m_allocator, inputOutput, process, batchSize, this);
+}
+template<class T>
+inline shared_ptr<scatter_job<T>> job_handler::make_scatter_job(const typename scatter_job<T>::input_vector_type & input, typename scatter_job<T>::output_vector_type & output, delegate<bool(typename scatter_job<T>::ref_value_type)>&& process, std::size_t batchSize)
+{
+	return make_shared<scatter_job<T>, jh_detail::allocator_type>(m_allocator, input, output, process, batchSize, this);
+}
 }
