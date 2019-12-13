@@ -39,7 +39,7 @@ namespace gdul{
 template <class T>
 class atomic_128;
 
-union u128
+union alignas(16) u128
 {
 	constexpr u128() : m_u64{ 0 } {}
 	constexpr u128(std::uint64_t low) : m_u64{ low ,  } {}
