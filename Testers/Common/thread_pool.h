@@ -4,6 +4,7 @@
 #include <thread>
 #include <atomic>
 #include <concurrent_queue.h>
+#include <gdul/concurrent_queue/concurrent_queue.h>
 #include <vector>
 
 #define WIN32_LEAN_AND_MEAN
@@ -30,7 +31,7 @@ private:
 
 	std::vector<std::thread> m_threads;
 
-	concurrency::concurrent_queue<std::function<void()>> m_taskQueue;
+	gdul::concurrent_queue<std::function<void()>> m_taskQueue;
 
 	std::atomic<bool> m_inCommission;
 
@@ -41,10 +42,10 @@ thread_pool::thread_pool(std::uint32_t threads, std::uint32_t affinityBegin) :
 	m_inCommission(true),
 	m_taskCounter(0)
 {
-	const std::size_t numThreads(std::thread::hardware_concurrency());
+	const std::size_t numCores(std::thread::hardware_concurrency());
 	for (std::uint32_t i = 0; i < threads; ++i)
 	{
-		const std::uint64_t affinity((((std::uint64_t)affinityBegin + i) % numThreads));
+		const std::uint64_t affinity((((std::uint64_t)affinityBegin + i) % numCores));
 		const std::uint64_t affinityMask((std::size_t(1) << affinity));
 		m_threads.push_back(std::thread(&thread_pool::idle, this, affinityMask));
 	}

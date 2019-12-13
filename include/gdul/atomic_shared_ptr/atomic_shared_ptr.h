@@ -28,12 +28,6 @@
 #include <memory>
 #include <cstddef>
 
-// (not atomic_)shared_ptr uses local refs by default to speed up the copy process,
-// which means if the number of local refs kept is > 1, the copyee must modify local
-// state (not concurrency safe) when stealing refs. Define GDUL_SP_SAFE_COPY to disable this
-// behaviour. The number of local refs may also be adjusted using shared_ptr<T>::set_local_refs(n)
-
-/* #define GDUL_SP_SAFE_COPY */
 
 #undef max
 
@@ -53,9 +47,15 @@ namespace aspdetail
 {
 typedef std::allocator<std::uint8_t> default_allocator;
 
-static constexpr std::uint64_t Ptr_Mask = (std::numeric_limits<std::uint64_t>::max() >> 16);
-static constexpr std::uint64_t Versioned_Ptr_Mask = (std::numeric_limits<std::uint64_t>::max() >> 8);
-static constexpr std::uint64_t Local_Ref_Mask = ~Versioned_Ptr_Mask;
+constexpr std::uint8_t get_num_bottom_bits() { std::uint8_t i = 0, align(alignof(std::max_align_t)); for (; align; ++i, align >>= 1); return i - 1; }
+
+static constexpr std::uint8_t Cb_Ptr_Bottom_Bits = get_num_bottom_bits();
+static constexpr std::uint64_t Owned_Mask = (std::numeric_limits<std::uint64_t>::max() >> 16);
+static constexpr std::uint64_t Cb_Mask = (std::numeric_limits<std::uint64_t>::max() >> 16) & ~std::uint64_t((std::uint16_t(1) << Cb_Ptr_Bottom_Bits) - 1);
+static constexpr std::uint64_t Versioned_Cb_Mask = (std::numeric_limits<std::uint64_t>::max() >> 8);
+static constexpr std::uint64_t Local_Ref_Mask = ~Versioned_Cb_Mask;
+static constexpr std::uint16_t Max_Version = (std::uint16_t(std::numeric_limits<std::uint8_t>::max()) << Cb_Ptr_Bottom_Bits | ((std::uint16_t(1) << Cb_Ptr_Bottom_Bits) - 1));
+
 union compressed_storage
 {
 	constexpr compressed_storage()  noexcept : m_u64(0ULL) {}
@@ -69,6 +69,10 @@ union compressed_storage
 
 template <class T>
 constexpr void assert_alignment(std::uint8_t* block);
+
+constexpr std::uint16_t to_version(compressed_storage);
+constexpr compressed_storage set_version(compressed_storage, std::uint16_t);
+constexpr compressed_storage inc_version(compressed_storage);
 
 template <class T>
 struct disable_deduction;
@@ -107,16 +111,12 @@ static constexpr std::uint64_t Local_Ref_Step(1ULL << (Local_Ref_Index * 8));
 
 // Also, the maximum number of concurrently accessing threads
 static constexpr std::uint8_t Local_Ref_Fill_Boundary(112);
-static constexpr std::uint8_t Default_Local_Refs =
-#if defined (GDUL_SP_SAFE_COPY) 
-1;
-#else 
-std::numeric_limits<std::uint8_t>::max();
-#endif
+static constexpr std::uint8_t Default_Local_Refs = std::numeric_limits<std::uint8_t>::max();
 
 enum STORAGE_BYTE : std::uint8_t
 {
-	STORAGE_BYTE_VERSION = 6,
+	STORAGE_BYTE_VERSION_LOWER = 0,
+	STORAGE_BYTE_VERSION_UPPER = 6,
 	STORAGE_BYTE_LOCAL_REF = Local_Ref_Index,
 };
 enum CAS_FLAG : std::uint8_t
@@ -173,7 +173,7 @@ public:
 
 	inline constexpr atomic_shared_ptr() noexcept;
 	inline constexpr atomic_shared_ptr(std::nullptr_t) noexcept;
-	inline constexpr atomic_shared_ptr(std::nullptr_t, std::uint8_t version) noexcept;
+	inline constexpr atomic_shared_ptr(std::nullptr_t, std::uint16_t version) noexcept;
 
 	inline atomic_shared_ptr(const shared_ptr<T>& from) noexcept;
 	inline atomic_shared_ptr(shared_ptr<T>&& from) noexcept;
@@ -228,7 +228,7 @@ public:
 	inline shared_ptr<T> exchange(const shared_ptr<T>& with, std::memory_order order = std::memory_order_seq_cst) noexcept;
 	inline shared_ptr<T> exchange(shared_ptr<T>&& with, std::memory_order order = std::memory_order_seq_cst) noexcept;
 
-	inline std::uint8_t get_version() const noexcept;
+	inline std::uint16_t get_version() const noexcept;
 
 	inline shared_ptr<T> unsafe_load(std::memory_order order = std::memory_order_seq_cst) const;
 
@@ -298,7 +298,7 @@ private:
 };
 template <class T>
 inline constexpr atomic_shared_ptr<T>::atomic_shared_ptr() noexcept
-	: m_storage(0ULL | (std::uint64_t(std::numeric_limits<std::uint8_t>::max()) << (aspdetail::STORAGE_BYTE_LOCAL_REF * 8)))
+	: m_storage((std::uint64_t(std::numeric_limits<std::uint8_t>::max()) << (aspdetail::STORAGE_BYTE_LOCAL_REF * 8)))
 {
 }
 template<class T>
@@ -307,8 +307,8 @@ inline constexpr atomic_shared_ptr<T>::atomic_shared_ptr(std::nullptr_t) noexcep
 {
 }
 template<class T>
-inline constexpr atomic_shared_ptr<T>::atomic_shared_ptr(std::nullptr_t, std::uint8_t version) noexcept
-	: m_storage(0ULL | (std::uint64_t(version) << (aspdetail::STORAGE_BYTE_VERSION * 8)) | (std::uint64_t(std::numeric_limits<std::uint8_t>::max()) << (aspdetail::STORAGE_BYTE_LOCAL_REF * 8)))
+inline constexpr atomic_shared_ptr<T>::atomic_shared_ptr(std::nullptr_t, std::uint16_t version) noexcept
+	: m_storage(aspdetail::set_version(compressed_storage(), version).m_u64 | (std::uint64_t(std::numeric_limits<std::uint8_t>::max()) << (aspdetail::STORAGE_BYTE_LOCAL_REF * 8)))
 {
 }
 template <class T>
@@ -413,15 +413,14 @@ template<class T>
 template<class PtrType>
 inline bool atomic_shared_ptr<T>::compare_exchange_strong(typename aspdetail::disable_deduction<PtrType>::type& expected, shared_ptr<T>&& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept
 {
-	const uint8_t localRefs(desired.get_local_refs());
-	if (localRefs < aspdetail::Local_Ref_Fill_Boundary)
-		desired.set_local_refs_internal(std::numeric_limits<std::uint8_t>::max());
+	if (desired.get_local_refs() < aspdetail::Local_Ref_Fill_Boundary)
+		desired.set_local_refs(std::numeric_limits<std::uint8_t>::max());
 
 	const compressed_storage desired_(desired.m_controlBlockStorage.m_u64);
 
 	compressed_storage expected_(m_storage.load(std::memory_order_relaxed));
-	expected_.m_u64 &= ~aspdetail::Versioned_Ptr_Mask;
-	expected_.m_u64 |= expected.m_controlBlockStorage.m_u64 & aspdetail::Versioned_Ptr_Mask;
+	expected_.m_u64 &= ~aspdetail::Versioned_Cb_Mask;
+	expected_.m_u64 |= expected.m_controlBlockStorage.m_u64 & aspdetail::Versioned_Cb_Mask;
 
 	const aspdetail::memory_orders orders{ successOrder, failOrder };
 
@@ -430,18 +429,18 @@ inline bool atomic_shared_ptr<T>::compare_exchange_strong(typename aspdetail::di
 	constexpr bool needsCapture(std::is_same<raw_type, shared_ptr<T>>::value);
 	const std::uint8_t flags(aspdetail::CAS_FLAG_CAPTURE_ON_FAILURE * needsCapture);
 
-	const std::uint64_t preCompare(expected_.m_u64 & aspdetail::Versioned_Ptr_Mask);
-	do {
-		if (compare_exchange_weak_internal(expected_, desired_, static_cast<aspdetail::CAS_FLAG>(flags), orders)) {
+	const std::uint64_t preCompare(expected_.m_u64 & aspdetail::Versioned_Cb_Mask);
+	do
+	{
+		if (compare_exchange_weak_internal(expected_, desired_, static_cast<aspdetail::CAS_FLAG>(flags), orders))
+		{
 
 			desired.clear();
 
 			return true;
 		}
 
-	} while (preCompare == (expected_.m_u64 & aspdetail::Versioned_Ptr_Mask));
-
-	desired.set_local_refs_internal(localRefs);
+	} while (preCompare == (expected_.m_u64 & aspdetail::Versioned_Cb_Mask));
 
 	expected = raw_type(expected_);
 
@@ -451,14 +450,13 @@ template<class T>
 template<class PtrType>
 inline bool atomic_shared_ptr<T>::compare_exchange_weak(typename aspdetail::disable_deduction<PtrType>::type& expected, shared_ptr<T>&& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept
 {
-	const uint8_t localRefs(desired.get_local_refs());
-	if (localRefs < aspdetail::Local_Ref_Fill_Boundary)
-		desired.set_local_refs_internal(std::numeric_limits<std::uint8_t>::max());
+	if (desired.get_local_refs() < aspdetail::Local_Ref_Fill_Boundary)
+		desired.set_local_refs(std::numeric_limits<std::uint8_t>::max());
 
 	const compressed_storage desired_(desired.m_controlBlockStorage.m_u64);
 	compressed_storage expected_(m_storage.load(std::memory_order_relaxed));
-	expected_.m_u64 &= ~aspdetail::Versioned_Ptr_Mask;
-	expected_.m_u64 |= expected.m_controlBlockStorage.m_u64 & aspdetail::Versioned_Ptr_Mask;
+	expected_.m_u64 &= ~aspdetail::Versioned_Cb_Mask;
+	expected_.m_u64 |= expected.m_controlBlockStorage.m_u64 & aspdetail::Versioned_Cb_Mask;
 
 	const aspdetail::memory_orders orders{ successOrder, failOrder };
 
@@ -467,21 +465,21 @@ inline bool atomic_shared_ptr<T>::compare_exchange_weak(typename aspdetail::disa
 	constexpr bool needsCapture(std::is_same<raw_type, shared_ptr<T>>::value);
 	const std::uint8_t flags(aspdetail::CAS_FLAG_CAPTURE_ON_FAILURE * needsCapture);
 
-	const std::uint64_t preCompare(expected_.m_u64 & aspdetail::Versioned_Ptr_Mask);
+	const std::uint64_t preCompare(expected_.m_u64 & aspdetail::Versioned_Cb_Mask);
 
-	if (compare_exchange_weak_internal(expected_, desired_, static_cast<aspdetail::CAS_FLAG>(flags), orders)) {
+	if (compare_exchange_weak_internal(expected_, desired_, static_cast<aspdetail::CAS_FLAG>(flags), orders))
+	{
 
 		desired.clear();
 
 		return true;
 	}
 
-	desired.set_local_refs_internal(localRefs);
-	
-	const std::uint64_t postCompare(expected_.m_u64 & aspdetail::Versioned_Ptr_Mask);
+	const std::uint64_t postCompare(expected_.m_u64 & aspdetail::Versioned_Cb_Mask);
 
 	// Failed, but not spuriously (other thread loaded, or compare_exchange_weak spurious fail)
-	if (preCompare != postCompare) {
+	if (preCompare != postCompare)
+	{
 		expected = raw_type(expected_);
 	}
 
@@ -513,7 +511,7 @@ template<class T>
 inline void atomic_shared_ptr<T>::store(shared_ptr<T>&& from, std::memory_order order) noexcept
 {
 	if (from.get_local_refs() < aspdetail::Local_Ref_Fill_Boundary)
-		from.set_local_refs_internal(std::numeric_limits<std::uint8_t>::max());
+		from.set_local_refs(std::numeric_limits<std::uint8_t>::max());
 
 	store_internal(from.m_controlBlockStorage.m_u64, order);
 	from.clear();
@@ -527,17 +525,17 @@ template<class T>
 inline shared_ptr<T> atomic_shared_ptr<T>::exchange(shared_ptr<T>&& with, std::memory_order order) noexcept
 {
 	if (with.get_local_refs() < aspdetail::Local_Ref_Fill_Boundary)
-		with.set_local_refs_internal(std::numeric_limits<std::uint8_t>::max());
+		with.set_local_refs(std::numeric_limits<std::uint8_t>::max());
 
 	compressed_storage previous(exchange_internal(with.m_controlBlockStorage, aspdetail::CAS_FLAG_STEAL_PREVIOUS, order));
 	with.clear();
 	return shared_ptr<T>(previous);
 }
 template<class T>
-inline std::uint8_t atomic_shared_ptr<T>::get_version() const noexcept
+inline std::uint16_t atomic_shared_ptr<T>::get_version() const noexcept
 {
 	const compressed_storage storage(m_storage.load(std::memory_order_relaxed));
-	return storage.m_u8[aspdetail::STORAGE_BYTE_VERSION];
+	return aspdetail::to_version(storage);
 }
 template<class T>
 inline shared_ptr<T> atomic_shared_ptr<T>::unsafe_load(std::memory_order order) const
@@ -577,7 +575,8 @@ template<class T>
 inline typename atomic_shared_ptr<T>::decayed_type* atomic_shared_ptr<T>::unsafe_get()
 {
 	aspdetail::control_block_base<T>* const cb(get_control_block());
-	if (cb) {
+	if (cb)
+	{
 		return cb->get();
 	}
 	return nullptr;
@@ -586,7 +585,8 @@ template<class T>
 inline const typename atomic_shared_ptr<T>::decayed_type* atomic_shared_ptr<T>::unsafe_get() const
 {
 	const aspdetail::control_block_base<T>* const cb(get_control_block());
-	if (cb) {
+	if (cb)
+	{
 		return cb->get();
 	}
 	return nullptr;
@@ -610,7 +610,7 @@ inline constexpr aspdetail::control_block_base<T>* atomic_shared_ptr<T>::get_con
 template<class T>
 inline atomic_shared_ptr<T>::operator bool() const noexcept
 {
-	return static_cast<bool>(m_storage.load(std::memory_order_relaxed) & aspdetail::Ptr_Mask);
+	return static_cast<bool>(m_storage.load(std::memory_order_relaxed) & aspdetail::Cb_Mask);
 }
 // cheap hint to see if this object holds a value
 template <class T>
@@ -640,7 +640,7 @@ inline constexpr bool operator!=(const atomic_shared_ptr<T>& ptr, std::nullptr_t
 template<class T>
 inline bool atomic_shared_ptr<T>::operator==(const aspdetail::ptr_base<T>& other) const noexcept
 {
-	return !((m_storage.load(std::memory_order_relaxed) ^ other.m_controlBlockStorage.m_u64) & aspdetail::Versioned_Ptr_Mask);
+	return !((m_storage.load(std::memory_order_relaxed) ^ other.m_controlBlockStorage.m_u64) & aspdetail::Versioned_Cb_Mask);
 }
 // cheap hint comparison to ptr_base derivatives
 template<class T>
@@ -661,31 +661,32 @@ inline void atomic_shared_ptr<T>::store_internal(compressed_storage from, std::m
 template<class T>
 inline constexpr aspdetail::control_block_base<T>* atomic_shared_ptr<T>::to_control_block(compressed_storage from) const noexcept
 {
-	return reinterpret_cast<aspdetail::control_block_base<T>*>(from.m_u64 & aspdetail::Ptr_Mask);
+	return reinterpret_cast<aspdetail::control_block_base<T>*>(from.m_u64 & aspdetail::Cb_Mask);
 }
 template<class T>
 inline bool atomic_shared_ptr<T>::compare_exchange_weak_internal(compressed_storage& expected, compressed_storage desired, aspdetail::CAS_FLAG flags, aspdetail::memory_orders orders) noexcept
 {
 	bool result(false);
 
-	compressed_storage desired_(desired);
-	desired_.m_u8[aspdetail::STORAGE_BYTE_VERSION] = expected.m_u8[aspdetail::STORAGE_BYTE_VERSION] + 1;
-
+	const compressed_storage desired_(aspdetail::set_version(desired, aspdetail::to_version(expected) + 1));
 	compressed_storage expected_(expected);
 
 	result = m_storage.compare_exchange_weak(expected_.m_u64, desired_.m_u64, orders.m_first, orders.m_second);
 
-	if (result & !(flags & aspdetail::CAS_FLAG_STEAL_PREVIOUS)) {
-		if (aspdetail::control_block_base<T>* const cb = to_control_block(expected)) {
+	if (result & !(flags & aspdetail::CAS_FLAG_STEAL_PREVIOUS))
+	{
+		if (aspdetail::control_block_base<T>* const cb = to_control_block(expected))
+		{
 			cb->decref(expected.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF]);
 		}
 	}
 
-	const bool otherInterjection((expected_.m_u64 ^ expected.m_u64) & aspdetail::Versioned_Ptr_Mask);
+	const bool otherInterjection((expected_.m_u64 ^ expected.m_u64) & aspdetail::Versioned_Cb_Mask);
 
 	expected = expected_;
 
-	if (otherInterjection & (flags & aspdetail::CAS_FLAG_CAPTURE_ON_FAILURE)) {
+	if (otherInterjection & (flags & aspdetail::CAS_FLAG_CAPTURE_ON_FAILURE))
+	{
 		expected = copy_internal(std::memory_order_relaxed);
 	}
 
@@ -694,15 +695,17 @@ inline bool atomic_shared_ptr<T>::compare_exchange_weak_internal(compressed_stor
 template<class T>
 inline void atomic_shared_ptr<T>::try_fill_local_refs(compressed_storage& expected) const noexcept
 {
-	if (!(expected.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] < aspdetail::Local_Ref_Fill_Boundary)) {
+	if (!(expected.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] < aspdetail::Local_Ref_Fill_Boundary))
+	{
 		return;
 	}
 
 	aspdetail::control_block_base<T>* const cb(to_control_block(expected));
 
-	const compressed_storage initialPtrBlock(expected.m_u64 & aspdetail::Versioned_Ptr_Mask);
+	const compressed_storage initialPtrBlock(expected.m_u64 & aspdetail::Versioned_Cb_Mask);
 
-	do {
+	do
+	{
 		const std::uint8_t localRefs(expected.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF]);
 		const std::uint8_t newRefs(std::numeric_limits<std::uint8_t>::max() - localRefs);
 
@@ -710,20 +713,23 @@ inline void atomic_shared_ptr<T>::try_fill_local_refs(compressed_storage& expect
 		desired.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] = std::numeric_limits<std::uint8_t>::max();
 
 		// Accept 'null' refs, to be able to avoid using compare_exchange_strong during copy_internal
-		if (cb){
+		if (cb)
+		{
 			cb->incref(newRefs);
 		}
 
-		if (m_storage.compare_exchange_weak(expected.m_u64, desired.m_u64, std::memory_order_relaxed)) {
+		if (m_storage.compare_exchange_weak(expected.m_u64, desired.m_u64, std::memory_order_relaxed))
+		{
 			return;
 		}
 
-		if (cb){
+		if (cb)
+		{
 			cb->decref(newRefs);
 		}
 
 	} while (
-		(expected.m_u64 & aspdetail::Versioned_Ptr_Mask) == initialPtrBlock.m_u64 &&
+		(expected.m_u64 & aspdetail::Versioned_Cb_Mask) == initialPtrBlock.m_u64 &&
 		expected.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] < aspdetail::Local_Ref_Fill_Boundary);
 }
 template <class T>
@@ -760,9 +766,7 @@ template<class T>
 inline union aspdetail::compressed_storage atomic_shared_ptr<T>::unsafe_exchange_internal(compressed_storage with, std::memory_order order)
 {
 	const compressed_storage old(m_storage.load(std::memory_order_relaxed));
-
-	compressed_storage replacement(with.m_u64);
-	replacement.m_u8[aspdetail::STORAGE_BYTE_VERSION] = old.m_u8[aspdetail::STORAGE_BYTE_VERSION] + 1;
+	const compressed_storage replacement(aspdetail::set_version(with, aspdetail::to_version(old) + 1));
 
 	m_storage.store(replacement.m_u64, std::memory_order_relaxed);
 
@@ -776,13 +780,13 @@ template <class T>
 inline void atomic_shared_ptr<T>::unsafe_store_internal(compressed_storage from, std::memory_order order)
 {
 	const compressed_storage previous(m_storage.load(std::memory_order_relaxed));
-	compressed_storage next(from);
-	next.m_u8[aspdetail::STORAGE_BYTE_VERSION] = previous.m_u8[aspdetail::STORAGE_BYTE_VERSION] + 1;
+	const compressed_storage next(aspdetail::set_version(from, aspdetail::to_version(previous) + 1));
 
 	m_storage.store(next.m_u64, std::memory_order_relaxed);
 
 	aspdetail::control_block_base<T>* const prevCb(to_control_block(previous));
-	if (prevCb) {
+	if (prevCb)
+	{
 		prevCb->decref(previous.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF]);
 	}
 
@@ -796,11 +800,13 @@ inline void atomic_shared_ptr<T>::unsafe_fill_local_refs() const noexcept
 	const compressed_storage current(m_storage.load(std::memory_order_relaxed));
 	aspdetail::control_block_base<T>* const cb(to_control_block(current));
 
-	if (current.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] < aspdetail::Local_Ref_Fill_Boundary) {
+	if (current.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] < aspdetail::Local_Ref_Fill_Boundary)
+	{
 		const std::uint8_t newRefs(std::numeric_limits<std::uint8_t>::max() - current.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF]);
 
 		// Accept 'null' refs, to be able to avoid using compare_exchange_strong during copy_internal
-		if (cb){
+		if (cb)
+		{
 			cb->incref(newRefs);
 		}
 
@@ -861,7 +867,8 @@ inline void control_block_base<T>::incref(size_type count) noexcept
 template<class T>
 inline void control_block_base<T>::decref(size_type count) noexcept
 {
-	if (!(m_useCount.fetch_sub(count, std::memory_order_acq_rel) - count)) {
+	if (!(m_useCount.fetch_sub(count, std::memory_order_acq_rel) - count))
+	{
 		destroy();
 	}
 }
@@ -873,12 +880,12 @@ inline std::uint8_t control_block_base<T>::block_offset() const
 template <class T>
 inline typename control_block_base<T>::decayed_type* control_block_base<T>::get() noexcept
 {
-	return (decayed_type*)(m_ptrStorage.m_u64 & Ptr_Mask);
+	return (decayed_type*)(m_ptrStorage.m_u64 & Owned_Mask);
 }
 template<class T>
 inline const typename control_block_base<T>::decayed_type* control_block_base<T>::get() const noexcept
 {
-	return (decayed_type*)(m_ptrStorage.m_u64 & Ptr_Mask);
+	return (decayed_type*)(m_ptrStorage.m_u64 & Owned_Mask);
 }
 template <class T>
 inline typename control_block_base<T>::size_type control_block_base<T>::use_count() const noexcept
@@ -1084,19 +1091,49 @@ struct alignas(Align) aligned_storage
 {
 	std::uint8_t dummy[Size]{};
 };
+constexpr std::uint16_t to_version(compressed_storage from)
+{
+	constexpr std::uint8_t bottomBits((std::uint8_t(1) << Cb_Ptr_Bottom_Bits) - 1);
+	const std::uint8_t lower(from.m_u8[STORAGE_BYTE_VERSION_LOWER] & bottomBits);
+	const std::uint8_t upper(from.m_u8[STORAGE_BYTE_VERSION_UPPER]);
+
+	const std::uint16_t version((std::uint16_t(upper) << Cb_Ptr_Bottom_Bits) | std::uint16_t(lower));
+
+	return version;
+}
+constexpr compressed_storage set_version(compressed_storage storage, std::uint16_t to)
+{
+	constexpr std::uint8_t bottomBits((std::uint8_t(1) << Cb_Ptr_Bottom_Bits) - 1);
+
+	const std::uint8_t lower(((std::uint8_t)to) & bottomBits);
+	const std::uint8_t upper((std::uint8_t) (to >> Cb_Ptr_Bottom_Bits));
+
+	compressed_storage updated(storage);
+	updated.m_u8[STORAGE_BYTE_VERSION_LOWER] &= ~bottomBits;
+	updated.m_u8[STORAGE_BYTE_VERSION_LOWER] |= lower;
+	updated.m_u8[STORAGE_BYTE_VERSION_UPPER] = upper;
+
+	return updated;
+}
+constexpr compressed_storage inc_version(compressed_storage storage)
+{
+	return set_version(storage, to_version(storage) + 1);
+}
 template<class T>
 constexpr void assert_alignment(std::uint8_t* block)
 {
 
 #if 201700 < __cplusplus || _HAS_CXX17
-	if ((std::uintptr_t)block % alignof(T) != 0) {
-		throw std::runtime_error("conforming with C++17 make_shared expects alignof(T) allocates");
+	if ((std::uintptr_t)block % alignof(T) != 0)
+	{
+		throw std::runtime_error("conforming with C++17 make_shared expects alignof(T) allocates. Minimally alignof(std::max_align_t)");
 	}
 #else
 	static_assert(!(std::numeric_limits<std::uint8_t>::max() < alignof(T)), "make_shared supports only supports up to std::numeric_limits<std::uint8_t>::max() byte aligned types");
 
-	if ((std::uintptr_t)block % alignof(std::max_align_t) != 0) {
-		throw std::runtime_error("make_shared expects at least alignof(max_align_t) allocates");
+	if ((std::uintptr_t)block % alignof(std::max_align_t) != 0)
+	{
+		throw std::runtime_error("make_shared expects at least alignof(std::max_align_t) allocates");
 	}
 #endif
 }
@@ -1109,7 +1146,7 @@ public:
 	using decayed_type = aspdetail::decay_unbounded_t<T>;
 
 	inline constexpr ptr_base(std::nullptr_t) noexcept;
-	inline constexpr ptr_base(std::nullptr_t, std::uint8_t version) noexcept;
+	inline constexpr ptr_base(std::nullptr_t, std::uint16_t version) noexcept;
 
 	inline constexpr operator bool() const noexcept;
 
@@ -1119,10 +1156,11 @@ public:
 	inline bool operator==(const atomic_shared_ptr<T>& other) const noexcept;
 	inline bool operator!=(const atomic_shared_ptr<T>& other) const noexcept;
 
-	inline constexpr std::uint8_t get_version() const noexcept;
+	inline constexpr std::uint16_t get_version() const noexcept;
 
 	inline size_type use_count() const noexcept;
 
+	inline void swap(ptr_base<T>& other) noexcept;
 protected:
 	inline constexpr const control_block_base<T>* get_control_block() const noexcept;
 	inline constexpr control_block_base<T>* get_control_block() noexcept;
@@ -1157,8 +1195,8 @@ inline constexpr ptr_base<T>::ptr_base(std::nullptr_t) noexcept
 {
 }
 template<class T>
-inline constexpr ptr_base<T>::ptr_base(std::nullptr_t, std::uint8_t version) noexcept
-	: m_controlBlockStorage(0ULL | (std::uint64_t(version) << (STORAGE_BYTE_VERSION * 8)))
+inline constexpr ptr_base<T>::ptr_base(std::nullptr_t, std::uint16_t version) noexcept
+	: m_controlBlockStorage(set_version(compressed_storage(), version))
 {
 }
 template <class T>
@@ -1176,12 +1214,12 @@ inline void ptr_base<T>::clear() noexcept
 template <class T>
 inline constexpr ptr_base<T>::operator bool() const noexcept
 {
-	return m_controlBlockStorage.m_u64 & aspdetail::Ptr_Mask;
+	return m_controlBlockStorage.m_u64 & aspdetail::Cb_Mask;
 }
 template <class T>
 inline constexpr bool ptr_base<T>::operator==(const ptr_base<T>& other) const noexcept
 {
-	return !((m_controlBlockStorage.m_u64 ^ other.m_controlBlockStorage.m_u64) & aspdetail::Versioned_Ptr_Mask);
+	return !((m_controlBlockStorage.m_u64 ^ other.m_controlBlockStorage.m_u64) & aspdetail::Versioned_Cb_Mask);
 }
 template <class T>
 inline constexpr bool ptr_base<T>::operator!=(const ptr_base<T>& other) const noexcept
@@ -1201,11 +1239,18 @@ inline bool ptr_base<T>::operator!=(const atomic_shared_ptr<T>& other) const noe
 template <class T>
 inline typename ptr_base<T>::size_type ptr_base<T>::use_count() const noexcept
 {
-	if (!operator bool()) {
+	if (!operator bool())
+	{
 		return 0;
 	}
 
 	return get_control_block()->use_count();
+}
+
+template<class T>
+inline void ptr_base<T>::swap(ptr_base<T>& other) noexcept
+{
+	std::swap(this->m_controlBlockStorage, other.m_controlBlockStorage);
 }
 
 template <class T>
@@ -1231,18 +1276,19 @@ inline constexpr bool operator!=(const ptr_base<T>& ptr, std::nullptr_t /*null*/
 template <class T>
 inline constexpr control_block_base<T>* ptr_base<T>::to_control_block(compressed_storage from) noexcept
 {
-	return reinterpret_cast<control_block_base<T>*>(from.m_u64 & Ptr_Mask);
+	return reinterpret_cast<control_block_base<T>*>(from.m_u64 & Cb_Mask);
 }
 template <class T>
 inline constexpr const control_block_base<T>* ptr_base<T>::to_control_block(compressed_storage from) const noexcept
 {
-	return reinterpret_cast<const control_block_base<T>*>(from.m_u64 & Ptr_Mask);
+	return reinterpret_cast<const control_block_base<T>*>(from.m_u64 & Cb_Mask);
 }
 template <class T>
 inline constexpr typename ptr_base<T>::decayed_type* ptr_base<T>::to_object(compressed_storage from) noexcept
 {
 	control_block_base<T>* const cb(to_control_block(from));
-	if (cb) {
+	if (cb)
+	{
 		return cb->get();
 	}
 	return nullptr;
@@ -1251,7 +1297,8 @@ template <class T>
 inline constexpr const typename ptr_base<T>::decayed_type* ptr_base<T>::to_object(compressed_storage from) const noexcept
 {
 	const control_block_base<T>* const cb(to_control_block(from));
-	if (cb) {
+	if (cb)
+	{
 		return cb->get();
 	}
 	return nullptr;
@@ -1267,9 +1314,9 @@ inline constexpr control_block_base<T>* ptr_base<T>::get_control_block() noexcep
 	return to_control_block(m_controlBlockStorage);
 }
 template<class T>
-inline constexpr std::uint8_t ptr_base<T>::get_version() const noexcept
+inline constexpr std::uint16_t ptr_base<T>::get_version() const noexcept
 {
-	return m_controlBlockStorage.m_u8[STORAGE_BYTE_VERSION];
+	return to_version(m_controlBlockStorage);
 }
 };
 template <class T>
@@ -1320,15 +1367,11 @@ public:
 	shared_ptr<T>& operator=(const shared_ptr<T>& other) noexcept;
 	shared_ptr<T>& operator=(shared_ptr<T>&& other) noexcept;
 
-	// Adjusts the amount of local refs kept for fast copies. Setting this to 1
-	// means a copy operation will not attempt to modify local state, and thus is
-	// concurrency safe(so long as the object remains unaltered). 
-	// Caching of local refs may be completely disabled via define GDUL_SP_SAFE_COPY
-	inline void set_local_refs(std::uint8_t target) noexcept;
+	inline void swap(shared_ptr<T>& other) noexcept;
 
-	inline constexpr std::uint8_t get_local_refs() const noexcept;
 private:
-	inline void set_local_refs_internal(std::uint8_t target) noexcept;
+	inline constexpr std::uint8_t get_local_refs() const noexcept;
+	inline void set_local_refs(std::uint8_t target) noexcept;
 
 	constexpr void clear() noexcept;
 
@@ -1388,7 +1431,8 @@ template<class T>
 inline shared_ptr<T>::~shared_ptr() noexcept
 {
 	aspdetail::control_block_base<T>* const cb(this->get_control_block());
-	if (cb) {
+	if (cb)
+	{
 		cb->decref(this->m_controlBlockStorage.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF]);
 	}
 }
@@ -1396,7 +1440,10 @@ template<class T>
 inline shared_ptr<T>::shared_ptr(shared_ptr<T>&& other) noexcept
 	: shared_ptr<T>()
 {
-	operator=(std::move(other));
+	this->m_controlBlockStorage = other.m_controlBlockStorage;
+	this->m_ptr = other.m_ptr;
+	other.m_controlBlockStorage = compressed_storage();
+	other.m_ptr = nullptr;
 }
 template<class T>
 inline shared_ptr<T>::shared_ptr(const shared_ptr<T>& other) noexcept
@@ -1447,15 +1494,6 @@ inline constexpr void shared_ptr<T>::clear() noexcept
 }
 template<class T>
 inline void shared_ptr<T>::set_local_refs(std::uint8_t target) noexcept
-{
-#ifndef GDUL_SP_SAFE_COPY
-	set_local_refs_internal(target);
-#else
-	(void)target;
-#endif
-}
-template<class T>
-inline void shared_ptr<T>::set_local_refs_internal(std::uint8_t target) noexcept
 {
 	if (aspdetail::control_block_base<T>* const cb = this->get_control_block())
 	{
@@ -1545,7 +1583,8 @@ inline constexpr typename shared_ptr<T>::decayed_type* shared_ptr<T>::get() noex
 template<class T>
 inline std::size_t shared_ptr<T>::item_count() const noexcept
 {
-	if (!this->operator bool()) {
+	if (!this->operator bool())
+	{
 		return 0;
 	}
 
@@ -1567,16 +1606,19 @@ inline union aspdetail::compressed_storage shared_ptr<T>::create_control_block(T
 
 	void* block(nullptr);
 
-	try {
+	try
+	{
 		block = rebound.allocate(blockSize);
 
-		if ((std::uintptr_t)block % alignof(std::max_align_t) != 0) {
+		if ((std::uintptr_t)block % alignof(std::max_align_t) != 0)
+		{
 			throw std::runtime_error("make_shared expects at least alignof(max_align_t) allocates");
 		}
 
 		controlBlock = new (block) aspdetail::control_block_claim_custom_delete<T, Allocator, Deleter>(object, allocator, std::forward<Deleter&&>(deleter));
 	}
-	catch (...) {
+	catch (...)
+	{
 		rebound.deallocate(static_cast<std::uint8_t*>(block), blockSize);
 		deleter(object, allocator);
 		throw;
@@ -1600,16 +1642,19 @@ inline union aspdetail::compressed_storage shared_ptr<T>::create_control_block(T
 
 	void* block(nullptr);
 
-	try {
+	try
+	{
 		block = rebound.allocate(blockSize);
 
-		if ((std::uintptr_t)block % alignof(std::max_align_t) != 0) {
+		if ((std::uintptr_t)block % alignof(std::max_align_t) != 0)
+		{
 			throw std::runtime_error("make_shared expects at least alignof(max_align_t) allocates");
 		}
 
 		controlBlock = new (block) aspdetail::control_block_claim<T, Allocator>(object, rebound);
 	}
-	catch (...) {
+	catch (...)
+	{
 		rebound.deallocate(static_cast<std::uint8_t*>(block), blockSize);
 		delete object;
 		throw;
@@ -1625,22 +1670,14 @@ inline shared_ptr<T>& shared_ptr<T>::operator=(const shared_ptr<T>& other) noexc
 {
 	compressed_storage copy(other.m_controlBlockStorage);
 
-	if (aspdetail::control_block_base<T>* const copyCb = this->to_control_block(copy)) {
-#ifndef GDUL_SP_SAFE_COPY
-		copy.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] = copy.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] / 2;
-		if (copy.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF]) {
-			other.m_controlBlockStorage.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] -= copy.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF];
-		}
-		else {
-#endif
-			copy.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] = aspdetail::Default_Local_Refs;
-			copyCb->incref(copy.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF]);
-#ifndef GDUL_SP_SAFE_COPY
-		}
-#endif
+	if (aspdetail::control_block_base<T>* const copyCb = this->to_control_block(copy))
+	{
+		copy.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] = aspdetail::Default_Local_Refs;
+		copyCb->incref(copy.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF]);
 	}
 
-	if (aspdetail::control_block_base<T>* const cb = this->get_control_block()) {
+	if (aspdetail::control_block_base<T>* const cb = this->get_control_block())
+	{
 		cb->decref(this->m_controlBlockStorage.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF]);
 	}
 
@@ -1652,9 +1689,16 @@ inline shared_ptr<T>& shared_ptr<T>::operator=(const shared_ptr<T>& other) noexc
 template<class T>
 inline shared_ptr<T>& shared_ptr<T>::operator=(shared_ptr<T>&& other) noexcept
 {
-	std::swap(this->m_controlBlockStorage, other.m_controlBlockStorage);
-	std::swap(this->m_ptr, other.m_ptr);
+	shared_ptr<T>(std::move(other)).swap(*this);
+
 	return *this;
+}
+
+template<class T>
+inline void shared_ptr<T>::swap(shared_ptr<T>& other) noexcept
+{
+	aspdetail::ptr_base<T>::swap(other);
+	std::swap(this->m_ptr, other.m_ptr);
 }
 
 // raw_ptr does not share in ownership of the object
@@ -1690,6 +1734,8 @@ public:
 
 	inline const decayed_type& operator[](aspdetail::size_type index) const;
 	inline decayed_type& operator[](aspdetail::size_type index);
+
+	inline void swap(raw_ptr<T>& other) noexcept;
 
 	constexpr raw_ptr<T>& operator=(const raw_ptr<T>& other) noexcept;
 	constexpr raw_ptr<T>& operator=(raw_ptr<T>&& other) noexcept;
@@ -1782,7 +1828,8 @@ inline constexpr typename raw_ptr<T>::decayed_type* raw_ptr<T>::get() noexcept
 template<class T>
 inline std::size_t raw_ptr<T>::item_count() const
 {
-	if (!this->operator bool()) {
+	if (!this->operator bool())
+	{
 		return 0;
 	}
 
@@ -1817,6 +1864,11 @@ template <class T>
 inline typename raw_ptr<T>::decayed_type& raw_ptr<T>::operator[](aspdetail::size_type index)
 {
 	return get()[index];
+}
+template<class T>
+inline void raw_ptr<T>::swap(raw_ptr<T>& other) noexcept
+{
+	this->swap(other);
 }
 template<class T>
 inline constexpr raw_ptr<T>::raw_ptr(compressed_storage from) noexcept
@@ -1912,7 +1964,8 @@ inline shared_ptr<T> make_shared(Allocator& allocator, Args&& ...args)
 	rebound_alloc rebound(allocator);
 	block_type* typedBlock(nullptr);
 	aspdetail::control_block_make_shared<T, Allocator>* controlBlock(nullptr);
-	try {
+	try
+	{
 		typedBlock = rebound.allocate(1);
 		std::uint8_t* const block((std::uint8_t*)typedBlock);
 
@@ -1923,11 +1976,14 @@ inline shared_ptr<T> make_shared(Allocator& allocator, Args&& ...args)
 
 		controlBlock = new (reinterpret_cast<std::uint8_t*>(block + offset)) aspdetail::control_block_make_shared<T, Allocator>(allocator, (std::uint8_t)offset, std::forward<Args&&>(args)...);
 	}
-	catch (...) {
-		if (controlBlock) {
+	catch (...)
+	{
+		if (controlBlock)
+		{
 			(*controlBlock).~control_block_make_shared();
 		}
-		if (typedBlock) {
+		if (typedBlock)
+		{
 			rebound.deallocate(typedBlock, 1);
 		}
 		throw;
@@ -1982,13 +2038,16 @@ inline shared_ptr<T> make_shared(std::size_t count, Allocator& allocator, Args&&
 	}
 	catch (...)
 	{
-		if (controlBlock) {
+		if (controlBlock)
+		{
 			(*controlBlock).~control_block_make_unbounded_array();
 		}
-		for (std::size_t i = 0; i < constructed; ++i) {
+		for (std::size_t i = 0; i < constructed; ++i)
+		{
 			arrayloc[i].~decayed_type();
 		}
-		if (block) {
+		if (block)
+		{
 			rebound.deallocate(block, blockSize);
 		}
 		throw;

@@ -1,12 +1,15 @@
 #pragma once
 
 #include "..\Common\thread_pool.h"
+#include "..\Common\util.h"
+#include "..\Common\tracking_allocator.h"
 #include <gdul\atomic_shared_ptr\atomic_shared_ptr.h>
 #include <random>
 #include <string>
 #include "Timer.h"
 #include <mutex>
 #include <cassert>
+#include <queue>
 
 using namespace gdul;
 #pragma warning(disable : 4324)
@@ -89,15 +92,34 @@ public:
 	tester(bool doInitArray = true, InitArgs && ...args);
 	~tester();
 
-	float execute(std::uint32_t passes, bool doAssign = true, bool doReassign = true, bool doCasTest = true, bool doRefTest = true);
+	float execute(std::uint32_t passes, bool doAssign = true, bool doReassign = true, bool doCasTest = true, bool doRefTest = true, bool testAba = true);
 
 
 	void work_assign(std::uint32_t passes);
 	void work_reassign(std::uint32_t passes);
 	void work_reference_test(std::uint32_t passes);
 	void work_cas(std::uint32_t passes);
+	void work_aba(std::uint32_t passes);
 
 	void check_pointers() const;
+
+	struct aba_node
+	{
+		aba_node() noexcept
+			: m_next(nullptr)
+			, m_owned(false)
+		{
+		}
+		bool m_owned = false;
+		atomic_shared_ptr<aba_node> m_next;
+	};
+
+	void aba_claim();
+	void aba_release();
+
+	static thread_local std::queue<shared_ptr<aba_node>> m_abaStorage;
+
+	atomic_shared_ptr<aba_node> m_topAba;
 
 	gdul::thread_pool m_worker;
 
@@ -114,6 +136,8 @@ public:
 	std::random_device m_rd;
 	std::mt19937 m_rng;
 };
+template <class T, std::uint32_t ArraySize, std::uint32_t NumThreads>
+thread_local std::queue<shared_ptr<typename tester<T, ArraySize, NumThreads>::aba_node>> tester<T, ArraySize, NumThreads>::m_abaStorage;
 
 template<class T, std::uint32_t ArraySize, std::uint32_t NumThreads>
 template<class ...InitArgs>
@@ -147,7 +171,7 @@ inline tester<T, ArraySize, NumThreads>::~tester()
 }
 
 template<class T, std::uint32_t ArraySize, std::uint32_t NumThreads>
-inline float tester<T, ArraySize, NumThreads>::execute(std::uint32_t passes, bool doAssign, bool doReassign, bool doCasTest, bool doRefTest)
+inline float tester<T, ArraySize, NumThreads>::execute(std::uint32_t passes, bool doAssign, bool doReassign, bool doCasTest, bool doRefTest, bool testAba)
 {
 	m_workBlock.store(false);
 
@@ -163,6 +187,9 @@ inline float tester<T, ArraySize, NumThreads>::execute(std::uint32_t passes, boo
 		}
 		if (doCasTest) {
 			m_worker.add_task([this, passes]() { work_cas(passes); });
+		}
+		if (testAba){
+			m_worker.add_task([this, passes]() { work_aba(passes); });
 		}
 	}
 
@@ -280,6 +307,50 @@ inline void tester<T, ArraySize, NumThreads>::work_cas(std::uint32_t passes)
 	m_summary += localSum;
 }
 
+template<class T, std::uint32_t ArraySize, std::uint32_t NumThreads>
+inline void tester<T, ArraySize, NumThreads>::work_aba(std::uint32_t passes)
+{
+	for (std::uint32_t i = 0; i < passes; ++i)
+	{
+		aba_claim();
+		aba_release();
+	}
+}
+template<class T, std::uint32_t ArraySize, std::uint32_t NumThreads>
+inline void tester<T, ArraySize, NumThreads>::aba_claim()
+{
+	shared_ptr<aba_node> top(m_topAba.load(std::memory_order_relaxed));
+	while (top)
+	{
+		shared_ptr<aba_node> next(top->m_next.load());
+
+		if (m_topAba.compare_exchange_strong(top, next, std::memory_order_seq_cst, std::memory_order_relaxed))
+		{
+			GDUL_ASSERT(!top->m_owned);
+			top->m_owned = true;
+			m_abaStorage.push(std::move(top));
+
+			return;
+		}
+	}
+	m_abaStorage.push(make_shared<aba_node, tracking_allocator<aba_node>>());
+}
+
+template<class T, std::uint32_t ArraySize, std::uint32_t NumThreads>
+inline void tester<T, ArraySize, NumThreads>::aba_release()
+{
+	shared_ptr<aba_node> toRelease(nullptr);
+
+	toRelease = m_abaStorage.front();
+	m_abaStorage.pop();
+	toRelease->m_owned = false;
+
+	shared_ptr<aba_node> top(m_topAba.load());
+	do
+	{
+		toRelease->m_next.store(top);
+	} while (!m_topAba.compare_exchange_strong(top, std::move(toRelease)));
+}
 template<class T, std::uint32_t ArraySize, std::uint32_t NumThreads>
 inline void tester<T, ArraySize, NumThreads>::check_pointers() const
 {
