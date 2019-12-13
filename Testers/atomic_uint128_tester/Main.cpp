@@ -2,7 +2,6 @@
 #include "pch.h"
 #include <iostream>
 #include <gdul\atomic_128\atomic_128.h>
-#include "../Common/Timer.h"
 #include <atomic>
 
 struct custom_struct
@@ -65,31 +64,6 @@ int main()
 		custom_struct valfive;
 		valfive = one.my_val();
 	}
-
-	timer<float> time;
-	{
-	u128 exp(0);
-	atomic_u128 val(1);
-	for (uint32_t i = 0; i < 1000000000; ++i)
-	{
-		u128 des(i);
-		val.compare_exchange_strong(exp, des);
-	}
-	std::cout << "first time: " << time.get() << std::endl;
-	}
-	{
-		time.reset();
-
-		uint64_t exp(0);
-		std::atomic<uint64_t> val(1);
-		for (uint32_t i = 0; i < 1000000000; ++i)
-		{
-			uint64_t des(i);
-			val.compare_exchange_strong(exp, des);
-		}
-		std::cout << "second time: " << time.get() << std::endl;
-	}
-
 
 	return 0;
 }
