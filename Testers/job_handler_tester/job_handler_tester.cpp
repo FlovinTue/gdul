@@ -60,10 +60,6 @@ void job_handler_tester::setup_workers()
 		wrk.set_name(std::string(std::string("StaticWorker#") + std::to_string(i + 1)).c_str());
 		wrk.activate();
 	}
-
-	std::vector<int> input;
-	delegate<bool(int&)> process;
-	gdul::shared_ptr<gdul::scatter_job<int>> scatter(m_handler.make_scatter_job<int>(input, process, 5));
 }
 
 float job_handler_tester::run_consumption_parallel_test(std::size_t jobs, float overDuration)
@@ -215,6 +211,23 @@ float job_handler_tester::run_consumption_strand_test(std::size_t jobs, float /*
 	end.wait_for_finish();
 
 	return time.get();
+}
+
+float job_handler_tester::run_scatter_test(std::size_t arraySize, std::size_t batchSize)
+{
+	arraySize;
+	batchSize;
+	m_scatterInput.clear();
+	m_scatterInput.reserve(arraySize);
+	for (std::size_t i = 0; i < arraySize; ++i){
+		m_scatterInput.push_back((int)i);
+	}
+	
+	delegate<bool(int&)> process([arraySize](int& item) { if (item % 5 == 0) return true; return false; });
+	
+	gdul::shared_ptr<gdul::scatter_job<int>> scatter(m_handler.make_scatter_job<int>(m_scatterInput, m_scatterOutput, std::move(process), 5));
+
+	return 0.f;
 }
 
 }

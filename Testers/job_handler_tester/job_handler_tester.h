@@ -33,11 +33,16 @@ public:
 	float run_mixed_parallel_test(std::size_t jobs, float overDuration);
 	float run_consumption_strand_test(std::size_t jobs, float overDuration);
 
+	float run_scatter_test(std::size_t arraySize, std::size_t batchSize);
+
 	job_handler_tester_info m_info;
 
 	gdul::job_handler m_handler;
 
 	gdul::work_tracker m_work;
+
+	std::vector<int> m_scatterInput;
+	std::vector<int*> m_scatterOutput;
 };
 
 }
