@@ -1,4 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
+
+<!-- Copyright(c) 2019 Flovin Michaelsen                                                  -->
+<!--                                                                                      -->
+<!-- Permission is hereby granted, free of charge, to any person obtaining a copy         -->
+<!-- of this software and associated documentation files(the "Software"), to deal         -->
+<!-- in the Software without restriction, including without limitation the rights         -->
+<!-- to use, copy, modify, merge, publish, distribute, sublicense, and/or sell            -->
+<!-- copies of the Software, and to permit persons to whom the Software is                -->
+<!-- furnished to do so, subject to the following conditions :                            -->
+<!--                                                                                      -->
+<!-- The above copyright notice and this permission notice shall be included in all       -->
+<!-- copies or substantial portions of the Software.                                      -->
+<!--                                                                                      -->
+<!-- THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR           -->
+<!-- IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,             -->
+<!-- FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.IN NO EVENT SHALL THE           -->
+<!-- AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER               -->
+<!-- LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,        -->
+<!-- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE        -->
+<!-- SOFTWARE.                                                                            -->
+
 <AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
 
 	<Type Name="gdul::concurrent_queue&lt;*&gt;">
@@ -10,21 +31,21 @@
 				<Variable Name = "pBuffer" InitialValue = "(buffer_type*)(0)" />
 
 				<Exec Condition="producerIndex != (uint64_t)_m_producerCount">
-					producerSlotsRaw = *(atomic_shared_ptr_slot_type**)(8 + (m_producerSlots.m_debugView.m_u64 &amp; aspdetail::Ptr_Mask))
+					producerSlotsRaw = *(atomic_shared_ptr_slot_type**)(8 + (m_producerSlots.m_debugView.m_u64 &amp; aspdetail::Cb_Mask))
 				</Exec>
 				
 				<Loop>
 					<Break Condition = "producerIndex == (uint64_t)_m_producerCount" />
 					<Exec>
-						pBuffer = *(buffer_type**)(8 + (producerSlotsRaw[producerIndex].m_debugView.m_u64 &amp; aspdetail::Ptr_Mask))
+						pBuffer = *(buffer_type**)(8 + (producerSlotsRaw[producerIndex].m_debugView.m_u64 &amp; aspdetail::Cb_Mask))
 					</Exec>
 					<Loop>
 						<Exec>
 							sizeAccumulator += ((uint64_t)pBuffer->_m_postWriteIterator - (uint64_t)pBuffer->_m_readSlot)
 						</Exec>
-						<Break Condition = "(pBuffer->m_next.m_debugView.m_u64 &amp; aspdetail::Ptr_Mask) == 0"/>
+						<Break Condition = "(pBuffer->m_next.m_debugView.m_u64 &amp; aspdetail::Cb_Mask) == 0"/>
 						<Exec>
-							pBuffer = *(buffer_type**)(8 + (pBuffer->m_next.m_debugView.m_u64 &amp; aspdetail::Ptr_Mask))
+							pBuffer = *(buffer_type**)(8 + (pBuffer->m_next.m_debugView.m_u64 &amp; aspdetail::Cb_Mask))
 						</Exec>
 					</Loop>
 					<Exec>
@@ -38,7 +59,7 @@
 				<Loop>
 					<Break Condition = "producerIndex == (uint64_t)_m_producerCount" />
 					<Exec>
-						pBuffer = *(buffer_type**)(8 + (producerSlotsRaw[producerIndex].m_debugView.m_u64 &amp; aspdetail::Ptr_Mask))
+						pBuffer = *(buffer_type**)(8 + (producerSlotsRaw[producerIndex].m_debugView.m_u64 &amp; aspdetail::Cb_Mask))
 					</Exec>
 					<Item Name='[producer_{producerIndex + 1}]'>*pBuffer</Item>
 					<Exec>
@@ -64,8 +85,8 @@
 
 				<Loop>
 					<Exec>sizeAccumulator += ((uint64_t)pBuffer->_m_postWriteIterator - (uint64_t)pBuffer->_m_readSlot)</Exec>
-					<Break Condition="((pBuffer->m_next.m_debugView.m_u64 &amp; aspdetail::Ptr_Mask) == 0)" />
-					<Exec>pBuffer = *(buffer_type**)(8 + (pBuffer->m_next.m_debugView.m_u64 &amp; aspdetail::Ptr_Mask))</Exec>
+					<Break Condition="((pBuffer->m_next.m_debugView.m_u64 &amp; aspdetail::Cb_Mask) == 0)" />
+					<Exec>pBuffer = *(buffer_type**)(8 + (pBuffer->m_next.m_debugView.m_u64 &amp; aspdetail::Cb_Mask))</Exec>
 				</Loop>
 
 				<Item Name="[size]">sizeAccumulator</Item>
@@ -74,8 +95,8 @@
 
 				<Loop>
 					<If Condition="itemCount == ((uint64_t)pBuffer->_m_postWriteIterator - (uint64_t)pBuffer->_m_readSlot)">
-						<Break Condition="((pBuffer->m_next.m_debugView.m_u64 &amp; aspdetail::Ptr_Mask) == 0)" />
-						<Exec>pBuffer = *(buffer_type**)(8 + (pBuffer->m_next.m_debugView.m_u64 &amp; aspdetail::Ptr_Mask))</Exec>
+						<Break Condition="((pBuffer->m_next.m_debugView.m_u64 &amp; aspdetail::Cb_Mask) == 0)" />
+						<Exec>pBuffer = *(buffer_type**)(8 + (pBuffer->m_next.m_debugView.m_u64 &amp; aspdetail::Cb_Mask))</Exec>
 						<Exec>pItem = pBuffer->m_dataBlock + ((uint64_t)pBuffer->_m_readSlot - (((uint64_t)pBuffer->_m_readSlot / pBuffer->m_capacity) * pBuffer->m_capacity))</Exec>
 						<Exec>itemCount = 0</Exec>
 					</If>
