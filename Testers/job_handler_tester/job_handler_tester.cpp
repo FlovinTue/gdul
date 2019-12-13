@@ -5,7 +5,7 @@
 #include <thread>
 #include "../Common/Timer.h"
 #include <gdul/delegate/delegate.h>
-
+#include "../Common/util.h"
 namespace gdul
 {
 
@@ -213,23 +213,44 @@ float job_handler_tester::run_consumption_strand_test(std::size_t jobs, float /*
 	return time.get();
 }
 
-float job_handler_tester::run_scatter_test(std::size_t arraySize, std::size_t batchSize)
+float job_handler_tester::run_scatter_test_input_output(std::size_t arraySize, std::size_t batchSize)
 {
+
 	arraySize;
 	batchSize;
+	std::uninitialized_fill(m_scatterOutput.begin(), m_scatterOutput.end(), nullptr);
 	m_scatterInput.clear();
+	m_scatterOutput.clear();
+
 	m_scatterInput.reserve(arraySize);
+
+	std::size_t preCount(0);
 	for (std::size_t i = 0; i < arraySize; ++i){
 		m_scatterInput.push_back((int)i);
+		if (i % 5 == 0) {
+			preCount += i;
+		}
 	}
 	
 	delegate<bool(int&)> process([arraySize](int& item) { if (item % 5 == 0) return true; return false; });
 	
 	gdul::shared_ptr<gdul::scatter_job<int>> scatter(m_handler.make_scatter_job<int>(m_scatterInput, m_scatterOutput, std::move(process), batchSize));
+	timer<float> time;
 	scatter->enable();
 	scatter->wait_for_finish();
 
-	return 0.f;
+	const float result(time.get());
+	
+	GDUL_ASSERT(m_handler.num_enqueued() == 0);
+
+	std::size_t postCount(0);
+
+	for (auto elem : m_scatterOutput) {
+		postCount += *elem;
+	}
+	GDUL_ASSERT(preCount == postCount);
+
+	return result;
 }
 
 }

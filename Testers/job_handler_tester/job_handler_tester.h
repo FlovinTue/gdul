@@ -33,7 +33,7 @@ public:
 	float run_mixed_parallel_test(std::size_t jobs, float overDuration);
 	float run_consumption_strand_test(std::size_t jobs, float overDuration);
 
-	float run_scatter_test(std::size_t arraySize, std::size_t batchSize);
+	float run_scatter_test_input_output(std::size_t arraySize, std::size_t batchSize);
 
 	job_handler_tester_info m_info;
 

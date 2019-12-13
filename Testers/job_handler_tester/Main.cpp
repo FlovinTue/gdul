@@ -19,7 +19,14 @@ int main()
 		
 		tester.init(info);
 
-		tester.run_scatter_test(100000, 20);
+		for (uint32_t i = 0; i < 50; ++i)
+		{
+			std::size_t arraySize(100000000), batchSize(100000);
+
+			std::cout << "running scatter test with " << arraySize << " elements and a batchsize of " << batchSize << std::endl;
+			const float time = tester.run_scatter_test_input_output(arraySize, batchSize);
+			std::cout << "run time was " << time << " seconds" << std::endl;
+		}
 	
 		for (uint32_t i = 0; i < 5000; ++i)
 		{

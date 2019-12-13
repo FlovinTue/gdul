@@ -51,10 +51,10 @@ public:
 	bool is_finished() const;
 
 	scatter_job(input_vector_type& input, output_vector_type& output, delegate<bool(ref_value_type)>&& process, std::size_t batchSize, job_handler* handler, jh_detail::allocator_type alloc);
+	scatter_job(input_vector_type& inputOutput, delegate<bool(ref_value_type)>&& process, std::size_t batchSize, job_handler* handler, jh_detail::allocator_type alloc);
 private:
 	friend class gdul::job_handler;
 
-	scatter_job(input_vector_type& inputOutput, delegate<bool(ref_value_type)>&& process, std::size_t batchSize, job_handler* handler, jh_detail::allocator_type alloc);
 
 	void initialize();
 	void finalize();
@@ -207,6 +207,7 @@ inline void scatter_job<T>::work_pack(std::size_t begin, std::size_t end)
 {
 	assert(begin != 0 && "Illegal to pack batch#0");
 	assert(!(m_output.size() < end) && "End index out of bounds");
+	(void)end;
 
 	const std::size_t packSlot(get_batch_pack_slot(begin / offset_batch_size()));
 
