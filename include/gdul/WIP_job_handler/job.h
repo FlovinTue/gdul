@@ -37,6 +37,12 @@ public:
 
 	~job();
 
+	job(job&& other) noexcept;
+	job(const job& other) noexcept;
+	job& operator=(job&& other) noexcept;
+	job& operator=(const job& other) noexcept;
+
+
 	void add_dependency(job& dependency);
 	void set_priority(std::uint8_t priority) noexcept;
 

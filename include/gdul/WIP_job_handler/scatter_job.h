@@ -210,24 +210,23 @@ inline void scatter_job<T>::work_pack(std::size_t begin, std::size_t end)
 
 	const std::size_t packSlot(get_batch_pack_slot(begin / offset_batch_size()));
 
-	auto batchEndStorageItr(m_output.at(packSlot));
+	auto batchEndStorageItr(m_output.begin() + packSlot);
 
 	// Will never pack batch#0 
 	std::uintptr_t lastBatchEnd((std::uintptr_t)m_output[begin - 1]);
 	const std::uintptr_t batchSize((std::uintptr_t)(*batchEndStorageItr));
 
-	auto copyBeginItr(m_output.at(begin));
+	auto copyBeginItr(m_output.begin() + begin);
 	auto copyEndItr(copyBeginItr + batchSize);
-	auto copyTargetItr(m_output.at(lastBatchEnd));
+	auto copyTargetItr(m_output.begin() + lastBatchEnd);
 
 	std::copy(copyBeginItr, copyEndItr, copyTargetItr);
 
-	batchEndStorageItr = (value_type*)(lastBatchEnd + batchSize);
+	*batchEndStorageItr = (derefref_value_type)(lastBatchEnd + batchSize);
 }
 template<class T>
 inline void scatter_job<T>::work_process(std::size_t begin, std::size_t end)
 {
-	assert(begin != 0 && "Illegal to pack batch#0");
 	assert(!(m_output.size() < end) && "End index out of bounds");
 
 	std::uintptr_t batchOutputSize(0);
@@ -251,7 +250,7 @@ template<class T>
 inline std::size_t scatter_job<T>::get_batch_pack_slot(std::size_t batchIndex)
 {
 	if ((void*)&m_input != (void*)&m_output) {
-		return offset_batch_size() * (batchIndex + 1);
+		return offset_batch_size() * batchIndex + base_batch_size();
 	}
 	else {
 		return m_input.size() + (batchIndex);

@@ -225,7 +225,9 @@ float job_handler_tester::run_scatter_test(std::size_t arraySize, std::size_t ba
 	
 	delegate<bool(int&)> process([arraySize](int& item) { if (item % 5 == 0) return true; return false; });
 	
-	gdul::shared_ptr<gdul::scatter_job<int>> scatter(m_handler.make_scatter_job<int>(m_scatterInput, m_scatterOutput, std::move(process), 5));
+	gdul::shared_ptr<gdul::scatter_job<int>> scatter(m_handler.make_scatter_job<int>(m_scatterInput, m_scatterOutput, std::move(process), batchSize));
+	scatter->enable();
+	scatter->wait_for_finish();
 
 	return 0.f;
 }

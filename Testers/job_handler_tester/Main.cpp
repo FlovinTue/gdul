@@ -12,11 +12,14 @@ int main()
 {	
 	{
 		gdul::job_handler_tester tester;
+
 		
 		gdul::job_handler_tester_info info;
 		info.affinity = gdul::JOB_HANDLER_TESTER_WORKER_AFFINITY_DYNAMIC;
 		
 		tester.init(info);
+
+		tester.run_scatter_test(100000, 20);
 	
 		for (uint32_t i = 0; i < 5000; ++i)
 		{

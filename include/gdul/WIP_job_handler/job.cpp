@@ -32,6 +32,24 @@ job::~job()
 {
 	assert(!(*this) || m_impl->is_enabled() && "Job destructor ran before enable was called");
 }
+job::job(job && other) noexcept
+{
+	operator=(std::move(other));
+}
+job::job(const job & other) noexcept
+{
+	operator=(other);
+}
+job & job::operator=(job && other) noexcept
+{
+	m_impl = std::move(other.m_impl);
+	return *this;
+}
+job & job::operator=(const job & other) noexcept
+{
+	m_impl = other.m_impl;
+	return *this;
+}
 void job::add_dependency(job & dependency)
 {
 	assert(m_impl && "Job not set");
