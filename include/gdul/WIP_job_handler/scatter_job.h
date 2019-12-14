@@ -239,7 +239,7 @@ inline void scatter_job<T>::work_process(std::size_t begin, std::size_t end)
 		}
 	}
 
-	m_output[get_batch_pack_slot(begin / offset_batch_size())] = (value_type*)batchOutputSize;
+	m_output[get_batch_pack_slot(begin / offset_batch_size())] = (derefref_value_type)batchOutputSize;
 }
 template<class T>
 inline void scatter_job<T>::finalize()

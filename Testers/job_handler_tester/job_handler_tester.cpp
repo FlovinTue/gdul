@@ -213,44 +213,51 @@ float job_handler_tester::run_consumption_strand_test(std::size_t jobs, float /*
 	return time.get();
 }
 
-float job_handler_tester::run_scatter_test_input_output(std::size_t arraySize, std::size_t batchSize)
+float job_handler_tester::run_scatter_test_input_output(std::size_t arraySize, std::size_t stepSize)
 {
+	m_scatterInput.resize(arraySize);
 
-	arraySize;
-	batchSize;
-	std::uninitialized_fill(m_scatterOutput.begin(), m_scatterOutput.end(), nullptr);
-	m_scatterInput.clear();
-	m_scatterOutput.clear();
-
-	m_scatterInput.reserve(arraySize);
-
-	std::size_t preCount(0);
-	for (std::size_t i = 0; i < arraySize; ++i){
-		m_scatterInput.push_back((int)i);
-		if (i % 5 == 0) {
-			preCount += i;
-		}
+	for (std::size_t i = 0; i < arraySize; ++i) {
+		m_scatterInput[i] = (int*)(std::uintptr_t(i));
 	}
+
+	const std::size_t passes(arraySize / stepSize);
+
+	float minTime(std::numeric_limits<float>::max());
+	std::size_t minTimeBatchSize(0);
 	
-	delegate<bool(int&)> process([arraySize](int& item) { if (item % 5 == 0) return true; return false; });
+	std::size_t batchSize(stepSize);
 	
-	gdul::shared_ptr<gdul::scatter_job<int>> scatter(m_handler.make_scatter_job<int>(m_scatterInput, m_scatterOutput, std::move(process), batchSize));
 	timer<float> time;
-	scatter->enable();
-	scatter->wait_for_finish();
+	for (std::size_t i = 0; i < passes; ++i) {
 
-	const float result(time.get());
-	
-	GDUL_ASSERT(m_handler.num_enqueued() == 0);
 
-	std::size_t postCount(0);
+		gdul::shared_ptr<gdul::scatter_job<int*>> scatter(m_handler.make_scatter_job<int*>(m_scatterInput, m_scatterOutput, delegate<bool(int*&)>(&work_tracker::scatter_process, &m_work), batchSize));
 
-	for (auto elem : m_scatterOutput) {
-		postCount += *elem;
+		time.reset();
+		scatter->enable();
+		scatter->wait_for_finish();
+
+		const float result(time.get());
+
+		if (result < minTime) {
+			minTime = result;
+			minTimeBatchSize = batchSize;
+		}
+		const std::size_t batches(m_scatterInput.size() / batchSize + ((bool)(m_scatterInput.size() % batchSize)));
+
+		std::cout << "Completed scatter job with a time of " << result << " seconds, averaging " << result / (float)batches << " seconds per batch" << std::endl;
+
+		batchSize += stepSize;
 	}
-	GDUL_ASSERT(preCount == postCount);
 
-	return result;
+	std::cout << "||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||" << std::endl;
+	const std::size_t batches(m_scatterInput.size() / batchSize + ((bool)(m_scatterInput.size() % batchSize)));
+	
+	std::cout << "Completed scatter testing with the best time being " << minTime << " seconds, averaging " << minTime / (float)batches << " seconds per batch" << std::endl;
+	std::cout << "The final batchSize is " << batchSize << std::endl;
+
+	return 0.f;
 }
 
 }

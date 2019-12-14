@@ -34,6 +34,25 @@ void work_tracker::end_work()
 {
 	evaluate_spin_count();
 }
+bool work_tracker::scatter_process(int *& item)
+{
+	// Just to add some heft
+	for (std::size_t i = 0; i < 100;)
+	{
+		double toAdd(std::sqrt(gdul::testSum));
+		gdul::testSum += toAdd;
+		if (gdul::testSum)
+		{
+			++i;
+		}
+	}
+
+
+	if ((std::uintptr_t)item % 5 == 0) {
+		return true;
+	}
+	return false;
+}
 
 void work_tracker::evaluate_spin_count()
 {
