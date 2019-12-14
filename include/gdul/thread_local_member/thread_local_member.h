@@ -263,43 +263,38 @@ private:
 template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::thread_local_member()
 	: thread_local_member<T, Allocator>::thread_local_member(T())
-{
-}
+{}
 template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::thread_local_member(T&& init)
 	: thread_local_member<T, Allocator>::thread_local_member(std::move(init), Allocator())
-{
-}
+{}
 template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::thread_local_member(const T& init)
 	: thread_local_member<T, Allocator>::thread_local_member(init, Allocator())
-{
-}
+{}
 template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::thread_local_member(Allocator allocator)
 	: thread_local_member<T, Allocator>::thread_local_member(T(), allocator)
-{
-}
+{}
 template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::thread_local_member(T&& init, Allocator allocator)
 	: m_allocator(allocator)
 	, m_index(s_st_container.m_indexPool.get(allocator))
 	, m_iteration(initialize_instance_tracker(std::forward<T&&>(init)))
-{
-}
+{}
 template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::thread_local_member(const T& init, Allocator allocator)
 	: m_allocator(allocator)
 	, m_index(s_st_container.m_indexPool.get(allocator))
 	, m_iteration(initialize_instance_tracker(std::forward<const T&>(init)))
-{
-}
+{}
 template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::~thread_local_member() noexcept
 {
-	store_instance_tracker(nullptr);
-
-	s_st_container.m_indexPool.add(m_index);
+	if (s_st_container.m_instanceTrackers) {
+		store_instance_tracker(nullptr);
+		s_st_container.m_indexPool.add(m_index);	
+	}
 }
 template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::operator T& ()
@@ -582,8 +577,7 @@ template<class T, class Allocator>
 template <class ...Args>
 inline void flexible_storage<T, Allocator>::reconstruct(size_type index, Args&& ...args)
 {
-	m_arrayRef[index].~T();
-	new (&m_arrayRef[index]) T(std::forward<Args&&>(args)...);
+	m_arrayRef[index] = T(std::forward<Args&&>(args)...);
 }
 template<class T, class Allocator>
 inline size_type flexible_storage<T, Allocator>::capacity() const noexcept
