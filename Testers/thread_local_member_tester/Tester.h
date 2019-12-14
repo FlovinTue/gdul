@@ -29,7 +29,7 @@ public:
 	using alloc_t = decltype(m_alloc);
 	using tlm_t = gdul::tlm<T, alloc_t>;
 
-	gdul::tlm_detail::index_pool<> m_indexPool;
+	gdul::tlm_detail::index_pool<void> m_indexPool;
 
 	const T m_init;
 };
