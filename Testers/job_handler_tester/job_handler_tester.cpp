@@ -5,6 +5,7 @@
 #include <thread>
 #include "../Common/Timer.h"
 #include <gdul/delegate/delegate.h>
+#include <array>
 #include "../Common/util.h"
 namespace gdul
 {
@@ -215,22 +216,23 @@ float job_handler_tester::run_consumption_strand_test(std::size_t jobs, float /*
 
 float job_handler_tester::run_scatter_test_input_output(std::size_t arraySize, std::size_t stepSize)
 {
-	m_scatterInput.resize(arraySize);
+	std::uninitialized_fill(m_scatterOutput.begin(), m_scatterOutput.end(), nullptr);
 
-	for (std::size_t i = 0; i < arraySize; ++i) {
-		m_scatterInput[i] = (int*)(std::uintptr_t(i));
-	}
+	const std::size_t passes((arraySize / stepSize) / 5);
 
-	const std::size_t passes(arraySize / stepSize);
-
-	float minTime(std::numeric_limits<float>::max());
-	std::size_t minTimeBatchSize(0);
+	std::array<std::pair<float, std::size_t>, 6> minTimes;
+	std::uninitialized_fill(minTimes.begin(), minTimes.end(),  std::pair<float, std::size_t>(std::numeric_limits<float>::max(), 0 ));
 	
 	std::size_t batchSize(stepSize);
 	
 	timer<float> time;
 	for (std::size_t i = 0; i < passes; ++i) {
 
+		m_scatterInput.resize(arraySize);
+
+		for (std::size_t j = 0; j < arraySize; ++j) {
+			m_scatterInput[j] = (int*)(std::uintptr_t(j));
+		}
 
 		gdul::shared_ptr<gdul::scatter_job<int*>> scatter(m_handler.make_scatter_job<int*>(m_scatterInput, m_scatterOutput, delegate<bool(int*&)>(&work_tracker::scatter_process, &m_work), batchSize));
 
@@ -240,13 +242,13 @@ float job_handler_tester::run_scatter_test_input_output(std::size_t arraySize, s
 
 		const float result(time.get());
 
-		if (result < minTime) {
-			minTime = result;
-			minTimeBatchSize = batchSize;
+		if (result < minTimes[5].first) {
+			minTimes[5] = { result, batchSize };
+			std::sort(minTimes.begin(), minTimes.end(), [](std::pair<float, std::size_t>& a, std::pair<float, std::size_t>& b) {return a.first < b.first; });
 		}
 		const std::size_t batches(m_scatterInput.size() / batchSize + ((bool)(m_scatterInput.size() % batchSize)));
 
-		std::cout << "Completed scatter job with a time of " << result << " seconds, averaging " << result / (float)batches << " seconds per batch" << std::endl;
+		std::cout << "Completed scatter job with a time of " << result << " seconds, averaging " << result / (float)batches << " seconds per batch. Batch size is currently " << batchSize << std::endl;
 
 		batchSize += stepSize;
 	}
@@ -254,7 +256,10 @@ float job_handler_tester::run_scatter_test_input_output(std::size_t arraySize, s
 	std::cout << "||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||" << std::endl;
 	const std::size_t batches(m_scatterInput.size() / batchSize + ((bool)(m_scatterInput.size() % batchSize)));
 	
-	std::cout << "Completed scatter testing with the best time being " << minTime << " seconds, averaging " << minTime / (float)batches << " seconds per batch" << std::endl;
+	std::cout << "Completed scatter testing. Top time/batchSize are: " << std::endl;
+	for (std::size_t i = 0; i < 6; ++i) {
+		std::cout << "Time " << minTimes[i].first << " with batchSize " << minTimes[i].second << " averaging " << minTimes[i].first / batches << "s per job"<< std::endl;
+	}
 	std::cout << "The final batchSize is " << batchSize << std::endl;
 
 	return 0.f;
