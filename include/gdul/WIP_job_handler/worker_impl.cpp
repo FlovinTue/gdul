@@ -34,27 +34,33 @@ namespace jh_detail
 {
 
 worker_impl::worker_impl()
-	: m_autoCoreAffinity(Worker_Auto_Affinity)
+	: m_name()
+	, m_threadHandle(jh_detail::create_thread_handle())
+	, m_priorityDistributionIteration(0)
+	, m_onEnable([]() {})
+	, m_onDisable([]() {})
+	, m_autoCoreAffinity(Worker_Auto_Affinity)
 	, m_coreAffinity(Worker_Auto_Affinity)
 	, m_isEnabled(false)
-	, m_priorityDistributionIteration(0)
 	, m_allocator(allocator_type())
 	, m_queueAffinity(Worker_Auto_Affinity)
 	, m_sleepThreshhold(std::numeric_limits<std::uint16_t>::max())
-	, m_threadHandle(jh_detail::create_thread_handle())
 	, m_isActive(false)
 {
 }
 worker_impl::worker_impl(std::thread&& thread, allocator_type allocator, std::uint8_t coreAffinity)
-	: m_autoCoreAffinity(coreAffinity)
-	, m_thread(std::move(thread))
+	: m_thread(std::move(thread))
+	, m_name()
+	, m_threadHandle(m_thread.native_handle())
+	, m_priorityDistributionIteration(0)
+	, m_onEnable([]() {})
+	, m_onDisable([]() {})
+	, m_autoCoreAffinity(coreAffinity)
 	, m_coreAffinity(Worker_Auto_Affinity)
 	, m_isEnabled(false)
-	, m_priorityDistributionIteration(0)
 	, m_allocator(allocator)
 	, m_queueAffinity(Worker_Auto_Affinity)
 	, m_sleepThreshhold(250)
-	, m_threadHandle(m_thread.native_handle())
 	, m_isActive(false)
 {
 	jh_detail::set_thread_core_affinity(coreAffinity, m_threadHandle);
@@ -147,13 +153,21 @@ bool worker_impl::is_enabled() const
 {
 	return m_isEnabled.load(std::memory_order_relaxed);
 }
-void worker_impl::run_on_enable(delegate<void()>&& toCall)
+void worker_impl::set_run_on_enable(delegate<void()>&& toCall)
 {
 	m_onEnable = std::forward<delegate<void()>>(toCall);
 }
-void worker_impl::run_on_disable(delegate<void()>&& toCall)
+void worker_impl::set_run_on_disable(delegate<void()>&& toCall)
 {
 	m_onDisable = std::forward<delegate<void()>>(toCall);
+}
+void worker_impl::on_enable()
+{
+	m_onEnable();
+}
+void worker_impl::on_disable()
+{
+	m_onDisable();
 }
 void worker_impl::idle()
 {

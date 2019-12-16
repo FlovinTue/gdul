@@ -56,8 +56,8 @@ public:
 	void activate();
 	bool deactivate();
 
-	void run_on_enable(delegate<void()>&& toCall);
-	void run_on_disable(delegate<void()>&& toCall);
+	void set_run_on_enable(delegate<void()>&& toCall);
+	void set_run_on_disable(delegate<void()>&& toCall);
 
 	bool is_active() const;
 

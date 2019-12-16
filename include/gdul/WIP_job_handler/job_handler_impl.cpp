@@ -139,11 +139,11 @@ void job_handler_impl::launch_worker(std::uint16_t index) noexcept
 
 	this_worker_impl->refresh_sleep_timer();
 
-	//myInitInfo.myOnThreadLaunch();
+	this_worker_impl->on_enable();
 
 	work();
 
-	//myInitInfo.myOnThreadExit();
+	this_worker_impl->on_disable();
 }
 void job_handler_impl::work()
 {

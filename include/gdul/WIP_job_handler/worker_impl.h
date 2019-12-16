@@ -60,8 +60,11 @@ public:
 	bool is_active() const;
 	bool is_enabled() const;
 
-	void run_on_enable(delegate<void()> && toCall);
-	void run_on_disable(delegate<void()> && toCall);
+	void set_run_on_enable(delegate<void()> && toCall);
+	void set_run_on_disable(delegate<void()> && toCall);
+
+	void on_enable();
+	void on_disable();
 
 	void idle();
 

@@ -296,7 +296,9 @@ inline void scatter_job<T>::work_process(std::size_t batchIndex)
 template<class T>
 inline void scatter_job<T>::finalize()
 {
-	work_pack(m_batchCount - 1);
+	if (1 < m_batchCount){
+		work_pack(m_batchCount - 1);
+	}
 
 	const std::uintptr_t batchesEnd((std::uintptr_t)(m_output.back()));
 	m_output.resize(batchesEnd);
