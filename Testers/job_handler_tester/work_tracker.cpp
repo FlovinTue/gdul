@@ -37,7 +37,7 @@ void work_tracker::end_work()
 bool work_tracker::scatter_process(int *& item)
 {
 	// Just to add some heft
-	for (std::size_t i = 0; i < 100;)
+	for (std::size_t i = 0; i < 1000;)
 	{
 		double toAdd(std::sqrt(gdul::testSum));
 		gdul::testSum += toAdd;

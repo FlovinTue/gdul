@@ -214,7 +214,7 @@ float job_handler_tester::run_consumption_strand_test(std::size_t jobs, float /*
 	return time.get();
 }
 
-float job_handler_tester::run_scatter_test_input_output(std::size_t arraySize, std::size_t stepSize)
+void job_handler_tester::run_scatter_test_input_output(std::size_t arraySize, std::size_t stepSize, float& outBestBatchTime, std::size_t& outBestBatchSize)
 {
 	std::uninitialized_fill(m_scatterOutput.begin(), m_scatterOutput.end(), nullptr);
 
@@ -248,21 +248,15 @@ float job_handler_tester::run_scatter_test_input_output(std::size_t arraySize, s
 		}
 		const std::size_t batches(m_scatterInput.size() / batchSize + ((bool)(m_scatterInput.size() % batchSize)));
 
-		std::cout << "Completed scatter job with a time of " << result << " seconds, averaging " << result / (float)batches << " seconds per batch. Batch size is currently " << batchSize << std::endl;
-
 		batchSize += stepSize;
 	}
 
-	std::cout << "||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||" << std::endl;
 	const std::size_t batches(m_scatterInput.size() / batchSize + ((bool)(m_scatterInput.size() % batchSize)));
 	
-	std::cout << "Completed scatter testing. Top time/batchSize are: " << std::endl;
-	for (std::size_t i = 0; i < 6; ++i) {
-		std::cout << "Time " << minTimes[i].first << " with batchSize " << minTimes[i].second << " averaging " << minTimes[i].first / batches << "s per job"<< std::endl;
-	}
-	std::cout << "The final batchSize is " << batchSize << std::endl;
+	std::cout << "Completed scatter testing. Top time/batchSize are: " << minTimes[0].first << ", " << minTimes[0].second << " -------------- " << arraySize << " array size" << std::endl;
 
-	return 0.f;
+	outBestBatchTime = minTimes[0].first;
+	outBestBatchSize = minTimes[0].second;
 }
 
 }

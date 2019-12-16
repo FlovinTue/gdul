@@ -9,9 +9,9 @@ namespace gdul
 
 enum JOB_HANDLER_TESTER_WORKER_AFFINITY
 {
-	JOB_HANDLER_TESTER_WORKER_AFFINITY_ASSIGNED,
-	JOB_HANDLER_TESTER_WORKER_AFFINITY_DYNAMIC,
-	JOB_HANDLER_TESTER_WORKER_AFFINITY_MIXED,
+	JOB_HANDLER_TESTER_WORKER_AFFINITY_ASSIGNED = 1,
+	JOB_HANDLER_TESTER_WORKER_AFFINITY_DYNAMIC = 2,
+	JOB_HANDLER_TESTER_WORKER_AFFINITY_MIXED = 4,
 };
 struct job_handler_tester_info
 {
@@ -33,7 +33,7 @@ public:
 	float run_mixed_parallel_test(std::size_t jobs, float overDuration);
 	float run_consumption_strand_test(std::size_t jobs, float overDuration);
 
-	float run_scatter_test_input_output(std::size_t arraySize, std::size_t stepSize);
+	void run_scatter_test_input_output(std::size_t arraySize, std::size_t stepSize, float& outBestBatchTime, std::size_t& bestBatchSize);
 
 	job_handler_tester_info m_info;
 
