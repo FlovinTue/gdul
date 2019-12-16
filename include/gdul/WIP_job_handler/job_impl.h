@@ -55,7 +55,7 @@ public:
 	std::uint8_t get_priority() const;
 	void set_priority(std::uint8_t priority);
 
-	std::uint32_t add_dependencies(std::uint32_t n = 1);
+	bool try_add_dependencies(std::uint32_t n = 1);
 	std::uint32_t remove_dependencies(std::uint32_t n = 1);
 
 	bool enable();

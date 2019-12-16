@@ -83,10 +83,12 @@ void job_impl::set_priority(std::uint8_t priority)
 {
 	m_priority = priority;
 }
-std::uint32_t job_impl::add_dependencies(std::uint32_t n)
+bool job_impl::try_add_dependencies(std::uint32_t n)
 {
-	std::uint32_t result(m_dependencies.fetch_add(n, std::memory_order_acq_rel));
-	return result - n;
+	std::uint32_t exp(m_dependencies.load(std::memory_order_relaxed));
+	while (!m_dependencies.compare_exchange_weak(exp, exp + n, std::memory_order_relaxed) && exp != 0);
+
+	return exp != 0;
 }
 std::uint32_t job_impl::remove_dependencies(std::uint32_t n)
 {
