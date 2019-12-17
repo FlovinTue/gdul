@@ -356,8 +356,11 @@ inline void concurrent_queue<T, Allocator>::unsafe_reset()
 	m_producerSlotPostReservation.store(0, std::memory_order_relaxed);
 	m_producerSlotReservation.store(0, std::memory_order_relaxed);
 
+	shared_ptr_array_type slots(m_producerSlots.unsafe_load(std::memory_order_relaxed));
+
 	for (std::uint16_t i = 0; i < producerCount; ++i) {
-		m_producerSlots.unsafe_get()[i].unsafe_store(nullptr, std::memory_order_relaxed);
+		buffer_type* slot(slots[i].unsafe_get());
+		slot->invalidate();
 	}
 
 	m_producerSlots.unsafe_store(nullptr, std::memory_order_relaxed);
@@ -566,6 +569,8 @@ void concurrent_queue<T, Allocator>::ensure_producer_slots_capacity(std::uint16_
 		}
 	} while (activeArray.item_count() < minCapacity);
 
+	assert(m_producerSlots);
+
 	if (m_producerSlotsSwap){
 		raw_ptr<atomic_shared_ptr_slot_type[]> expSwap(swapArray);
 		m_producerSlotsSwap.compare_exchange_strong(expSwap, nullptr);
@@ -578,8 +583,8 @@ inline void concurrent_queue<T, Allocator>::force_store_to_producer_slot(shared_
 	shared_ptr_array_type swapArray(nullptr);
 
 	do{
-		activeArray = m_producerSlots.load(std::memory_order_acquire);
-		swapArray = m_producerSlotsSwap.load(std::memory_order_relaxed);
+		activeArray = m_producerSlots.load(std::memory_order_seq_cst);
+		swapArray = m_producerSlotsSwap.load(std::memory_order_seq_cst);
 
 		if (slot < swapArray.item_count() &&
 			swapArray[slot] != producer){
@@ -611,12 +616,12 @@ template<class T, class Allocator>
 inline void concurrent_queue<T, Allocator>::try_swap_producer_count(std::uint16_t toValue)
 {
 	std::uint16_t exp(m_producerCount.load(std::memory_order_relaxed));
-	while (!m_producerCount.compare_exchange_strong(exp, toValue, std::memory_order_relaxed) && exp < toValue);
+	while (exp < toValue && !m_producerCount.compare_exchange_strong(exp, toValue, std::memory_order_relaxed));
 }
 template<class T, class Allocator>
 inline typename concurrent_queue<T, Allocator>::buffer_type* concurrent_queue<T, Allocator>::this_producer_cached()
 {
-	if ((t_cachedAccesses.m_lastProducer.m_addrBlock & cqdetail::Ptr_Mask) ^ reinterpret_cast<std::uint64_t>(this)) {
+	if ((t_cachedAccesses.m_lastProducer.m_addrBlock & cqdetail::Ptr_Mask) ^ reinterpret_cast<std::uintptr_t>(this)) {
 		refresh_cached_producer();
 	}
 	return t_cachedAccesses.m_lastProducer.m_buffer;
@@ -625,7 +630,7 @@ inline typename concurrent_queue<T, Allocator>::buffer_type* concurrent_queue<T,
 template<class T, class Allocator>
 inline typename concurrent_queue<T, Allocator>::buffer_type* concurrent_queue<T, Allocator>::this_consumer_cached()
 {
-	if ((t_cachedAccesses.m_lastConsumer.m_addrBlock & cqdetail::Ptr_Mask) ^ reinterpret_cast<std::uint64_t>(this)) {
+	if ((t_cachedAccesses.m_lastConsumer.m_addrBlock & cqdetail::Ptr_Mask) ^ reinterpret_cast<std::uintptr_t>(this)) {
 		refresh_cached_consumer();
 	}
 	return t_cachedAccesses.m_lastConsumer.m_buffer;
