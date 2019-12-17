@@ -500,7 +500,7 @@ inline typename concurrent_queue<T, Allocator>::shared_ptr_slot_type concurrent_
 		const std::size_t bufferOffset(bufferBegin - totalBlockBegin);
 		const std::size_t dataOffset(dataBegin - totalBlockBegin);
 
-		// new (addr) (arr[n]) is unreliable...
+		// new (addr) (type[n]) is unreliable...
 		data = reinterpret_cast<cqdetail::item_container<T>*>(totalBlock + dataOffset);
 		for (; constructed < log2size; ++constructed) {
 			cqdetail::item_container<T>* const item(&data[constructed]);
@@ -595,9 +595,6 @@ inline void concurrent_queue<T, Allocator>::force_store_to_producer_slot(shared_
 		}
 	} while (m_producerSlotsSwap != swapArray || m_producerSlots != activeArray);
 }
-// Find a slot for the buffer in the producer store. Also, update the active producer
-// array, capacity and producer count as is necessary. In the event a new producer array
-// needs to be allocated, threads will compete to do so.
 template<class T, class Allocator>
 inline void concurrent_queue<T, Allocator>::push_producer_buffer(shared_ptr_slot_type buffer)
 {
@@ -694,6 +691,7 @@ public:
 	// Searches the buffer list towards the front for
 	// the first buffer contining entries
 	inline shared_ptr_slot_type find_back();
+
 	// Pushes a newly allocated buffer buffer to the front of the
 	// buffer list
 	inline void push_front(shared_ptr_slot_type newBuffer);
@@ -1107,8 +1105,6 @@ inline void producer_buffer<T, Allocator>::reintegrate_failed_entries(typename p
 #endif
 }
 
-// used to be able to redirect access to data in the event
-// of an exception being thrown
 template <class T>
 class item_container
 {
@@ -1139,13 +1135,11 @@ public:
 	inline void reset_ref();
 
 private:
+	T m_data;
 #ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
 	// May or may not reference this continer
 	inline item_container<T>& reference() const;
 
-#endif
-	T m_data;
-#ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
 	union
 	{
 		std::uint64_t m_stateBlock;
