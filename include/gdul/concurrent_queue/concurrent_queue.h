@@ -207,7 +207,7 @@ private:
 	inline void try_swap_producer_count(std::uint16_t toValue);
 
 	inline std::uint16_t claim_producer_slot();
-	inline void ensure_producer_array_capacity(std::uint16_t minCapacity);
+	inline void ensure_producer_slots_capacity(std::uint16_t minCapacity);
 
 	inline buffer_type* this_producer_cached();
 	inline buffer_type* this_consumer_cached();
@@ -224,8 +224,8 @@ private:
 
 	static cqdetail::dummy_container<T, allocator_type> s_dummyContainer;
 
-	atomic_shared_ptr_array_type m_producerSlotsSwap;
 	atomic_shared_ptr_array_type m_producerSlots;
+	atomic_shared_ptr_array_type m_producerSlotsSwap;
 
 	GDUL_ATOMIC_WITH_VIEW(std::uint16_t, m_producerCount);
 
@@ -249,6 +249,7 @@ inline concurrent_queue<T, Allocator>::concurrent_queue(Allocator allocator)
 	, t_producer(s_dummyContainer.m_dummyBuffer, allocator)
 	, t_consumer(cqdetail::consumer_wrapper<shared_ptr_slot_type, shared_ptr_array_type>(s_dummyContainer.m_dummyBuffer), allocator)
 	, m_producerSlots(nullptr)
+	, m_producerSlotsSwap(nullptr)
 	, m_relocationIndex(0)
 	, m_allocator(allocator)
 {
@@ -527,7 +528,7 @@ std::uint16_t concurrent_queue<T, Allocator>::claim_producer_slot()
 	do{
 	const std::uint16_t desiredSlot(m_producerSlotReservation.load(std::memory_order_relaxed));
 
-	ensure_producer_array_capacity(desiredSlot + 1);
+	ensure_producer_slots_capacity(desiredSlot + 1);
 
 	slot = desiredSlot;
 	}while (!m_producerSlotReservation.compare_exchange_strong(desiredSlot, desiredSlot + 1));
@@ -535,21 +536,45 @@ std::uint16_t concurrent_queue<T, Allocator>::claim_producer_slot()
 	return slot;
 }
 template <class T, class Allocator>
-void concurrent_queue<T, Allocator>::ensure_producer_array_capacity(std::uint16_t minCapacity)
+void concurrent_queue<T, Allocator>::ensure_producer_slots_capacity(std::uint16_t minCapacity)
 {
-	shared_ptr_array_type activeArray(m_producerSlots.load(std::memory_order_relaxed));
+	const size_type minimum(minCapacity);
+	shared_ptr_array_type activeArray(nullptr);
+	shared_ptr_array_type swapArray(nullptr);
+	do{
+		activeArray = m_producerSlots.load();
 
-	if (activeArray.item_count() < minCapacity){
-
-		const std::uint16_t minSize(desiredSlot + (bool)desiredSlot + 1);
-		const std::uint16_t newSize(minSize * 2);
-		shared_ptr_array_type toSwap(make_shared<atomic_shared_ptr_slot_type[], allocator_type>(newSize, m_allocator));
-
-		for (std::uint16_t i = 0; i < activeArray.item_count(); ++i){
-			toSwap[i].unsafe_store(activeArray[i].load(std::memory_order_relaxed));
+		if (!(activeArray.item_count() < minimum)){
+			break;
 		}
 
-		while (!m_producerSlotsSwap.compare_exchange_strong(activeArray, toSwap) && activeArray.item_count() < newSize);
+		swapArray = m_producerSlotsSwap.load();
+
+		if (swapArray.item_count() < minimum){
+			const float growth(((float)minimum) * 1.4f);
+
+			shared_ptr_array_type grown(make_shared<atomic_shared_ptr_slot_type[], allocator_type>((size_type)growth, m_allocator));
+
+			raw_ptr<atomic_shared_ptr_slot_type[]> exp(swapArray);
+			m_producerSlotsSwap.compare_exchange_strong(exp, std::move(grown));
+
+			continue;
+		}
+
+		for (size_type i = 0, itemCount((size_type)activeArray.item_count()); i < itemCount; ++i){
+			raw_ptr<atomic_shared_ptr_slot_type[]> exp(nullptr, 0);
+			swapArray[i].compare_exchange_strong(exp, activeArray[i].load());
+		}
+
+		if (m_producerSlots.compare_exchange_strong(activeArray, swapArray)){
+			break;
+		}
+	} while (activeArray.item_count() < minimum);
+
+	if (!(activeArray.item_count() < swapArray.item_count()))
+	{
+		raw_ptr<instance_tracker_atomic_entry[]> expSwap(swapArray);
+		s_st_container.m_swapArray.compare_exchange_strong(expSwap, nullptr);
 	}
 }
 // Find a slot for the buffer in the producer store. Also, update the active producer
