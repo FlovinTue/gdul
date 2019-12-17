@@ -64,7 +64,7 @@ private:
 template<class Object, class Allocator>
 inline concurrent_object_pool<Object, Allocator>::concurrent_object_pool(std::size_t blockSize)
 	: m_blockSize(blockSize)
-	, m_unusedObjects(blockSize, m_allocator)
+	, m_unusedObjects(m_allocator)
 	, m_lastBlock(nullptr)
 {
 	try_alloc_block();
@@ -73,7 +73,7 @@ template<class Object, class Allocator>
 inline concurrent_object_pool<Object, Allocator>::concurrent_object_pool(std::size_t blockSize, Allocator & allocator)
 	: m_allocator(allocator)
 	, m_blockSize(blockSize)
-	, m_unusedObjects(blockSize, allocator)
+	, m_unusedObjects(allocator)
 	, m_lastBlock(nullptr)
 {
 	try_alloc_block();
@@ -129,6 +129,9 @@ inline void concurrent_object_pool<Object, Allocator>::try_alloc_block()
 	}
 
 	if (m_lastBlock.compare_exchange_strong(exp, node)){
+		
+		m_unusedObjects.reserve(m_blockSize);
+
 		for (std::size_t i = 0; i < m_blockSize; ++i){
 			m_unusedObjects.push(&node->m_objects[i]);
 		}
