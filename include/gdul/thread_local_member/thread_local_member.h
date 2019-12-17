@@ -440,14 +440,11 @@ inline void thread_local_member<T, Allocator>::grow_instance_tracker_array() con
 		swapArray = s_st_container.m_swapArray.load();
 
 		if (swapArray.item_count() < minimum) {
-			const float growth(((float)minimum) * 1.4f);
-
 			allocator_instance_tracker_array arrayAlloc(m_allocator);
-			instance_tracker_array grown(make_shared<instance_tracker_atomic_entry[], allocator_instance_tracker_array>((size_type)growth, arrayAlloc));
+			instance_tracker_array grown(make_shared<instance_tracker_atomic_entry[], allocator_instance_tracker_array>(minimum, arrayAlloc));
 
 			raw_ptr<instance_tracker_atomic_entry[]> exp(swapArray);
 			s_st_container.m_swapArray.compare_exchange_strong(exp, std::move(grown));
-				
 			continue;
 		}
 
