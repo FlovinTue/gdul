@@ -325,11 +325,7 @@ inline double tester<T, Allocator>::ExecuteWrite(std::uint32_t runs)
 		m_isRunning = false;
 	}
 
-	std::cout << "ExecuteWrite Threw " << m_thrown;
-	if (!CheckResults()) {
-		std::cout << " and failed check";
-	}
-	std::cout << std::endl;
+	std::cout << "ExecuteWrite Threw " << m_thrown << std::endl;
 
 	return result;
 }
