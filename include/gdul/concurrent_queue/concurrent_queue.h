@@ -232,7 +232,7 @@ private:
 
 	std::atomic<std::uint16_t> m_relocationIndex;
 	std::atomic<std::uint16_t> m_producerSlotReservation;
-	std::atomic<std::uint16_t> m_producerSlotPostIterator;
+	std::atomic<std::uint16_t> m_producerSlotPostReservation;
 
 	allocator_type m_allocator;
 };
@@ -245,7 +245,7 @@ inline concurrent_queue<T, Allocator>::concurrent_queue()
 template<class T, class Allocator>
 inline concurrent_queue<T, Allocator>::concurrent_queue(Allocator allocator)
 	: m_producerCount(0)
-	, m_producerSlotPostIterator(0)
+	, m_producerSlotPostReservation(0)
 	, m_producerSlotReservation(0)
 	, t_producer(s_dummyContainer.m_dummyBuffer, allocator)
 	, t_consumer(cqdetail::consumer_wrapper<shared_ptr_slot_type, shared_ptr_array_type>(s_dummyContainer.m_dummyBuffer), allocator)
@@ -350,19 +350,18 @@ inline void concurrent_queue<T, Allocator>::unsafe_reset()
 	std::atomic_thread_fence(std::memory_order_acquire);
 
 	const std::uint16_t producerCount(m_producerCount.load(std::memory_order_relaxed));
-	const std::uint16_t slots(cqdetail::to_store_array_slot<void>(producerCount - static_cast<bool>(producerCount)) + static_cast<bool>(producerCount));
-
-	kill_store_array_below(slots, true);
 
 	m_relocationIndex.store(0, std::memory_order_relaxed);
-	m_producerCapacity.store(0, std::memory_order_relaxed);
 	m_producerCount.store(0, std::memory_order_relaxed);
-	m_producerSlotPostIterator.store(0, std::memory_order_relaxed);
+	m_producerSlotPostReservation.store(0, std::memory_order_relaxed);
 	m_producerSlotReservation.store(0, std::memory_order_relaxed);
 
 	for (std::uint16_t i = 0; i < producerCount; ++i) {
 		m_producerSlots.unsafe_get()[i].unsafe_store(nullptr, std::memory_order_relaxed);
 	}
+
+	m_producerSlots.unsafe_store(nullptr, std::memory_order_relaxed);
+	m_producerSlotsSwap.unsafe_store(nullptr, std::memory_order_relaxed);
 
 	std::atomic_thread_fence(std::memory_order_release);
 }
@@ -416,6 +415,7 @@ inline bool concurrent_queue<T, Allocator>::relocate_consumer()
 	const std::uint16_t maxVisited(producers - static_cast<bool>(producers) + !(producers - static_cast<bool>(producers)));
 
 	cqdetail::consumer_wrapper<shared_ptr_slot_type, shared_ptr_array_type>& consumer(t_consumer);
+
 	if (consumer.m_lastKnownArray != m_producerSlots) {
 		consumer.m_lastKnownArray = m_producerSlots.load(std::memory_order_relaxed);
 	}
@@ -525,16 +525,12 @@ inline typename concurrent_queue<T, Allocator>::shared_ptr_slot_type concurrent_
 template <class T, class Allocator>
 std::uint16_t concurrent_queue<T, Allocator>::claim_producer_slot()
 {
-	std::uint16_t slot;
+	std::uint16_t desiredSlot(m_producerSlotReservation.load(std::memory_order_relaxed));
 	do{
-	const std::uint16_t desiredSlot(m_producerSlotReservation.load(std::memory_order_relaxed));
+		ensure_producer_slots_capacity(desiredSlot + 1);
+	}while (!m_producerSlotReservation.compare_exchange_strong(desiredSlot, desiredSlot + 1, std::memory_order_seq_cst));
 
-	ensure_producer_slots_capacity(desiredSlot + 1);
-
-	slot = desiredSlot;
-	}while (!m_producerSlotReservation.compare_exchange_strong(desiredSlot, desiredSlot + 1));
-
-	return slot;
+	return desiredSlot;
 }
 template <class T, class Allocator>
 void concurrent_queue<T, Allocator>::ensure_producer_slots_capacity(std::uint16_t minCapacity)
@@ -550,8 +546,9 @@ void concurrent_queue<T, Allocator>::ensure_producer_slots_capacity(std::uint16_
 
 		swapArray = m_producerSlotsSwap.load();
 
-		if (swapArray.item_count() < minimum){
-			shared_ptr_array_type grown(make_shared<atomic_shared_ptr_slot_type[], allocator_type>((size_type)minCapacity, m_allocator));
+		if (swapArray.item_count() < minCapacity){
+			const float growth((float)minCapacity * 1.4f);
+			shared_ptr_array_type grown(make_shared<atomic_shared_ptr_slot_type[], allocator_type>((size_type)growth, m_allocator));
 
 			raw_ptr<atomic_shared_ptr_slot_type[]> exp(swapArray);
 			m_producerSlotsSwap.compare_exchange_strong(exp, std::move(grown));
@@ -560,18 +557,17 @@ void concurrent_queue<T, Allocator>::ensure_producer_slots_capacity(std::uint16_
 		}
 
 		for (size_type i = 0, itemCount((size_type)activeArray.item_count()); i < itemCount; ++i){
-			raw_ptr<atomic_shared_ptr_slot_type[]> exp(nullptr, 0);
+			raw_ptr<buffer_type> exp(nullptr, 0);
 			swapArray[i].compare_exchange_strong(exp, activeArray[i].load());
 		}
 
 		if (m_producerSlots.compare_exchange_strong(activeArray, swapArray)){
 			break;
 		}
-	} while (activeArray.item_count() < minimum);
+	} while (activeArray.item_count() < minCapacity);
 
-	if (!(activeArray.item_count() < swapArray.item_count()))
-	{
-		raw_ptr<instance_tracker_atomic_entry[]> expSwap(swapArray);
+	if (m_producerSlotsSwap){
+		raw_ptr<atomic_shared_ptr_slot_type[]> expSwap(swapArray);
 		m_producerSlotsSwap.compare_exchange_strong(expSwap, nullptr);
 	}
 }
@@ -585,12 +581,12 @@ inline void concurrent_queue<T, Allocator>::force_store_to_producer_slot(shared_
 		activeArray = m_producerSlots.load(std::memory_order_acquire);
 		swapArray = m_producerSlotsSwap.load(std::memory_order_relaxed);
 
-		if (m_index < swapArray.item_count() &&
-			swapArray[m_index] != entry){
-			swapArray[m_index].store(entry, std::memory_order_release);
+		if (slot < swapArray.item_count() &&
+			swapArray[slot] != producer){
+			swapArray[slot].store(producer, std::memory_order_release);
 		}
-		if (activeArray[m_index] != entry){
-			activeArray[m_index].store(entry, std::memory_order_release);
+		if (activeArray[slot] != producer){
+			activeArray[slot].store(producer, std::memory_order_release);
 		}
 	} while (m_producerSlotsSwap != swapArray || m_producerSlots != activeArray);
 }
@@ -604,10 +600,10 @@ inline void concurrent_queue<T, Allocator>::push_producer_buffer(shared_ptr_slot
 
 	force_store_to_producer_slot(std::move(buffer), bufferSlot);
 
-	const std::uint16_t postIterator(m_producerSlotPostIterator.fetch_add(1, std::memory_order_seq_cst) + 1);
-	const std::uint16_t numReserved(m_producerSlotReservation.load(std::memory_order_seq_cst));
+	const std::uint16_t postIterator(m_producerSlotPostReservation.operator++());
+	const std::uint16_t reservedSlots(m_producerSlotReservation.load(std::memory_order_seq_cst));
 
-	if (postIterator == numReserved) {
+	if (postIterator == reservedSlots) {
 		try_swap_producer_count(postIterator);
 	}
 }
