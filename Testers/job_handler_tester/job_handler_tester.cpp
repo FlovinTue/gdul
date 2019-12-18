@@ -7,6 +7,7 @@
 #include <gdul/delegate/delegate.h>
 #include <array>
 #include "../Common/util.h"
+#include <gdul/WIP_job_handler/scatter_job.h>
 namespace gdul
 {
 
@@ -216,47 +217,48 @@ float job_handler_tester::run_consumption_strand_test(std::size_t jobs, float /*
 
 void job_handler_tester::run_scatter_test_input_output(std::size_t arraySize, std::size_t stepSize, float& outBestBatchTime, std::size_t& outBestBatchSize)
 {
-	std::uninitialized_fill(m_scatterOutput.begin(), m_scatterOutput.end(), nullptr);
+	arraySize; stepSize; outBestBatchSize; outBestBatchTime;
+	//std::uninitialized_fill(m_scatterOutput.begin(), m_scatterOutput.end(), nullptr);
 
-	const std::size_t passes((arraySize / stepSize) / 5);
+	//const std::size_t passes((arraySize / stepSize) / 5);
 
-	std::array<std::pair<float, std::size_t>, 6> minTimes;
-	std::uninitialized_fill(minTimes.begin(), minTimes.end(),  std::pair<float, std::size_t>(std::numeric_limits<float>::max(), 0 ));
-	
-	std::size_t batchSize(stepSize);
-	
-	timer<float> time;
-	for (std::size_t i = 0; i < passes; ++i) {
+	//std::array<std::pair<float, std::size_t>, 6> minTimes;
+	//std::uninitialized_fill(minTimes.begin(), minTimes.end(),  std::pair<float, std::size_t>(std::numeric_limits<float>::max(), 0 ));
+	//
+	//std::size_t batchSize(stepSize);
+	//
+	//timer<float> time;
+	//for (std::size_t i = 0; i < passes; ++i) {
 
-		m_scatterInput.resize(arraySize);
+	//	m_scatterInput.resize(arraySize);
 
-		for (std::size_t j = 0; j < arraySize; ++j) {
-			m_scatterInput[j] = (int*)(std::uintptr_t(j));
-		}
+	//	for (std::size_t j = 0; j < arraySize; ++j) {
+	//		m_scatterInput[j] = (int*)(std::uintptr_t(j));
+	//	}
 
-		gdul::shared_ptr<gdul::scatter_job<int*>> scatter(m_handler.make_scatter_job<int*>(m_scatterInput, m_scatterOutput, delegate<bool(int*&)>(&work_tracker::scatter_process, &m_work), batchSize));
+	//	gdul::shared_ptr<gdul::scatter_job_impl<int*>> scatter(m_handler.make_scatter_job<int*>(m_scatterInput, m_scatterOutput, delegate<bool(int*&)>(&work_tracker::scatter_process, &m_work), batchSize));
 
-		time.reset();
-		scatter->enable();
-		scatter->wait_for_finish();
+	//	time.reset();
+	//	scatter->enable();
+	//	scatter->wait_for_finish();
 
-		const float result(time.get());
+	//	const float result(time.get());
 
-		if (result < minTimes[5].first) {
-			minTimes[5] = { result, batchSize };
-			std::sort(minTimes.begin(), minTimes.end(), [](std::pair<float, std::size_t>& a, std::pair<float, std::size_t>& b) {return a.first < b.first; });
-		}
-		const std::size_t batches(m_scatterInput.size() / batchSize + ((bool)(m_scatterInput.size() % batchSize)));
+	//	if (result < minTimes[5].first) {
+	//		minTimes[5] = { result, batchSize };
+	//		std::sort(minTimes.begin(), minTimes.end(), [](std::pair<float, std::size_t>& a, std::pair<float, std::size_t>& b) {return a.first < b.first; });
+	//	}
+	//	const std::size_t batches(m_scatterInput.size() / batchSize + ((bool)(m_scatterInput.size() % batchSize)));
 
-		batchSize += stepSize;
-	}
+	//	batchSize += stepSize;
+	//}
 
-	const std::size_t batches(m_scatterInput.size() / batchSize + ((bool)(m_scatterInput.size() % batchSize)));
-	
-	std::cout << "Completed scatter testing. Top time/batchSize are: " << minTimes[0].first << ", " << minTimes[0].second << " -------------- " << arraySize << " array size" << std::endl;
+	//const std::size_t batches(m_scatterInput.size() / batchSize + ((bool)(m_scatterInput.size() % batchSize)));
+	//
+	//std::cout << "Completed scatter testing. Top time/batchSize are: " << minTimes[0].first << ", " << minTimes[0].second << " -------------- " << arraySize << " array size" << std::endl;
 
-	outBestBatchTime = minTimes[0].first;
-	outBestBatchSize = minTimes[0].second;
+	//outBestBatchTime = minTimes[0].first;
+	//outBestBatchSize = minTimes[0].second;
 }
 
 }
