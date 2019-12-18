@@ -3,7 +3,7 @@
 #include <thread>
 #include "../Common/thread_pool.h"
 #include <gdul\concurrent_queue\concurrent_queue.h>
-#include "Timer.h"
+#include "../Common/Timer.h"
 #include <concurrent_queue.h>
 #include <queue>
 #include <mutex>
@@ -133,7 +133,7 @@ inline double tester<T, Allocator>::ExecuteConcurrent(std::uint32_t runs)
 		for (std::uint32_t j = 0; j < Readers; ++j)
 			m_reader.add_task(std::bind(&tester::Read, this, ReadsPerThread));
 
-		Timer timer;
+		gdul::timer<float> time;
 		m_isRunning = true;
 
 		while (m_writer.has_unfinished_tasks() | m_reader.has_unfinished_tasks())
@@ -146,7 +146,7 @@ inline double tester<T, Allocator>::ExecuteConcurrent(std::uint32_t runs)
 #endif
 		m_waiting = 0;
 
-		result += timer.GetTotalTime();
+		result += time.get();
 
 		m_isRunning = false;
 	}
@@ -175,12 +175,12 @@ inline double tester<T, Allocator>::ExecuteSingleThread(std::uint32_t runs)
 
 		m_isRunning = true;
 
-		Timer timer;
+		gdul::timer<float> time;
 
 		Write(Writes);
 		Read(Writes);
 
-		result += timer.GetTotalTime();
+		result += time.get();
 
 		m_waiting = 0;
 
@@ -214,14 +214,14 @@ inline double tester<T, Allocator>::ExecuteSingleProducerSingleConsumer(std::uin
 		m_writer.add_task(std::bind(&tester::Write, this, Writes));
 		m_reader.add_task(std::bind(&tester::Read, this, Writes));
 
-		Timer timer;
+		gdul::timer<float> time;
 
 		m_isRunning = true;
 
 		while (m_writer.has_unfinished_tasks() | m_reader.has_unfinished_tasks())
 			std::this_thread::yield();
 
-		result += timer.GetTotalTime();
+		result += time.get();
 
 		m_waiting = 0;
 
@@ -263,13 +263,13 @@ inline double tester<T, Allocator>::ExecuteRead(std::uint32_t runs)
 		for (std::uint32_t j = 0; j < Readers; ++j)
 			m_reader.add_task(std::bind(&tester::Read, this, ReadsPerThread));
 
-		Timer timer;
+		gdul::timer<float> time;
 		m_isRunning = true;
 
 		while (m_reader.has_unfinished_tasks())
 			std::this_thread::yield();
 
-		result += timer.GetTotalTime();
+		result += time.get();
 
 		m_waiting = 0;
 
@@ -303,13 +303,13 @@ inline double tester<T, Allocator>::ExecuteWrite(std::uint32_t runs)
 		for (std::uint32_t j = 0; j < Writers; ++j)
 			m_writer.add_task(std::bind(&tester::Write, this, WritesPerThread));
 
-		Timer timer;
+		gdul::timer<float> time;
 		m_isRunning = true;
 
 		while (m_writer.has_unfinished_tasks())
 			std::this_thread::yield();
 
-		result += timer.GetTotalTime();
+		result += time.get();
 
 #ifdef GDUL
 		m_queue.unsafe_clear();
