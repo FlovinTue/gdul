@@ -46,6 +46,8 @@ job_impl::~job_impl()
 
 void job_impl::operator()()
 {
+	assert(!m_finished);
+
 	m_workUnit();
 
 	m_finished.store(true, std::memory_order_seq_cst);
@@ -71,7 +73,7 @@ bool job_impl::try_attach_child(job_impl_shared_ptr child)
 			return false;
 		}
 
-	} while (!m_firstDependee.compare_exchange_strong(rawRep, std::move(dependee), std::memory_order_relaxed, std::memory_order_relaxed));
+	} while (!m_firstDependee.compare_exchange_weak(rawRep, std::move(dependee), std::memory_order_relaxed, std::memory_order_relaxed));
 
 	return true;
 }
@@ -86,7 +88,7 @@ void job_impl::set_priority(std::uint8_t priority)
 bool job_impl::try_add_dependencies(std::uint32_t n)
 {
 	std::uint32_t exp(m_dependencies.load(std::memory_order_relaxed));
-	while (!m_dependencies.compare_exchange_weak(exp, exp + n, std::memory_order_relaxed) && exp != 0);
+	while (exp != 0 && !m_dependencies.compare_exchange_weak(exp, exp + n, std::memory_order_relaxed));
 
 	return exp != 0;
 }

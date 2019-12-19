@@ -23,6 +23,8 @@
 #include <gdul/WIP_job_handler/job_handler_commons.h>
 #include <gdul/WIP_job_handler/job.h>
 #include <gdul/delegate/delegate.h>
+
+// Get rid of this dependency.... belongs to implementation details. (does 'this' too for that matter)
 #include <gdul/WIP_job_handler/chunk_allocator.h>
 
 #include <vector>
@@ -98,7 +100,6 @@ private:
 	std::size_t offset_batch_size() const {
 		return m_batchSize + 1;
 	}
-	std::atomic_bool finalizeRan = false;
 
 	job m_root;
 	job m_end;
@@ -221,7 +222,6 @@ inline void scatter_job_impl<T>::make_jobs()
 
 	for (std::size_t i = 1; i < m_batchCount; ++i) {
 		job nextProcessJob(make_work_slice(&scatter_job_impl<T>::work_process, i));
-		nextProcessJob.enable();
 
 		if (i < (m_batchCount - 1)) {
 			job nextPackJob(make_work_slice(&scatter_job_impl<T>::work_pack, i));
@@ -232,6 +232,7 @@ inline void scatter_job_impl<T>::make_jobs()
 			currentPackJob = std::move(nextPackJob);
 		}
 
+		nextProcessJob.enable();
 		currentProcessJob = std::move(nextProcessJob);
 	}
 
@@ -254,6 +255,11 @@ inline job scatter_job_impl<T>::make_work_slice(Fun fun, std::size_t batchIndex)
 template<class T>
 inline void scatter_job_impl<T>::work_pack(std::size_t batchIndex)
 {
+	const std::size_t blah(m_input.size());
+	blah;
+	const std::size_t blahe(m_output.size());
+	blahe;
+
 	const std::size_t outputBegin(to_output_begin(batchIndex));
 	const std::size_t outputEnd(to_output_end(batchIndex));
 
@@ -279,6 +285,10 @@ inline void scatter_job_impl<T>::work_pack(std::size_t batchIndex)
 template<class T>
 inline void scatter_job_impl<T>::work_process(std::size_t batchIndex)
 {
+	const std::size_t blah(m_input.size());
+	blah;
+	const std::size_t blahe(m_output.size());
+	blahe;
 	const std::size_t inputBegin(to_input_begin(batchIndex));
 	const std::size_t inputEnd(to_input_end(batchIndex));
 	const std::size_t outputBegin(to_output_begin(batchIndex));
@@ -300,12 +310,12 @@ inline void scatter_job_impl<T>::work_process(std::size_t batchIndex)
 template<class T>
 inline void scatter_job_impl<T>::finalize()
 {
-	finalizeRan = true;
 	if (1 < m_batchCount) {
 		work_pack(m_batchCount - 1);
 	}
 
 	const std::uintptr_t batchesEnd((std::uintptr_t)(m_output.back()));
+
 	m_output.resize(batchesEnd);
 }
 template<class T>

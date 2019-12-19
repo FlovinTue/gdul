@@ -24,6 +24,7 @@
 
 namespace gdul {
 
+class job_handler;
 
 namespace jh_detail {
 
@@ -56,6 +57,7 @@ public:
 
 private:
 	friend class jh_detail::job_handler_impl;
+	friend class job_handler;
 
 	job(gdul::shared_ptr<jh_detail::job_impl> impl) noexcept;
 

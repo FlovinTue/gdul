@@ -48,6 +48,8 @@ public:
 	job_handler(const jh_detail::allocator_type& allocator);
 	~job_handler();
 
+	static thread_local job this_job;
+	static thread_local worker this_worker;
 
 	template <class T>
 	scatter_job make_scatter_job(

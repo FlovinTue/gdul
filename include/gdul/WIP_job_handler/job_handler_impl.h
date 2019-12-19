@@ -48,8 +48,11 @@ class job_handler_impl
 public:
 	using job_impl_shared_ptr = job_impl::job_impl_shared_ptr;
 
-	static thread_local job this_job;
-	static thread_local worker this_worker;
+	struct tl_container
+	{
+		worker_impl* this_worker_impl;
+		worker_impl m_implicitWorker;
+	}static thread_local t_items;
 
 	job_handler_impl();
 	job_handler_impl(allocator_type& allocator);
@@ -69,8 +72,6 @@ public:
 
 	void enqueue_job(job_impl_shared_ptr job);
 
-	static thread_local worker_impl* this_worker_impl;
-	static thread_local worker_impl ourImplicitWorker;
 
 	using job_impl_allocator = chunk_allocator<job_impl, job_impl_chunk_rep>;
 	using job_dependee_allocator = chunk_allocator<job_dependee, job_dependee_chunk_rep>;

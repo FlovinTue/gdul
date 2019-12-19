@@ -21,6 +21,7 @@
 #include <gdul\WIP_job_handler\job_handler_impl.h>
 #include <string>
 #include <thread>
+#include <gdul/WIP_job_handler/job_handler.h>
 
 #if defined(_WIN64) | defined(_WIN32)
 #define NOMINMAX
@@ -34,10 +35,7 @@ namespace gdul
 #undef GetObject
 namespace jh_detail
 {
-thread_local job job_handler_impl::this_job(nullptr);
-thread_local worker job_handler_impl::this_worker(&job_handler_impl::ourImplicitWorker);
-thread_local jh_detail::worker_impl* job_handler_impl::this_worker_impl(&job_handler_impl::ourImplicitWorker);
-thread_local jh_detail::worker_impl job_handler_impl::ourImplicitWorker;
+thread_local job_handler_impl::tl_container job_handler_impl::t_items{ &job_handler_impl::t_items.m_implicitWorker };
 
 job_handler_impl::job_handler_impl()
 	: m_jobImplChunkPool(jh_detail::Job_Impl_Allocator_Block_Size, m_mainAllocator)
@@ -133,46 +131,46 @@ void job_handler_impl::enqueue_job(job_impl_shared_ptr job)
 
 void job_handler_impl::launch_worker(std::uint16_t index) noexcept
 {
-	this_worker_impl = &m_workers[index];
-	this_worker = worker(this_worker_impl);
+	t_items.this_worker_impl = &m_workers[index];
+	job_handler::this_worker = worker(t_items.this_worker_impl);
 
-	while (!this_worker_impl->is_enabled()) {
-		this_worker_impl->idle();
+	while (!t_items.this_worker_impl->is_enabled()) {
+		t_items.this_worker_impl->idle();
 	}
 
-	this_worker_impl->refresh_sleep_timer();
+	t_items.this_worker_impl->refresh_sleep_timer();
 
-	this_worker_impl->on_enable();
+	t_items.this_worker_impl->on_enable();
 
 	work();
 
-	this_worker_impl->on_disable();
+	t_items.this_worker_impl->on_disable();
 }
 void job_handler_impl::work()
 {
-	while (this_worker_impl->is_active()) {
+	while (t_items.this_worker_impl->is_active()) {
 
-		this_job = job(fetch_job());
+		job_handler::this_job = job(fetch_job());
 
-		if (this_job.m_impl) {
-			(*this_job.m_impl)();
+		if (job_handler::this_job.m_impl) {
+			(*job_handler::this_job.m_impl)();
 
-			this_worker_impl->refresh_sleep_timer();
+			t_items.this_worker_impl->refresh_sleep_timer();
 
 			continue;
 		}
 
-		this_worker_impl->idle();
+		t_items.this_worker_impl->idle();
 	}
 }
 
 job_handler_impl::job_impl_shared_ptr job_handler_impl::fetch_job()
 {
-	const uint8_t queueIndex(this_worker_impl->get_queue_target());
+	const uint8_t queueIndex(t_items.this_worker_impl->get_queue_target());
 
 	job_handler_impl::job_impl_shared_ptr out(nullptr);
 
-	for (uint8_t i = 0; i < this_worker_impl->get_fetch_retries(); ++i) {
+	for (uint8_t i = 0; i < t_items.this_worker_impl->get_fetch_retries(); ++i) {
 
 		const uint8_t index((queueIndex + i) % jh_detail::Priority_Granularity);
 

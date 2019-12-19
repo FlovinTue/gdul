@@ -56,7 +56,7 @@ void job::add_dependency(job & dependency)
 
 	if (m_impl->try_add_dependencies(1)) {
 		if (!dependency.m_impl->try_attach_child(m_impl)) {
-			if (m_impl->remove_dependencies(1)) {
+			if (!m_impl->remove_dependencies(1)) {
 				m_impl->get_handler()->enqueue_job(m_impl);
 			}
 		}
@@ -86,8 +86,8 @@ void job::wait_for_finish() noexcept
 	assert(m_impl && "Job not set");
 
 	while (!is_finished()) {
-		jh_detail::job_handler_impl::this_worker_impl->refresh_sleep_timer();
-		jh_detail::job_handler_impl::this_worker_impl->idle();
+		jh_detail::job_handler_impl::t_items.this_worker_impl->refresh_sleep_timer();
+		jh_detail::job_handler_impl::t_items.this_worker_impl->idle();
 	}
 }
 job::job(gdul::shared_ptr<jh_detail::job_impl> impl) noexcept
