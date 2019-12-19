@@ -30,6 +30,9 @@ class concurrent_object_pool;
 namespace jh_detail
 {
 
+// Make chunk_allocator / chunk_allocator_impl to remove scatter_job dependency on
+// concurrent_queue/concurrent_object_pool
+
 // Wrapper to get / recycle chunks from object pool
 template <class T, class ChunkRep>
 class chunk_allocator
