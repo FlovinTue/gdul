@@ -101,7 +101,7 @@ int main()
 	};
 	const size_t blah = sizeof(awkwardLam);
 
-	timer<float> time;
+	gdul::timer<float> time;
 
 	for (uint32_t i = 0; i < 300000000; ++i){
 		delegate<void()> constructed(awkwardLam);
