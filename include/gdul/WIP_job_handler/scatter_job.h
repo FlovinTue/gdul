@@ -2,19 +2,23 @@
 
 #include <gdul/WIP_job_handler/job_handler_commons.h>
 #include <gdul/WIP_job_handler/job_interface.h>
-#include <gdul/WIP_job_handler/scatter_job_impl_abstr.h>
 
 namespace gdul {
 class job;
 
-namespace jh_detail {
+namespace jh_detail
+{
+template <class T>
+class scatter_job_impl_abstr;
+template <class T>
+class scatter_job_impl;
 }
 
 class scatter_job
 {
 public:
 	scatter_job() : m_impl(nullptr), m_storage{} {}
-	~scatter_job() { m_impl->~job_interface(); }
+	~scatter_job() { m_impl->~job_interface(); m_impl = nullptr; std::uninitialized_fill_n(&m_storage[0], sizeof(m_storage), 0); }
 
 	void add_dependency(job& dependency) {
 		m_impl->add_dependency(dependency);
@@ -43,7 +47,9 @@ private:
 		m_impl = new (&m_storage[0]) jh_detail::scatter_job_impl_abstr<T>(std::move(job));
 	}
 
+	struct scatter_job_rep : public jh_detail::job_interface{gdul::shared_ptr<int> dummy;};
+
 	jh_detail::job_interface* m_impl;
-	std::uint8_t m_storage[sizeof(jh_detail::scatter_job_impl_abstr<void>)];
+	std::uint8_t m_storage[sizeof(scatter_job_rep)];
 };
 }
