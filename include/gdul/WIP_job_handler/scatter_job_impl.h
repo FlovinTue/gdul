@@ -23,6 +23,8 @@
 #include <gdul/WIP_job_handler/job_handler_commons.h>
 #include <gdul/WIP_job_handler/job.h>
 #include <gdul/delegate/delegate.h>
+#include <gdul/WIP_job_handler/chunk_allocator.h>
+
 #include <vector>
 
 namespace gdul
@@ -54,8 +56,8 @@ public:
 	void enable();
 	bool is_finished() const;
 
-	scatter_job_impl(input_vector_type& input, output_vector_type& output, delegate<bool(ref_value_type)>&& process, std::size_t batchSize, job_handler* handler, jh_detail::allocator_type alloc);
-	scatter_job_impl(input_vector_type& inputOutput, delegate<bool(ref_value_type)>&& process, std::size_t batchSize, job_handler* handler, jh_detail::allocator_type alloc);
+	scatter_job_impl(input_vector_type& input, output_vector_type& output, delegate<bool(ref_value_type)>&& process, std::size_t batchSize, job_handler* handler);
+	scatter_job_impl(input_vector_type& inputOutput, delegate<bool(ref_value_type)>&& process, std::size_t batchSize, job_handler* handler);
 private:
 	friend class gdul::job_handler;
 
@@ -96,6 +98,7 @@ private:
 	std::size_t offset_batch_size() const {
 		return m_batchSize + 1;
 	}
+	std::atomic_bool finalizeRan = false;
 
 	job m_root;
 	job m_end;
@@ -111,13 +114,11 @@ private:
 
 	job_handler* const m_handler;
 
-	jh_detail::allocator_type m_allocator;
-
 	std::uint8_t m_priority;
 };
 template<class T>
-inline scatter_job_impl<T>::scatter_job_impl(input_vector_type& inputOutput, delegate<bool(ref_value_type)>&& process, std::size_t batchSize, job_handler* handler, jh_detail::allocator_type alloc)
-	: scatter_job_impl<T>::scatter_job_impl(inputOutput, inputOutput, std::move(process), batchSize, handler, alloc)
+inline scatter_job_impl<T>::scatter_job_impl(input_vector_type& inputOutput, delegate<bool(ref_value_type)>&& process, std::size_t batchSize, job_handler* handler)
+	: scatter_job_impl<T>::scatter_job_impl(inputOutput, inputOutput, std::move(process), batchSize, handler)
 {
 	static_assert(std::is_pointer_v<value_type>, "value_type must be of pointer type when working with a single inputOutput array");
 }
@@ -161,7 +162,7 @@ inline bool scatter_job_impl<T>::is_input_output() const
 	return (void*)&m_input == (void*)&m_output;
 }
 template<class T>
-inline scatter_job_impl<T>::scatter_job_impl(input_vector_type& input, output_vector_type& output, delegate<bool(ref_value_type)>&& process, std::size_t batchSize, job_handler* handler, jh_detail::allocator_type alloc)
+inline scatter_job_impl<T>::scatter_job_impl(input_vector_type& input, output_vector_type& output, delegate<bool(ref_value_type)>&& process, std::size_t batchSize, job_handler* handler)
 	: m_root(_redirect_make_job(handler, delegate<void()>(&scatter_job_impl<T>::initialize, this)))
 	, m_end(_redirect_make_job(handler, delegate<void()>(&scatter_job_impl<T>::finalize, this)))
 	, m_process(std::move(process))
@@ -171,7 +172,6 @@ inline scatter_job_impl<T>::scatter_job_impl(input_vector_type& input, output_ve
 	, m_batchCount(m_input.size() / base_batch_size() + ((bool)(m_input.size() % base_batch_size())))
 	, m_baseArraySize(m_input.size())
 	, m_handler(handler)
-	, m_allocator(alloc)
 	, m_priority(jh_detail::Default_Job_Priority)
 {
 }
@@ -228,13 +228,18 @@ inline void scatter_job_impl<T>::make_jobs()
 			nextPackJob.add_dependency(currentPackJob);
 			nextPackJob.add_dependency(nextProcessJob);
 			nextPackJob.enable();
+			
 			currentPackJob = std::move(nextPackJob);
 		}
 
 		currentProcessJob = std::move(nextProcessJob);
 	}
 
-	m_end.add_dependency(currentPackJob);
+	if (1 < m_batchCount){
+		m_end.add_dependency(currentPackJob);
+	}
+
+	m_end.add_dependency(currentProcessJob);
 	m_end.enable();
 }
 template<class T>
@@ -295,6 +300,7 @@ inline void scatter_job_impl<T>::work_process(std::size_t batchIndex)
 template<class T>
 inline void scatter_job_impl<T>::finalize()
 {
+	finalizeRan = true;
 	if (1 < m_batchCount) {
 		work_pack(m_batchCount - 1);
 	}
@@ -314,5 +320,10 @@ inline std::size_t scatter_job_impl<T>::get_batch_pack_slot(std::size_t batchInd
 		return m_baseArraySize + (batchIndex);
 	}
 }
+// Memory chunk representation of scatter_job_impl
+struct alignas(alignof(scatter_job_impl<int>)) scatter_job_chunk_rep
+{
+	std::uint8_t dummy[alloc_size_make_shared<scatter_job_impl<int>, chunk_allocator<scatter_job_impl<int>, scatter_job_chunk_rep>>()]{};
+};
 }
 }

@@ -9,9 +9,9 @@ job_handler::job_handler()
 {
 }
 job_handler::job_handler(const jh_detail::allocator_type & allocator)
-	: m_allocator(allocator)
 {
-	m_impl = gdul::make_shared<jh_detail::job_handler_impl, jh_detail::allocator_type>(m_allocator);
+	jh_detail::allocator_type alloc(allocator);
+	m_impl = gdul::make_shared<jh_detail::job_handler_impl, decltype(alloc)>(alloc, alloc);
 }
 job_handler::~job_handler()
 {
@@ -31,6 +31,10 @@ std::size_t job_handler::num_workers() const
 std::size_t job_handler::num_enqueued() const
 {
 	return m_impl->num_enqueued();
+}
+concurrent_object_pool<jh_detail::scatter_job_chunk_rep, jh_detail::allocator_type>* job_handler::get_scatter_job_chunk_pool()
+{
+	return m_impl->get_scatter_job_chunk_pool();
 }
 job job_handler::make_job(gdul::delegate<void()>&& workUnit)
 {

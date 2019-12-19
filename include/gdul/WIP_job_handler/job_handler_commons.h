@@ -46,6 +46,7 @@ constexpr std::uint8_t Worker_Auto_Affinity = std::numeric_limits<std::uint8_t>:
 // The number of job chunks that the Job_Impl block allocator will allocate
 // when empty
 constexpr std::size_t Job_Impl_Allocator_Block_Size = 128;
+constexpr std::size_t Scatter_Job_Allocator_Block_Size = 8;
 
 //using allocator_type = std::allocator<uint8_t>;
 using allocator_type = tracking_allocator<uint8_t>;

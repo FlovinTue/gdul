@@ -42,8 +42,7 @@ thread_local jh_detail::worker_impl job_handler_impl::ourImplicitWorker;
 job_handler_impl::job_handler_impl()
 	: m_jobImplChunkPool(jh_detail::Job_Impl_Allocator_Block_Size, m_mainAllocator)
 	, m_jobDependeeChunkPool(jh_detail::Job_Impl_Allocator_Block_Size, m_mainAllocator)
-	, m_jobImplAllocator(&m_jobImplChunkPool)
-	, m_jobDependeeAllocator(&m_jobDependeeChunkPool)
+	, m_scatterJobChunkPool(Scatter_Job_Allocator_Block_Size, m_mainAllocator)
 	, m_workerCount(0)
 {
 }
@@ -52,8 +51,7 @@ job_handler_impl::job_handler_impl(allocator_type & allocator)
 	: m_mainAllocator(allocator)
 	, m_jobImplChunkPool(jh_detail::Job_Impl_Allocator_Block_Size, m_mainAllocator)
 	, m_jobDependeeChunkPool(jh_detail::Job_Impl_Allocator_Block_Size, m_mainAllocator)
-	, m_jobImplAllocator(&m_jobImplChunkPool)
-	, m_jobDependeeAllocator(&m_jobDependeeChunkPool)
+	, m_scatterJobChunkPool(Scatter_Job_Allocator_Block_Size, m_mainAllocator)
 	, m_workerCount(0)
 {
 }
@@ -90,9 +88,10 @@ worker job_handler_impl::make_worker()
 
 job job_handler_impl::make_job(delegate<void()>&& workUnit)
 {
+	job_impl_allocator alloc(&m_jobImplChunkPool);
 	const job_impl_shared_ptr jobImpl(make_shared<job_impl, job_impl_allocator>
 		(
-			m_jobImplAllocator,
+			alloc,
 			std::forward<delegate<void()>>(workUnit),
 			this
 			));
@@ -115,10 +114,14 @@ std::size_t job_handler_impl::num_enqueued() const noexcept
 
 	return accum;
 }
-
-typename job_handler_impl::job_dependee_allocator job_handler_impl::get_job_dependee_allocator() const noexcept
+concurrent_object_pool<job_dependee_chunk_rep, allocator_type>* job_handler_impl::get_job_dependee_chunk_pool() noexcept
 {
-	return m_jobDependeeAllocator;
+	return &m_jobDependeeChunkPool;
+}
+
+concurrent_object_pool<scatter_job_chunk_rep, allocator_type>* job_handler_impl::get_scatter_job_chunk_pool() noexcept
+{
+	return &m_scatterJobChunkPool;
 }
 
 void job_handler_impl::enqueue_job(job_impl_shared_ptr job)

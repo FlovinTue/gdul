@@ -31,7 +31,9 @@
     <ClCompile Include="..\..\include\gdul\WIP_job_handler\job_impl.cpp">
       <Filter>implementation\job</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\include\gdul\WIP_job_handler\scatter_job_impl.cpp" />
+    <ClCompile Include="..\..\include\gdul\WIP_job_handler\scatter_job_impl.cpp">
+      <Filter>implementation\job</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\chunk_allocator.h">

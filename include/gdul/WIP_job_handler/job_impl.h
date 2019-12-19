@@ -84,8 +84,7 @@ private:
 // Memory chunk representation of job_impl
 struct alignas(alignof(job_impl)) job_impl_chunk_rep
 {
-	job_impl_chunk_rep() : dummy{} {}
-	uint8_t dummy[alloc_size_make_shared<job_impl, chunk_allocator<jh_detail::job_impl, job_impl_chunk_rep>>()];
+	std::uint8_t dummy[alloc_size_make_shared<job_impl, chunk_allocator<jh_detail::job_impl, job_impl_chunk_rep>>()]{};
 };
 }
 }

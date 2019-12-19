@@ -236,7 +236,7 @@ void job_handler_tester::run_scatter_test_input_output(std::size_t arraySize, st
 			m_scatterInput[j] = (int*)(std::uintptr_t(j));
 		}
 
-		gdul::scatter_job scatter(m_handler.make_scatter_job<int*>(m_scatterInput, m_scatterOutput, delegate<bool(int*&)>(&work_tracker::scatter_process, &m_work), batchSize));
+		gdul::scatter_job scatter(m_handler.make_scatter_job<int*>(m_scatterInput, m_scatterOutput, delegate<bool(int*&)>(&work_tracker::scatter_process, &m_work), /*batchSize*/30));
 
 		time.reset();
 		scatter.enable();

@@ -35,6 +35,7 @@
 #include <gdul/WIP_job_handler/worker_impl.h>
 #include <gdul/WIP_job_handler/worker.h>
 #include <gdul/delegate/delegate.h>
+#include <gdul/WIP_job_handler/scatter_job_impl.h>
 
 namespace gdul {
 
@@ -62,9 +63,11 @@ public:
 
 	std::size_t num_workers() const noexcept;
 	std::size_t num_enqueued() const noexcept;
-private:
-	friend class job_impl;
-	friend class job;
+
+	concurrent_object_pool<job_dependee_chunk_rep, allocator_type>* get_job_dependee_chunk_pool() noexcept;
+	concurrent_object_pool<scatter_job_chunk_rep, allocator_type>* get_scatter_job_chunk_pool() noexcept;
+
+	void enqueue_job(job_impl_shared_ptr job);
 
 	static thread_local worker_impl* this_worker_impl;
 	static thread_local worker_impl ourImplicitWorker;
@@ -72,9 +75,7 @@ private:
 	using job_impl_allocator = chunk_allocator<job_impl, job_impl_chunk_rep>;
 	using job_dependee_allocator = chunk_allocator<job_dependee, job_dependee_chunk_rep>;
 
-	job_dependee_allocator get_job_dependee_allocator() const noexcept;
-
-	void enqueue_job(job_impl_shared_ptr job);
+private:
 
 	void launch_worker(std::uint16_t index) noexcept;
 
@@ -86,11 +87,9 @@ private:
 
 	concurrent_object_pool<job_impl_chunk_rep, allocator_type> m_jobImplChunkPool;
 	concurrent_object_pool<job_dependee_chunk_rep, allocator_type> m_jobDependeeChunkPool;
+	concurrent_object_pool<scatter_job_chunk_rep, allocator_type> m_scatterJobChunkPool;
 
 	concurrent_queue<job_impl_shared_ptr, allocator_type> m_jobQueues[Priority_Granularity];
-	
-	job_impl_allocator m_jobImplAllocator;
-	job_dependee_allocator m_jobDependeeAllocator;
 
 	std::array<worker_impl, Job_Handler_Max_Workers> m_workers;
 
@@ -99,11 +98,3 @@ private:
 }
 }
 #pragma warning(pop)
-
-// .. Array scatter-gather helper?
-// Needs Source array.. oor.. begin -> end iterator. Probably better.
-// Needs operation to perform... Hmm generalize more.. hmmm
-// And an output array? ( or output begin->end iterator) 
-// Use cases? Hmm. Need to generalize for more use cases?
-// For example sort? How would that work?
-// Culling? Output arrays would not match input.

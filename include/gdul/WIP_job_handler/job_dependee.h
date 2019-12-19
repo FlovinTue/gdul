@@ -37,8 +37,7 @@ struct job_dependee
 // Memory chunk representation of job_dependee
 struct alignas(alignof(job_dependee)) job_dependee_chunk_rep
 {
-	job_dependee_chunk_rep() : dummy{} {}
-	uint8_t dummy[alloc_size_make_shared<job_dependee, chunk_allocator<jh_detail::job_dependee, job_dependee_chunk_rep>>()];
+	std::uint8_t dummy[alloc_size_make_shared<job_dependee, chunk_allocator<jh_detail::job_dependee, job_dependee_chunk_rep>>()]{};
 };
 using job_dependee_shared_ptr = gdul::shared_ptr<job_dependee>;
 using job_dependee_atomic_shared_ptr = gdul::atomic_shared_ptr<job_dependee>;
