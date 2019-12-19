@@ -2,6 +2,7 @@
 
 #include <gdul/WIP_job_handler/job_handler_commons.h>
 #include <gdul/WIP_job_handler/job_interface.h>
+#include <gdul/WIP_job_handler/scatter_job_impl_abstr.h>
 
 namespace gdul {
 class job;
@@ -18,7 +19,7 @@ class scatter_job
 {
 public:
 	scatter_job() : m_impl(nullptr), m_storage{} {}
-	~scatter_job() { m_impl->~job_interface(); m_impl = nullptr; std::uninitialized_fill_n(&m_storage[0], sizeof(m_storage), 0); }
+	~scatter_job() { m_impl->~job_interface(); m_impl = nullptr; memset(&m_storage[0], 0, sizeof(m_storage)); }
 
 	void add_dependency(job& dependency) {
 		m_impl->add_dependency(dependency);

@@ -113,6 +113,7 @@
     <ClCompile Include="..\..\include\gdul\WIP_job_handler\job_handler_impl.cpp" />
     <ClCompile Include="..\..\include\gdul\WIP_job_handler\job_handler_commons.cpp" />
     <ClCompile Include="..\..\include\gdul\WIP_job_handler\job_impl.cpp" />
+    <ClCompile Include="..\..\include\gdul\WIP_job_handler\scatter_job_impl.cpp" />
     <ClCompile Include="..\..\include\gdul\WIP_job_handler\worker.cpp" />
     <ClCompile Include="..\..\include\gdul\WIP_job_handler\worker_impl.cpp" />
     <ClCompile Include="work_tracker.cpp" />

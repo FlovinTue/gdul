@@ -21,13 +21,19 @@
 #pragma once
 
 #include <gdul/WIP_job_handler/job_handler_commons.h>
-#include <gdul/WIP_job_handler/job_handler.h>
 #include <gdul/WIP_job_handler/job.h>
+#include <gdul/delegate/delegate.h>
 #include <vector>
 
 namespace gdul
 {
+class job_handler;
+
 namespace jh_detail {
+
+// Gets rid of circular dependency job_handler->scatter_job_impl & scatter_job_impl->job_handler
+job _redirect_make_job(job_handler* handler, gdul::delegate<void()>&& workUnit);
+
 template <class T>
 class scatter_job_impl
 {
@@ -156,8 +162,8 @@ inline bool scatter_job_impl<T>::is_input_output() const
 }
 template<class T>
 inline scatter_job_impl<T>::scatter_job_impl(input_vector_type& input, output_vector_type& output, delegate<bool(ref_value_type)>&& process, std::size_t batchSize, job_handler* handler, jh_detail::allocator_type alloc)
-	: m_root(handler->make_job(delegate<void()>(&scatter_job_impl<T>::initialize, this)))
-	, m_end(handler->make_job(delegate<void()>(&scatter_job_impl<T>::finalize, this)))
+	: m_root(_redirect_make_job(handler, delegate<void()>(&scatter_job_impl<T>::initialize, this)))
+	, m_end(_redirect_make_job(handler, delegate<void()>(&scatter_job_impl<T>::finalize, this)))
 	, m_process(std::move(process))
 	, m_input(input)
 	, m_output(output)
@@ -235,7 +241,7 @@ template<class T>
 template<class Fun>
 inline job scatter_job_impl<T>::make_work_slice(Fun fun, std::size_t batchIndex)
 {
-	job newJob(m_handler->make_job(delegate<void()>(fun, this, batchIndex)));
+	job newJob(_redirect_make_job(m_handler, delegate<void()>(fun, this, batchIndex)));
 	newJob.set_priority(m_priority);
 
 	return newJob;
