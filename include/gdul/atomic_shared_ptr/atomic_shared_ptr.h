@@ -1110,7 +1110,7 @@ struct type_diff_copy_helper
 	void clear_ptr_base_derivative(T& ptrBaseDerivative){
 		ptrBaseDerivative.clear();
 	}
-	compressed_storage fetch_storage(T& ptrBaseDerivative){
+	compressed_storage fetch_storage(const T& ptrBaseDerivative){
 		return ptrBaseDerivative.m_controlBlockStorage;
 	}
 };

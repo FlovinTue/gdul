@@ -12,9 +12,27 @@
 #include <assert.h>
 #include <vld.h>
 
+struct base
+{
+	virtual ~base() { std::cout << "destroyed base" << std::endl; }
+};
+struct derived : public base
+{
+	~derived() { std::cout << "destroyed derived" << std::endl; }
+};
 int main()
 {
 	using namespace gdul;
+
+	shared_ptr<derived> d1(make_shared<derived>());
+	shared_ptr<base> b1(d1);
+	shared_ptr<base> b2(std::move(d1));
+
+	shared_ptr<derived> d2(make_shared<derived>());
+	shared_ptr<base> b3(nullptr);
+	shared_ptr<base> b4(nullptr);
+	b3 = d2;
+	b4 = std::move(b4);
 
 	constexpr std::size_t mksh = gdul::alloc_size_make_shared<int, std::allocator<int>>();
 	constexpr std::size_t mkar = gdul::alloc_size_make_shared<int[], std::allocator<int>>(5);
@@ -163,59 +181,59 @@ int main()
 	threada.join();
 	threadb.join();
 
-	//		{
-	//
-	//			const std::uint32_t testArraySize(32);
-	//			const std::uint32_t numThreads(8);
-	//			tester<std::uint64_t, testArraySize, numThreads> tester(true, rand());
-	//
-	//			const bool
-	//				doassign(true),
-	//				doreassign(true),
-	//				doCAStest(true),
-	//				doreferencetest(false),
-	//				testAba(false);
-	//
-	//			uint32_t arraySweeps(10000);
-	//			uint32_t runs(10);
-	//			float time(0.f);
-	//			for (std::uint32_t i = 0; i < runs; ++i)
-	//			{
-	//				time += tester.execute(arraySweeps, doassign, doreassign, doCAStest, doreferencetest, testAba);
-	//			}
-	//			if (runs)
-	//			{
-	//#ifdef _DEBUG
-	//				std::string config("DEBUG");
-	//#else
-	//				std::string config("RELEASE");
-	//#endif
-	//				std::string assign(doassign ? ", assign" : "");
-	//				std::string reassign(doreassign ? ", reassign" : "");
-	//				std::string referencetest(doreferencetest ? ", referencetest" : "");
-	//
-	//				std::cout
-	//					<< "Executed "
-	//					<< runs
-	//					<< " runs with "
-	//					<< arraySweeps
-	//					<< " array sweeps over "
-	//					<< time
-	//					<< " seconds averaging "
-	//					<< time / runs
-	//					<< " seconds per run in "
-	//					<< config
-	//					<< " mode"
-	//					<< " using tests "
-	//					<< assign
-	//					<< reassign
-	//					<< referencetest
-	//					<< ". The number of threads used were "
-	//					<< numThreads
-	//					<< std::endl;
-	//
-	//			}
-	//		}
+			{
+	
+				const std::uint32_t testArraySize(32);
+				const std::uint32_t numThreads(8);
+				tester<std::uint64_t, testArraySize, numThreads> tester(true, rand());
+	
+				const bool
+					doassign(true),
+					doreassign(true),
+					doCAStest(true),
+					doreferencetest(false),
+					testAba(false);
+	
+				uint32_t arraySweeps(10000);
+				uint32_t runs(10);
+				float time(0.f);
+				for (std::uint32_t i = 0; i < runs; ++i)
+				{
+					time += tester.execute(arraySweeps, doassign, doreassign, doCAStest, doreferencetest, testAba);
+				}
+				if (runs)
+				{
+	#ifdef _DEBUG
+					std::string config("DEBUG");
+	#else
+					std::string config("RELEASE");
+	#endif
+					std::string assign(doassign ? ", assign" : "");
+					std::string reassign(doreassign ? ", reassign" : "");
+					std::string referencetest(doreferencetest ? ", referencetest" : "");
+	
+					std::cout
+						<< "Executed "
+						<< runs
+						<< " runs with "
+						<< arraySweeps
+						<< " array sweeps over "
+						<< time
+						<< " seconds averaging "
+						<< time / runs
+						<< " seconds per run in "
+						<< config
+						<< " mode"
+						<< " using tests "
+						<< assign
+						<< reassign
+						<< referencetest
+						<< ". The number of threads used were "
+						<< numThreads
+						<< std::endl;
+	
+				}
+			}
 	std::cout << "Final alloc'd " << s_allocated << std::endl;
 	return 0;
 }
