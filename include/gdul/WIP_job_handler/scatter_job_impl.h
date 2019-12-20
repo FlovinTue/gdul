@@ -49,7 +49,7 @@ public:
 	using input_vector_type = std::vector<value_type>;
 	using output_vector_type = std::vector<derefref_value_type>;
 
-	void add_dependency(job& dependency);
+	void add_dependency(base_job_abstr& dependency);
 
 	void set_priority(std::uint8_t priority) noexcept;
 
@@ -60,6 +60,8 @@ public:
 
 	scatter_job_impl(input_vector_type& input, output_vector_type& output, delegate<bool(ref_value_type)>&& process, std::size_t batchSize, job_handler* handler);
 	scatter_job_impl(input_vector_type& inputOutput, delegate<bool(ref_value_type)>&& process, std::size_t batchSize, job_handler* handler);
+
+	job& get_last_job();
 private:
 	friend class gdul::job_handler;
 
@@ -86,7 +88,7 @@ private:
 	}
 
 	template <class Fun>
-	job make_work_slice(Fun fun, std::size_t batchIndex);
+	base_job_abstr make_work_slice(Fun fun, std::size_t batchIndex);
 
 	void work_process(std::size_t batchIndex);
 	void work_pack(std::size_t batchIndex);
@@ -101,8 +103,8 @@ private:
 		return m_batchSize + 1;
 	}
 
-	job m_root;
-	job m_end;
+	base_job_abstr m_root;
+	base_job_abstr m_end;
 
 	delegate<bool(ref_value_type)> m_process;
 
@@ -122,6 +124,11 @@ inline scatter_job_impl<T>::scatter_job_impl(input_vector_type& inputOutput, del
 	: scatter_job_impl<T>::scatter_job_impl(inputOutput, inputOutput, std::move(process), batchSize, handler)
 {
 	static_assert(std::is_pointer_v<value_type>, "value_type must be of pointer type when working with a single inputOutput array");
+}
+template<class T>
+inline job & scatter_job_impl<T>::get_last_job()
+{
+	return m_end();
 }
 template<class T>
 inline std::size_t scatter_job_impl<T>::to_input_begin(std::size_t batchIndex) const
@@ -177,7 +184,7 @@ inline scatter_job_impl<T>::scatter_job_impl(input_vector_type& input, output_ve
 {
 }
 template<class T>
-inline void scatter_job_impl<T>::add_dependency(job& dependency)
+inline void scatter_job_impl<T>::add_dependency(base_job_abstr& dependency)
 {
 	m_root.add_dependency(dependency);
 }
@@ -215,16 +222,16 @@ inline void scatter_job_impl<T>::make_jobs()
 {
 	const std::size_t finalizeIndex(m_batchCount);
 
-	job currentProcessJob = make_work_slice(&scatter_job_impl<T>::work_process, 0);
+	base_job_abstr currentProcessJob = make_work_slice(&scatter_job_impl<T>::work_process, 0);
 	currentProcessJob.enable();
 
-	job currentPackJob(currentProcessJob);
+	base_job_abstr currentPackJob(currentProcessJob);
 
 	for (std::size_t i = 1; i < m_batchCount; ++i) {
-		job nextProcessJob(make_work_slice(&scatter_job_impl<T>::work_process, i));
+		base_job_abstr nextProcessJob(make_work_slice(&scatter_job_impl<T>::work_process, i));
 
 		if (i < (m_batchCount - 1)) {
-			job nextPackJob(make_work_slice(&scatter_job_impl<T>::work_pack, i));
+			base_job_abstr nextPackJob(make_work_slice(&scatter_job_impl<T>::work_pack, i));
 			nextPackJob.add_dependency(currentPackJob);
 			nextPackJob.add_dependency(nextProcessJob);
 			nextPackJob.enable();
@@ -245,9 +252,9 @@ inline void scatter_job_impl<T>::make_jobs()
 }
 template<class T>
 template<class Fun>
-inline job scatter_job_impl<T>::make_work_slice(Fun fun, std::size_t batchIndex)
+inline base_job_abstr scatter_job_impl<T>::make_work_slice(Fun fun, std::size_t batchIndex)
 {
-	job newJob(_redirect_make_job(m_handler, delegate<void()>(fun, this, batchIndex)));
+	base_job_abstr newJob(_redirect_make_job(m_handler, delegate<void()>(fun, this, batchIndex)));
 	newJob.set_priority(m_priority);
 
 	return newJob;

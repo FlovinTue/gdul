@@ -26,7 +26,7 @@ namespace gdul
 {
 namespace jh_detail
 {
-job gdul::jh_detail::_redirect_make_job(job_handler * handler, gdul::delegate<void()>&& workUnit)
+base_job_abstr gdul::jh_detail::_redirect_make_job(job_handler * handler, gdul::delegate<void()>&& workUnit)
 {
 	return handler->make_job(std::move(workUnit));
 }

@@ -26,11 +26,11 @@ namespace gdul
 {
 namespace jh_detail
 {
-job_impl::job_impl()
-	: job_impl(delegate<void()>([]() {}), nullptr)
+base_job_impl::base_job_impl()
+	: base_job_impl(delegate<void()>([]() {}), nullptr)
 {
 }
-job_impl::job_impl(delegate<void()>&& workUnit, job_handler_impl* handler)
+base_job_impl::base_job_impl(delegate<void()>&& workUnit, job_handler_impl* handler)
 	: m_workUnit(std::forward<delegate<void()>>(workUnit))
 	, m_finished(false)
 	, m_enabled(false)
@@ -40,11 +40,11 @@ job_impl::job_impl(delegate<void()>&& workUnit, job_handler_impl* handler)
 	, m_dependencies(Job_Max_Dependencies)
 {
 }
-job_impl::~job_impl()
+base_job_impl::~base_job_impl()
 {
 }
 
-void job_impl::operator()()
+void base_job_impl::operator()()
 {
 	assert(!m_finished);
 
@@ -54,7 +54,7 @@ void job_impl::operator()()
 
 	detach_children();
 }
-bool job_impl::try_attach_child(job_impl_shared_ptr child)
+bool base_job_impl::try_attach_child(job_impl_shared_ptr child)
 {
 	typename job_handler_impl::job_dependee_allocator jobDependeeAlloc(m_handler->get_job_dependee_chunk_pool());
 
@@ -77,46 +77,46 @@ bool job_impl::try_attach_child(job_impl_shared_ptr child)
 
 	return true;
 }
-std::uint8_t job_impl::get_priority() const
+std::uint8_t base_job_impl::get_priority() const
 {
 	return m_priority;
 }
-void job_impl::set_priority(std::uint8_t priority)
+void base_job_impl::set_priority(std::uint8_t priority)
 {
 	m_priority = priority;
 }
-bool job_impl::try_add_dependencies(std::uint32_t n)
+bool base_job_impl::try_add_dependencies(std::uint32_t n)
 {
 	std::uint32_t exp(m_dependencies.load(std::memory_order_relaxed));
 	while (exp != 0 && !m_dependencies.compare_exchange_weak(exp, exp + n, std::memory_order_relaxed));
 
 	return exp != 0;
 }
-std::uint32_t job_impl::remove_dependencies(std::uint32_t n)
+std::uint32_t base_job_impl::remove_dependencies(std::uint32_t n)
 {
 	std::uint32_t result(m_dependencies.fetch_sub(n, std::memory_order_acq_rel));
 	return result - n;
 }
-bool job_impl::enable()
+bool base_job_impl::enable()
 {
 	if (!m_enabled.exchange(true, std::memory_order_relaxed)){
 		return !remove_dependencies(Job_Max_Dependencies);
 	}
 	return false;
 }
-job_handler_impl * job_impl::get_handler() const
+job_handler_impl * base_job_impl::get_handler() const
 {
 	return m_handler;
 }
-bool job_impl::is_finished() const
+bool base_job_impl::is_finished() const
 {
 	return m_finished.load(std::memory_order_relaxed);
 }
-bool job_impl::is_enabled() const
+bool base_job_impl::is_enabled() const
 {
 	return m_enabled.load(std::memory_order_relaxed);
 }
-void job_impl::detach_children()
+void base_job_impl::detach_children()
 {
 	job_dependee_shared_ptr dependee(m_firstDependee.exchange(nullptr, std::memory_order_relaxed));
 

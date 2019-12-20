@@ -48,17 +48,17 @@ public:
 	job_handler(const jh_detail::allocator_type& allocator);
 	~job_handler();
 
-	static thread_local job this_job;
+	static thread_local base_job_abstr this_job;
 	static thread_local worker this_worker;
 
 	template <class T>
-	scatter_job make_scatter_job(
+	job make_scatter_job(
 		typename jh_detail::scatter_job_impl<T>::input_vector_type& inputOutput,
 		delegate<bool(typename jh_detail::scatter_job_impl<T>::ref_value_type)>&& process,
 		std::size_t batchSize);
 
 	template <class T>
-	scatter_job make_scatter_job(
+	job make_scatter_job(
 		typename jh_detail::scatter_job_impl<T>::input_vector_type& input,
 		typename jh_detail::scatter_job_impl<T>::output_vector_type& output,
 		delegate<bool(typename jh_detail::scatter_job_impl<T>::ref_value_type)>&& process,
@@ -66,7 +66,7 @@ public:
 
 	worker make_worker();
 
-	job make_job(gdul::delegate<void()>&& workUnit);
+	base_job_abstr make_job(gdul::delegate<void()>&& workUnit);
 
 	void retire_workers();
 
@@ -75,24 +75,24 @@ public:
 private:
 	concurrent_object_pool<jh_detail::scatter_job_chunk_rep, jh_detail::allocator_type>* get_scatter_job_chunk_pool();
 
-	gdul::shared_ptr<jh_detail::job_handler_impl> m_impl;
+	gdul::shared_ptr<jh_detail::job_handler_impl> m_abstr;
 };
 template<class T>
-inline scatter_job job_handler::make_scatter_job(typename jh_detail::scatter_job_impl<T>::input_vector_type & inputOutput, delegate<bool(typename jh_detail::scatter_job_impl<T>::ref_value_type)>&& process, std::size_t batchSize)
+inline job job_handler::make_scatter_job(typename jh_detail::scatter_job_impl<T>::input_vector_type & inputOutput, delegate<bool(typename jh_detail::scatter_job_impl<T>::ref_value_type)>&& process, std::size_t batchSize)
 {
 	jh_detail::chunk_allocator<T, jh_detail::scatter_job_chunk_rep> alloc(get_scatter_job_chunk_pool());
 
 	shared_ptr<jh_detail::scatter_job_impl<T>> sp;
 	sp = make_shared<jh_detail::scatter_job_impl<T>, decltype(alloc)>(alloc, inputOutput, std::forward<decltype(process)>(process), batchSize, this);
-	return scatter_job(std::move(sp));
+	return job(std::move(sp));
 }
 template<class T>
-inline scatter_job job_handler::make_scatter_job(typename jh_detail::scatter_job_impl<T>::input_vector_type & input, typename jh_detail::scatter_job_impl<T>::output_vector_type & output, delegate<bool(typename jh_detail::scatter_job_impl<T>::ref_value_type)>&& process, std::size_t batchSize)
+inline job job_handler::make_scatter_job(typename jh_detail::scatter_job_impl<T>::input_vector_type & input, typename jh_detail::scatter_job_impl<T>::output_vector_type & output, delegate<bool(typename jh_detail::scatter_job_impl<T>::ref_value_type)>&& process, std::size_t batchSize)
 {
 	jh_detail::chunk_allocator<T, jh_detail::scatter_job_chunk_rep> alloc(get_scatter_job_chunk_pool());
 
 	shared_ptr<jh_detail::scatter_job_impl<T>> sp;
 	sp = make_shared<jh_detail::scatter_job_impl<T>, decltype(alloc)>(alloc, input, output, std::forward<decltype(process)>(process), batchSize, this);
-	return scatter_job(std::move(sp));
+	return job(std::move(sp));
 }
 }

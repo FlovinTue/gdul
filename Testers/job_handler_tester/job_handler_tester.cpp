@@ -67,15 +67,15 @@ void job_handler_tester::setup_workers()
 float job_handler_tester::run_consumption_parallel_test(std::size_t jobs, float overDuration)
 {
 	auto wrap = []() {}; overDuration;
-	job root(m_handler.make_job(gdul::delegate<void()>(wrap)));
+	base_job_abstr root(m_handler.make_job(gdul::delegate<void()>(wrap)));
 	root.set_priority(0);
-	job end(m_handler.make_job(gdul::delegate<void()>([this]() { std::cout << "Finished run_consumption_parallel_test. Number of enqueued jobs: " << m_handler.num_enqueued() << std::endl; })));
+	base_job_abstr end(m_handler.make_job(gdul::delegate<void()>([this]() { std::cout << "Finished run_consumption_parallel_test. Number of enqueued jobs: " << m_handler.num_enqueued() << std::endl; })));
 
 	for (std::size_t i = 0; i < jobs; ++i)
 	{
 		for (std::size_t j = 0; j < m_handler.num_workers(); ++j)
 		{
-			job jb(m_handler.make_job(gdul::delegate<void()>(wrap)));
+			base_job_abstr jb(m_handler.make_job(gdul::delegate<void()>(wrap)));
 			jb.set_priority((j + i) % jh_detail::Priority_Granularity);
 
 			end.add_dependency(jb);
@@ -99,12 +99,12 @@ float job_handler_tester::run_consumption_strand_parallel_test(std::size_t jobs,
 
 	auto last = [this, jobs]() {m_work.end_work(); std::cout << "Finished run_consumption_strand_parallel_test. Number of enqueued jobs: " << m_handler.num_enqueued() << " out of " << jobs << " initial" << std::endl; };
 
-	job root(m_handler.make_job(gdul::delegate<void()>(&work_tracker::begin_work, &m_work)));
-	job end(m_handler.make_job(gdul::delegate<void()>(last)));
+	base_job_abstr root(m_handler.make_job(gdul::delegate<void()>(&work_tracker::begin_work, &m_work)));
+	base_job_abstr end(m_handler.make_job(gdul::delegate<void()>(last)));
 	end.add_dependency(root);
 	end.enable();
 
-	job next[8]{};
+	base_job_abstr next[8]{};
 	next[0] = m_handler.make_job(gdul::delegate<void()>(&work_tracker::main_work, &m_work));
 	end.add_dependency(next[0]);
 
@@ -116,7 +116,7 @@ float job_handler_tester::run_consumption_strand_parallel_test(std::size_t jobs,
 	for (std::size_t i = 0; i < jobs; ++i)
 	{
 		uint8_t children(1 + (rand() % 8));
-		job intermediate[8]{};
+		base_job_abstr intermediate[8]{};
 		for (std::uint8_t j = 0; j < children; ++j, ++i)
 		{
 			intermediate[j] = m_handler.make_job(gdul::delegate<void()>(&work_tracker::main_work, &m_work));
@@ -188,14 +188,14 @@ float job_handler_tester::run_consumption_strand_test(std::size_t jobs, float /*
 {
 	auto last = [this]() {m_work.end_work();  std::cout << "Finished run_consumption_strand_test. Number of enqueued jobs: " << m_handler.num_enqueued() << std::endl;};
 
-	job root(m_handler.make_job((gdul::delegate<void()>(&work_tracker::begin_work, &m_work))));
-	job previous(m_handler.make_job(gdul::delegate<void()>(&work_tracker::main_work, &m_work)));
+	base_job_abstr root(m_handler.make_job((gdul::delegate<void()>(&work_tracker::begin_work, &m_work))));
+	base_job_abstr previous(m_handler.make_job(gdul::delegate<void()>(&work_tracker::main_work, &m_work)));
 	previous.add_dependency(root);
 	previous.enable();
 
 	for (std::size_t i = 0; i < jobs; ++i)
 	{
-		job next = m_handler.make_job(gdul::delegate<void()>(&work_tracker::main_work, &m_work));
+		base_job_abstr next = m_handler.make_job(gdul::delegate<void()>(&work_tracker::main_work, &m_work));
 		next.set_priority(i % jh_detail::Priority_Granularity);
 
 		next.add_dependency(previous);
@@ -203,7 +203,7 @@ float job_handler_tester::run_consumption_strand_test(std::size_t jobs, float /*
 
 		previous = std::move(next);
 	}
-	job end(m_handler.make_job(gdul::delegate<void()>(last)));
+	base_job_abstr end(m_handler.make_job(gdul::delegate<void()>(last)));
 	end.add_dependency(previous);
 	end.enable();
 
@@ -236,13 +236,14 @@ void job_handler_tester::run_scatter_test_input_output(std::size_t arraySize, st
 			m_scatterInput[j] = (int*)(std::uintptr_t(j));
 		}
 
-		gdul::scatter_job scatter(m_handler.make_scatter_job<int*>(m_scatterInput, m_scatterOutput, delegate<bool(int*&)>(&work_tracker::scatter_process, &m_work), /*batchSize*/30));
-
+		gdul::job scatter(m_handler.make_scatter_job<int*>(m_scatterInput, m_scatterOutput, delegate<bool(int*&)>(&work_tracker::scatter_process, &m_work), /*batchSize*/30));
+		float result(0.f);
+		gdul::base_job_abstr postJob(m_handler.make_job([&time, &result]() { result = time.get(); });
+		postJob.add_dependency(scatter);
 		time.reset();
 		scatter.enable();
 		scatter.wait_for_finish();
 
-		const float result(time.get());
 
 		if (result < minTimes[5].first) {
 			minTimes[5] = { result, batchSize };
