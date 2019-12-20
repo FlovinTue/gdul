@@ -133,7 +133,7 @@ inline double tester<T, Allocator>::ExecuteConcurrent(std::uint32_t runs)
 		for (std::uint32_t j = 0; j < Readers; ++j)
 			m_reader.add_task(std::bind(&tester::Read, this, ReadsPerThread));
 
-		gdul::timer<float> time;
+		timer<float> time;
 		m_isRunning = true;
 
 		while (m_writer.has_unfinished_tasks() | m_reader.has_unfinished_tasks())
@@ -175,7 +175,7 @@ inline double tester<T, Allocator>::ExecuteSingleThread(std::uint32_t runs)
 
 		m_isRunning = true;
 
-		gdul::timer<float> time;
+		timer<float> time;
 
 		Write(Writes);
 		Read(Writes);
@@ -214,7 +214,7 @@ inline double tester<T, Allocator>::ExecuteSingleProducerSingleConsumer(std::uin
 		m_writer.add_task(std::bind(&tester::Write, this, Writes));
 		m_reader.add_task(std::bind(&tester::Read, this, Writes));
 
-		gdul::timer<float> time;
+		timer<float> time;
 
 		m_isRunning = true;
 
@@ -263,7 +263,7 @@ inline double tester<T, Allocator>::ExecuteRead(std::uint32_t runs)
 		for (std::uint32_t j = 0; j < Readers; ++j)
 			m_reader.add_task(std::bind(&tester::Read, this, ReadsPerThread));
 
-		gdul::timer<float> time;
+		timer<float> time;
 		m_isRunning = true;
 
 		while (m_reader.has_unfinished_tasks())
@@ -303,7 +303,7 @@ inline double tester<T, Allocator>::ExecuteWrite(std::uint32_t runs)
 		for (std::uint32_t j = 0; j < Writers; ++j)
 			m_writer.add_task(std::bind(&tester::Write, this, WritesPerThread));
 
-		gdul::timer<float> time;
+		timer<float> time;
 		m_isRunning = true;
 
 		while (m_writer.has_unfinished_tasks())

@@ -363,8 +363,8 @@ inline void concurrent_queue<T, Allocator>::unsafe_reset()
 		slot->invalidate();
 	}
 
-	m_producerSlots.unsafe_store(nullptr, std::memory_order_relaxed);
-	m_producerSlotsSwap.unsafe_store(nullptr, std::memory_order_relaxed);
+	m_producerSlots.unsafe_store(shared_ptr_array_type(nullptr), std::memory_order_relaxed);
+	m_producerSlotsSwap.unsafe_store(shared_ptr_array_type(nullptr), std::memory_order_relaxed);
 
 	std::atomic_thread_fence(std::memory_order_release);
 }
@@ -573,7 +573,7 @@ void concurrent_queue<T, Allocator>::ensure_producer_slots_capacity(std::uint16_
 
 	if (m_producerSlotsSwap){
 		raw_ptr<atomic_shared_ptr_slot_type[]> expSwap(swapArray);
-		m_producerSlotsSwap.compare_exchange_strong(expSwap, nullptr);
+		m_producerSlotsSwap.compare_exchange_strong(expSwap, shared_ptr_array_type(nullptr));
 	}
 }
 template<class T, class Allocator>
@@ -1311,7 +1311,7 @@ template <class SharedPtrSlotType, class SharedPtrArrayType>
 struct consumer_wrapper
 {
 	consumer_wrapper()
-		: consumer_wrapper<SharedPtrSlotType, SharedPtrArrayType>::consumer_wrapper(nullptr)
+		: consumer_wrapper<SharedPtrSlotType, SharedPtrArrayType>::consumer_wrapper(SharedPtrSlotType(nullptr))
 	{}
 
 	consumer_wrapper(SharedPtrSlotType buffer)
