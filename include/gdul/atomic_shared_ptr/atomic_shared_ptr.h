@@ -285,7 +285,6 @@ private:
 	inline constexpr aspdetail::control_block_free_type_base<T>* to_control_block(compressed_storage from) const noexcept;
 
 	using cb_free_type = aspdetail::control_block_free_type_base<T>;
-	using cb_base_type = aspdetail::control_block_base<T, T>;
 	using cb_count_type = aspdetail::control_block_base_count<T>;
 
 	friend class shared_ptr<T>;
@@ -830,7 +829,7 @@ template <class T>
 class control_block_free_type_base
 {
 public:
-	control_block_free_type_base() noexcept;
+	control_block_free_type_base(compressed_storage storage) noexcept;
 
 	using size_type = aspdetail::size_type;
 	using decayed_type = aspdetail::decay_unbounded_t<T>;
@@ -848,12 +847,20 @@ public:
 protected:
 	virtual ~control_block_free_type_base() = default;
 	virtual void destroy() = 0;
+
+	const compressed_storage m_ptrStorage;
+	
 private:
-	std::atomic<size_type> m_useCount;
+	union
+	{
+		std::atomic<size_type> m_useCount;
+		size_type _m_useCount;
+	};
 };
 template<class T>
-inline control_block_free_type_base<T>::control_block_free_type_base() noexcept
-	: m_useCount(Default_Local_Refs)
+inline control_block_free_type_base<T>::control_block_free_type_base(compressed_storage storage) noexcept
+	: m_ptrStorage(storage)
+	, m_useCount(Default_Local_Refs)
 {}
 template<class T>
 inline void control_block_free_type_base<T>::incref(size_type count) noexcept
@@ -890,27 +897,25 @@ public:
 protected:
 	control_block_base(decayed_type* object, std::uint8_t blockOffset = 0) noexcept;
 	std::uint8_t block_offset() const;
-private:
-	const compressed_storage m_ptrStorage;
 };
 template <class T, class U>
 inline typename control_block_base<T, U>::conv_type* control_block_base<T, U>::get() noexcept
 {
-	return static_cast<conv_type*>((decayed_type*)(m_ptrStorage.m_u64 & Owned_Mask));
+	return static_cast<conv_type*>((decayed_type*)(this->m_ptrStorage.m_u64 & Owned_Mask));
 }
 template<class T, class U>
 inline const typename control_block_base<T, U>::conv_type* control_block_base<T, U>::get() const noexcept
 {
-	return static_cast<const conv_type*>((decayed_type*)(m_ptrStorage.m_u64 & Owned_Mask));
+	return static_cast<const conv_type*>((decayed_type*)(this->m_ptrStorage.m_u64 & Owned_Mask));
 }
 template<class T, class U>
 inline std::uint8_t control_block_base<T, U>::block_offset() const
 {
-	return std::uint8_t(m_ptrStorage.m_u8[6]);
+	return std::uint8_t(this->m_ptrStorage.m_u8[6]);
 }
 template<class T, class U>
 control_block_base<T, U>::control_block_base(decayed_type* object, std::uint8_t blockOffset) noexcept
-	: m_ptrStorage(std::uint64_t(object) | (std::uint64_t(blockOffset) << 48) | (std::uint64_t(is_unbounded_array_v<T>) << 56))
+	: control_block_free_type_base<U>(compressed_storage(std::uint64_t(object) | (std::uint64_t(blockOffset) << 48) | (std::uint64_t(is_unbounded_array_v<T>) << 56)))
 {
 }
 template <class T>
