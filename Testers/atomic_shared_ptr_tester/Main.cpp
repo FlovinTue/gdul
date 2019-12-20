@@ -15,10 +15,12 @@
 struct base
 {
 	virtual ~base() { std::cout << "destroyed base" << std::endl; }
+	uint8_t memberb = '7';
 };
 struct derived : public base
 {
 	~derived() { std::cout << "destroyed derived" << std::endl; }
+	uint64_t memberull = 123;
 };
 int main()
 {
@@ -32,7 +34,11 @@ int main()
 	shared_ptr<base> b3(nullptr);
 	shared_ptr<base> b4(nullptr);
 	b3 = d2;
-	b4 = std::move(b4);
+	b4 = std::move(d2);
+
+	shared_ptr<derived> d3(make_shared<derived>());
+	shared_ptr<base> b5;
+	b5 = (shared_ptr<base>)d3;
 
 	constexpr std::size_t mksh = gdul::alloc_size_make_shared<int, std::allocator<int>>();
 	constexpr std::size_t mkar = gdul::alloc_size_make_shared<int[], std::allocator<int>>(5);

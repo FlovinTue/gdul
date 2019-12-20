@@ -578,7 +578,7 @@ template<class T>
 inline typename atomic_shared_ptr<T>::decayed_type* atomic_shared_ptr<T>::unsafe_get()
 {
 	aspdetail::control_block_free_type_base<T>* const cb(get_control_block());
-	if (cb){
+	if (cb) {
 		return cb->get();
 	}
 	return nullptr;
@@ -587,7 +587,7 @@ template<class T>
 inline const typename atomic_shared_ptr<T>::decayed_type* atomic_shared_ptr<T>::unsafe_get() const
 {
 	const aspdetail::control_block_free_type_base<T>* const cb(get_control_block());
-	if (cb){
+	if (cb) {
 		return cb->get();
 	}
 	return nullptr;
@@ -863,7 +863,7 @@ inline void control_block_free_type_base<T>::incref(size_type count) noexcept
 template<class T>
 inline void control_block_free_type_base<T>::decref(size_type count) noexcept
 {
-	if (!(m_useCount.fetch_sub(count, std::memory_order_acq_rel) - count)){
+	if (!(m_useCount.fetch_sub(count, std::memory_order_acq_rel) - count)) {
 		destroy();
 	}
 }
@@ -1107,12 +1107,9 @@ struct alignas(Align) aligned_storage
 template <class T>
 struct type_diff_copy_helper
 {
-	void clear_ptr_base_derivative(T& ptrBaseDerivative){
-		ptrBaseDerivative.clear();
-	}
-	compressed_storage fetch_storage(const T& ptrBaseDerivative){
-		return ptrBaseDerivative.m_controlBlockStorage;
-	}
+	shared_ptr<T> construct_from(compressed_storage storage) {
+		return shared_ptr<T>(storage);
+	};
 };
 constexpr std::uint16_t to_version(compressed_storage from)
 {
@@ -1297,8 +1294,7 @@ template <class T>
 inline constexpr typename ptr_base<T>::decayed_type* ptr_base<T>::to_object(compressed_storage from) noexcept
 {
 	control_block_free_type_base<T>* const cb(to_control_block(from));
-	if (cb)
-	{
+	if (cb){
 		return cb->get();
 	}
 	return nullptr;
@@ -1307,8 +1303,7 @@ template <class T>
 inline constexpr const typename ptr_base<T>::decayed_type* ptr_base<T>::to_object(compressed_storage from) const noexcept
 {
 	const control_block_free_type_base<T>* const cb(to_control_block(from));
-	if (cb)
-	{
+	if (cb){
 		return cb->get();
 	}
 	return nullptr;
@@ -1342,16 +1337,14 @@ public:
 
 	using aspdetail::ptr_base<T>::ptr_base;
 
-	template <class U, class V = T, std::enable_if_t<std::is_convertible_v<U*, V*>>* = nullptr>
-	inline shared_ptr(const shared_ptr<U>& other) noexcept;
-	template <class U, class V = T, std::enable_if_t<std::is_convertible_v<U*, V*>>* = nullptr>
-	inline shared_ptr(shared_ptr<U>&& other) noexcept;
+	inline shared_ptr(const shared_ptr<T>& other) noexcept;
+	inline shared_ptr(shared_ptr<T>&& other) noexcept;
 
-	template <class U, class V = T, std::enable_if_t<std::is_convertible_v<U*, V*>>* = nullptr>
-	shared_ptr<T>& operator=(const shared_ptr<U>& other) noexcept;
-	template <class U, class V = T, std::enable_if_t<std::is_convertible_v<U*, V*>>* = nullptr>
-	shared_ptr<T>& operator=(shared_ptr<U>&& other) noexcept;
+	shared_ptr<T>& operator=(const shared_ptr<T>& other) noexcept;
+	shared_ptr<T>& operator=(shared_ptr<T>&& other) noexcept;
 
+	template <class U, class V = T, std::enable_if_t<std::is_convertible_v<V*, U*>> * = nullptr>
+	inline operator shared_ptr<U>() const noexcept;
 
 	inline explicit shared_ptr(T* object);
 	template <class Allocator>
@@ -1399,7 +1392,7 @@ private:
 
 	friend class raw_ptr<T>;
 	friend class atomic_shared_ptr<T>;
-	friend struct aspdetail::type_diff_copy_helper<shared_ptr<T>>;
+	friend struct aspdetail::type_diff_copy_helper<T>;
 
 	template
 		<
@@ -1446,20 +1439,16 @@ inline shared_ptr<T>::~shared_ptr() noexcept
 	}
 }
 template<class T>
-template <class U, class V, std::enable_if_t<std::is_convertible_v<U*, V*>>*>
-inline shared_ptr<T>::shared_ptr(shared_ptr<U>&& other) noexcept
+inline shared_ptr<T>::shared_ptr(shared_ptr<T>&& other) noexcept
 	: shared_ptr<T>()
 {
-	aspdetail::type_diff_copy_helper<shared_ptr<U>> helper;
+	this->m_controlBlockStorage = other.m_controlBlockStorage;
+	this->m_ptr = other.m_ptr;
 
-	this->m_controlBlockStorage = helper.fetch_storage(other);
-	this->m_ptr = this->to_object(this->m_controlBlockStorage);
-	
-	helper.clear_ptr_base_derivative(other);
+	other.clear();
 }
 template<class T>
-template <class U, class V, std::enable_if_t<std::is_convertible_v<U*, V*>>*>
-inline shared_ptr<T>::shared_ptr(const shared_ptr<U>& other) noexcept
+inline shared_ptr<T>::shared_ptr(const shared_ptr<T>& other) noexcept
 	: shared_ptr<T>()
 {
 	operator=(other);
@@ -1471,6 +1460,14 @@ inline shared_ptr<T>::shared_ptr(T* object)
 	aspdetail::default_allocator alloc;
 	this->m_controlBlockStorage = create_control_block(object, alloc);
 	this->m_ptr = this->to_object(this->m_controlBlockStorage);
+}
+template<class T>
+template <class U, class V, std::enable_if_t<std::is_convertible_v<V*, U*>>*>
+inline shared_ptr<T>::operator shared_ptr<U>() const noexcept
+{
+	aspdetail::type_diff_copy_helper<U> helper;
+
+	return helper.construct_from(this->m_controlBlockStorage);
 }
 template <class T>
 template <class Allocator>
@@ -1679,12 +1676,9 @@ inline union aspdetail::compressed_storage shared_ptr<T>::create_control_block(T
 	return storage;
 }
 template<class T>
-template <class U, class V, std::enable_if_t<std::is_convertible_v<U*, V*>>*>
-inline shared_ptr<T>& shared_ptr<T>::operator=(const shared_ptr<U>& other) noexcept
+inline shared_ptr<T>& shared_ptr<T>::operator=(const shared_ptr<T>& other) noexcept
 {
-	aspdetail::type_diff_copy_helper<shared_ptr<U>> helper;
-
-	compressed_storage copy(helper.fetch_storage(other));
+	compressed_storage copy(other.m_controlBlockStorage);
 
 	if (aspdetail::control_block_free_type_base<T>* const copyCb = this->to_control_block(copy))
 	{
@@ -1698,13 +1692,12 @@ inline shared_ptr<T>& shared_ptr<T>::operator=(const shared_ptr<U>& other) noexc
 	}
 
 	this->m_controlBlockStorage = copy;
-	this->m_ptr = this->to_object(this->m_controlBlockStorage);
+	this->m_ptr = other.m_ptr;
 
 	return *this;
 }
 template<class T>
-template <class U, class V, std::enable_if_t<std::is_convertible_v<U*, V*>>*>
-inline shared_ptr<T>& shared_ptr<T>::operator=(shared_ptr<U>&& other) noexcept
+inline shared_ptr<T>& shared_ptr<T>::operator=(shared_ptr<T>&& other) noexcept
 {
 	shared_ptr<T>(std::move(other)).swap(*this);
 
