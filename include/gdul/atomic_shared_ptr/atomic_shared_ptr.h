@@ -1340,25 +1340,28 @@ public:
 
 	inline shared_ptr(const shared_ptr<T>& other) noexcept;
 
-	inline shared_ptr(shared_ptr<T>&& other) noexcept;
+	template <class U, std::enable_if_t<std::is_convertible_v<U*, T*>> * = nullptr>
+	inline shared_ptr(shared_ptr<U>&& other) noexcept;
 
 	shared_ptr<T>& operator=(const shared_ptr<T>& other) noexcept;
-	shared_ptr<T>& operator=(shared_ptr<T>&& other) noexcept;
 
-	template <class U, class V = T, std::enable_if_t<std::is_convertible_v<V*, U*>> * = nullptr>
+	template <class U, std::enable_if_t<std::is_convertible_v<U*, T*>> * = nullptr>
+	shared_ptr<T>& operator=(shared_ptr<U>&& other) noexcept;
+
+	template <class U, std::enable_if_t<std::is_convertible_v<T*, U*>> * = nullptr>
 	inline operator const shared_ptr<U>&() const noexcept;
-	template <class U, class V = T, std::enable_if_t<std::is_convertible_v<V*, U*>> * = nullptr>
+	template <class U, std::enable_if_t<std::is_convertible_v<T*, U*>> * = nullptr>
 	inline operator shared_ptr<U>&() noexcept;
-	template <class U, class V = T, std::enable_if_t<std::is_convertible_v<V*, U*>> * = nullptr>
+	template <class U, std::enable_if_t<std::is_convertible_v<T*, U*>> * = nullptr>
 	inline explicit operator shared_ptr<U>&&() noexcept;
 
-	template <class U, class V = T, std::enable_if_t<std::is_base_of_v<V, U>> * = nullptr>
+	template <class U, std::enable_if_t<std::is_base_of_v<T, U>> * = nullptr>
 	inline explicit operator const shared_ptr<U>&() const noexcept;
 
-	template <class U, class V = T, std::enable_if_t<std::is_base_of_v<V, U>> * = nullptr>
+	template <class U, std::enable_if_t<std::is_base_of_v<T, U>> * = nullptr>
 	inline explicit operator shared_ptr<U>&() noexcept;
 
-	template <class U, class V = T, std::enable_if_t<std::is_base_of_v<V, U>> * = nullptr>
+	template <class U, std::enable_if_t<std::is_base_of_v<T, U>> * = nullptr>
 	inline explicit operator shared_ptr<U>&&() noexcept;
 
 	inline explicit shared_ptr(T* object);
@@ -1454,19 +1457,29 @@ inline shared_ptr<T>::~shared_ptr() noexcept
 	}
 }
 template<class T>
-inline shared_ptr<T>::shared_ptr(shared_ptr<T>&& other) noexcept
+template <class U, std::enable_if_t<std::is_convertible_v<U*, T*>>*>
+inline shared_ptr<T>::shared_ptr(shared_ptr<U>&& other) noexcept
 	: shared_ptr<T>()
 {
-	this->m_controlBlockStorage = other.m_controlBlockStorage;
-	this->m_ptr = this->to_object(this->m_controlBlockStorage);
+	memcpy(this, &other, sizeof(shared_ptr<T>));
+	memset(&other, 0, sizeof(shared_ptr<U>));
 
-	other.clear();
+	this->m_ptr = this->to_object(this->m_controlBlockStorage);
 }
 template<class T>
 inline shared_ptr<T>::shared_ptr(const shared_ptr<T>& other) noexcept
 	: shared_ptr<T>()
 {
-	operator=(other);
+	compressed_storage copy(other.m_controlBlockStorage);
+
+	if (aspdetail::control_block_free_type_base<T>* const cb = this->to_control_block(copy))
+	{
+		copy.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] = aspdetail::Default_Local_Refs;
+		cb->incref(aspdetail::Default_Local_Refs);
+	}
+
+	this->m_controlBlockStorage = copy;
+	this->m_ptr = this->to_object(this->m_controlBlockStorage);
 }
 template <class T>
 inline shared_ptr<T>::shared_ptr(T* object)
@@ -1477,37 +1490,37 @@ inline shared_ptr<T>::shared_ptr(T* object)
 	this->m_ptr = this->to_object(this->m_controlBlockStorage);
 }
 template<class T>
-template <class U, class V, std::enable_if_t<std::is_convertible_v<V*, U*>>*>
+template <class U, std::enable_if_t<std::is_convertible_v<T*, U*>>*>
 inline shared_ptr<T>::operator const shared_ptr<U>&() const noexcept
 {
 	return *reinterpret_cast<const shared_ptr<U>*>(this);
 }
 template<class T>
-template <class U, class V, std::enable_if_t<std::is_convertible_v<V*, U*>>*>
+template <class U, std::enable_if_t<std::is_convertible_v<T*, U*>>*>
 inline shared_ptr<T>::operator shared_ptr<U>&() noexcept
 {
 	return *reinterpret_cast<shared_ptr<U>*>(this);
 }
 template<class T>
-template <class U, class V, std::enable_if_t<std::is_convertible_v<V*, U*>>*>
+template <class U, std::enable_if_t<std::is_convertible_v<T*, U*>>*>
 inline shared_ptr<T>::operator shared_ptr<U>&&() noexcept
 {
 	return std::move(*reinterpret_cast<shared_ptr<U>*>(this));
 }
 template <class T>
-template <class U, class V, std::enable_if_t<std::is_base_of_v<V, U>>*>
+template <class U, std::enable_if_t<std::is_base_of_v<T, U>>*>
 inline shared_ptr<T>::operator const shared_ptr<U>&() const noexcept 
 {
 	return *reinterpret_cast<const shared_ptr<U>*>(this);
 }
 template <class T>
-template <class U, class V, std::enable_if_t<std::is_base_of_v<V, U>>*>
+template <class U, std::enable_if_t<std::is_base_of_v<T, U>>*>
 inline shared_ptr<T>::operator shared_ptr<U>&() noexcept
 {
 	return *reinterpret_cast<shared_ptr<U>*>(this);
 }
 template <class T>
-template <class U, class V, std::enable_if_t<std::is_base_of_v<V, U>>*>
+template <class U, std::enable_if_t<std::is_base_of_v<T, U>>*>
 inline shared_ptr<T>::operator shared_ptr<U>&&() noexcept
 {
 	return std::move(*reinterpret_cast<shared_ptr<U>*>(this));
@@ -1721,26 +1734,13 @@ inline union aspdetail::compressed_storage shared_ptr<T>::create_control_block(T
 template<class T>
 inline shared_ptr<T>& shared_ptr<T>::operator=(const shared_ptr<T>& other) noexcept
 {
-	compressed_storage copy(other.m_controlBlockStorage);
-
-	if (aspdetail::control_block_free_type_base<T>* const copyCb = this->to_control_block(copy))
-	{
-		copy.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] = aspdetail::Default_Local_Refs;
-		copyCb->incref(copy.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF]);
-	}
-
-	if (aspdetail::control_block_free_type_base<T>* const cb = this->get_control_block())
-	{
-		cb->decref(this->m_controlBlockStorage.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF]);
-	}
-
-	this->m_controlBlockStorage = copy;
-	this->m_ptr = this->to_object(this->m_controlBlockStorage);
+	shared_ptr<T>(other).swap(*this);
 
 	return *this;
 }
 template<class T>
-inline shared_ptr<T>& shared_ptr<T>::operator=(shared_ptr<T>&& other) noexcept
+template <class U, std::enable_if_t<std::is_convertible_v<U*, T*>>*>
+inline shared_ptr<T>& shared_ptr<T>::operator=(shared_ptr<U>&& other) noexcept
 {
 	shared_ptr<T>(std::move(other)).swap(*this);
 
@@ -1751,8 +1751,7 @@ template<class T>
 inline void shared_ptr<T>::swap(shared_ptr<T>& other) noexcept
 {
 	aspdetail::ptr_base<T>::swap(other);
-	other.m_ptr = this->to_object(other.m_controlBlockStorage);
-	m_ptr = this->to_object(this->m_controlBlockStorage);
+	std::swap(m_ptr, other.m_ptr);
 }
 
 // raw_ptr does not share in ownership of the object
