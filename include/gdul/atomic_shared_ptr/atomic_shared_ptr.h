@@ -849,13 +849,9 @@ protected:
 	virtual void destroy() = 0;
 
 	const compressed_storage m_ptrStorage;
-	
 private:
-	union
-	{
-		std::atomic<size_type> m_useCount;
-		size_type _m_useCount;
-	};
+
+	std::atomic<size_type> m_useCount;
 };
 template<class T>
 inline control_block_free_type_base<T>::control_block_free_type_base(compressed_storage storage) noexcept

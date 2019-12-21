@@ -23,7 +23,7 @@
 
 <AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
 
-  <Type Name="gdul::aspdetail::ptr_base&lt;*&gt;">
+  <Type Name="gdul::raw_ptr&lt;*&gt;">
 		<DisplayString Condition="(m_controlBlockStorage.m_u64 &amp; aspdetail::Cb_Mask) != 0">
       {*(decayed_type*)(((cb_free_type*)(m_controlBlockStorage.m_u64 &amp; aspdetail::Cb_Mask))->m_ptrStorage.m_u64 &amp; aspdetail::Owned_Mask)}
     </DisplayString>
@@ -40,40 +40,74 @@
       </Item>
       <ArrayItems Condition="(m_controlBlockStorage.m_u64 &amp; aspdetail::Cb_Mask) != 0 &amp;&amp; 
           (((cb_free_type*)(m_controlBlockStorage.m_u64 &amp; aspdetail::Cb_Mask))->m_ptrStorage.m_u8[7] != 0)">
-        <Size>(((cb_free_type*)(m_controlBlockStorage.m_u64 &amp; aspdetail::Cb_Mask))->m_ptrStorage.m_u64 &amp; aspdetail::Owned_Mask)->_m_useCount</Size>
+        <Size>(*(size_t*)((m_controlBlockStorage.m_u64 + 24) &amp; aspdetail::Cb_Mask))</Size>
         <ValuePointer>(decayed_type*)(((cb_free_type*)(m_controlBlockStorage.m_u64 &amp; aspdetail::Cb_Mask))->m_ptrStorage.m_u64 &amp; aspdetail::Owned_Mask)</ValuePointer>
       </ArrayItems>
+      <Item Name="[**ptr_use_count]" Condition="(m_controlBlockStorage.m_u64 &amp; aspdetail::Cb_Mask) != 0">
+        ((cb_free_type*)(m_controlBlockStorage.m_u64 &amp; aspdetail::Cb_Mask))->m_useCount
+      </Item>
+      <Item Name="[**ptr_use_count]" Condition="(m_controlBlockStorage.m_u64 &amp; aspdetail::Cb_Mask) == 0">0UL</Item>
+      <Item Name="[**ptr_local_refs]">(size_type)m_controlBlockStorage.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF]</Item>
+      <Item Name="[**ptr_version]">(((size_type)m_controlBlockStorage.m_u8[aspdetail::STORAGE_BYTE_VERSION_UPPER]) &lt;&lt; aspdetail::Cb_Ptr_Bottom_Bits) | (((uint64_t)m_controlBlockStorage.m_u8[aspdetail::STORAGE_BYTE_VERSION_LOWER]) &amp; ~aspdetail::Cb_Mask)</Item>
     </Expand>
   </Type>
 
-	<Type Name="gdul::atomic_shared_ptr&lt;*&gt;">
-		<DisplayString Condition="(m_debugView.m_u64 &amp; aspdetail::Cb_Mask) != 0">
-      {(*(decayed_type*)((*((uint64_t*)((m_debugView.m_u64 &amp; aspdetail::Cb_Mask) + 8)))&amp; aspdetail::Cb_Mask))}
+  <Type Name="gdul::shared_ptr&lt;*&gt;">
+    <DisplayString Condition="(m_controlBlockStorage.m_u64 &amp; aspdetail::Cb_Mask) != 0">
+      {*(decayed_type*)(((cb_free_type*)(m_controlBlockStorage.m_u64 &amp; aspdetail::Cb_Mask))->m_ptrStorage.m_u64 &amp; aspdetail::Owned_Mask)}
     </DisplayString>
-		<DisplayString Condition="(m_debugView.m_u64 &amp; aspdetail::Cb_Mask) == 0">
-			{(void*)0}
-		</DisplayString>
-    <Expand >
+    <DisplayString Condition="(m_controlBlockStorage.m_u64 &amp; aspdetail::Cb_Mask) == 0">
+      {(void*)0}
+    </DisplayString>
+    <Expand>
+      <ExpandedItem Condition="(m_controlBlockStorage.m_u64 &amp; aspdetail::Cb_Mask) != 0 &amp;&amp; 
+          (((cb_free_type*)(m_controlBlockStorage.m_u64 &amp; aspdetail::Cb_Mask))->m_ptrStorage.m_u8[7] == 0)">
+        m_ptr
+      </ExpandedItem>
+      <Item Name="[object]" Condition="(m_controlBlockStorage.m_u64 &amp; aspdetail::Cb_Mask) == 0">
+        (void*)0
+      </Item>
+      <ArrayItems Condition="(m_controlBlockStorage.m_u64 &amp; aspdetail::Cb_Mask) != 0 &amp;&amp; 
+          (((cb_free_type*)(m_controlBlockStorage.m_u64 &amp; aspdetail::Cb_Mask))->m_ptrStorage.m_u8[7] != 0)">
+        <Size>(*(size_t*)((m_controlBlockStorage.m_u64 + 24) &amp; aspdetail::Cb_Mask))</Size>
+        <ValuePointer>m_ptr</ValuePointer>
+      </ArrayItems>
+      <Item Name="[**ptr_use_count]" Condition="(m_controlBlockStorage.m_u64 &amp; aspdetail::Cb_Mask) != 0">
+        ((cb_free_type*)(m_controlBlockStorage.m_u64 &amp; aspdetail::Cb_Mask))->m_useCount
+      </Item>
+      <Item Name="[**ptr_use_count]" Condition="(m_controlBlockStorage.m_u64 &amp; aspdetail::Cb_Mask) == 0">0UL</Item>
+      <Item Name="[**ptr_local_refs]">(size_type)m_controlBlockStorage.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF]</Item>
+      <Item Name="[**ptr_version]">(((size_type)m_controlBlockStorage.m_u8[aspdetail::STORAGE_BYTE_VERSION_UPPER]) &lt;&lt; aspdetail::Cb_Ptr_Bottom_Bits) | (((uint64_t)m_controlBlockStorage.m_u8[aspdetail::STORAGE_BYTE_VERSION_LOWER]) &amp; ~aspdetail::Cb_Mask)</Item>
+    </Expand>
+  </Type>
+
+  <Type Name="gdul::atomic_shared_ptr&lt;*&gt;">
+    <DisplayString Condition="(m_debugView.m_u64 &amp; aspdetail::Cb_Mask) != 0">
+      {*(decayed_type*)(((cb_free_type*)(m_debugView.m_u64 &amp; aspdetail::Cb_Mask))->m_ptrStorage.m_u64 &amp; aspdetail::Owned_Mask)}
+    </DisplayString>
+    <DisplayString Condition="(m_debugView.m_u64 &amp; aspdetail::Cb_Mask) == 0">
+      {(void*)0}
+    </DisplayString>
+    <Expand>
       <ExpandedItem Condition="(m_debugView.m_u64 &amp; aspdetail::Cb_Mask) != 0 &amp;&amp; 
-        ((*((compressed_storage*)((m_debugView.m_u64 &amp; aspdetail::Cb_Mask) + 8))).m_u8[7] == 0)">
-        (decayed_type*)(((cb_base_type*)(cb_free_type*)(m_debugView.m_u64 &amp; aspdetail::Cb_Mask))->m_ptrStorage.m_u64 &amp; aspdetail::Owned_Mask)
-			</ExpandedItem>
+          (((cb_free_type*)(m_debugView.m_u64 &amp; aspdetail::Cb_Mask))->m_ptrStorage.m_u8[7] == 0)">
+        (decayed_type*)(((cb_free_type*)(m_debugView.m_u64 &amp; aspdetail::Cb_Mask))->m_ptrStorage.m_u64 &amp; aspdetail::Owned_Mask)
+      </ExpandedItem>
       <Item Name="[object]" Condition="(m_debugView.m_u64 &amp; aspdetail::Cb_Mask) == 0">
         (void*)0
       </Item>
       <ArrayItems Condition="(m_debugView.m_u64 &amp; aspdetail::Cb_Mask) != 0 &amp;&amp; 
-        ((*((compressed_storage*)((m_debugView.m_u64 &amp; aspdetail::Cb_Mask) + 8))).m_u8[7] != 0)">
+          (((cb_free_type*)(m_debugView.m_u64 &amp; aspdetail::Cb_Mask))->m_ptrStorage.m_u8[7] != 0)">
         <Size>(*(size_t*)((m_debugView.m_u64 + 24) &amp; aspdetail::Cb_Mask))</Size>
-        <ValuePointer>(decayed_type*)(((cb_base_type*)(cb_free_type*)(m_debugView.m_u64 &amp; aspdetail::Cb_Mask))->m_ptrStorage.m_u64 &amp; aspdetail::Owned_Mask)</ValuePointer>
+        <ValuePointer>(decayed_type*)(((cb_free_type*)(m_debugView.m_u64 &amp; aspdetail::Cb_Mask))->m_ptrStorage.m_u64 &amp; aspdetail::Owned_Mask)</ValuePointer>
       </ArrayItems>
       <Item Name="[**ptr_use_count]" Condition="(m_debugView.m_u64 &amp; aspdetail::Cb_Mask) != 0">
-        ((cb_base_type*)(cb_free_type*)(m_debugView.m_u64 &amp; aspdetail::Cb_Mask))->m_useCount
+        ((cb_free_type*)(m_debugView.m_u64 &amp; aspdetail::Cb_Mask))->m_useCount
       </Item>
       <Item Name="[**ptr_use_count]" Condition="(m_debugView.m_u64 &amp; aspdetail::Cb_Mask) == 0">0UL</Item>
       <Item Name="[**ptr_local_refs]">(size_type)m_debugView.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF]</Item>
       <Item Name="[**ptr_version]">(((size_type)m_debugView.m_u8[aspdetail::STORAGE_BYTE_VERSION_UPPER]) &lt;&lt; aspdetail::Cb_Ptr_Bottom_Bits) | (((uint64_t)m_debugView.m_u8[aspdetail::STORAGE_BYTE_VERSION_LOWER]) &amp; ~aspdetail::Cb_Mask)</Item>
-
     </Expand>
-	</Type>
+  </Type>
 	
 </AutoVisualizer>
