@@ -1345,10 +1345,15 @@ public:
 	shared_ptr<T>& operator=(shared_ptr<T>&& other) noexcept;
 
 	template <class U, class V = T, std::enable_if_t<std::is_convertible_v<V*, U*>> * = nullptr>
-	inline operator shared_ptr<U>() const noexcept;
+	inline operator const shared_ptr<U>&() const noexcept;
+	template <class U, class V = T, std::enable_if_t<std::is_convertible_v<V*, U*>> * = nullptr>
+	inline operator shared_ptr<U>&() noexcept;
 
 	template <class U, class V = T, std::enable_if_t<std::is_base_of_v<V, U>> * = nullptr>
-	inline explicit operator shared_ptr<U>() const noexcept;
+	inline explicit operator const shared_ptr<U>&() const noexcept;
+
+	template <class U, class V = T, std::enable_if_t<std::is_base_of_v<V, U>> * = nullptr>
+	inline explicit operator shared_ptr<U>&() noexcept;
 
 	inline explicit shared_ptr(T* object);
 	template <class Allocator>
@@ -1447,7 +1452,7 @@ inline shared_ptr<T>::shared_ptr(shared_ptr<T>&& other) noexcept
 	: shared_ptr<T>()
 {
 	this->m_controlBlockStorage = other.m_controlBlockStorage;
-	this->m_ptr = other.m_ptr;
+	this->m_ptr = this->to_object(this->m_controlBlockStorage);
 
 	other.clear();
 }
@@ -1467,18 +1472,27 @@ inline shared_ptr<T>::shared_ptr(T* object)
 }
 template<class T>
 template <class U, class V, std::enable_if_t<std::is_convertible_v<V*, U*>>*>
-inline shared_ptr<T>::operator shared_ptr<U>() const noexcept
+inline shared_ptr<T>::operator const shared_ptr<U>&() const noexcept
 {
-	aspdetail::type_diff_copy_helper<U> helper;
-
-	return helper.construct_from(this->m_controlBlockStorage);
+	return *reinterpret_cast<const shared_ptr<U>*>(this);
+}
+template<class T>
+template <class U, class V, std::enable_if_t<std::is_convertible_v<V*, U*>>*>
+inline shared_ptr<T>::operator shared_ptr<U>&() noexcept
+{
+	return *reinterpret_cast<shared_ptr<U>*>(this);
 }
 template <class T>
 template <class U, class V, std::enable_if_t<std::is_base_of_v<V, U>>*>
-inline shared_ptr<T>::operator shared_ptr<U>() const noexcept {
-	aspdetail::type_diff_copy_helper<U> helper;
-
-	return helper.construct_from(this->m_controlBlockStorage);
+inline shared_ptr<T>::operator const shared_ptr<U>&() const noexcept 
+{
+	return *reinterpret_cast<const shared_ptr<U>*>(this);
+}
+template <class T>
+template <class U, class V, std::enable_if_t<std::is_base_of_v<V, U>>*>
+inline shared_ptr<T>::operator shared_ptr<U>&() noexcept
+{
+	return *reinterpret_cast<shared_ptr<U>*>(this);
 }
 template <class T>
 template <class Allocator>
@@ -1703,7 +1717,7 @@ inline shared_ptr<T>& shared_ptr<T>::operator=(const shared_ptr<T>& other) noexc
 	}
 
 	this->m_controlBlockStorage = copy;
-	this->m_ptr = other.m_ptr;
+	this->m_ptr = this->to_object(this->m_controlBlockStorage);
 
 	return *this;
 }
