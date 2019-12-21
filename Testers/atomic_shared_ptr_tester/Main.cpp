@@ -28,13 +28,13 @@ int main()
 
 	shared_ptr<derived> d1(make_shared<derived>());
 	shared_ptr<base> b1(d1);
-	shared_ptr<base> b2(std::move(d1));
+	shared_ptr<base> b2((shared_ptr<base>&&)d1);
 
 	shared_ptr<derived> d2(make_shared<derived>());
 	shared_ptr<base> b3(nullptr);
 	shared_ptr<base> b4(nullptr);
 	b3 = d2;
-	b4 = std::move(d2);
+	b4 = (shared_ptr<base>&&)std::move(d2);
 
 	shared_ptr<derived> d3(make_shared<derived>());
 	shared_ptr<base> b5;
