@@ -193,7 +193,7 @@ inline float tester<T, ArraySize, NumThreads>::execute(std::uint32_t passes, boo
 		}
 	}
 
-	gdul::timer<float> time;
+	timer<float> time;
 
 	m_workBlock.store(true);
 
