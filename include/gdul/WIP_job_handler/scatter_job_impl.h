@@ -23,7 +23,7 @@
 #include <gdul/WIP_job_handler/job_handler_commons.h>
 #include <gdul/WIP_job_handler/job.h>
 #include <gdul/delegate/delegate.h>
-
+#include <gdul/WIP_job_handler/job_interface.h>
 // Get rid of this dependency.... belongs to implementation details. (does 'this' too for that matter)
 #include <gdul/WIP_job_handler/chunk_allocator.h>
 
@@ -39,7 +39,7 @@ namespace jh_detail {
 job _redirect_make_job(job_handler* handler, gdul::delegate<void()>&& workUnit);
 
 template <class T>
-class scatter_job_impl
+class scatter_job_impl : public job_interface
 {
 public:
 	scatter_job_impl() = default;
@@ -51,12 +51,14 @@ public:
 
 	void add_dependency(job& dependency);
 
-	void set_priority(std::uint8_t priority) noexcept;
+	void set_priority(std::uint8_t priority) noexcept override final;
 
-	void wait_for_finish() noexcept;
+	void wait_for_finish() noexcept override final;
 
 	void enable();
-	bool is_finished() const;
+	bool is_finished() const noexcept override final;
+
+	job& get_endjob() noexcept override final;
 
 	scatter_job_impl(input_vector_type& input, output_vector_type& output, delegate<bool(ref_value_type)>&& process, std::size_t batchSize, job_handler* handler);
 	scatter_job_impl(input_vector_type& inputOutput, delegate<bool(ref_value_type)>&& process, std::size_t batchSize, job_handler* handler);
@@ -198,9 +200,15 @@ inline void scatter_job_impl<T>::enable()
 }
 
 template<class T>
-inline bool scatter_job_impl<T>::is_finished() const
+inline bool scatter_job_impl<T>::is_finished() const noexcept
 {
 	return m_end.is_finished();
+}
+
+template<class T>
+inline job & scatter_job_impl<T>::get_endjob() noexcept
+{
+	return m_end;
 }
 
 template<class T>

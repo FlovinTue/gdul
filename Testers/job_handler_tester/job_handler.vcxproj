@@ -101,7 +101,6 @@
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_interface.h" />
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\scatter_job.h" />
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\scatter_job_impl.h" />
-    <ClInclude Include="..\..\include\gdul\WIP_job_handler\scatter_job_impl_abstr.h" />
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\worker.h" />
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\worker_impl.h" />
     <ClInclude Include="work_tracker.h" />

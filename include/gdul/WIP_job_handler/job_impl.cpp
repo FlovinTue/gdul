@@ -118,7 +118,7 @@ bool job_impl::is_enabled() const
 }
 void job_impl::detach_children()
 {
-	job_dependee_shared_ptr dependee(m_firstDependee.exchange(nullptr, std::memory_order_relaxed));
+	job_dependee_shared_ptr dependee(m_firstDependee.exchange(job_dependee_shared_ptr(nullptr), std::memory_order_relaxed));
 
 	while (dependee) {
 		job_dependee_shared_ptr next(std::move(dependee->m_sibling));

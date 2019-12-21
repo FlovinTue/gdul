@@ -4,7 +4,7 @@
 
 namespace gdul
 {
-thread_local job job_handler::this_job(nullptr);
+thread_local job job_handler::this_job(shared_ptr<jh_detail::job_impl>(nullptr));
 thread_local worker job_handler::this_worker(&jh_detail::job_handler_impl::t_items.m_implicitWorker);
 
 job_handler::job_handler()

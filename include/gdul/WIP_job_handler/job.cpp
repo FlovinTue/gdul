@@ -91,7 +91,7 @@ void job::wait_for_finish() noexcept
 	}
 }
 job::job(gdul::shared_ptr<jh_detail::job_impl> impl) noexcept
-	: m_impl(std::move(impl))
+	: m_impl((decltype(m_impl)&&)std::move(impl))
 {
 }
 job::operator bool() const noexcept 

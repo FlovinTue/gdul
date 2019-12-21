@@ -78,9 +78,6 @@
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\scatter_job.h">
       <Filter>implementation\job</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\gdul\WIP_job_handler\scatter_job_impl_abstr.h">
-      <Filter>implementation\job</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\include\gdul\WIP_job_handler\job_interface.h">
       <Filter>implementation\job</Filter>
     </ClInclude>

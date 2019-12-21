@@ -238,11 +238,16 @@ void job_handler_tester::run_scatter_test_input_output(std::size_t arraySize, st
 
 		gdul::scatter_job scatter(m_handler.make_scatter_job<int*>(m_scatterInput, m_scatterOutput, delegate<bool(int*&)>(&work_tracker::scatter_process, &m_work), /*batchSize*/30));
 
+
+		float result(time.get());
+		job endJob(m_handler.make_job([&time, &result]() {result = time.get(); }));
+		endJob.add_dependency(scatter.get_endjob());
+		endJob.enable();
+
 		time.reset();
 		scatter.enable();
 		scatter.wait_for_finish();
 
-		const float result(time.get());
 
 		if (result < minTimes[5].first) {
 			minTimes[5] = { result, batchSize };
