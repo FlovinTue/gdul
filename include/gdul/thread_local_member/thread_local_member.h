@@ -140,7 +140,7 @@ template<class Dummy>
 template <class Allocator>
 inline void index_pool<Dummy>::alloc_pool_entry(Allocator allocator)
 {
-	shared_ptr<node> entry(make_shared<node, Allocator>(allocator, std::numeric_limits<size_type>::max(), nullptr));
+	shared_ptr<node> entry(make_shared<node, Allocator>(allocator, std::numeric_limits<size_type>::max(), shared_ptr<node>(nullptr)));
 	push_pool_entry(entry);
 }
 template<class Dummy>
@@ -292,7 +292,7 @@ template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::~thread_local_member() noexcept
 {
 	if (s_st_container.m_instanceTrackers) {
-		store_instance_tracker(nullptr);
+		store_instance_tracker(instance_tracker_entry(nullptr));
 		s_st_container.m_indexPool.add(m_index);	
 	}
 }
@@ -463,7 +463,7 @@ inline void thread_local_member<T, Allocator>::grow_instance_tracker_array() con
 
 	if (!(activeArray.item_count() < swapArray.item_count())) {
 		raw_ptr<instance_tracker_atomic_entry[]> expSwap(swapArray);
-		s_st_container.m_swapArray.compare_exchange_strong(expSwap, nullptr);
+		s_st_container.m_swapArray.compare_exchange_strong(expSwap, instance_tracker_array(nullptr));
 	}
 }
 template<class T, class Allocator>

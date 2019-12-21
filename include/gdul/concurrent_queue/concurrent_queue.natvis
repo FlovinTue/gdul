@@ -31,13 +31,14 @@
 				<Variable Name = "pBuffer" InitialValue = "(buffer_type*)(0)" />
 
 				<Exec Condition="producerIndex != (uint64_t)_m_producerCount">
-					producerSlotsRaw = *(atomic_shared_ptr_slot_type**)(8 + (m_producerSlots.m_debugView.m_u64 &amp; aspdetail::Cb_Mask))
+					producerSlotsRaw = (atomic_shared_ptr_slot_type*)((*(uint64_t*)(8 + (m_producerSlots.m_debugView.m_u64 &amp; aspdetail::Cb_Mask))) &amp; aspdetail::Cb_Mask)
 				</Exec>
+				
 				
 				<Loop>
 					<Break Condition = "producerIndex == (uint64_t)_m_producerCount" />
 					<Exec>
-						pBuffer = *(buffer_type**)(8 + (producerSlotsRaw[producerIndex].m_debugView.m_u64 &amp; aspdetail::Cb_Mask))
+						pBuffer = (buffer_type*)((*(uint64_t*)(8 + (producerSlotsRaw[producerIndex].m_debugView.m_u64 &amp; aspdetail::Cb_Mask))) &amp; aspdetail::Cb_Mask)
 					</Exec>
 					<Loop>
 						<Exec>
@@ -45,7 +46,7 @@
 						</Exec>
 						<Break Condition = "(pBuffer->m_next.m_debugView.m_u64 &amp; aspdetail::Cb_Mask) == 0"/>
 						<Exec>
-							pBuffer = *(buffer_type**)(8 + (pBuffer->m_next.m_debugView.m_u64 &amp; aspdetail::Cb_Mask))
+							pBuffer = (buffer_type*)((*(uint64_t*)(8 + (pBuffer->m_next.m_debugView.m_u64 &amp; aspdetail::Cb_Mask))) &amp; aspdetail::Cb_Mask)
 						</Exec>
 					</Loop>
 					<Exec>
@@ -55,17 +56,18 @@
 
 				<Exec>pBuffer = 0</Exec>
 				<Exec>producerIndex = 0</Exec>
-				
+
 				<Loop>
 					<Break Condition = "producerIndex == (uint64_t)_m_producerCount" />
 					<Exec>
-						pBuffer = *(buffer_type**)(8 + (producerSlotsRaw[producerIndex].m_debugView.m_u64 &amp; aspdetail::Cb_Mask))
+						pBuffer = (buffer_type*)((*(uint64_t*)(8 + (producerSlotsRaw[producerIndex].m_debugView.m_u64 &amp; aspdetail::Cb_Mask))) &amp; aspdetail::Cb_Mask)
 					</Exec>
 					<Item Name='[producer_{producerIndex + 1}]'>*pBuffer</Item>
 					<Exec>
 						++producerIndex
 					</Exec>
 				</Loop>
+				
 				
 				<Item Name = "[size]">sizeAccumulator</Item>
 				<Item Name = "[producer_count]">(uint64_t)_m_producerCount</Item>

@@ -6,7 +6,7 @@
 #include <gdul\atomic_shared_ptr\atomic_shared_ptr.h>
 #include <random>
 #include <string>
-#include "Timer.h"
+#include "../Common/Timer.h"
 #include <mutex>
 #include <cassert>
 #include <queue>
@@ -193,7 +193,7 @@ inline float tester<T, ArraySize, NumThreads>::execute(std::uint32_t passes, boo
 		}
 	}
 
-	Timer timer;
+	timer<float> time;
 
 	m_workBlock.store(true);
 
@@ -205,7 +205,7 @@ inline float tester<T, ArraySize, NumThreads>::execute(std::uint32_t passes, boo
 
 	std::cout << "Checksum" << m_summary << std::endl;
 
-	return timer.GetTotalTime();
+	return time.get();
 }
 
 template<class T, std::uint32_t ArraySize, std::uint32_t NumThreads>
