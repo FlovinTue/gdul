@@ -1347,6 +1347,9 @@ public:
 	template <class U, class V = T, std::enable_if_t<std::is_convertible_v<V*, U*>> * = nullptr>
 	inline operator shared_ptr<U>() const noexcept;
 
+	template <class U, class V = T, std::enable_if_t<std::is_base_of_v<V, U>> * = nullptr>
+	inline explicit operator shared_ptr<U>() const noexcept;
+
 	inline explicit shared_ptr(T* object);
 	template <class Allocator>
 	inline explicit shared_ptr(T* object, Allocator& allocator);
@@ -1466,6 +1469,13 @@ template<class T>
 template <class U, class V, std::enable_if_t<std::is_convertible_v<V*, U*>>*>
 inline shared_ptr<T>::operator shared_ptr<U>() const noexcept
 {
+	aspdetail::type_diff_copy_helper<U> helper;
+
+	return helper.construct_from(this->m_controlBlockStorage);
+}
+template <class T>
+template <class U, class V, std::enable_if_t<std::is_base_of_v<V, U>>*>
+inline shared_ptr<T>::operator shared_ptr<U>() const noexcept {
 	aspdetail::type_diff_copy_helper<U> helper;
 
 	return helper.construct_from(this->m_controlBlockStorage);
