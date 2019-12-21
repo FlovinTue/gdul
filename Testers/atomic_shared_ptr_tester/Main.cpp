@@ -40,6 +40,11 @@ int main()
 	shared_ptr<base> b5;
 	b5 = (shared_ptr<base>)d3;
 
+	shared_ptr<derived> d4(make_shared<derived>());
+	shared_ptr<base> b6(d4);
+	shared_ptr<derived> d5(static_cast<shared_ptr<derived>>(b6));
+
+
 	constexpr std::size_t mksh = gdul::alloc_size_make_shared<int, std::allocator<int>>();
 	constexpr std::size_t mkar = gdul::alloc_size_make_shared<int[], std::allocator<int>>(5);
 	constexpr std::size_t claim = gdul::alloc_size_sp_claim<int, std::allocator<int>>();
