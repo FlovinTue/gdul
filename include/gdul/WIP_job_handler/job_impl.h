@@ -34,19 +34,19 @@ namespace jh_detail {
 
 class job_handler_impl;
 
-class base_job_impl
+class job_impl
 {
 public:
 	using allocator_type = gdul::jh_detail::allocator_type; 
 
-	using job_impl_shared_ptr = shared_ptr<base_job_impl>;
-	using job_impl_atomic_shared_ptr = atomic_shared_ptr<base_job_impl>;
-	using job_impl_raw_ptr = raw_ptr<base_job_impl>;
+	using job_impl_shared_ptr = shared_ptr<job_impl>;
+	using job_impl_atomic_shared_ptr = atomic_shared_ptr<job_impl>;
+	using job_impl_raw_ptr = raw_ptr<job_impl>;
 
-	base_job_impl();
+	job_impl();
 
-	base_job_impl(delegate<void()>&& workUnit, job_handler_impl* handler);
-	~base_job_impl();
+	job_impl(delegate<void()>&& workUnit, job_handler_impl* handler);
+	~job_impl();
 	
 	void operator()();
 
@@ -82,9 +82,9 @@ private:
 	std::uint8_t m_priority;
 };
 // Memory chunk representation of job_impl
-struct alignas(alignof(base_job_impl)) job_impl_chunk_rep
+struct alignas(alignof(job_impl)) job_impl_chunk_rep
 {
-	std::uint8_t dummy[alloc_size_make_shared<base_job_impl, chunk_allocator<jh_detail::base_job_impl, job_impl_chunk_rep>>()]{};
+	std::uint8_t dummy[alloc_size_make_shared<job_impl, chunk_allocator<jh_detail::job_impl, job_impl_chunk_rep>>()]{};
 };
 }
 }

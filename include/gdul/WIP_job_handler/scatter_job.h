@@ -20,48 +20,57 @@
 
 #pragma once
 
-#include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
+#include <gdul/WIP_job_handler/job_handler_commons.h>
 #include <gdul/WIP_job_handler/job_interface.h>
+#include <gdul/WIP_job_handler/scatter_job_impl_abstr.h>
 
 namespace gdul {
+class job;
 
-class job_handler;
+namespace jh_detail
+{
+template <class T>
+class scatter_job_impl_abstr;
+template <class T>
+class scatter_job_impl;
+}
 
-namespace jh_detail {
-
-class job_handler_impl;
-class base_job_impl;
-
-class base_job_abstr : public job_interface
+class scatter_job
 {
 public:
-	base_job_abstr() noexcept;
+	scatter_job() : m_impl(nullptr), m_storage{} {}
+	~scatter_job() { m_impl->~job_interface(); m_impl = nullptr; memset(&m_storage[0], 0, sizeof(m_storage)); }
 
-	~base_job_abstr() noexcept;
-
-	base_job_abstr(base_job_abstr&& other) noexcept;
-	base_job_abstr(const base_job_abstr& other) noexcept;
-	base_job_abstr& operator=(base_job_abstr&& other) noexcept;
-	base_job_abstr& operator=(const base_job_abstr& other) noexcept;
-
-	void add_dependency(job_interface& other) override;
-	void set_priority(std::uint8_t priority) noexcept override;
-
-	void enable();
-
-	bool is_finished() const noexcept;
-
-	void wait_for_finish() noexcept;
-
-	operator bool() const noexcept;
+	void add_dependency(job& dependency) {
+		m_impl->add_dependency(dependency);
+	}
+	void set_priority(std::uint8_t priority) noexcept {
+		m_impl->set_priority(priority);
+	}
+	void enable() {
+		m_impl->enable();
+	}
+	bool is_finished() const noexcept {
+		return m_impl->is_finished();
+	}
+	void wait_for_finish() noexcept {
+		m_impl->wait_for_finish();
+	}
+	operator bool() const noexcept {
+		m_impl;
+	}
 
 private:
-	friend class job_handler_impl;
 	friend class job_handler;
 
-	base_job_abstr(gdul::shared_ptr<base_job_impl> impl) noexcept;
+	template <class T>
+	scatter_job(shared_ptr<jh_detail::scatter_job_impl<T>>&& job) {
+		m_impl = new (&m_storage[0]) jh_detail::scatter_job_impl_abstr<T>(std::move(job));
+	}
 
-	gdul::shared_ptr<base_job_impl> m_abstr;
+	struct scatter_job_rep : public jh_detail::job_interface{gdul::shared_ptr<int> dummy;};
+
+	jh_detail::job_interface* m_impl;
+	std::uint8_t m_storage[sizeof(scatter_job_rep)];
 };
-}
 }

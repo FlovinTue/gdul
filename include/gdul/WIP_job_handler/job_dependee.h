@@ -26,12 +26,12 @@ namespace gdul
 {
 namespace jh_detail
 {
-class base_job_impl;
+class job_impl;
 
 struct job_dependee
 {
 	gdul::shared_ptr<job_dependee> m_sibling;
-	gdul::shared_ptr<base_job_impl> m_job;
+	gdul::shared_ptr<job_impl> m_job;
 };
 
 // Memory chunk representation of job_dependee

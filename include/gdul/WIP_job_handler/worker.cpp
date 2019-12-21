@@ -24,7 +24,7 @@
 namespace gdul
 {
 worker::worker(jh_detail::worker_impl * impl)
-	: m_abstr(impl)
+	: m_impl(impl)
 {
 }
 
@@ -34,41 +34,41 @@ worker::~worker()
 
 void worker::set_core_affinity(std::uint8_t core)
 {
-	m_abstr->set_core_affinity(core);
+	m_impl->set_core_affinity(core);
 }
 
 void worker::set_queue_affinity(std::uint8_t queue)
 {
-	m_abstr->set_queue_affinity(queue);
+	m_impl->set_queue_affinity(queue);
 }
 
 void worker::set_execution_priority(std::int32_t priority)
 {
-	m_abstr->set_execution_priority(priority);
+	m_impl->set_execution_priority(priority);
 }
 
 void worker::set_name(const std::string& name)
 {
-	m_abstr->set_name(name);
+	m_impl->set_name(name);
 }
 void worker::activate()
 {
-	m_abstr->activate();
+	m_impl->activate();
 }
 bool worker::deactivate()
 {
-	return m_abstr->deactivate();
+	return m_impl->deactivate();
 }
 void worker::set_run_on_enable(delegate<void()>&& toCall)
 {
-	m_abstr->set_run_on_enable(std::forward<delegate<void()>>(toCall));
+	m_impl->set_run_on_enable(std::forward<delegate<void()>>(toCall));
 }
 void worker::set_run_on_disable(delegate<void()>&& toCall)
 {
-	m_abstr->set_run_on_disable(std::forward<delegate<void()>>(toCall));
+	m_impl->set_run_on_disable(std::forward<delegate<void()>>(toCall));
 }
 bool worker::is_active() const
 {
-	return m_abstr->is_active();
+	return m_impl->is_active();
 }
 }

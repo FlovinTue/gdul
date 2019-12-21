@@ -64,6 +64,6 @@ public:
 private:
 	friend class job_handler_impl;
 
-	jh_detail::worker_impl* m_abstr;
+	jh_detail::worker_impl* m_impl;
 };
 }

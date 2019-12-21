@@ -41,12 +41,12 @@ namespace gdul {
 
 namespace  jh_detail{
 
-class base_job_impl;
+class job_impl;
 
 class job_handler_impl
 {
 public:
-	using job_impl_shared_ptr = base_job_impl::job_impl_shared_ptr;
+	using job_impl_shared_ptr = job_impl::job_impl_shared_ptr;
 
 	struct tl_container
 	{
@@ -62,7 +62,7 @@ public:
 
 	worker make_worker();
 
-	base_job_abstr make_job(delegate<void()>&& workUnit);
+	job make_job(delegate<void()>&& workUnit);
 
 	std::size_t num_workers() const noexcept;
 	std::size_t num_enqueued() const noexcept;
@@ -70,10 +70,10 @@ public:
 	concurrent_object_pool<job_dependee_chunk_rep, allocator_type>* get_job_dependee_chunk_pool() noexcept;
 	concurrent_object_pool<scatter_job_chunk_rep, allocator_type>* get_scatter_job_chunk_pool() noexcept;
 
-	void enqueue_job(job_impl_shared_ptr base_job_abstr);
+	void enqueue_job(job_impl_shared_ptr job);
 
 
-	using job_impl_allocator = chunk_allocator<base_job_impl, job_impl_chunk_rep>;
+	using job_impl_allocator = chunk_allocator<job_impl, job_impl_chunk_rep>;
 	using job_dependee_allocator = chunk_allocator<job_dependee, job_dependee_chunk_rep>;
 
 private:

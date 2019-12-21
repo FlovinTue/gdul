@@ -84,17 +84,17 @@ worker job_handler_impl::make_worker()
 	return worker(&m_workers[index]);
 }
 
-base_job_abstr job_handler_impl::make_job(delegate<void()>&& workUnit)
+job job_handler_impl::make_job(delegate<void()>&& workUnit)
 {
 	job_impl_allocator alloc(&m_jobImplChunkPool);
-	const job_impl_shared_ptr jobImpl(make_shared<base_job_impl, job_impl_allocator>
+	const job_impl_shared_ptr jobImpl(make_shared<job_impl, job_impl_allocator>
 		(
 			alloc,
 			std::forward<delegate<void()>>(workUnit),
 			this
 			));
 	
-	return base_job_abstr(jobImpl);
+	return job(jobImpl);
 }
 
 std::size_t job_handler_impl::num_workers() const noexcept
@@ -122,11 +122,11 @@ concurrent_object_pool<scatter_job_chunk_rep, allocator_type>* job_handler_impl:
 	return &m_scatterJobChunkPool;
 }
 
-void job_handler_impl::enqueue_job(job_impl_shared_ptr base_job_abstr)
+void job_handler_impl::enqueue_job(job_impl_shared_ptr job)
 {
-	const std::uint8_t priority(base_job_abstr->get_priority());
+	const std::uint8_t priority(job->get_priority());
 
-	m_jobQueues[priority].push(std::move(base_job_abstr));
+	m_jobQueues[priority].push(std::move(job));
 }
 
 void job_handler_impl::launch_worker(std::uint16_t index) noexcept
@@ -150,10 +150,10 @@ void job_handler_impl::work()
 {
 	while (t_items.this_worker_impl->is_active()) {
 
-		job_handler::this_job = base_job_abstr(fetch_job());
+		job_handler::this_job = job(fetch_job());
 
-		if (job_handler::this_job.m_abstr) {
-			(*job_handler::this_job.m_abstr)();
+		if (job_handler::this_job.m_impl) {
+			(*job_handler::this_job.m_impl)();
 
 			t_items.this_worker_impl->refresh_sleep_timer();
 

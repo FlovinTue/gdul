@@ -30,33 +30,28 @@ template <class T>
 class scatter_job_impl_abstr : public job_interface
 {
 public:
-	scatter_job_impl_abstr(shared_ptr<scatter_job_impl<T>>&& base_job_abstr) 
-		: m_abstr(std::move(base_job_abstr)) 
+	scatter_job_impl_abstr(shared_ptr<scatter_job_impl<T>>&& job) 
+		: m_impl(std::move(job)) 
 	{}
 
-	void add_dependency(base_job_abstr& dependency) {
-		m_abstr->add_dependency(dependency);
+	void add_dependency(job& dependency) {
+		m_impl->add_dependency(dependency);
 	}
 	void set_priority(std::uint8_t priority) noexcept {
-		m_abstr->set_priority(priority);
+		m_impl->set_priority(priority);
 	}
 	void enable() {
-		m_abstr->enable();
+		m_impl->enable();
 	}
 	bool is_finished() const noexcept {
-		return m_abstr->is_finished();
+		return m_impl->is_finished();
 	}
 	void wait_for_finish() noexcept {
-		m_abstr->wait_for_finish();
-	}
-
-	base_job_abstr& get_depender() override{
-		m_abstr->get_last_job();
+		m_impl->wait_for_finish();
 	}
 
 private:
-
-	shared_ptr<scatter_job_impl<T>> m_abstr;
+	shared_ptr<scatter_job_impl<T>> m_impl;
 };
 }
 }

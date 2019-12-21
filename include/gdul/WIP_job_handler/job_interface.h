@@ -23,19 +23,16 @@
 #include <gdul/WIP_job_handler/job_handler_commons.h>
 
 namespace gdul {
+class job;
 namespace jh_detail {
-class base_job_abstr;
 class job_interface
 {
 public:
-	virtual void add_dependency(job_interface&) = 0;
-	virtual void set_priority(std::uint8_t) noexcept = 0;
+	virtual void add_dependency(job& dependency) = 0;
+	virtual void set_priority(std::uint8_t priority) noexcept = 0;
 	virtual void enable() = 0;
 	virtual bool is_finished() const noexcept = 0;
 	virtual void wait_for_finish() noexcept = 0;
-	virtual base_job_abstr& get_depender() = 0;
-	virtual job_interface* copy_construct_at(std::uint8_t*) = 0;
-	virtual job_interface* move_construct_at(std::uint8_t*) = 0;
 };
 }
 }
