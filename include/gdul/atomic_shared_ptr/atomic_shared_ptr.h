@@ -1339,6 +1339,7 @@ public:
 	using aspdetail::ptr_base<T>::ptr_base;
 
 	inline shared_ptr(const shared_ptr<T>& other) noexcept;
+
 	inline shared_ptr(shared_ptr<T>&& other) noexcept;
 
 	shared_ptr<T>& operator=(const shared_ptr<T>& other) noexcept;
@@ -1348,12 +1349,17 @@ public:
 	inline operator const shared_ptr<U>&() const noexcept;
 	template <class U, class V = T, std::enable_if_t<std::is_convertible_v<V*, U*>> * = nullptr>
 	inline operator shared_ptr<U>&() noexcept;
+	template <class U, class V = T, std::enable_if_t<std::is_convertible_v<V*, U*>> * = nullptr>
+	inline explicit operator shared_ptr<U>&&() noexcept;
 
 	template <class U, class V = T, std::enable_if_t<std::is_base_of_v<V, U>> * = nullptr>
 	inline explicit operator const shared_ptr<U>&() const noexcept;
 
 	template <class U, class V = T, std::enable_if_t<std::is_base_of_v<V, U>> * = nullptr>
 	inline explicit operator shared_ptr<U>&() noexcept;
+
+	template <class U, class V = T, std::enable_if_t<std::is_base_of_v<V, U>> * = nullptr>
+	inline explicit operator shared_ptr<U>&&() noexcept;
 
 	inline explicit shared_ptr(T* object);
 	template <class Allocator>
@@ -1482,6 +1488,12 @@ inline shared_ptr<T>::operator shared_ptr<U>&() noexcept
 {
 	return *reinterpret_cast<shared_ptr<U>*>(this);
 }
+template<class T>
+template <class U, class V, std::enable_if_t<std::is_convertible_v<V*, U*>>*>
+inline shared_ptr<T>::operator shared_ptr<U>&&() noexcept
+{
+	return std::move(*reinterpret_cast<shared_ptr<U>*>(this));
+}
 template <class T>
 template <class U, class V, std::enable_if_t<std::is_base_of_v<V, U>>*>
 inline shared_ptr<T>::operator const shared_ptr<U>&() const noexcept 
@@ -1493,6 +1505,12 @@ template <class U, class V, std::enable_if_t<std::is_base_of_v<V, U>>*>
 inline shared_ptr<T>::operator shared_ptr<U>&() noexcept
 {
 	return *reinterpret_cast<shared_ptr<U>*>(this);
+}
+template <class T>
+template <class U, class V, std::enable_if_t<std::is_base_of_v<V, U>>*>
+inline shared_ptr<T>::operator shared_ptr<U>&&() noexcept
+{
+	return std::move(*reinterpret_cast<shared_ptr<U>*>(this));
 }
 template <class T>
 template <class Allocator>
@@ -1733,7 +1751,8 @@ template<class T>
 inline void shared_ptr<T>::swap(shared_ptr<T>& other) noexcept
 {
 	aspdetail::ptr_base<T>::swap(other);
-	std::swap(this->m_ptr, other.m_ptr);
+	other.m_ptr = this->to_object(other.m_controlBlockStorage);
+	m_ptr = this->to_object(this->m_controlBlockStorage);
 }
 
 // raw_ptr does not share in ownership of the object
