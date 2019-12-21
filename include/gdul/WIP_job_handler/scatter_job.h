@@ -63,9 +63,9 @@ private:
 	friend class job_handler;
 
 	template <class T>
-	scatter_job(shared_ptr<jh_detail::scatter_job_impl<T>>&& job) {
-		m_impl = (decltype(m_impl)&&)std::move(job);
-	}
+	scatter_job(shared_ptr<jh_detail::scatter_job_impl<T>>&& job)
+	: m_impl(std::move(job))
+	{}
 
 	shared_ptr<jh_detail::job_interface> m_impl;
 };
