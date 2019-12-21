@@ -106,7 +106,7 @@ inline std::size_t concurrent_object_pool<Object, Allocator>::avaliable()
 template<class Object, class Allocator>
 inline void concurrent_object_pool<Object, Allocator>::unsafe_destroy()
 {
-	shared_ptr<block_node> next(m_lastBlock.unsafe_exchange(nullptr, std::memory_order_relaxed));
+	shared_ptr<block_node> next(m_lastBlock.unsafe_exchange(shared_ptr<block_node>(nullptr), std::memory_order_relaxed));
 
 	while (next)
 	{
