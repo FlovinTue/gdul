@@ -31,6 +31,10 @@ worker job_handler::make_worker()
 {
 	return m_impl->make_worker();
 }
+worker job_handler::make_worker(const worker_info & info)
+{
+	return m_impl->make_worker(info);
+}
 std::size_t job_handler::num_workers() const
 {
 	return m_impl->num_workers();

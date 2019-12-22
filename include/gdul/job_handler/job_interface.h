@@ -29,7 +29,7 @@ class job_interface
 {
 public:
 	virtual void add_dependency(job& dependency) = 0;
-	virtual void set_priority(std::uint8_t priority) noexcept = 0;
+	virtual void set_queue(std::uint8_t target) noexcept = 0;
 	virtual void enable() = 0;
 	virtual bool is_finished() const noexcept = 0;
 	virtual void wait_for_finish() noexcept = 0;

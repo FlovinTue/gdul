@@ -37,11 +37,6 @@ void worker::set_core_affinity(std::uint8_t core)
 	m_impl->set_core_affinity(core);
 }
 
-void worker::set_queue_affinity(std::uint8_t queue)
-{
-	m_impl->set_queue_affinity(queue);
-}
-
 void worker::set_execution_priority(std::int32_t priority)
 {
 	m_impl->set_execution_priority(priority);

@@ -45,7 +45,7 @@ public:
 
 
 	void add_dependency(job& dependency);
-	void set_priority(std::uint8_t priority) noexcept;
+	void set_queue(std::uint8_t target) noexcept;
 
 	void enable();
 

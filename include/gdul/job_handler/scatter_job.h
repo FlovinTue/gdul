@@ -41,8 +41,8 @@ public:
 	void add_dependency(job& dependency) {
 		m_impl->add_dependency(dependency);
 	}
-	void set_priority(std::uint8_t priority) noexcept {
-		m_impl->set_priority(priority);
+	void set_queue(std::uint8_t target) noexcept {
+		m_impl->set_queue(target);
 	}
 	void enable() {
 		m_impl->enable();
@@ -63,8 +63,8 @@ public:
 private:
 	friend class job_handler;
 
-	template <class T>
-	scatter_job(shared_ptr<jh_detail::scatter_job_impl<T>>&& job)
+	template <class Container>
+	scatter_job(shared_ptr<jh_detail::scatter_job_impl<Container>>&& job)
 	: m_impl(std::move(job))
 	{}
 

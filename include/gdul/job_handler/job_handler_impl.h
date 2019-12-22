@@ -61,6 +61,7 @@ public:
  	void retire_workers();
 
 	worker make_worker();
+	worker make_worker(const worker_info& w);
 
 	job make_job(delegate<void()>&& workUnit);
 
@@ -90,7 +91,7 @@ private:
 	concurrent_object_pool<job_dependee_chunk_rep, allocator_type> m_jobDependeeChunkPool;
 	concurrent_object_pool<scatter_job_chunk_rep, allocator_type> m_scatterJobChunkPool;
 
-	concurrent_queue<job_impl_shared_ptr, allocator_type> m_jobQueues[Priority_Granularity];
+	concurrent_queue<job_impl_shared_ptr, allocator_type> m_jobQueues[Num_Job_Queues];
 
 	std::array<worker_impl, Job_Handler_Max_Workers> m_workers;
 

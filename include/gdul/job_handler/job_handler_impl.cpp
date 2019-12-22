@@ -71,13 +71,28 @@ void job_handler_impl::retire_workers()
 
 worker job_handler_impl::make_worker()
 {
+	worker_info info;
+	info.m_coreAffinity = jh_detail::Worker_Auto_Affinity;
+	info.m_name = "worker thread";
+	info.m_queueBegin = 0;
+	info.m_queueEnd = Num_Job_Queues;
+
+	return make_worker(info);
+}
+
+worker job_handler_impl::make_worker(const worker_info & w)
+{
+	worker_info info(w);
+
 	const std::uint16_t index(m_workerCount.fetch_add(1, std::memory_order_relaxed));
 
-	const std::uint8_t coreAffinity(static_cast<std::uint8_t>(index % std::thread::hardware_concurrency()));
-	
+	if (info.m_coreAffinity == jh_detail::Worker_Auto_Affinity) {
+		info.m_coreAffinity = static_cast<std::uint8_t>(index % std::thread::hardware_concurrency());
+	}
+
 	std::thread thread(&job_handler_impl::launch_worker, this, index);
 
-	jh_detail::worker_impl impl(std::move(thread), m_mainAllocator, coreAffinity);
+	jh_detail::worker_impl impl(std::move(info), std::move(thread), m_mainAllocator);
 
 	m_workers[index] = std::move(impl);
 
@@ -106,7 +121,7 @@ std::size_t job_handler_impl::num_enqueued() const noexcept
 {
 	std::size_t accum(0);
 
-	for (std::uint8_t i = 0; i < jh_detail::Priority_Granularity; ++i) {
+	for (std::uint8_t i = 0; i < jh_detail::Num_Job_Queues; ++i) {
 		accum += m_jobQueues[i].size();
 	}
 
@@ -124,9 +139,9 @@ concurrent_object_pool<scatter_job_chunk_rep, allocator_type>* job_handler_impl:
 
 void job_handler_impl::enqueue_job(job_impl_shared_ptr job)
 {
-	const std::uint8_t priority(job->get_priority());
+	const std::uint8_t target(job->get_queue());
 
-	m_jobQueues[priority].push(std::move(job));
+	m_jobQueues[target].push(std::move(job));
 }
 
 void job_handler_impl::launch_worker(std::uint16_t index) noexcept
@@ -172,7 +187,7 @@ job_handler_impl::job_impl_shared_ptr job_handler_impl::fetch_job()
 
 	for (uint8_t i = 0; i < t_items.this_worker_impl->get_fetch_retries(); ++i) {
 
-		const uint8_t index((queueIndex + i) % jh_detail::Priority_Granularity);
+		const uint8_t index((queueIndex + i) % jh_detail::Num_Job_Queues);
 
 		if (m_jobQueues[index].try_pop(out)) {
 			return out;

@@ -27,8 +27,6 @@
 // Get rid of this dependency.... belongs to implementation details. (does 'this' too for that matter)
 #include <gdul/job_handler/chunk_allocator.h>
 
-#include <vector>
-
 namespace gdul
 {
 class job_handler;
@@ -38,20 +36,18 @@ namespace jh_detail {
 // Gets rid of circular dependency job_handler->scatter_job_impl & scatter_job_impl->job_handler
 job _redirect_make_job(job_handler* handler, gdul::delegate<void()>&& workUnit);
 
-template <class T>
+template <class Container>
 class scatter_job_impl : public job_interface
 {
 public:
 	scatter_job_impl() = default;
-	using value_type = T;
-	using derefref_value_type = std::remove_pointer_t<value_type>*;
-	using ref_value_type = T&;
-	using input_vector_type = std::vector<value_type>;
-	using output_vector_type = std::vector<derefref_value_type>;
+
+	using container_type = Container;
+	using value_type = typename Container::value_type;
 
 	void add_dependency(job& dependency);
 
-	void set_priority(std::uint8_t priority) noexcept override final;
+	void set_queue(std::uint8_t target) noexcept override final;
 
 	void wait_for_finish() noexcept override final;
 
@@ -60,10 +56,15 @@ public:
 
 	job& get_endjob() noexcept override final;
 
-	scatter_job_impl(input_vector_type& input, output_vector_type& output, delegate<bool(ref_value_type)>&& process, std::size_t batchSize, job_handler* handler);
-	scatter_job_impl(input_vector_type& inputOutput, delegate<bool(ref_value_type)>&& process, std::size_t batchSize, job_handler* handler);
+	scatter_job_impl(container_type& input, container_type& output, delegate<bool(value_type)>&& process, std::size_t batchSize, job_handler* handler);
+	scatter_job_impl(container_type& inputOutput, delegate<bool(value_type)>&& process, std::size_t batchSize, job_handler* handler);
 private:
 	friend class gdul::job_handler;
+
+	template <class Arr>
+	std::size_t array_size(const Arr& arr) {
+		return arr.end() - arr.begin();
+	}
 
 	std::size_t to_input_begin(std::size_t batchIndex) const;
 	std::size_t to_input_end(std::size_t batchIndex) const;
@@ -76,16 +77,6 @@ private:
 	void finalize();
 
 	void make_jobs();
-
-	template <class U = value_type, std::enable_if_t<std::is_pointer_v<U>> * = nullptr>
-	derefref_value_type copy_ref(ref_value_type ref) {
-		return ref;
-	}
-
-	template <class U = value_type, std::enable_if_t<!std::is_pointer_v<U>> * = nullptr>
-	derefref_value_type copy_ref(ref_value_type ref) {
-		return &ref;
-	}
 
 	template <class Fun>
 	job make_work_slice(Fun fun, std::size_t batchIndex);
@@ -106,10 +97,10 @@ private:
 	job m_root;
 	job m_end;
 
-	delegate<bool(ref_value_type)> m_process;
+	delegate<bool(value_type)> m_process;
 
-	input_vector_type& m_input;
-	output_vector_type& m_output;
+	container_type& m_input;
+	container_type& m_output;
 
 	const std::size_t m_batchSize;
 	const std::size_t m_batchCount;
@@ -117,21 +108,19 @@ private:
 
 	job_handler* const m_handler;
 
-	std::uint8_t m_priority;
+	std::uint8_t m_targetQueue;
 };
-template<class T>
-inline scatter_job_impl<T>::scatter_job_impl(input_vector_type& inputOutput, delegate<bool(ref_value_type)>&& process, std::size_t batchSize, job_handler* handler)
-	: scatter_job_impl<T>::scatter_job_impl(inputOutput, inputOutput, std::move(process), batchSize, handler)
-{
-	static_assert(std::is_pointer_v<value_type>, "value_type must be of pointer type when working with a single inputOutput array");
-}
-template<class T>
-inline std::size_t scatter_job_impl<T>::to_input_begin(std::size_t batchIndex) const
+template<class Container>
+inline scatter_job_impl<Container>::scatter_job_impl(container_type& inputOutput, delegate<bool(value_type)>&& process, std::size_t batchSize, job_handler* handler)
+	: scatter_job_impl<Container>::scatter_job_impl(inputOutput, inputOutput, std::move(process), batchSize, handler)
+{}
+template<class Container>
+inline std::size_t scatter_job_impl<Container>::to_input_begin(std::size_t batchIndex) const
 {
 	return batchIndex * base_batch_size();
 }
-template<class T>
-inline std::size_t scatter_job_impl<T>::to_input_end(std::size_t batchIndex) const
+template<class Container>
+inline std::size_t scatter_job_impl<Container>::to_input_end(std::size_t batchIndex) const
 {
 	const std::size_t desiredEnd(batchIndex * base_batch_size() + base_batch_size());
 	if (!(m_baseArraySize < desiredEnd)) {
@@ -139,100 +128,101 @@ inline std::size_t scatter_job_impl<T>::to_input_end(std::size_t batchIndex) con
 	}
 	return m_baseArraySize;
 }
-template<class T>
-inline std::size_t scatter_job_impl<T>::to_output_begin(std::size_t batchIndex) const
+template<class Container>
+inline std::size_t scatter_job_impl<Container>::to_output_begin(std::size_t batchIndex) const
 {
 	if (!is_input_output()) {
 		return batchIndex * offset_batch_size();
 	}
 	return to_input_begin(batchIndex);
 }
-template<class T>
-inline std::size_t scatter_job_impl<T>::to_output_end(std::size_t batchIndex) const
+template<class Container>
+inline std::size_t scatter_job_impl<Container>::to_output_end(std::size_t batchIndex) const
 {
 	if (!is_input_output()) {
 		const std::size_t desiredEnd(batchIndex * offset_batch_size() + offset_batch_size());
-		if (!(m_output.size() < desiredEnd)) {
+		if (!(array_size(m_output) < desiredEnd)) {
 			return desiredEnd;
 		}
-		return m_output.size();
+		return array_size(m_output);
 	}
 	return to_input_end(batchIndex);
 }
-template<class T>
-inline bool scatter_job_impl<T>::is_input_output() const
+template<class Container>
+inline bool scatter_job_impl<Container>::is_input_output() const
 {
 	return (void*)&m_input == (void*)&m_output;
 }
-template<class T>
-inline scatter_job_impl<T>::scatter_job_impl(input_vector_type& input, output_vector_type& output, delegate<bool(ref_value_type)>&& process, std::size_t batchSize, job_handler* handler)
-	: m_root(_redirect_make_job(handler, delegate<void()>(&scatter_job_impl<T>::initialize, this)))
-	, m_end(_redirect_make_job(handler, delegate<void()>(&scatter_job_impl<T>::finalize, this)))
+template<class Container>
+inline scatter_job_impl<Container>::scatter_job_impl(container_type& input, container_type& output, delegate<bool(value_type)>&& process, std::size_t batchSize, job_handler* handler)
+	: m_root(_redirect_make_job(handler, delegate<void()>(&scatter_job_impl<Container>::initialize, this)))
+	, m_end(_redirect_make_job(handler, delegate<void()>(&scatter_job_impl<Container>::finalize, this)))
 	, m_process(std::move(process))
 	, m_input(input)
 	, m_output(output)
 	, m_batchSize(batchSize + !(bool)batchSize)
-	, m_batchCount(m_input.size() / base_batch_size() + ((bool)(m_input.size() % base_batch_size())))
-	, m_baseArraySize(m_input.size())
+	, m_batchCount(array_size(m_input) / base_batch_size() + ((bool)(array_size(m_input) % base_batch_size())))
+	, m_baseArraySize(array_size(m_input))
 	, m_handler(handler)
-	, m_priority(jh_detail::Default_Job_Priority)
+	, m_targetQueue(jh_detail::Default_Job_Queue)
 {
+	static_assert(std::is_pointer_v<value_type>, "value_type must be of pointer type");
 }
-template<class T>
-inline void scatter_job_impl<T>::add_dependency(job& dependency)
+template<class Container>
+inline void scatter_job_impl<Container>::add_dependency(job& dependency)
 {
 	m_root.add_dependency(dependency);
 }
-template<class T>
-inline void scatter_job_impl<T>::set_priority(std::uint8_t priority) noexcept
+template<class Container>
+inline void scatter_job_impl<Container>::set_queue(std::uint8_t target) noexcept
 {
-	m_priority = priority;
+	m_targetQueue = target;
 }
-template<class T>
-inline void scatter_job_impl<T>::wait_for_finish() noexcept
+template<class Container>
+inline void scatter_job_impl<Container>::wait_for_finish() noexcept
 {
 	m_end.wait_for_finish();
 }
-template<class T>
-inline void scatter_job_impl<T>::enable()
+template<class Container>
+inline void scatter_job_impl<Container>::enable()
 {
 	m_root.enable();
 }
 
-template<class T>
-inline bool scatter_job_impl<T>::is_finished() const noexcept
+template<class Container>
+inline bool scatter_job_impl<Container>::is_finished() const noexcept
 {
 	return m_end.is_finished();
 }
 
-template<class T>
-inline job & scatter_job_impl<T>::get_endjob() noexcept
+template<class Container>
+inline job & scatter_job_impl<Container>::get_endjob() noexcept
 {
 	return m_end;
 }
 
-template<class T>
-inline void scatter_job_impl<T>::initialize()
+template<class Container>
+inline void scatter_job_impl<Container>::initialize()
 {
-	m_output.resize(m_input.size() + m_batchCount);
+	m_output.resize(array_size(m_input) + m_batchCount);
 
 	make_jobs();
 }
-template<class T>
-inline void scatter_job_impl<T>::make_jobs()
+template<class Container>
+inline void scatter_job_impl<Container>::make_jobs()
 {
 	const std::size_t finalizeIndex(m_batchCount);
 
-	job currentProcessJob = make_work_slice(&scatter_job_impl<T>::work_process, 0);
+	job currentProcessJob = make_work_slice(&scatter_job_impl<Container>::work_process, 0);
 	currentProcessJob.enable();
 
 	job currentPackJob(currentProcessJob);
 
 	for (std::size_t i = 1; i < m_batchCount; ++i) {
-		job nextProcessJob(make_work_slice(&scatter_job_impl<T>::work_process, i));
+		job nextProcessJob(make_work_slice(&scatter_job_impl<Container>::work_process, i));
 
 		if (i < (m_batchCount - 1)) {
-			job nextPackJob(make_work_slice(&scatter_job_impl<T>::work_pack, i));
+			job nextPackJob(make_work_slice(&scatter_job_impl<Container>::work_pack, i));
 			nextPackJob.add_dependency(currentPackJob);
 			nextPackJob.add_dependency(nextProcessJob);
 			nextPackJob.enable();
@@ -251,35 +241,35 @@ inline void scatter_job_impl<T>::make_jobs()
 	m_end.add_dependency(currentProcessJob);
 	m_end.enable();
 }
-template<class T>
+template<class Container>
 template<class Fun>
-inline job scatter_job_impl<T>::make_work_slice(Fun fun, std::size_t batchIndex)
+inline job scatter_job_impl<Container>::make_work_slice(Fun fun, std::size_t batchIndex)
 {
 	job newJob(_redirect_make_job(m_handler, delegate<void()>(fun, this, batchIndex)));
-	newJob.set_priority(m_priority);
+	newJob.set_queue(m_targetQueue);
 
 	return newJob;
 }
-template<class T>
-inline void scatter_job_impl<T>::work_pack(std::size_t batchIndex)
+template<class Container>
+inline void scatter_job_impl<Container>::work_pack(std::size_t batchIndex)
 {
-	const std::size_t blah(m_input.size());
+	const std::size_t blah(array_size(m_input));
 	blah;
-	const std::size_t blahe(m_output.size());
+	const std::size_t blahe(array_size(m_output));
 	blahe;
 
 	const std::size_t outputBegin(to_output_begin(batchIndex));
 	const std::size_t outputEnd(to_output_end(batchIndex));
 
 	assert(outputBegin != 0 && "Illegal to pack batch#0");
-	assert(!(m_output.size() < outputEnd) && "End index out of bounds");
+	assert(!(array_size(m_output) < outputEnd) && "End index out of bounds");
 
 	const std::size_t packSlot(get_batch_pack_slot(batchIndex));
 
 	auto batchEndStorageItr(m_output.begin() + packSlot);
 
 	// Will never pack batch#0 
-	std::uintptr_t lastBatchEnd((std::uintptr_t)m_output[outputBegin - 1]);
+	std::uintptr_t lastBatchEnd((std::uintptr_t)*(m_output.begin() + outputBegin - 1));
 	const std::uintptr_t batchSize((std::uintptr_t)(*batchEndStorageItr));
 
 	auto copyBeginItr(m_output.begin() + outputBegin);
@@ -288,35 +278,35 @@ inline void scatter_job_impl<T>::work_pack(std::size_t batchIndex)
 
 	std::copy(copyBeginItr, copyEndItr, copyTargetItr);
 
-	*batchEndStorageItr = (derefref_value_type)(lastBatchEnd + batchSize);
+	*batchEndStorageItr = (value_type)(lastBatchEnd + batchSize);
 }
-template<class T>
-inline void scatter_job_impl<T>::work_process(std::size_t batchIndex)
+template<class Container>
+inline void scatter_job_impl<Container>::work_process(std::size_t batchIndex)
 {
-	const std::size_t blah(m_input.size());
+	const std::size_t blah(array_size(m_input));
 	blah;
-	const std::size_t blahe(m_output.size());
+	const std::size_t blahe(array_size(m_output));
 	blahe;
 	const std::size_t inputBegin(to_input_begin(batchIndex));
 	const std::size_t inputEnd(to_input_end(batchIndex));
 	const std::size_t outputBegin(to_output_begin(batchIndex));
 
-	assert(!(m_output.size() < to_output_end(batchIndex)) && "End index out of bounds");
+	assert(!(array_size(m_output) < to_output_end(batchIndex)) && "End index out of bounds");
 
 	const std::size_t packSlot(get_batch_pack_slot(batchIndex));
 	std::uintptr_t batchOutputSize(0);
 
 	for (std::size_t i = inputBegin; i < inputEnd; ++i) {
-		if (m_process(m_input[i])) {
-			m_output[outputBegin + batchOutputSize] = copy_ref(m_input[i]);
+		if (m_process(*(m_input.begin() + i))) {
+			*(m_output.begin() + outputBegin + batchOutputSize) = *(m_input.begin() + i);
 			++batchOutputSize;
 		}
 	}
 
-	m_output[packSlot] = (derefref_value_type)batchOutputSize;
+	*(m_output.begin() + packSlot) = (value_type)batchOutputSize;
 }
-template<class T>
-inline void scatter_job_impl<T>::finalize()
+template<class Container>
+inline void scatter_job_impl<Container>::finalize()
 {
 	if (1 < m_batchCount) {
 		work_pack(m_batchCount - 1);
@@ -326,11 +316,11 @@ inline void scatter_job_impl<T>::finalize()
 
 	m_output.resize(batchesEnd);
 }
-template<class T>
-inline std::size_t scatter_job_impl<T>::get_batch_pack_slot(std::size_t batchIndex)
+template<class Container>
+inline std::size_t scatter_job_impl<Container>::get_batch_pack_slot(std::size_t batchIndex)
 {
 	if (!is_input_output()) {
-		const std::size_t last(m_output.size() - 1);
+		const std::size_t last(array_size(m_output) - 1);
 		const std::size_t desired(batchIndex * offset_batch_size() + (offset_batch_size() - 1));
 		return desired < last ? desired : last;
 	}
@@ -339,9 +329,15 @@ inline std::size_t scatter_job_impl<T>::get_batch_pack_slot(std::size_t batchInd
 	}
 }
 // Memory chunk representation of scatter_job_impl
-struct alignas(alignof(scatter_job_impl<int>)) scatter_job_chunk_rep
+
+struct dummy_container
 {
-	std::uint8_t dummy[alloc_size_make_shared<scatter_job_impl<int>, chunk_allocator<scatter_job_impl<int>, scatter_job_chunk_rep>>()]{};
+	using value_type = void*;
+};
+
+struct alignas(alignof(std::max_align_t)) scatter_job_chunk_rep
+{
+	std::uint8_t dummy[alloc_size_make_shared<scatter_job_impl<dummy_container>, chunk_allocator<scatter_job_impl<dummy_container>, scatter_job_chunk_rep>>()]{};
 };
 }
 }

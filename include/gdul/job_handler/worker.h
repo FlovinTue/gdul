@@ -21,12 +21,26 @@
 #pragma once
 
 #include <gdul/job_handler/job_handler_commons.h>
+#include <gdul/delegate/delegate.h>
 #include <string>
 
 namespace gdul
 {
 template <class Signature>
 class delegate;
+
+struct worker_info
+{
+	delegate<void()> m_onEnable = []() {};
+	delegate<void()> m_onDisable = []() {};
+
+	std::string m_name;
+
+	std::uint32_t m_executionPriority = 5;
+	std::uint8_t m_coreAffinity = jh_detail::Worker_Auto_Affinity;
+	std::uint8_t m_queueBegin = 0;
+	std::uint8_t m_queueEnd = jh_detail::Num_Job_Queues;
+};
 
 namespace jh_detail
 {
@@ -43,15 +57,8 @@ public:
 
 	~worker();
 
-	// Sets core affinity. jh_detail::Worker_Auto_Affinity represents automatic setting
-	void set_core_affinity(std::uint8_t core = jh_detail::Worker_Auto_Affinity);
-
-	// Sets which job queue to consume from. jh_detail::Worker_Auto_Affinity represents
-	// dynamic runtime selection
-	void set_queue_affinity(std::uint8_t queue = jh_detail::Worker_Auto_Affinity);
-
+	void set_core_affinity(std::uint8_t core);
 	void set_execution_priority(std::int32_t priority);
-
 	void set_name(const std::string& name);
 
 	void activate();

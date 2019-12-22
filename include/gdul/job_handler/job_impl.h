@@ -52,8 +52,8 @@ public:
 
 	bool try_attach_child(job_impl_shared_ptr child);
 
-	std::uint8_t get_priority() const;
-	void set_priority(std::uint8_t priority);
+	std::uint8_t get_queue() const;
+	void set_queue(std::uint8_t target);
 
 	bool try_add_dependencies(std::uint32_t n = 1);
 	std::uint32_t remove_dependencies(std::uint32_t n = 1);
@@ -79,7 +79,7 @@ private:
 	std::atomic_bool m_finished;
 	std::atomic_bool m_enabled;
 
-	std::uint8_t m_priority;
+	std::uint8_t m_targetQueue;
 };
 // Memory chunk representation of job_impl
 struct alignas(alignof(job_impl)) job_impl_chunk_rep

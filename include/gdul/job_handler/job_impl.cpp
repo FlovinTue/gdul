@@ -35,7 +35,7 @@ job_impl::job_impl(delegate<void()>&& workUnit, job_handler_impl* handler)
 	, m_finished(false)
 	, m_enabled(false)
 	, m_firstDependee(nullptr)
-	, m_priority(Default_Job_Priority)
+	, m_targetQueue(Default_Job_Queue)
 	, m_handler(handler)
 	, m_dependencies(Job_Max_Dependencies)
 {
@@ -77,13 +77,13 @@ bool job_impl::try_attach_child(job_impl_shared_ptr child)
 
 	return true;
 }
-std::uint8_t job_impl::get_priority() const
+std::uint8_t job_impl::get_queue() const
 {
-	return m_priority;
+	return m_targetQueue;
 }
-void job_impl::set_priority(std::uint8_t priority)
+void job_impl::set_queue(std::uint8_t target)
 {
-	m_priority = priority;
+	m_targetQueue = target;
 }
 bool job_impl::try_add_dependencies(std::uint32_t n)
 {

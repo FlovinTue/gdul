@@ -34,9 +34,8 @@ namespace jh_detail
 constexpr std::uint32_t Job_Max_Dependencies = std::numeric_limits<std::uint32_t>::max() / 2;
 
 // The number of internal job queues. 
-constexpr std::uint8_t Priority_Granularity = 3;
-constexpr std::uint8_t Default_Job_Priority = 0;
-constexpr std::uint8_t Callable_Max_Size_No_Heap_Alloc = 32;
+constexpr std::uint8_t Num_Job_Queues = 4;
+constexpr std::uint8_t Default_Job_Queue = 0;
 constexpr std::uint16_t Job_Handler_Max_Workers = 32;
 
 constexpr std::uint8_t Worker_Auto_Affinity = std::numeric_limits<std::uint8_t>::max();

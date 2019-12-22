@@ -63,9 +63,9 @@ void job::add_dependency(job & dependency)
 	}
 
 }
-void job::set_priority(std::uint8_t priority) noexcept
+void job::set_queue(std::uint8_t target) noexcept
 {
-	m_impl->set_priority(priority);
+	m_impl->set_queue(target);
 }
 void job::enable()
 {
