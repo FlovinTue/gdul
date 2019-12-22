@@ -39,9 +39,11 @@ public:
 	inline Object* get_object();
 	inline void recycle_object(Object* object);
 
-	inline std::size_t avaliable();
+	inline std::size_t avaliable() const;
+	inline std::size_t block_size() const;
 
 	inline void unsafe_destroy();
+
 
 private:
 	void try_alloc_block();
@@ -99,9 +101,14 @@ inline void concurrent_object_pool<Object, Allocator>::recycle_object(Object * o
 	m_unusedObjects.push(object);
 }
 template<class Object, class Allocator>
-inline std::size_t concurrent_object_pool<Object, Allocator>::avaliable()
+inline std::size_t concurrent_object_pool<Object, Allocator>::avaliable() const
 {
 	return m_unusedObjects.size();
+}
+template<class Object, class Allocator>
+inline std::size_t concurrent_object_pool<Object, Allocator>::block_size() const
+{
+	return m_blockSize;
 }
 template<class Object, class Allocator>
 inline void concurrent_object_pool<Object, Allocator>::unsafe_destroy()
