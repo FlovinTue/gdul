@@ -18,10 +18,10 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <gdul\WIP_job_handler\job_handler_impl.h>
+#include <gdul\job_handler\job_handler_impl.h>
 #include <string>
 #include <thread>
-#include <gdul/WIP_job_handler/job_handler.h>
+#include <gdul/job_handler/job_handler.h>
 
 #if defined(_WIN64) | defined(_WIN32)
 #define NOMINMAX

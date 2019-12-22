@@ -20,20 +20,50 @@
 
 #pragma once
 
-#include <gdul/WIP_job_handler/job_handler_commons.h>
+#include <gdul/job_handler/job_handler_commons.h>
 
-namespace gdul {
-class job;
-namespace jh_detail {
-class job_interface
+namespace gdul
+{
+template <class Signature>
+class delegate;
+
+namespace jh_detail
+{
+class worker_impl;
+}
+class worker
 {
 public:
-	virtual void add_dependency(job& dependency) = 0;
-	virtual void set_priority(std::uint8_t priority) noexcept = 0;
-	virtual void enable() = 0;
-	virtual bool is_finished() const noexcept = 0;
-	virtual void wait_for_finish() noexcept = 0;
-	virtual job& get_endjob() noexcept = 0;
+	worker(jh_detail::worker_impl* impl);
+	worker(const worker&) = default;
+	worker(worker&&) = default;
+	worker& operator=(const worker&) = default;
+	worker& operator=(worker&&) = default;
+
+	~worker();
+
+	// Sets core affinity. jh_detail::Worker_Auto_Affinity represents automatic setting
+	void set_core_affinity(std::uint8_t core = jh_detail::Worker_Auto_Affinity);
+
+	// Sets which job queue to consume from. jh_detail::Worker_Auto_Affinity represents
+	// dynamic runtime selection
+	void set_queue_affinity(std::uint8_t queue = jh_detail::Worker_Auto_Affinity);
+
+	void set_execution_priority(std::int32_t priority);
+
+	void set_name(const std::string& name);
+
+	void activate();
+	bool deactivate();
+
+	void set_run_on_enable(delegate<void()>&& toCall);
+	void set_run_on_disable(delegate<void()>&& toCall);
+
+	bool is_active() const;
+
+private:
+	friend class job_handler_impl;
+
+	jh_detail::worker_impl* m_impl;
 };
-}
 }

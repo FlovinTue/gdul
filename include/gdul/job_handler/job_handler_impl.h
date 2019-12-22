@@ -28,14 +28,14 @@
 #include <gdul/concurrent_object_pool/concurrent_object_pool.h>
 #include <gdul/concurrent_queue/concurrent_queue.h>
 
-#include <gdul/WIP_job_handler/job.h>
-#include <gdul/WIP_job_handler/job_handler_commons.h>
-#include <gdul/WIP_job_handler/job_impl.h>
-#include <gdul/WIP_job_handler/chunk_allocator.h>
-#include <gdul/WIP_job_handler/worker_impl.h>
-#include <gdul/WIP_job_handler/worker.h>
+#include <gdul/job_handler/job.h>
+#include <gdul/job_handler/job_handler_commons.h>
+#include <gdul/job_handler/job_impl.h>
+#include <gdul/job_handler/chunk_allocator.h>
+#include <gdul/job_handler/worker_impl.h>
+#include <gdul/job_handler/worker.h>
 #include <gdul/delegate/delegate.h>
-#include <gdul/WIP_job_handler/scatter_job_impl.h>
+#include <gdul/job_handler/scatter_job_impl.h>
 
 namespace gdul {
 

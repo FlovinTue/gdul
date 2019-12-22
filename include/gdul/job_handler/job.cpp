@@ -19,9 +19,9 @@
 // SOFTWARE.
 
 #include <cassert>
-#include <gdul/WIP_job_handler/Job.h>
-#include <gdul/WIP_job_handler/job_handler_impl.h>
-#include <gdul/WIP_job_handler/job_impl.h>
+#include <gdul/job_handler/Job.h>
+#include <gdul/job_handler/job_handler_impl.h>
+#include <gdul/job_handler/job_impl.h>
 
 namespace gdul
 {

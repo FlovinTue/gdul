@@ -1,5 +1,5 @@
-#include <gdul/WIP_job_handler/job_handler.h>
-#include <gdul/WIP_job_handler/job_handler_impl.h>
+#include <gdul/job_handler/job_handler.h>
+#include <gdul/job_handler/job_handler_impl.h>
 #include <cassert>
 
 namespace gdul

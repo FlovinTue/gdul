@@ -22,10 +22,10 @@
 #pragma warning(push)
 #pragma warning(disable : 4324)
 
-#include <gdul/WIP_job_handler/job_handler_commons.h>
-#include <gdul/WIP_job_handler/chunk_allocator.h>
+#include <gdul/job_handler/job_handler_commons.h>
+#include <gdul/job_handler/chunk_allocator.h>
 #include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
-#include <gdul/WIP_job_handler/job_dependee.h>
+#include <gdul/job_handler/job_dependee.h>
 #include <gdul/delegate/delegate.h>
 
 namespace gdul{

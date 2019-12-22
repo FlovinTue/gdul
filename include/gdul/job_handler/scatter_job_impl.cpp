@@ -20,7 +20,7 @@
 
 #include "scatter_job_impl.h"
 #include <gdul/delegate/delegate.h>
-#include <gdul/WIP_job_handler/job_handler.h>
+#include <gdul/job_handler/job_handler.h>
 
 namespace gdul
 {

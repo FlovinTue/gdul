@@ -20,12 +20,12 @@
 
 #pragma once
 
-#include <gdul/WIP_job_handler/job_handler_commons.h>
-#include <gdul/WIP_job_handler/job.h>
+#include <gdul/job_handler/job_handler_commons.h>
+#include <gdul/job_handler/job.h>
 #include <gdul/delegate/delegate.h>
-#include <gdul/WIP_job_handler/job_interface.h>
+#include <gdul/job_handler/job_interface.h>
 // Get rid of this dependency.... belongs to implementation details. (does 'this' too for that matter)
-#include <gdul/WIP_job_handler/chunk_allocator.h>
+#include <gdul/job_handler/chunk_allocator.h>
 
 #include <vector>
 

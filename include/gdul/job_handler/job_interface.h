@@ -20,53 +20,20 @@
 
 #pragma once
 
-#include <gdul/WIP_job_handler/job_handler_commons.h>
-#include <gdul/WIP_job_handler/job_interface.h>
+#include <gdul/job_handler/job_handler_commons.h>
 
 namespace gdul {
 class job;
-
-namespace jh_detail
-{
-template <class T>
-class scatter_job_impl;
-}
-
-class scatter_job
+namespace jh_detail {
+class job_interface
 {
 public:
-	scatter_job() : m_impl(nullptr) {}
-
-	void add_dependency(job& dependency) {
-		m_impl->add_dependency(dependency);
-	}
-	void set_priority(std::uint8_t priority) noexcept {
-		m_impl->set_priority(priority);
-	}
-	void enable() {
-		m_impl->enable();
-	}
-	bool is_finished() const noexcept {
-		return m_impl->is_finished();
-	}
-	void wait_for_finish() noexcept {
-		m_impl->wait_for_finish();
-	}
-	operator bool() const noexcept {
-		m_impl;
-	}
-	job& get_endjob() noexcept {
-		return m_impl->get_endjob();
-	}
-
-private:
-	friend class job_handler;
-
-	template <class T>
-	scatter_job(shared_ptr<jh_detail::scatter_job_impl<T>>&& job)
-	: m_impl(std::move(job))
-	{}
-
-	shared_ptr<jh_detail::job_interface> m_impl;
+	virtual void add_dependency(job& dependency) = 0;
+	virtual void set_priority(std::uint8_t priority) noexcept = 0;
+	virtual void enable() = 0;
+	virtual bool is_finished() const noexcept = 0;
+	virtual void wait_for_finish() noexcept = 0;
+	virtual job& get_endjob() noexcept = 0;
 };
+}
 }

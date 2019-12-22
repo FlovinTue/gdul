@@ -20,50 +20,53 @@
 
 #pragma once
 
-#include <gdul/WIP_job_handler/job_handler_commons.h>
+#include <gdul/job_handler/job_handler_commons.h>
+#include <gdul/job_handler/job_interface.h>
 
-namespace gdul
-{
-template <class Signature>
-class delegate;
+namespace gdul {
+class job;
 
 namespace jh_detail
 {
-class worker_impl;
+template <class T>
+class scatter_job_impl;
 }
-class worker
+
+class scatter_job
 {
 public:
-	worker(jh_detail::worker_impl* impl);
-	worker(const worker&) = default;
-	worker(worker&&) = default;
-	worker& operator=(const worker&) = default;
-	worker& operator=(worker&&) = default;
+	scatter_job() : m_impl(nullptr) {}
 
-	~worker();
-
-	// Sets core affinity. jh_detail::Worker_Auto_Affinity represents automatic setting
-	void set_core_affinity(std::uint8_t core = jh_detail::Worker_Auto_Affinity);
-
-	// Sets which job queue to consume from. jh_detail::Worker_Auto_Affinity represents
-	// dynamic runtime selection
-	void set_queue_affinity(std::uint8_t queue = jh_detail::Worker_Auto_Affinity);
-
-	void set_execution_priority(std::int32_t priority);
-
-	void set_name(const std::string& name);
-
-	void activate();
-	bool deactivate();
-
-	void set_run_on_enable(delegate<void()>&& toCall);
-	void set_run_on_disable(delegate<void()>&& toCall);
-
-	bool is_active() const;
+	void add_dependency(job& dependency) {
+		m_impl->add_dependency(dependency);
+	}
+	void set_priority(std::uint8_t priority) noexcept {
+		m_impl->set_priority(priority);
+	}
+	void enable() {
+		m_impl->enable();
+	}
+	bool is_finished() const noexcept {
+		return m_impl->is_finished();
+	}
+	void wait_for_finish() noexcept {
+		m_impl->wait_for_finish();
+	}
+	operator bool() const noexcept {
+		m_impl;
+	}
+	job& get_endjob() noexcept {
+		return m_impl->get_endjob();
+	}
 
 private:
-	friend class job_handler_impl;
+	friend class job_handler;
 
-	jh_detail::worker_impl* m_impl;
+	template <class T>
+	scatter_job(shared_ptr<jh_detail::scatter_job_impl<T>>&& job)
+	: m_impl(std::move(job))
+	{}
+
+	shared_ptr<jh_detail::job_interface> m_impl;
 };
 }

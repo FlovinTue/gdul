@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <gdul/WIP_job_handler/worker_impl.h>
+#include <gdul/job_handler/worker_impl.h>
 #include <cassert>
 #include <cmath>
 

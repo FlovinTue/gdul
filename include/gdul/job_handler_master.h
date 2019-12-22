@@ -20,8 +20,8 @@
 
 #pragma once
 
-#include <gdul/WIP_job_handler/job.h>
-#include <gdul/WIP_job_handler/job_handler.h>
-#include <gdul/WIP_job_handler/worker.h>
-#include <gdul/WIP_job_handler/scatter_job.h>
-#include <gdul/WIP_job_handler/scatter_job_impl.h>
+#include <gdul/job_handler/job.h>
+#include <gdul/job_handler/job_handler.h>
+#include <gdul/job_handler/worker.h>
+#include <gdul/job_handler/scatter_job.h>
+#include <gdul/job_handler/scatter_job_impl.h>
