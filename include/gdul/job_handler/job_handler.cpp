@@ -11,9 +11,13 @@ job_handler::job_handler()
 	: job_handler(jh_detail::allocator_type())
 {
 }
-job_handler::job_handler(const jh_detail::allocator_type & allocator)
+job_handler::job_handler(jh_detail::allocator_type allocator)
+	: m_allocator(allocator)
 {
-	jh_detail::allocator_type alloc(allocator);
+
+}
+void job_handler::init() {
+	jh_detail::allocator_type alloc(m_allocator);
 	m_impl = gdul::make_shared<jh_detail::job_handler_impl, decltype(alloc)>(alloc, alloc);
 }
 job_handler::~job_handler()

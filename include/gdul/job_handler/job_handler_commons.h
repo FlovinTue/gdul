@@ -24,8 +24,6 @@
 #include <limits>
 #include <memory>
 
-#include "../../Testers/Common/tracking_allocator.h"
-
 namespace gdul
 {
 
@@ -49,7 +47,7 @@ constexpr std::size_t Job_Impl_Allocator_Block_Size = 128;
 constexpr std::size_t Scatter_Job_Allocator_Block_Size = 8;
 
 //using allocator_type = std::allocator<uint8_t>;
-using allocator_type = tracking_allocator<uint8_t>;
+using allocator_type = std::allocator<uint8_t>;
 
 constexpr std::size_t pow2(std::size_t n)
 {

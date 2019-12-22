@@ -22,6 +22,7 @@
 
 #include <gdul/job_handler/job_handler_commons.h>
 #include <gdul/job_handler/job_interface.h>
+#include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
 
 namespace gdul {
 class job;

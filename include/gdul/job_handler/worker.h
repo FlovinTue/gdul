@@ -21,6 +21,7 @@
 #pragma once
 
 #include <gdul/job_handler/job_handler_commons.h>
+#include <string>
 
 namespace gdul
 {

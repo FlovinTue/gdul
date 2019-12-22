@@ -46,8 +46,11 @@ class job_handler
 {
 public:
 	job_handler();
-	job_handler(const jh_detail::allocator_type& allocator);
+	job_handler(jh_detail::allocator_type allocator);
 	~job_handler();
+
+
+	void init();
 
 	static thread_local job this_job;
 	static thread_local worker this_worker;
@@ -77,6 +80,8 @@ private:
 	concurrent_object_pool<jh_detail::scatter_job_chunk_rep, jh_detail::allocator_type>* get_scatter_job_chunk_pool();
 
 	gdul::shared_ptr<jh_detail::job_handler_impl> m_impl;
+
+	jh_detail::allocator_type m_allocator;
 };
 template<class T>
 inline scatter_job job_handler::make_scatter_job(typename jh_detail::scatter_job_impl<T>::input_vector_type & inputOutput, delegate<bool(typename jh_detail::scatter_job_impl<T>::ref_value_type)>&& process, std::size_t batchSize)
