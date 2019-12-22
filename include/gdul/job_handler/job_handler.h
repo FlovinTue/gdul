@@ -26,6 +26,7 @@
 #include <gdul/job_handler/scatter_job.h>
 #include <gdul/concurrent_object_pool/concurrent_object_pool.h>
 #include <gdul/job_handler/chunk_allocator.h>
+#include <gdul/delegate/delegate.h>
 
 #pragma once
 
