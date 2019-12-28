@@ -26,21 +26,24 @@ namespace gdul
 {
 namespace jh_detail
 {
+template <class T, class ChunkRep>
+class chunk_allocator;
+
 class job_impl;
 
-struct job_dependee
+struct job_node
 {
-	gdul::shared_ptr<job_dependee> m_sibling;
+	gdul::shared_ptr<job_node> m_next;
 	gdul::shared_ptr<job_impl> m_job;
 };
 
-// Memory chunk representation of job_dependee
-struct alignas(alignof(job_dependee)) job_dependee_chunk_rep
+// Memory chunk representation of job_node
+struct alignas(alignof(job_node)) job_node_chunk_rep
 {
-	std::uint8_t dummy[alloc_size_make_shared<job_dependee, chunk_allocator<jh_detail::job_dependee, job_dependee_chunk_rep>>()]{};
+	std::uint8_t dummy[alloc_size_make_shared<job_node, chunk_allocator<jh_detail::job_node, job_node_chunk_rep>>()]{};
 };
-using job_dependee_shared_ptr = gdul::shared_ptr<job_dependee>;
-using job_dependee_atomic_shared_ptr = gdul::atomic_shared_ptr<job_dependee>;
-using job_dependee_raw_ptr = gdul::raw_ptr<job_dependee>;
+using job_node_shared_ptr = gdul::shared_ptr<job_node>;
+using job_node_atomic_shared_ptr = gdul::atomic_shared_ptr<job_node>;
+using job_node_raw_ptr = gdul::raw_ptr<job_node>;
 }
 }

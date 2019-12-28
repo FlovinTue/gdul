@@ -36,7 +36,7 @@ namespace jh_detail
 constexpr std::uint32_t Job_Max_Dependencies = std::numeric_limits<std::uint32_t>::max() / 2;
 
 // The number of internal job queues. 
-constexpr std::uint8_t Num_Job_Queues = 3;
+constexpr std::uint8_t Num_Job_Queues = 5;
 constexpr std::uint8_t Default_Job_Queue = 0;
 constexpr std::uint16_t Job_Handler_Max_Workers = 32;
 constexpr std::uint16_t Batch_Job_Max_Batches = 128;

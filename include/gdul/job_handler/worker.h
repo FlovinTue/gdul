@@ -59,8 +59,8 @@ public:
 	void set_execution_priority(std::int32_t priority);
 	void set_name(const std::string& name);
 
-	void activate();
-	bool deactivate();
+	void enable();
+	bool disable();
 
 	void set_run_on_enable(delegate<void()>&& toCall);
 	void set_run_on_disable(delegate<void()>&& toCall);

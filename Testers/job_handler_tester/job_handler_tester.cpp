@@ -50,13 +50,13 @@ void job_handler_tester::setup_workers()
 	
 	for (std::size_t i = 0; i < dynamicWorkers; ++i) {
 		worker_info info;
-		info.m_coreAffinity = jh_detail::Worker_Auto_Affinity;
+		info.m_coreAffinity = (std::uint8_t)i;
 		info.m_executionPriority = 5;
 		info.m_queueBegin = 0;
-		info.m_queueEnd = jh_detail::Num_Job_Queues;
+		info.m_queueEnd = 2;
 		worker wrk(m_handler.make_worker(info));
 		wrk.set_name(std::string(std::string("DynamicWorker#") + std::to_string(i + 1)));
-		wrk.activate();
+		wrk.enable();
 	}
 }
 

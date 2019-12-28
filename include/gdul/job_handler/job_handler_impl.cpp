@@ -22,6 +22,7 @@
 #include <string>
 #include <thread>
 #include <gdul/job_handler/job_handler.h>
+#include <gdul/job_handler/chunk_allocator.h>
 
 #if defined(_WIN64) | defined(_WIN32)
 #define NOMINMAX
@@ -39,7 +40,7 @@ thread_local job_handler_impl::tl_container job_handler_impl::t_items{ &job_hand
 
 job_handler_impl::job_handler_impl()
 	: m_jobImplChunkPool(jh_detail::Job_Impl_Allocator_Block_Size, m_mainAllocator)
-	, m_jobDependeeChunkPool(jh_detail::Job_Impl_Allocator_Block_Size, m_mainAllocator)
+	, m_jobNodeChunkPool(jh_detail::Job_Impl_Allocator_Block_Size, m_mainAllocator)
 	, m_scatterJobChunkPool(batch_job_Allocator_Block_Size, m_mainAllocator)
 	, m_workerCount(0)
 {
@@ -48,7 +49,7 @@ job_handler_impl::job_handler_impl()
 job_handler_impl::job_handler_impl(allocator_type & allocator)
 	: m_mainAllocator(allocator)
 	, m_jobImplChunkPool(jh_detail::Job_Impl_Allocator_Block_Size, m_mainAllocator)
-	, m_jobDependeeChunkPool(jh_detail::Job_Impl_Allocator_Block_Size, m_mainAllocator)
+	, m_jobNodeChunkPool(jh_detail::Job_Impl_Allocator_Block_Size, m_mainAllocator)
 	, m_scatterJobChunkPool(batch_job_Allocator_Block_Size, m_mainAllocator)
 	, m_workerCount(0)
 {
@@ -65,7 +66,7 @@ void job_handler_impl::retire_workers()
 	const std::uint16_t workers(m_workerCount.exchange(0, std::memory_order_seq_cst));
 
 	for (size_t i = 0; i < workers; ++i) {
-		m_workers[i].deactivate();
+		m_workers[i].disable();
 	}
 }
 
@@ -110,7 +111,7 @@ job job_handler_impl::make_job(delegate<void()>&& workUnit)
 			std::forward<delegate<void()>>(workUnit),
 			this
 			));
-	
+
 	return job(jobImpl);
 }
 
@@ -129,9 +130,9 @@ std::size_t job_handler_impl::num_enqueued() const noexcept
 
 	return accum;
 }
-concurrent_object_pool<job_dependee_chunk_rep, allocator_type>* job_handler_impl::get_job_dependee_chunk_pool() noexcept
+concurrent_object_pool<job_node_chunk_rep, allocator_type>* job_handler_impl::get_job_node_chunk_pool() noexcept
 {
-	return &m_jobDependeeChunkPool;
+	return &m_jobNodeChunkPool;
 }
 
 concurrent_object_pool<batch_job_chunk_rep, allocator_type>* job_handler_impl::get_batch_job_chunk_pool() noexcept
@@ -166,13 +167,12 @@ void job_handler_impl::launch_worker(std::uint16_t index) noexcept
 void job_handler_impl::work()
 {
 	while (t_items.this_worker_impl->is_active()) {
-
 		job_handler::this_job = job(fetch_job());
 
-		if (job_handler::this_job.m_impl) {
+		if (job_handler::this_job) {
 
 #if defined(GDUL_DEBUG)
-		job_handler::this_worker.set_name(job_handler::this_job.get_name());
+			job_handler::this_worker.set_name(job_handler::this_job.get_name());
 #endif
 
 			(*job_handler::this_job.m_impl)();

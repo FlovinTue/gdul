@@ -20,6 +20,7 @@
 
 #include <gdul\job_handler\worker.h>
 #include <gdul\job_handler\worker_impl.h>
+#include <gdul/job_handler/chunk_allocator.h>
 
 namespace gdul
 {
@@ -46,13 +47,13 @@ void worker::set_name(const std::string& name)
 {
 	m_impl->set_name(name);
 }
-void worker::activate()
+void worker::enable()
 {
-	m_impl->activate();
+	m_impl->enable();
 }
-bool worker::deactivate()
+bool worker::disable()
 {
-	return m_impl->deactivate();
+	return m_impl->disable();
 }
 void worker::set_run_on_enable(delegate<void()>&& toCall)
 {

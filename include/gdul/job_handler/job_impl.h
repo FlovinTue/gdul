@@ -25,7 +25,7 @@
 #include <gdul/job_handler/job_handler_commons.h>
 #include <gdul/job_handler/chunk_allocator.h>
 #include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
-#include <gdul/job_handler/job_dependee.h>
+#include <gdul/job_handler/job_node.h>
 #include <gdul/delegate/delegate.h>
 
 namespace gdul{
@@ -79,7 +79,7 @@ private:
 
 	job_handler_impl* const m_handler;
 
-	atomic_shared_ptr<job_dependee> m_firstDependee;
+	atomic_shared_ptr<job_node> m_firstDependee;
 
 	std::atomic<std::uint32_t> m_dependencies;
 

@@ -56,24 +56,24 @@ void job_impl::operator()()
 }
 bool job_impl::try_attach_child(job_impl_shared_ptr child)
 {
-	typename job_handler_impl::job_dependee_allocator jobDependeeAlloc(m_handler->get_job_dependee_chunk_pool());
+	typename job_handler_impl::job_node_allocator jobDependeeAlloc(m_handler->get_job_node_chunk_pool());
 
-	job_dependee_shared_ptr dependee(make_shared<job_dependee, typename job_handler_impl::job_dependee_allocator>(jobDependeeAlloc));
+	job_node_shared_ptr dependee(make_shared<job_node, typename job_handler_impl::job_node_allocator>(jobDependeeAlloc));
 	dependee->m_job = std::move(child);
 
-	job_dependee_shared_ptr firstDependee(nullptr);
-	job_dependee_raw_ptr rawRep(nullptr);
+	job_node_shared_ptr firstDependee(nullptr);
+	job_node_raw_ptr rawRep(nullptr);
 	do {
 		firstDependee = m_firstDependee.load(std::memory_order_relaxed);
 		rawRep = firstDependee;
 
-		dependee->m_sibling = std::move(firstDependee);
+		dependee->m_next = std::move(firstDependee);
 
 		if (m_finished.load(std::memory_order_seq_cst)) {
 			return false;
 		}
 
-	} while (!m_firstDependee.compare_exchange_weak(rawRep, std::move(dependee), std::memory_order_relaxed, std::memory_order_relaxed));
+	} while (!m_firstDependee.compare_exchange_strong(rawRep, std::move(dependee), std::memory_order_relaxed, std::memory_order_relaxed));
 
 	return true;
 }
@@ -133,10 +133,10 @@ bool job_impl::is_enabled() const
 }
 void job_impl::detach_children()
 {
-	job_dependee_shared_ptr dependee(m_firstDependee.exchange(job_dependee_shared_ptr(nullptr), std::memory_order_relaxed));
+	job_node_shared_ptr dependee(m_firstDependee.exchange(job_node_shared_ptr(nullptr), std::memory_order_relaxed));
 
 	while (dependee) {
-		job_dependee_shared_ptr next(std::move(dependee->m_sibling));
+		job_node_shared_ptr next(std::move(dependee->m_next));
 
 		if (!dependee->m_job->remove_dependencies(1)) {
 			job_handler_impl* const nativeHandler(dependee->m_job->get_handler());

@@ -68,14 +68,14 @@ public:
 	std::size_t num_workers() const noexcept;
 	std::size_t num_enqueued() const noexcept;
 
-	concurrent_object_pool<job_dependee_chunk_rep, allocator_type>* get_job_dependee_chunk_pool() noexcept;
+	concurrent_object_pool<job_node_chunk_rep, allocator_type>* get_job_node_chunk_pool() noexcept;
 	concurrent_object_pool<batch_job_chunk_rep, allocator_type>* get_batch_job_chunk_pool() noexcept;
 
 	void enqueue_job(job_impl_shared_ptr job);
 
 
 	using job_impl_allocator = chunk_allocator<job_impl, job_impl_chunk_rep>;
-	using job_dependee_allocator = chunk_allocator<job_dependee, job_dependee_chunk_rep>;
+	using job_node_allocator = chunk_allocator<job_node, job_node_chunk_rep>;
 
 private:
 
@@ -88,7 +88,7 @@ private:
 	allocator_type m_mainAllocator;
 
 	concurrent_object_pool<job_impl_chunk_rep, allocator_type> m_jobImplChunkPool;
-	concurrent_object_pool<job_dependee_chunk_rep, allocator_type> m_jobDependeeChunkPool;
+	concurrent_object_pool<job_node_chunk_rep, allocator_type> m_jobNodeChunkPool;
 	concurrent_object_pool<batch_job_chunk_rep, allocator_type> m_scatterJobChunkPool;
 
 	concurrent_queue<job_impl_shared_ptr, allocator_type> m_jobQueues[Num_Job_Queues];

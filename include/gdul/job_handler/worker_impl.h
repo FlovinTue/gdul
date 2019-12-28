@@ -30,6 +30,7 @@
 #include <gdul/job_handler/job_handler_commons.h>
 #include <gdul/delegate/delegate.h>
 #include <gdul/job_handler/worker.h>
+#include <gdul/job_handler/job.h>
 
 namespace gdul {
 namespace jh_detail
@@ -50,9 +51,9 @@ public:
 	void set_sleep_threshhold(std::uint16_t ms);
 	void set_name(const std::string & name);
 
-	void activate();
+	void enable();
 
-	bool deactivate();
+	bool disable();
 
 	void refresh_sleep_timer();
 

@@ -71,7 +71,7 @@ worker_impl::~worker_impl()
 		m_threadHandle = nullptr;
 	}
 
-	deactivate();
+	disable();
 
 	if (m_thread.joinable()) {
 		m_thread.join();
@@ -112,11 +112,11 @@ void worker_impl::set_sleep_threshhold(std::uint16_t ms)
 {
 	m_sleepThreshhold = ms;
 }
-void worker_impl::activate()
+void worker_impl::enable()
 {
 	m_isEnabled.store(true, std::memory_order_release);
 }
-bool worker_impl::deactivate()
+bool worker_impl::disable()
 {
 	return m_isActive.exchange(false, std::memory_order_release);
 }
@@ -172,10 +172,12 @@ std::uint8_t worker_impl::get_queue_target()
 
 	uint8_t index(0);
 
+	const std::uint8_t range(m_info.m_queueEnd - m_info.m_queueBegin);
+
 	// Find way to remove loop.
 	// Maybe find the highest mod in one check somehow?
-	for (uint8_t i = 1; i < m_info.m_queueEnd; ++i) {
-		const std::uint8_t power(((m_info.m_queueEnd) - (i + 1)));
+	for (uint8_t i = 1; i < range; ++i) {
+		const std::uint8_t power(((range) - (i + 1)));
 		const float fdesiredSlice(std::powf((float)2, (float)power));
 		const std::size_t desiredSlice((std::size_t)fdesiredSlice);
 		const std::size_t awardedSlice((m_distributionChunks) / desiredSlice);
@@ -185,7 +187,7 @@ std::uint8_t worker_impl::get_queue_target()
 		index -= prev * eval;
 	}
 
-	return index;
+	return m_info.m_queueBegin + index;
 }
 std::uint8_t worker_impl::get_fetch_retries() const
 {

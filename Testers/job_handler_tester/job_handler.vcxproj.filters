@@ -64,9 +64,6 @@
     <ClInclude Include="..\..\include\gdul\job_handler\chunk_allocator.h">
       <Filter>implementation</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\gdul\job_handler\job_dependee.h">
-      <Filter>implementation</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\include\gdul\job_handler\job_handler.h">
       <Filter>implementation</Filter>
     </ClInclude>
@@ -86,6 +83,9 @@
       <Filter>implementation\job</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\gdul\defines.h">
+      <Filter>implementation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\gdul\job_handler\job_node.h">
       <Filter>implementation</Filter>
     </ClInclude>
   </ItemGroup>
