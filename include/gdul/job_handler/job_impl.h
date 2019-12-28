@@ -52,6 +52,9 @@ public:
 
 	bool try_attach_child(job_impl_shared_ptr child);
 
+	void set_name(const std::string& name);
+	const std::string& get_name() const;
+
 	std::uint8_t get_queue() const;
 	void set_queue(std::uint8_t target);
 
@@ -67,6 +70,10 @@ public:
 private:
 
 	void detach_children();
+
+#if defined(GDUL_DEBUG)
+	std::string m_name;
+#endif
 
 	delegate<void()> m_workUnit;
 

@@ -27,6 +27,8 @@ void job_handler_tester::init(const job_handler_tester_info& info)
 {
 	m_info = info;
 
+	m_handler.init();
+
 	setup_workers();
 }
 void job_handler_tester::setup_workers()
@@ -47,19 +49,13 @@ void job_handler_tester::setup_workers()
 	}
 	
 	for (std::size_t i = 0; i < dynamicWorkers; ++i) {
-		worker wrk(m_handler.make_worker());
-		wrk.set_core_affinity(jh_detail::Worker_Auto_Affinity);
-		wrk.set_queue_affinity(jh_detail::Worker_Auto_Affinity);
-		wrk.set_execution_priority(4);
-		wrk.set_name(std::string(std::string("DynamicWorker#") + std::to_string(i + 1)).c_str());
-		wrk.activate();
-	}
-	for (std::size_t i = 0; i < staticWorkers; ++i) {
-		worker wrk(m_handler.make_worker());
-		wrk.set_core_affinity(jh_detail::Worker_Auto_Affinity);
-		wrk.set_queue_affinity(i % jh_detail::Priority_Granularity);
-		wrk.set_execution_priority(4);
-		wrk.set_name(std::string(std::string("StaticWorker#") + std::to_string(i + 1)).c_str());
+		worker_info info;
+		info.m_coreAffinity = jh_detail::Worker_Auto_Affinity;
+		info.m_executionPriority = 5;
+		info.m_queueBegin = 0;
+		info.m_queueEnd = jh_detail::Num_Job_Queues;
+		worker wrk(m_handler.make_worker(info));
+		wrk.set_name(std::string(std::string("DynamicWorker#") + std::to_string(i + 1)));
 		wrk.activate();
 	}
 }
@@ -68,7 +64,7 @@ float job_handler_tester::run_consumption_parallel_test(std::size_t jobs, float 
 {
 	auto wrap = []() {}; overDuration;
 	job root(m_handler.make_job(gdul::delegate<void()>(wrap)));
-	root.set_priority(0);
+	root.set_queue(0);
 	job end(m_handler.make_job(gdul::delegate<void()>([this]() { std::cout << "Finished run_consumption_parallel_test. Number of enqueued jobs: " << m_handler.num_enqueued() << std::endl; })));
 
 	for (std::size_t i = 0; i < jobs; ++i)
@@ -76,7 +72,7 @@ float job_handler_tester::run_consumption_parallel_test(std::size_t jobs, float 
 		for (std::size_t j = 0; j < m_handler.num_workers(); ++j)
 		{
 			job jb(m_handler.make_job(gdul::delegate<void()>(wrap)));
-			jb.set_priority((j + i) % jh_detail::Priority_Granularity);
+			jb.set_queue((j + i) % jh_detail::Num_Job_Queues);
 
 			end.add_dependency(jb);
 
@@ -120,7 +116,7 @@ float job_handler_tester::run_consumption_strand_parallel_test(std::size_t jobs,
 		for (std::uint8_t j = 0; j < children; ++j, ++i)
 		{
 			intermediate[j] = m_handler.make_job(gdul::delegate<void()>(&work_tracker::main_work, &m_work));
-			intermediate[j].set_priority((j + i) % jh_detail::Priority_Granularity);
+			intermediate[j].set_queue((j + i) % jh_detail::Num_Job_Queues);
 			end.add_dependency(intermediate[j]);
 
 			for (std::uint8_t dependencies = 0; dependencies < nextNum; ++dependencies)
@@ -196,7 +192,7 @@ float job_handler_tester::run_consumption_strand_test(std::size_t jobs, float /*
 	for (std::size_t i = 0; i < jobs; ++i)
 	{
 		job next = m_handler.make_job(gdul::delegate<void()>(&work_tracker::main_work, &m_work));
-		next.set_priority(i % jh_detail::Priority_Granularity);
+		next.set_queue(i % jh_detail::Num_Job_Queues);
 
 		next.add_dependency(previous);
 		next.enable();
@@ -219,9 +215,9 @@ void job_handler_tester::run_scatter_test_input_output(std::size_t arraySize, st
 {
 	arraySize; stepSize; outBestBatchSize; outBestBatchTime;
 	std::uninitialized_fill(m_scatterOutput.begin(), m_scatterOutput.end(), nullptr);
-
+	
 	const std::size_t passes((arraySize / stepSize) / 5);
-
+	
 	std::array<std::pair<float, std::size_t>, 6> minTimes;
 	std::uninitialized_fill(minTimes.begin(), minTimes.end(),  std::pair<float, std::size_t>(std::numeric_limits<float>::max(), 0 ));
 	
@@ -229,39 +225,47 @@ void job_handler_tester::run_scatter_test_input_output(std::size_t arraySize, st
 	
 	timer<float> time;
 	for (std::size_t i = 0; i < passes; ++i) {
-
+	
 		m_scatterInput.resize(arraySize);
-
+	
 		for (std::size_t j = 0; j < arraySize; ++j) {
 			m_scatterInput[j] = (int*)(std::uintptr_t(j));
 		}
-
-		gdul::scatter_job scatter(m_handler.make_scatter_job<int*>(m_scatterInput, m_scatterOutput, delegate<bool(int*&)>(&work_tracker::scatter_process, &m_work), /*batchSize*/30));
-
-
+	
+		//delegate<bool(int*&, int*&)> process(&work_tracker::scatter_process, &m_work);
+		//delegate<bool(int*&)> process(&work_tracker::scatter_process_input, &m_work);
+		delegate<void(int*&)> process(&work_tracker::scatter_process_update, &m_work);
+	
+		//gdul::batch_job scatter(m_handler.make_batch_job(m_scatterInput, m_scatterOutput, std::move(process) , /*batchSize*/30));
+		//gdul::batch_job scatter(m_handler.make_batch_job(m_scatterInput, std::move(process) , /*batchSize*/30));
+		gdul::batch_job scatter(m_handler.make_batch_job(m_scatterInput, std::move(process) , /*batchSize*/30));
+	
+	
 		float result(time.get());
 		job endJob(m_handler.make_job([&time, &result]() {result = time.get(); }));
+		endJob.set_name("batch post job");
 		endJob.add_dependency(scatter.get_endjob());
 		endJob.enable();
-
+	
 		time.reset();
 		scatter.enable();
-		scatter.wait_for_finish();
-
-
+		endJob.wait_for_finish();
+	
+		GDUL_ASSERT(!m_handler.num_enqueued());
+	
 		if (result < minTimes[5].first) {
 			minTimes[5] = { result, batchSize };
 			std::sort(minTimes.begin(), minTimes.end(), [](std::pair<float, std::size_t>& a, std::pair<float, std::size_t>& b) {return a.first < b.first; });
 		}
 		const std::size_t batches(m_scatterInput.size() / batchSize + ((bool)(m_scatterInput.size() % batchSize)));
-
+	
 		batchSize += stepSize;
 	}
-
+	
 	const std::size_t batches(m_scatterInput.size() / batchSize + ((bool)(m_scatterInput.size() % batchSize)));
 	
 	std::cout << "Completed scatter testing. Top time/batchSize are: " << minTimes[0].first << ", " << minTimes[0].second << " -------------- " << arraySize << " array size" << std::endl;
-
+	
 	outBestBatchTime = minTimes[0].first;
 	outBestBatchSize = minTimes[0].second;
 }

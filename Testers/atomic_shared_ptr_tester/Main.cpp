@@ -7,7 +7,7 @@
 #include "Tester.h"
 
 #include <intrin.h>
-#include "Timer.h"
+#include "../Common/Timer.h"
 #include <functional>
 #include <assert.h>
 #include <vld.h>

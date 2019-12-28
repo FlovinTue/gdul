@@ -43,9 +43,9 @@ std::size_t job_handler::num_enqueued() const
 {
 	return m_impl->num_enqueued();
 }
-concurrent_object_pool<jh_detail::scatter_job_chunk_rep, jh_detail::allocator_type>* job_handler::get_scatter_job_chunk_pool()
+concurrent_object_pool<jh_detail::batch_job_chunk_rep, jh_detail::allocator_type>* job_handler::get_batch_job_chunk_pool()
 {
-	return m_impl->get_scatter_job_chunk_pool();
+	return m_impl->get_batch_job_chunk_pool();
 }
 job job_handler::make_job(gdul::delegate<void()>&& workUnit)
 {

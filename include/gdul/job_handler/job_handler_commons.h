@@ -24,6 +24,8 @@
 #include <limits>
 #include <memory>
 
+#include <gdul/defines.h>
+
 namespace gdul
 {
 
@@ -37,13 +39,14 @@ constexpr std::uint32_t Job_Max_Dependencies = std::numeric_limits<std::uint32_t
 constexpr std::uint8_t Num_Job_Queues = 3;
 constexpr std::uint8_t Default_Job_Queue = 0;
 constexpr std::uint16_t Job_Handler_Max_Workers = 32;
+constexpr std::uint16_t Batch_Job_Max_Batches = 128;
 
 constexpr std::uint8_t Worker_Auto_Affinity = std::numeric_limits<std::uint8_t>::max();
 
 // The number of job chunks that the Job_Impl block allocator will allocate
 // when empty
 constexpr std::size_t Job_Impl_Allocator_Block_Size = 128;
-constexpr std::size_t Scatter_Job_Allocator_Block_Size = 8;
+constexpr std::size_t batch_job_Allocator_Block_Size = 8;
 
 //using allocator_type = std::allocator<uint8_t>;
 using allocator_type = std::allocator<uint8_t>;

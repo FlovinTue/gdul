@@ -14,7 +14,9 @@ public:
 	void main_work();
 	void end_work();
 
-	bool scatter_process(int*& item);
+	bool scatter_process(int*& input, int*& output);
+	bool scatter_process_input(int*& input);
+	void scatter_process_update(int*& input);
 
 private:
 	void evaluate_spin_count();

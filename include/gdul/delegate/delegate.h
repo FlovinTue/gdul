@@ -71,8 +71,8 @@ struct callable_wrapper_base
 template <class Ret, class Callable,class ...Args>
 struct callable_wrapper_impl_call : public callable_wrapper_base<Ret, Args...>
 {
-	callable_wrapper_impl_call(Callable&& callable)
-		: m_callable(std::forward<Callable>(callable)) {}
+	callable_wrapper_impl_call(Callable callable)
+		: m_callable(callable) {}
 
 	inline Ret operator()(Args&&... args) override {
 		return call_with_tuple(m_callable, std::forward_as_tuple(std::forward<Args>(args)...));
@@ -82,14 +82,14 @@ struct callable_wrapper_impl_call : public callable_wrapper_base<Ret, Args...>
 		return new (block) (callable_wrapper_impl_call<Ret, Callable, Args...>)(Callable(m_callable));
 	}
 
-	const Callable m_callable;
+	Callable m_callable;
 };
 
 template <class Ret, class Callable,class Allocator, class ...Args>
 struct callable_wrapper_impl_call_alloc : public callable_wrapper_impl_call<Ret, Callable, Args...>
 {
-	callable_wrapper_impl_call_alloc(Callable&& callable, Allocator alloc)
-		: callable_wrapper_impl_call<Ret, Callable, Args...>(std::forward<Callable>(callable))
+	callable_wrapper_impl_call_alloc(Callable callable, Allocator alloc)
+		: callable_wrapper_impl_call<Ret, Callable, Args...>(callable)
 		, m_allocator(alloc) {}
 
 	std::uint8_t* allocate() override { 
@@ -102,7 +102,7 @@ struct callable_wrapper_impl_call_alloc : public callable_wrapper_impl_call<Ret,
 		alloc.deallocate((std::uint8_t*)obj, size);
 	}
 	callable_wrapper_base<Ret, Args...>* copy_construct_at(std::uint8_t* block) override {
-		return new (block) (callable_wrapper_impl_call_alloc<Ret, Callable, Allocator, Args...>)(Callable(this->m_callable), m_allocator);
+		return new (block) (callable_wrapper_impl_call_alloc<Ret, Callable, Allocator, Args...>)(this->m_callable, m_allocator);
 	}
 
 	Allocator m_allocator;
@@ -111,26 +111,26 @@ struct callable_wrapper_impl_call_alloc : public callable_wrapper_impl_call<Ret,
 template <class Ret, class Callable,class BindTuple, class ...Args>
 struct callable_wrapper_impl_call_bind : public callable_wrapper_base<Ret, Args...>
 {
-	callable_wrapper_impl_call_bind(Callable&& callable, BindTuple&& bind)
-		: m_callable(std::forward<Callable>(callable))
+	callable_wrapper_impl_call_bind(Callable callable, BindTuple&& bind)
+		: m_callable(callable)
 		, m_boundTuple(std::forward<BindTuple>(bind)) {}
 
 	inline Ret operator()(Args&&... args) override {
-		return call_with_tuple(this->m_callable, std::tuple_cat(m_boundTuple, std::forward_as_tuple(std::forward<Args>(args)...)));
+		return call_with_tuple(m_callable, std::tuple_cat(m_boundTuple, std::forward_as_tuple(std::forward<Args>(args)...)));
 	}
 
 	callable_wrapper_base<Ret, Args...>* copy_construct_at(std::uint8_t* block) override {
-		return new (block) (callable_wrapper_impl_call_bind<Ret, Callable, BindTuple, Args...>)(Callable(m_callable), BindTuple(m_boundTuple));
+		return new (block) (callable_wrapper_impl_call_bind<Ret, Callable, BindTuple, Args...>)(m_callable, BindTuple(m_boundTuple));
 	}
 
-	const Callable m_callable;
-	const BindTuple m_boundTuple;
+	Callable m_callable;
+	BindTuple m_boundTuple;
 };
 template <class Ret, class Callable,class Allocator, class BindTuple, class ...Args>
 struct callable_wrapper_impl_call_bind_alloc : public callable_wrapper_impl_call_bind<Ret, Callable, BindTuple, Args...>
 {
-	callable_wrapper_impl_call_bind_alloc(Callable&& callable, BindTuple&& bind, Allocator alloc)
-		: callable_wrapper_impl_call_bind<Ret, Callable, BindTuple, Args...>(std::forward<Callable>(callable), std::forward<BindTuple>(bind))
+	callable_wrapper_impl_call_bind_alloc(Callable callable, BindTuple&& bind, Allocator alloc)
+		: callable_wrapper_impl_call_bind<Ret, Callable, BindTuple, Args...>(callable, std::forward<BindTuple>(bind))
 		, m_allocator(alloc) {}
 
 	std::uint8_t* allocate() override {
@@ -155,6 +155,8 @@ class alignas (alignof(std::max_align_t)) delegate_impl
 {
 public:
 	using return_type = Ret;
+
+	static constexpr std::size_t Num_Args = sizeof...(Args);
 
 	inline delegate_impl() noexcept;
 	inline ~delegate_impl() noexcept;

@@ -50,6 +50,14 @@ job & job::operator=(const job & other) noexcept
 	m_impl = other.m_impl;
 	return *this;
 }
+void job::set_name(const std::string & name)
+{
+	m_impl->set_name(name);
+}
+const std::string & job::get_name() const
+{
+	return m_impl->get_name();
+}
 void job::add_dependency(job & dependency)
 {
 	assert(m_impl && "Job not set");

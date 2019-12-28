@@ -74,6 +74,9 @@ public:
 	allocator_type get_allocator() const;
 
 private:
+#ifdef GDUL_DEBUG
+	std::string m_name;
+#endif
 	worker_info m_info;
 
 	std::thread m_thread;

@@ -43,6 +43,8 @@ public:
 	job& operator=(job&& other) noexcept;
 	job& operator=(const job& other) noexcept;
 
+	void set_name(const std::string& name);
+	const std::string& get_name() const;
 
 	void add_dependency(job& dependency);
 	void set_queue(std::uint8_t target) noexcept;

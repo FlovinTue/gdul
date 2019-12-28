@@ -57,8 +57,6 @@ worker_impl::worker_impl(worker_info&& info, std::thread&& thrd, allocator_type 
 	m_info.m_queueEnd = std::min<std::uint8_t>(m_info.m_queueEnd, Num_Job_Queues);
 	m_info.m_queueBegin = std::min<std::uint8_t>(m_info.m_queueBegin, m_info.m_queueEnd - 1);
 
-	jh_detail::set_thread_name(m_info.m_name.c_str(), m_threadHandle);
-
 	m_distributionChunks = jh_detail::pow2summation(m_info.m_queueBegin + 1, m_info.m_queueEnd);
 
 	jh_detail::set_thread_core_affinity(m_info.m_coreAffinity, m_threadHandle);
@@ -199,10 +197,15 @@ allocator_type worker_impl::get_allocator() const
 }
 void worker_impl::set_name(const std::string& name)
 {
+#if defined(GDUL_DEBUG)
 	assert(is_active() && "Cannot set name to inactive worker");
 
 	jh_detail::set_thread_name(name.c_str(), m_threadHandle);
-	m_info.m_name = name;
+	
+	m_name = name;
+#else
+	(void)name;
+#endif
 }
 }
 }

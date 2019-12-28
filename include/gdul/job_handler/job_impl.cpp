@@ -77,6 +77,21 @@ bool job_impl::try_attach_child(job_impl_shared_ptr child)
 
 	return true;
 }
+void job_impl::set_name(const std::string & name)
+{
+	(void)name;
+#if defined GDUL_DEBUG
+	m_name = name;
+#endif
+}
+const std::string & job_impl::get_name() const
+{
+#if defined(GDUL_DEBUG)
+	return m_name;
+#else
+	return "";
+#endif
+}
 std::uint8_t job_impl::get_queue() const
 {
 	return m_targetQueue;

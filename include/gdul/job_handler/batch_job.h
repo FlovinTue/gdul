@@ -18,17 +18,42 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include "scatter_job_impl.h"
-#include <gdul/delegate/delegate.h>
-#include <gdul/job_handler/job_handler.h>
+#pragma once
 
-namespace gdul
-{
+#include <gdul/job_handler/job_handler_commons.h>
+#include <gdul/job_handler/job_interface.h>
+#include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
+
+namespace gdul {
+class job;
+
 namespace jh_detail
 {
-job gdul::jh_detail::_redirect_make_job(job_handler * handler, gdul::delegate<void()>&& workUnit)
+template <class InputContainer, class OutputContainer, class Process>
+class batch_job_impl;
+}
+
+class batch_job
 {
-	return handler->make_job(std::move(workUnit));
-}
-}
+public:
+	batch_job();
+
+	void add_dependency(job& dependency);
+	void set_queue(std::uint8_t target) noexcept;
+	void enable();
+	bool is_finished() const noexcept;
+	void wait_for_finish() noexcept;
+	operator bool() const noexcept;
+	job& get_endjob() noexcept;
+	void set_name(const std::string& name);
+private:
+	friend class job_handler;
+
+	template <class InputContainer, class OutputContainer, class Process>
+	batch_job(shared_ptr<jh_detail::batch_job_impl<InputContainer, OutputContainer, Process>>&& job)
+	: m_impl(std::move(job))
+	{}
+
+	shared_ptr<jh_detail::job_interface> m_impl;
+};
 }

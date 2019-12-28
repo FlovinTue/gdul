@@ -35,7 +35,7 @@
 #include <gdul/job_handler/worker_impl.h>
 #include <gdul/job_handler/worker.h>
 #include <gdul/delegate/delegate.h>
-#include <gdul/job_handler/scatter_job_impl.h>
+#include <gdul/job_handler/batch_job_impl.h>
 
 namespace gdul {
 
@@ -69,7 +69,7 @@ public:
 	std::size_t num_enqueued() const noexcept;
 
 	concurrent_object_pool<job_dependee_chunk_rep, allocator_type>* get_job_dependee_chunk_pool() noexcept;
-	concurrent_object_pool<scatter_job_chunk_rep, allocator_type>* get_scatter_job_chunk_pool() noexcept;
+	concurrent_object_pool<batch_job_chunk_rep, allocator_type>* get_batch_job_chunk_pool() noexcept;
 
 	void enqueue_job(job_impl_shared_ptr job);
 
@@ -89,7 +89,7 @@ private:
 
 	concurrent_object_pool<job_impl_chunk_rep, allocator_type> m_jobImplChunkPool;
 	concurrent_object_pool<job_dependee_chunk_rep, allocator_type> m_jobDependeeChunkPool;
-	concurrent_object_pool<scatter_job_chunk_rep, allocator_type> m_scatterJobChunkPool;
+	concurrent_object_pool<batch_job_chunk_rep, allocator_type> m_scatterJobChunkPool;
 
 	concurrent_queue<job_impl_shared_ptr, allocator_type> m_jobQueues[Num_Job_Queues];
 

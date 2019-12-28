@@ -22,8 +22,8 @@
 #include <gdul/job_handler/job_handler_commons.h>
 #include <gdul/job_handler/worker.h>
 #include <gdul/job_handler/job.h>
-#include <gdul/job_handler/scatter_job_impl.h>
-#include <gdul/job_handler/scatter_job.h>
+#include <gdul/job_handler/batch_job_impl.h>
+#include <gdul/job_handler/batch_job.h>
 #include <gdul/concurrent_object_pool/concurrent_object_pool.h>
 #include <gdul/job_handler/chunk_allocator.h>
 #include <gdul/delegate/delegate.h>
@@ -32,15 +32,9 @@
 
 namespace gdul
 {
-template <class Signature>
-class delegate;
-
 namespace jh_detail
 {
 class job_handler_impl;
-
-template <class T>
-class scatter_job_impl;
 }
 
 class job_handler
@@ -50,29 +44,34 @@ public:
 	job_handler(jh_detail::allocator_type allocator);
 	~job_handler();
 
-
 	void init();
 
 	static thread_local job this_job;
 	static thread_local worker this_worker;
 
-	// Requirements on Container is begin() / end() iterators as well as resize() and Container::value_type definition.
-	// The process returnvalue signals inclusion/exclusion of an item in the output container. Container may only hold
-	// pointer values
-	template <class Container>
-	scatter_job make_scatter_job(
-		Container& inputOutput,
-		delegate<bool(typename Container::value_type)>&& process,
+	template <class InputContainer>
+	batch_job make_batch_job(
+		InputContainer& input,
+		gdul::delegate<void(typename InputContainer::value_type&)>&& process,
 		std::size_t batchSize);
 
 	// Requirements on Container is begin() / end() iterators as well as resize() and Container::value_type definition
-	// The process returnvalue signals inclusion/exclusion of an item in the output container. Container may only hold
-	// pointer values
-	template <class Container>
-	scatter_job make_scatter_job(
-		Container& input,
-		Container& output,
-		delegate<bool(typename Container::value_type)>&& process,
+	// The process returnvalue signals inclusion/exclusion of an item in the output container. Expected process signature is
+	// bool(inputItem&)
+	template <class InputOutputContainer>
+	batch_job make_batch_job(
+		InputOutputContainer& inputOutput,
+		gdul::delegate<bool(typename InputOutputContainer::value_type&)>&& process,
+		std::size_t batchSize);
+
+	// Requirements on Container is begin() / end() iterators as well as resize() and Container::value_type definition
+	// The process returnvalue signals inclusion/exclusion of an item in the output container. Expected process signature is
+	// bool(inputItem&, outputItem&)
+	template <class InputContainer, class OutputContainer>
+	batch_job make_batch_job(
+		InputContainer& input,
+		OutputContainer& output,
+		gdul::delegate<bool(typename InputContainer::value_type&, typename OutputContainer::value_type&)>&& process,
 		std::size_t batchSize);
 
 	worker make_worker();
@@ -85,39 +84,61 @@ public:
 	std::size_t num_workers() const;
 	std::size_t num_enqueued() const;
 private:
-	concurrent_object_pool<jh_detail::scatter_job_chunk_rep, jh_detail::allocator_type>* get_scatter_job_chunk_pool();
+	concurrent_object_pool<jh_detail::batch_job_chunk_rep, jh_detail::allocator_type>* get_batch_job_chunk_pool();
 
 	gdul::shared_ptr<jh_detail::job_handler_impl> m_impl;
 
 	jh_detail::allocator_type m_allocator;
 };
-template<class Container>
-inline scatter_job job_handler::make_scatter_job(
-	Container& inputOutput,
-	delegate<bool(typename Container::value_type)>&& process,
+
+template<class InputContainer>
+inline batch_job job_handler::make_batch_job(
+	InputContainer& input,
+	gdul::delegate<void(typename InputContainer::value_type&)>&& process,
 	std::size_t batchSize)
 {
-	using scatter_type = jh_detail::scatter_job_impl<Container>;
+	using batch_type = jh_detail::batch_job_impl<InputContainer, InputContainer, gdul::delegate<void(typename InputContainer::value_type&)>>;
 
-	jh_detail::chunk_allocator<scatter_type, jh_detail::scatter_job_chunk_rep> alloc(get_scatter_job_chunk_pool());
+	jh_detail::chunk_allocator<batch_type, jh_detail::batch_job_chunk_rep> alloc(get_batch_job_chunk_pool());
 
-	shared_ptr<scatter_type> sp;
-	sp = make_shared<scatter_type, decltype(alloc)>(alloc, inputOutput, std::forward<decltype(process)>(process), batchSize, this);
-	return scatter_job(std::move(sp));
+	shared_ptr<batch_type> sp;
+	sp = make_shared<batch_type, decltype(alloc)>(alloc, input, std::forward<decltype(process)>(process), batchSize, this);
+	return batch_job(std::move(sp));
 }
-template<class Container>
-inline scatter_job job_handler::make_scatter_job(
-	Container& input,
-	Container& output,
-	delegate<bool(typename Container::value_type)>&& process,
+
+// Requirements on Container is begin() / end() iterators as well as resize() and Container::value_type definition
+// The process returnvalue signals inclusion/exclusion of an item in the output container. Expected process signature is
+// bool(inputItem&, outputItem&)
+template<class InputOutputContainer>
+inline batch_job job_handler::make_batch_job(
+	InputOutputContainer& inputOutput,
+	gdul::delegate<bool(typename InputOutputContainer::value_type&)>&& process,
 	std::size_t batchSize)
 {
-	using scatter_type = jh_detail::scatter_job_impl<Container>;
+	using batch_type = jh_detail::batch_job_impl<InputOutputContainer, InputOutputContainer, gdul::delegate<bool(typename InputOutputContainer::value_type&)>>;
 
-	jh_detail::chunk_allocator<scatter_type, jh_detail::scatter_job_chunk_rep> alloc(get_scatter_job_chunk_pool());
+	jh_detail::chunk_allocator<batch_type, jh_detail::batch_job_chunk_rep> alloc(get_batch_job_chunk_pool());
 
-	shared_ptr<scatter_type> sp;
-	sp = make_shared<scatter_type, decltype(alloc)>(alloc, input, output, std::forward<decltype(process)>(process), batchSize, this);
-	return scatter_job(std::move(sp));
+	shared_ptr<batch_type> sp;
+	sp = make_shared<batch_type, decltype(alloc)>(alloc, inputOutput, std::forward<decltype(process)>(process), batchSize, this);
+	return batch_job(std::move(sp));
+}
+// Requirements on Container is begin() / end() iterators as well as resize() and Container::value_type definition
+// The process returnvalue signals inclusion/exclusion of an item in the output container. Expected process signature is
+// bool(inputItem&, outputItem&)
+template<class InputContainer, class OutputContainer>
+inline batch_job job_handler::make_batch_job(
+	InputContainer& input,
+	OutputContainer& output,
+	gdul::delegate<bool(typename InputContainer::value_type&, typename OutputContainer::value_type&)>&& process,
+	std::size_t batchSize)
+{
+	using batch_type = jh_detail::batch_job_impl<InputContainer, OutputContainer, gdul::delegate<bool(typename InputContainer::value_type&, typename OutputContainer::value_type&)>>;
+
+	jh_detail::chunk_allocator<batch_type, jh_detail::batch_job_chunk_rep> alloc(get_batch_job_chunk_pool());
+
+	shared_ptr<batch_type> sp;
+	sp = make_shared<batch_type, decltype(alloc)>(alloc, input, output, std::forward<decltype(process)>(process), batchSize, this);
+	return batch_job(std::move(sp));
 }
 }

@@ -40,7 +40,7 @@ thread_local job_handler_impl::tl_container job_handler_impl::t_items{ &job_hand
 job_handler_impl::job_handler_impl()
 	: m_jobImplChunkPool(jh_detail::Job_Impl_Allocator_Block_Size, m_mainAllocator)
 	, m_jobDependeeChunkPool(jh_detail::Job_Impl_Allocator_Block_Size, m_mainAllocator)
-	, m_scatterJobChunkPool(Scatter_Job_Allocator_Block_Size, m_mainAllocator)
+	, m_scatterJobChunkPool(batch_job_Allocator_Block_Size, m_mainAllocator)
 	, m_workerCount(0)
 {
 }
@@ -49,7 +49,7 @@ job_handler_impl::job_handler_impl(allocator_type & allocator)
 	: m_mainAllocator(allocator)
 	, m_jobImplChunkPool(jh_detail::Job_Impl_Allocator_Block_Size, m_mainAllocator)
 	, m_jobDependeeChunkPool(jh_detail::Job_Impl_Allocator_Block_Size, m_mainAllocator)
-	, m_scatterJobChunkPool(Scatter_Job_Allocator_Block_Size, m_mainAllocator)
+	, m_scatterJobChunkPool(batch_job_Allocator_Block_Size, m_mainAllocator)
 	, m_workerCount(0)
 {
 }
@@ -73,11 +73,13 @@ worker job_handler_impl::make_worker()
 {
 	worker_info info;
 	info.m_coreAffinity = jh_detail::Worker_Auto_Affinity;
-	info.m_name = "worker thread";
 	info.m_queueBegin = 0;
 	info.m_queueEnd = Num_Job_Queues;
 
-	return make_worker(info);
+	worker w(make_worker(info));
+	w.set_name("worker");
+
+	return w;
 }
 
 worker job_handler_impl::make_worker(const worker_info & w)
@@ -132,7 +134,7 @@ concurrent_object_pool<job_dependee_chunk_rep, allocator_type>* job_handler_impl
 	return &m_jobDependeeChunkPool;
 }
 
-concurrent_object_pool<scatter_job_chunk_rep, allocator_type>* job_handler_impl::get_scatter_job_chunk_pool() noexcept
+concurrent_object_pool<batch_job_chunk_rep, allocator_type>* job_handler_impl::get_batch_job_chunk_pool() noexcept
 {
 	return &m_scatterJobChunkPool;
 }
@@ -168,6 +170,11 @@ void job_handler_impl::work()
 		job_handler::this_job = job(fetch_job());
 
 		if (job_handler::this_job.m_impl) {
+
+#if defined(GDUL_DEBUG)
+		job_handler::this_worker.set_name(job_handler::this_job.get_name());
+#endif
+
 			(*job_handler::this_job.m_impl)();
 
 			t_items.this_worker_impl->refresh_sleep_timer();

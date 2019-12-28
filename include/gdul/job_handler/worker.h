@@ -34,8 +34,6 @@ struct worker_info
 	delegate<void()> m_onEnable = []() {};
 	delegate<void()> m_onDisable = []() {};
 
-	std::string m_name;
-
 	std::uint32_t m_executionPriority = 5;
 	std::uint8_t m_coreAffinity = jh_detail::Worker_Auto_Affinity;
 	std::uint8_t m_queueBegin = 0;

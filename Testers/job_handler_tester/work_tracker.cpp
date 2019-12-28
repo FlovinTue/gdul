@@ -34,7 +34,7 @@ void work_tracker::end_work()
 {
 	evaluate_spin_count();
 }
-bool work_tracker::scatter_process(int *& item)
+bool work_tracker::scatter_process(int *& input, int*& output)
 {
 	// Just to add some heft
 	for (std::size_t i = 0; i < 1000;)
@@ -47,11 +47,21 @@ bool work_tracker::scatter_process(int *& item)
 		}
 	}
 
-
-	if ((std::uintptr_t)item % 5 == 0) {
+	if ((std::uintptr_t)input % 5 == 0) {
+		output = input;
 		return true;
 	}
 	return false;
+}
+
+bool work_tracker::scatter_process_input(int *& input)
+{
+	return scatter_process(input, input);
+}
+
+void work_tracker::scatter_process_update(int *& input)
+{
+	scatter_process_input(input);
 }
 
 void work_tracker::evaluate_spin_count()
