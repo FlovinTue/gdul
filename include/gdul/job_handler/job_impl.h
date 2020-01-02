@@ -67,12 +67,18 @@ public:
 
 	bool is_finished() const;
 	bool is_enabled() const;
+
+	float get_time() const noexcept;
+
+	void work_until_finished(std::uint8_t queueBegin, std::uint8_t queueEnd);
+	void wait_until_finished() noexcept;
 private:
 
 	void detach_children();
 
 #if defined(GDUL_DEBUG)
 	std::string m_name;
+	float m_time;
 #endif
 
 	delegate<void()> m_workUnit;

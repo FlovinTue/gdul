@@ -38,6 +38,9 @@ job_impl::job_impl(delegate<void()>&& workUnit, job_handler_impl* handler)
 	, m_targetQueue(Default_Job_Queue)
 	, m_handler(handler)
 	, m_dependencies(Job_Max_Dependencies)
+#if defined (GDUL_DEBUG)
+	, m_time(0.f)
+#endif
 {
 }
 job_impl::~job_impl()
@@ -48,7 +51,13 @@ void job_impl::operator()()
 {
 	assert(!m_finished);
 
+#if defined (GDUL_DEBUG)
+	timer time;
+#endif
 	m_workUnit();
+#if defined (GDUL_DEBUG)
+	m_time = time.get();
+#endif
 
 	m_finished.store(true, std::memory_order_seq_cst);
 
@@ -130,6 +139,30 @@ bool job_impl::is_finished() const
 bool job_impl::is_enabled() const
 {
 	return m_enabled.load(std::memory_order_relaxed);
+}
+float job_impl::get_time() const noexcept
+{
+#if defined (GDUL_DEBUG)
+	return m_time;
+#else
+	return 0.0f;
+#endif
+}
+void job_impl::work_until_finished(std::uint8_t queueBegin, std::uint8_t queueEnd)
+{
+	while (!is_finished()) {
+		if (!m_handler->consume_from(queueBegin, queueEnd)) {
+			jh_detail::job_handler_impl::t_items.this_worker_impl->refresh_sleep_timer();
+			jh_detail::job_handler_impl::t_items.this_worker_impl->idle();
+		}
+	}
+}
+void job_impl::wait_until_finished() noexcept
+{
+	while (!is_finished()) {
+		jh_detail::job_handler_impl::t_items.this_worker_impl->refresh_sleep_timer();
+		jh_detail::job_handler_impl::t_items.this_worker_impl->idle();
+	}
 }
 void job_impl::detach_children()
 {

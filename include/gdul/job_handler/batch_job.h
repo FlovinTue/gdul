@@ -42,10 +42,16 @@ public:
 	void set_queue(std::uint8_t target) noexcept;
 	void enable();
 	bool is_finished() const noexcept;
-	void wait_for_finish() noexcept;
+	void wait_until_finished() noexcept;
+
+	// Consume jobs until finished. Beware of recursive calls (stack overflow, stalls etc..)
+	void work_until_finished(std::uint8_t queueBegin = jh_detail::Default_Job_Queue, std::uint8_t queueEnd = jh_detail::Default_Job_Queue + 1);
+
 	operator bool() const noexcept;
 	job& get_endjob() noexcept;
 	void set_name(const std::string& name);
+
+	float get_time() const noexcept;
 private:
 	friend class job_handler;
 

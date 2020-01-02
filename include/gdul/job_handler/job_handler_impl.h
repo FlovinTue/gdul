@@ -73,6 +73,7 @@ public:
 
 	void enqueue_job(job_impl_shared_ptr job);
 
+	bool consume_from(std::uint8_t queueBegin, std::uint8_t queueEnd);
 
 	using job_impl_allocator = chunk_allocator<job_impl, job_impl_chunk_rep>;
 	using job_node_allocator = chunk_allocator<job_node, job_node_chunk_rep>;

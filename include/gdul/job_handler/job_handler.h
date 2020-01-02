@@ -52,7 +52,7 @@ public:
 	template <class InputContainer>
 	batch_job make_batch_job(
 		InputContainer& input,
-		gdul::delegate<void(typename InputContainer::value_type&)>&& process,
+		gdul::delegate<void(typename InputContainer::value_type&)> process,
 		std::size_t batchSize);
 
 	// Requirements on Container is begin() / end() iterators as well as resize() and Container::value_type definition
@@ -61,7 +61,7 @@ public:
 	template <class InputOutputContainer>
 	batch_job make_batch_job(
 		InputOutputContainer& inputOutput,
-		gdul::delegate<bool(typename InputOutputContainer::value_type&)>&& process,
+		gdul::delegate<bool(typename InputOutputContainer::value_type&)> process,
 		std::size_t batchSize);
 
 	// Requirements on Container is begin() / end() iterators as well as resize() and Container::value_type definition
@@ -71,7 +71,7 @@ public:
 	batch_job make_batch_job(
 		InputContainer& input,
 		OutputContainer& output,
-		gdul::delegate<bool(typename InputContainer::value_type&, typename OutputContainer::value_type&)>&& process,
+		gdul::delegate<bool(typename InputContainer::value_type&, typename OutputContainer::value_type&)> process,
 		std::size_t batchSize);
 
 	worker make_worker();
@@ -94,7 +94,7 @@ private:
 template<class InputContainer>
 inline batch_job job_handler::make_batch_job(
 	InputContainer& input,
-	gdul::delegate<void(typename InputContainer::value_type&)>&& process,
+	gdul::delegate<void(typename InputContainer::value_type&)> process,
 	std::size_t batchSize)
 {
 	using batch_type = jh_detail::batch_job_impl<InputContainer, InputContainer, gdul::delegate<void(typename InputContainer::value_type&)>>;
@@ -102,7 +102,7 @@ inline batch_job job_handler::make_batch_job(
 	jh_detail::chunk_allocator<batch_type, jh_detail::batch_job_chunk_rep> alloc(get_batch_job_chunk_pool());
 
 	shared_ptr<batch_type> sp;
-	sp = make_shared<batch_type, decltype(alloc)>(alloc, input, std::forward<decltype(process)>(process), batchSize, this);
+	sp = make_shared<batch_type, decltype(alloc)>(alloc, input, std::move(process), batchSize, this);
 	return batch_job(std::move(sp));
 }
 
@@ -112,7 +112,7 @@ inline batch_job job_handler::make_batch_job(
 template<class InputOutputContainer>
 inline batch_job job_handler::make_batch_job(
 	InputOutputContainer& inputOutput,
-	gdul::delegate<bool(typename InputOutputContainer::value_type&)>&& process,
+	gdul::delegate<bool(typename InputOutputContainer::value_type&)> process,
 	std::size_t batchSize)
 {
 	using batch_type = jh_detail::batch_job_impl<InputOutputContainer, InputOutputContainer, gdul::delegate<bool(typename InputOutputContainer::value_type&)>>;
@@ -120,7 +120,7 @@ inline batch_job job_handler::make_batch_job(
 	jh_detail::chunk_allocator<batch_type, jh_detail::batch_job_chunk_rep> alloc(get_batch_job_chunk_pool());
 
 	shared_ptr<batch_type> sp;
-	sp = make_shared<batch_type, decltype(alloc)>(alloc, inputOutput, std::forward<decltype(process)>(process), batchSize, this);
+	sp = make_shared<batch_type, decltype(alloc)>(alloc, inputOutput, std::move(process), batchSize, this);
 	return batch_job(std::move(sp));
 }
 // Requirements on Container is begin() / end() iterators as well as resize() and Container::value_type definition
@@ -130,7 +130,7 @@ template<class InputContainer, class OutputContainer>
 inline batch_job job_handler::make_batch_job(
 	InputContainer& input,
 	OutputContainer& output,
-	gdul::delegate<bool(typename InputContainer::value_type&, typename OutputContainer::value_type&)>&& process,
+	gdul::delegate<bool(typename InputContainer::value_type&, typename OutputContainer::value_type&)> process,
 	std::size_t batchSize)
 {
 	using batch_type = jh_detail::batch_job_impl<InputContainer, OutputContainer, gdul::delegate<bool(typename InputContainer::value_type&, typename OutputContainer::value_type&)>>;
@@ -138,7 +138,7 @@ inline batch_job job_handler::make_batch_job(
 	jh_detail::chunk_allocator<batch_type, jh_detail::batch_job_chunk_rep> alloc(get_batch_job_chunk_pool());
 
 	shared_ptr<batch_type> sp;
-	sp = make_shared<batch_type, decltype(alloc)>(alloc, input, output, std::forward<decltype(process)>(process), batchSize, this);
+	sp = make_shared<batch_type, decltype(alloc)>(alloc, input, output, std::move(process), batchSize, this);
 	return batch_job(std::move(sp));
 }
 }

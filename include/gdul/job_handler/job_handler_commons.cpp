@@ -100,5 +100,6 @@ thread_handle create_thread_handle()
 	return nullptr;
 }
 #endif
+
 }
 }

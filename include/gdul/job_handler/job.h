@@ -21,6 +21,7 @@
 #pragma once
 
 #include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
+#include <gdul/job_handler/job_handler_commons.h>
 
 namespace gdul {
 
@@ -53,9 +54,14 @@ public:
 
 	bool is_finished() const noexcept;
 
-	void wait_for_finish() noexcept;
+	void wait_until_finished() noexcept;
+
+	// Consume jobs until finished. Beware of recursive calls (stack overflow, stalls etc..)
+	void work_until_finished(std::uint8_t queueBegin = jh_detail::Default_Job_Queue, std::uint8_t queueEnd = jh_detail::Default_Job_Queue + 1);
 
 	operator bool() const noexcept;
+
+	float get_time() const noexcept;
 
 private:
 	friend class jh_detail::job_handler_impl;

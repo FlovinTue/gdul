@@ -146,7 +146,17 @@ void job_handler_impl::enqueue_job(job_impl_shared_ptr job)
 
 	m_jobQueues[target].push(std::move(job));
 }
-
+bool job_handler_impl::consume_from(std::uint8_t queueBegin, std::uint8_t queueEnd)
+{
+	for (std::uint8_t i = queueBegin; i < queueEnd; ++i) {
+		job_handler_impl::job_impl_shared_ptr jb;
+		if (m_jobQueues[i].try_pop(jb)) {
+			jb->operator()();
+			return true;
+		}
+	}
+	return false;
+}
 void job_handler_impl::launch_worker(std::uint16_t index) noexcept
 {
 	t_items.this_worker_impl = &m_workers[index];
@@ -170,10 +180,6 @@ void job_handler_impl::work()
 		job_handler::this_job = job(fetch_job());
 
 		if (job_handler::this_job) {
-
-#if defined(GDUL_DEBUG)
-			job_handler::this_worker.set_name(job_handler::this_job.get_name());
-#endif
 
 			(*job_handler::this_job.m_impl)();
 

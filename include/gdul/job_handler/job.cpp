@@ -89,14 +89,15 @@ bool job::is_finished() const noexcept
 
 	return m_impl->is_finished();
 }
-void job::wait_for_finish() noexcept
+void job::wait_until_finished() noexcept
 {
 	assert(m_impl && "Job not set");
 
-	while (!is_finished()) {
-		jh_detail::job_handler_impl::t_items.this_worker_impl->refresh_sleep_timer();
-		jh_detail::job_handler_impl::t_items.this_worker_impl->idle();
-	}
+	m_impl->wait_until_finished();
+}
+void job::work_until_finished(std::uint8_t queueBegin, std::uint8_t queueEnd)
+{
+	m_impl->work_until_finished(queueBegin, queueEnd);
 }
 job::job(gdul::shared_ptr<jh_detail::job_impl> impl) noexcept
 	: m_impl(std::move(impl))
@@ -105,5 +106,9 @@ job::job(gdul::shared_ptr<jh_detail::job_impl> impl) noexcept
 job::operator bool() const noexcept 
 {
 	return m_impl;
+}
+float job::get_time() const noexcept
+{
+	return m_impl->get_time();
 }
 }

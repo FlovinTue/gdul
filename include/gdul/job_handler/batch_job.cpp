@@ -23,13 +23,21 @@ bool batch_job::is_finished() const noexcept
 {
 	return m_impl->is_finished();
 }
-void batch_job::wait_for_finish() noexcept
+void batch_job::wait_until_finished() noexcept
 {
-	m_impl->wait_for_finish();
+	m_impl->wait_until_finished();
+}
+void batch_job::work_until_finished(std::uint8_t queueBegin, std::uint8_t queueEnd)
+{
+	m_impl->work_until_finished(queueBegin, queueEnd);
 }
 batch_job::operator bool() const noexcept
 {
 	return m_impl;
+}
+float batch_job::get_time() const noexcept
+{
+	return m_impl->get_time();
 }
 job & batch_job::get_endjob() noexcept
 {
@@ -40,4 +48,5 @@ void batch_job::set_name(const std::string & name)
 {
 	m_impl->set_name(name);
 }
+
 }

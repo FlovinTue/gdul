@@ -20,11 +20,16 @@
 
 #pragma once
 
+#include <gdul/defines.h>
+
 #include <cstdint>
 #include <limits>
 #include <memory>
 
-#include <gdul/defines.h>
+#if defined (GDUL_DEBUG)
+#include <chrono>
+#endif
+
 
 namespace gdul
 {
@@ -90,5 +95,30 @@ void set_thread_priority(std::int32_t priority, thread_handle handle);
 void set_thread_core_affinity(std::uint8_t core, thread_handle handle);
 thread_handle create_thread_handle();
 
+#if defined(GDUL_DEBUG)
+class timer
+{
+public:
+	timer();
+
+	float get() const;
+	void reset();
+
+private:
+	std::chrono::high_resolution_clock myClock;
+	std::chrono::high_resolution_clock::time_point myFromTime;
+};
+inline timer::timer()
+	: myFromTime(myClock.now())
+{}
+inline float timer::get() const
+{
+	return std::chrono::duration_cast<std::chrono::duration<float>>(myClock.now() - myFromTime).count();
+}
+inline void timer::reset()
+{
+	myFromTime = myClock.now();
+}
+#endif
 }
 }

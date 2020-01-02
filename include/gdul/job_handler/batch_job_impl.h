@@ -54,12 +54,15 @@ public:
 	void set_queue(std::uint8_t target) noexcept override final;
 	void set_name(const std::string& name) override final;
 
-	void wait_for_finish() noexcept override final;
+	void wait_until_finished() noexcept override final;
+	void work_until_finished(std::uint8_t queueBegin, std::uint8_t queueEnd) override final;
 
 	void enable();
 	bool is_finished() const noexcept override final;
 
 	job& get_endjob() noexcept override final;
+
+	float get_time() const noexcept override final;
 
 	batch_job_impl(intput_container_type& input, output_container_type& output, process_type&& process, std::size_t batchSize, job_handler* handler);
 	batch_job_impl(intput_container_type& inputOutput, process_type&& process, std::size_t batchSize, job_handler* handler);
@@ -129,8 +132,12 @@ private:
 	intput_container_type& m_input;
 	output_container_type& m_output;
 
-
 	const std::size_t m_baseArraySize;
+
+#if defined(GDUL_DEBUG)
+	float m_time;
+	timer m_timer;
+#endif
 
 	const std::uint32_t m_batchSize;
 	const std::uint16_t m_batchCount;
@@ -154,6 +161,9 @@ inline batch_job_impl<InputContainer, OutputContainer, Process>::batch_job_impl(
 	, m_batchCount((std::uint16_t)(array_size(m_input) / m_batchSize + ((bool)(array_size(m_input) % m_batchSize))))
 	, m_baseArraySize(array_size(m_input))
 	, m_targetQueue(jh_detail::Default_Job_Queue)
+#if defined(GDUL_DEBUG)
+	, m_time(0.f)
+#endif
 {
 	m_root.set_name(" initialize");
 }
@@ -245,13 +255,19 @@ inline void batch_job_impl<InputContainer, OutputContainer, Process>::set_name(c
 #endif
 }
 template<class InputContainer, class OutputContainer, class Process>
-inline void batch_job_impl<InputContainer, OutputContainer, Process>::wait_for_finish() noexcept
+inline void batch_job_impl<InputContainer, OutputContainer, Process>::wait_until_finished() noexcept
 {
-	m_end.wait_for_finish();
+	m_end.wait_until_finished();
+}
+template<class InputContainer, class OutputContainer, class Process>
+inline void batch_job_impl<InputContainer, OutputContainer, Process>::work_until_finished(std::uint8_t queueBegin, std::uint8_t queueEnd)
+{
+	m_end.work_until_finished(queueBegin, queueEnd);
 }
 template<class InputContainer, class OutputContainer, class Process>
 inline void batch_job_impl<InputContainer, OutputContainer, Process>::enable()
 {
+	m_timer.reset();
 	m_root.enable();
 }
 
@@ -265,6 +281,15 @@ template<class InputContainer, class OutputContainer, class Process>
 inline job & batch_job_impl<InputContainer, OutputContainer, Process>::get_endjob() noexcept
 {
 	return m_end;
+}
+template<class InputContainer, class OutputContainer, class Process>
+inline float batch_job_impl<InputContainer, OutputContainer, Process>::get_time() const noexcept
+{
+#if defined(GDUL_DEBUG)
+	return m_time;
+#else
+	return 0.f;
+#endif
 }
 template<class InputContainer, class OutputContainer, class Process>
 template<class Fun>
@@ -430,11 +455,19 @@ inline void batch_job_impl<InputContainer, OutputContainer, Process>::finalize()
 	}
 
 	m_output.resize(m_batchTracker[m_batchCount - 1]);
+
+#if defined(GDUL_DEBUG)
+	m_time = m_timer.get();
+#endif
 }
 template<class InputContainer, class OutputContainer, class Process>
 template <class U, std::enable_if_t<U::Specialize_Update>*>
 inline void batch_job_impl<InputContainer, OutputContainer, Process>::finalize()
-{}
+{
+#if defined(GDUL_DEBUG)
+	m_time = m_timer.get();
+#endif
+}
 // Memory chunk representation of batch_job_impl
 struct dummy_container
 {

@@ -84,7 +84,7 @@ float job_handler_tester::run_consumption_parallel_test(std::size_t jobs, float 
 
 	gdul::timer<float> time;
 	root.enable();
-	end.wait_for_finish();
+	end.wait_until_finished();
 
 	return time.get();
 }
@@ -136,7 +136,7 @@ float job_handler_tester::run_consumption_strand_parallel_test(std::size_t jobs,
 	gdul::timer<float> time;
 
 	root.enable();
-	end.wait_for_finish();
+	end.wait_until_finished();
 
 	return time.get();
 }
@@ -206,7 +206,7 @@ float job_handler_tester::run_consumption_strand_test(std::size_t jobs, float /*
 	gdul::timer<float> time;
 
 	root.enable();
-	end.wait_for_finish();
+	end.wait_until_finished();
 
 	return time.get();
 }
@@ -249,7 +249,7 @@ void job_handler_tester::run_scatter_test_input_output(std::size_t arraySize, st
 	
 		time.reset();
 		scatter.enable();
-		endJob.wait_for_finish();
+		endJob.wait_until_finished();
 	
 		GDUL_ASSERT(!m_handler.num_enqueued());
 	
