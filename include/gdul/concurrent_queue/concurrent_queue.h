@@ -551,7 +551,7 @@ void concurrent_queue<T, Allocator>::ensure_producer_slots_capacity(std::uint16_
 
 		if (swapArray.item_count() < minCapacity){
 			const float growth((float)minCapacity * 1.4f);
-			shared_ptr_array_type grown(make_shared<atomic_shared_ptr_slot_type[], allocator_type>((size_type)growth, m_allocator));
+			shared_ptr_array_type grown(gdul::allocate_shared<atomic_shared_ptr_slot_type[]>((size_type)growth, m_allocator));
 
 			raw_ptr<atomic_shared_ptr_slot_type[]> exp(swapArray);
 			m_producerSlotsSwap.compare_exchange_strong(exp, std::move(grown));

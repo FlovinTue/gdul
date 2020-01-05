@@ -127,9 +127,9 @@ inline void concurrent_object_pool<Object, Allocator>::try_alloc_block()
 {
 	raw_ptr<block_node> exp(m_lastBlock.get_raw_ptr());
 
-	shared_ptr<block_node> node(make_shared<block_node, Allocator>(m_allocator));
+	shared_ptr<block_node> node(gdul::allocate_shared<block_node>(m_allocator));
 	node->m_next = m_lastBlock.load();
-	node->m_objects = make_shared<Object[], Allocator>(m_blockSize, m_allocator);
+	node->m_objects = gdul::allocate_shared<Object[]>(m_blockSize, m_allocator);
 
 	if (m_unusedObjects.size()){
 		return;
