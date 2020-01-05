@@ -140,7 +140,7 @@ template<class Dummy>
 template <class Allocator>
 inline void index_pool<Dummy>::alloc_pool_entry(Allocator allocator)
 {
-	shared_ptr<node> entry(make_shared<node, Allocator>(allocator, std::numeric_limits<size_type>::max(), shared_ptr<node>(nullptr)));
+	shared_ptr<node> entry(gdul::allocate_shared<node>(allocator, std::numeric_limits<size_type>::max(), shared_ptr<node>(nullptr)));
 	push_pool_entry(entry);
 }
 template<class Dummy>
@@ -378,7 +378,7 @@ inline std::uint64_t thread_local_member<T, Allocator>::initialize_instance_trac
 	grow_instance_tracker_array();
 
 	allocator_instance_tracker_entry alloc(m_allocator);
-	instance_tracker_entry trackedEntry(make_shared<tlm_detail::instance_tracker<T>, allocator_instance_tracker_entry>(alloc, 0, std::forward<Args&&>(args)...));
+	instance_tracker_entry trackedEntry(gdul::allocate_shared<tlm_detail::instance_tracker<T>>(alloc, 0, std::forward<Args&&>(args)...));
 
 	store_instance_tracker(trackedEntry);
 
@@ -443,7 +443,7 @@ inline void thread_local_member<T, Allocator>::grow_instance_tracker_array() con
 			const float growth(((float)minimum) * 1.4f);
 
 			allocator_instance_tracker_array arrayAlloc(m_allocator);
-			instance_tracker_array grown(make_shared<instance_tracker_atomic_entry[], allocator_instance_tracker_array>((size_type)growth, arrayAlloc));
+			instance_tracker_array grown(gdul::allocate_shared<instance_tracker_atomic_entry[]>((size_type)growth, arrayAlloc));
 
 			raw_ptr<instance_tracker_atomic_entry[]> exp(swapArray);
 			s_st_container.m_swapArray.compare_exchange_strong(exp, std::move(grown));

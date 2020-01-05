@@ -333,7 +333,7 @@ inline void tester<T, ArraySize, NumThreads>::aba_claim()
 			return;
 		}
 	}
-	m_abaStorage.push(make_shared<aba_node, tracking_allocator<aba_node>>());
+	m_abaStorage.push(gdul::allocate_shared<aba_node>(tracking_allocator<aba_node>()));
 }
 
 template<class T, std::uint32_t ArraySize, std::uint32_t NumThreads>
