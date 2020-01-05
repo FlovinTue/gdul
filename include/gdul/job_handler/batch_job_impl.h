@@ -24,7 +24,6 @@
 #include <gdul/job_handler/job.h>
 #include <gdul/delegate/delegate.h>
 #include <gdul/job_handler/job_interface.h>
-// Get rid of this dependency.... belongs to implementation details. (so to, does 'this' for that matter)
 #include <gdul/job_handler/chunk_allocator.h>
 #include <array>
 
