@@ -26,6 +26,7 @@
 namespace gdul {
 
 class job_handler;
+class batch_job;
 
 namespace jh_detail {
 
@@ -48,6 +49,8 @@ public:
 	const std::string& get_name() const;
 
 	void add_dependency(job& dependency);
+	void add_dependency(batch_job& dependency);
+
 	void set_queue(std::uint8_t target) noexcept;
 
 	void enable();

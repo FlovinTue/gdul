@@ -22,6 +22,7 @@
 #include <gdul/job_handler/Job.h>
 #include <gdul/job_handler/job_handler_impl.h>
 #include <gdul/job_handler/job_impl.h>
+#include <gdul/job_handler/batch_job.h>
 
 namespace gdul
 {
@@ -70,6 +71,10 @@ void job::add_dependency(job & dependency)
 		}
 	}
 
+}
+void job::add_dependency(batch_job & dependency)
+{
+	add_dependency(dependency.get_endjob());
 }
 void job::set_queue(std::uint8_t target) noexcept
 {
