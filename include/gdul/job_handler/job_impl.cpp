@@ -67,7 +67,7 @@ bool job_impl::try_attach_child(job_impl_shared_ptr child)
 {
 	typename job_handler_impl::job_node_allocator jobDependeeAlloc(m_handler->get_job_node_chunk_pool());
 
-	job_node_shared_ptr dependee(make_shared<job_node, typename job_handler_impl::job_node_allocator>(jobDependeeAlloc));
+	job_node_shared_ptr dependee(gdul::allocate_shared<job_node>(jobDependeeAlloc));
 	dependee->m_job = std::move(child);
 
 	job_node_shared_ptr firstDependee(nullptr);

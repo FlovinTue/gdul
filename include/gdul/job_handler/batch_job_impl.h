@@ -267,7 +267,9 @@ inline void batch_job_impl<InputContainer, OutputContainer, Process>::work_until
 template<class InputContainer, class OutputContainer, class Process>
 inline void batch_job_impl<InputContainer, OutputContainer, Process>::enable()
 {
+#if defined(GDUL_DEBUG)
 	m_timer.reset();
+#endif
 	m_root.enable();
 }
 
@@ -476,7 +478,7 @@ struct dummy_container
 
 struct alignas(alignof(std::max_align_t)) batch_job_chunk_rep
 {
-	std::uint8_t dummy[alloc_size_make_shared<batch_job_impl<dummy_container, dummy_container, gdul::delegate<bool(int&, int&)>>, chunk_allocator<batch_job_impl<dummy_container, dummy_container, gdul::delegate<bool(int&, int&)>>, batch_job_chunk_rep>>()]{};
+	std::uint8_t dummy[allocate_shared_size<batch_job_impl<dummy_container, dummy_container, gdul::delegate<bool(int&, int&)>>, chunk_allocator<batch_job_impl<dummy_container, dummy_container, gdul::delegate<bool(int&, int&)>>, batch_job_chunk_rep>>()]{};
 };
 }
 }

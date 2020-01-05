@@ -135,16 +135,16 @@ template <class T>
 class raw_ptr;
 
 template <class T, class Allocator, std::enable_if_t<!aspdetail::is_unbounded_array_v<T>> * = nullptr>
-constexpr std::size_t alloc_shared_size() noexcept;
+constexpr std::size_t allocate_shared_size() noexcept;
 
 template <class T, class Allocator, std::enable_if_t<aspdetail::is_unbounded_array_v<T>> * = nullptr>
-constexpr std::size_t alloc_shared_size(std::size_t count) noexcept;
+constexpr std::size_t allocate_shared_size(std::size_t count) noexcept;
 
 template <class T, class Allocator>
-constexpr std::size_t alloc_size_sp_claim() noexcept;
+constexpr std::size_t sp_claim_size() noexcept;
 
 template <class T, class Allocator, class Deleter>
-constexpr std::size_t alloc_size_sp_claim_custom_delete() noexcept;
+constexpr std::size_t sp_claim_size_custom_delete() noexcept;
 
 template
 <
@@ -974,7 +974,7 @@ inline void control_block_make_shared<T, Allocator>::destroy() noexcept
 
 	(*this).~control_block_make_shared<T, Allocator>();
 
-	constexpr std::size_t blockSize(gdul::alloc_shared_size<T, Allocator>());
+	constexpr std::size_t blockSize(gdul::allocate_shared_size<T, Allocator>());
 	constexpr std::size_t blockAlign(alignof(T));
 
 	using block_type = aspdetail::aligned_storage<blockAlign, blockSize>;
@@ -1030,7 +1030,7 @@ inline void control_block_make_unbounded_array<T, Allocator>::destroy() noexcept
 
 	uint8_t* const block((uint8_t*)this);
 
-	rebound.deallocate(block, alloc_shared_size<T, Allocator>(nItems));
+	rebound.deallocate(block, allocate_shared_size<T, Allocator>(nItems));
 }
 template <class T, class Allocator>
 class control_block_claim : public control_block_base<T>
@@ -1059,7 +1059,7 @@ inline void control_block_claim<T, Allocator>::destroy() noexcept
 
 	rebound_alloc rebound(alloc);
 
-	rebound.deallocate(reinterpret_cast<std::uint8_t*>(this), gdul::alloc_size_sp_claim<T, Allocator>());
+	rebound.deallocate(reinterpret_cast<std::uint8_t*>(this), gdul::sp_claim_size<T, Allocator>());
 }
 template <class T, class Allocator, class Deleter>
 class control_block_claim_custom_delete : public control_block_base<T>
@@ -1092,7 +1092,7 @@ inline void control_block_claim_custom_delete<T, Allocator, Deleter>::destroy() 
 
 	rebound_alloc rebound(alloc);
 
-	rebound.deallocate((std::uint8_t*)this, gdul::alloc_size_sp_claim_custom_delete<T, Allocator, Deleter>());
+	rebound.deallocate((std::uint8_t*)this, gdul::sp_claim_size_custom_delete<T, Allocator, Deleter>());
 }
 
 template <class T>
@@ -1656,7 +1656,7 @@ inline union aspdetail::compressed_storage shared_ptr<T>::create_control_block(T
 
 	aspdetail::control_block_claim_custom_delete<T, Allocator, Deleter>* controlBlock(nullptr);
 
-	constexpr std::size_t blockSize(alloc_size_sp_claim_custom_delete<T, Allocator, Deleter>());
+	constexpr std::size_t blockSize(sp_claim_size_custom_delete<T, Allocator, Deleter>());
 
 	void* block(nullptr);
 
@@ -1692,7 +1692,7 @@ inline union aspdetail::compressed_storage shared_ptr<T>::create_control_block(T
 
 	aspdetail::control_block_claim<T, Allocator>* controlBlock(nullptr);
 
-	constexpr std::size_t blockSize(alloc_size_sp_claim<T, Allocator>());
+	constexpr std::size_t blockSize(sp_claim_size<T, Allocator>());
 
 	void* block(nullptr);
 
@@ -1932,7 +1932,7 @@ inline constexpr raw_ptr<T>::raw_ptr(compressed_storage from) noexcept
 // The amount of memory requested from the allocator when calling
 // alloc_shared (object or statically sized array)
 template <class T, class Allocator, std::enable_if_t<!aspdetail::is_unbounded_array_v<T>>*>
-inline constexpr std::size_t alloc_shared_size() noexcept
+inline constexpr std::size_t allocate_shared_size() noexcept
 {
 	return sizeof(aspdetail::control_block_make_shared<T, Allocator>);
 }
@@ -1940,7 +1940,7 @@ inline constexpr std::size_t alloc_shared_size() noexcept
 // The amount of memory requested from the allocator when calling
 // alloc_shared (object or statically sized array)
 template <class T, class Allocator, std::enable_if_t<!aspdetail::is_unbounded_array_v<T>>*>
-inline constexpr std::size_t alloc_shared_size() noexcept
+inline constexpr std::size_t allocate_shared_size() noexcept
 {
 	constexpr std::size_t align(alignof(T) < alignof(std::max_align_t) ? alignof(std::max_align_t) : alignof(T));
 	constexpr std::size_t maxExtra(align - alignof(std::max_align_t));
@@ -1950,7 +1950,7 @@ inline constexpr std::size_t alloc_shared_size() noexcept
 // The amount of memory requested from the allocator when calling
 // alloc_shared (dynamically sized array)
 template <class T, class Allocator, std::enable_if_t<aspdetail::is_unbounded_array_v<T>>*>
-inline constexpr std::size_t alloc_shared_size(std::size_t count) noexcept
+inline constexpr std::size_t allocate_shared_size(std::size_t count) noexcept
 {
 	using decayed_type = aspdetail::decay_unbounded_t<T>;
 
@@ -1961,14 +1961,14 @@ inline constexpr std::size_t alloc_shared_size(std::size_t count) noexcept
 // The amount of memory requested from the allocator when 
 // shared_ptr takes ownership of an object using default deleter
 template <class T, class Allocator>
-inline constexpr std::size_t alloc_size_sp_claim() noexcept
+inline constexpr std::size_t sp_claim_size() noexcept
 {
 	return sizeof(aspdetail::control_block_claim<T, Allocator>);
 }
 // The amount of memory requested from the allocator when 
 // shared_ptr takes ownership of an object using a custom deleter
 template<class T, class Allocator, class Deleter>
-inline constexpr std::size_t alloc_size_sp_claim_custom_delete() noexcept
+inline constexpr std::size_t sp_claim_size_custom_delete() noexcept
 {
 	return sizeof(aspdetail::control_block_claim_custom_delete<T, Allocator, Deleter>);
 }
@@ -1981,7 +1981,7 @@ template
 >
 inline shared_ptr<T> allocate_shared(Allocator allocator, Args&& ...args)
 {
-	constexpr std::size_t blockSize(alloc_shared_size<T, Allocator>());
+	constexpr std::size_t blockSize(allocate_shared_size<T, Allocator>());
 	constexpr std::size_t blockAlign(alignof(T));
 
 	using block_type = aspdetail::aligned_storage<blockAlign, blockSize>;
@@ -2029,7 +2029,7 @@ inline shared_ptr<T> allocate_shared(std::size_t count, Allocator allocator, Arg
 {
 	using decayed_type = aspdetail::decay_unbounded_t<T>;
 
-	const std::size_t blockSize(alloc_shared_size<T, Allocator>(count));
+	const std::size_t blockSize(allocate_shared_size<T, Allocator>(count));
 
 	using rebound_alloc = typename std::allocator_traits<Allocator>::template rebind_alloc<uint8_t>;
 

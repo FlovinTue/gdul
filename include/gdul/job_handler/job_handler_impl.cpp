@@ -105,7 +105,7 @@ worker job_handler_impl::make_worker(const worker_info & w)
 job job_handler_impl::make_job(delegate<void()>&& workUnit)
 {
 	job_impl_allocator alloc(&m_jobImplChunkPool);
-	const job_impl_shared_ptr jobImpl(make_shared<job_impl, job_impl_allocator>
+	const job_impl_shared_ptr jobImpl(gdul::allocate_shared<job_impl>
 		(
 			alloc,
 			std::forward<delegate<void()>>(workUnit),

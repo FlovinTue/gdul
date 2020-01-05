@@ -19,7 +19,7 @@ int main()
 		
 		tester.init(info);
 
-		const uint32_t scatterRuns(400);
+		const uint32_t scatterRuns(40);
 		float scatterTimeAccum(0.f);
 		std::size_t scatterBatchAccum(0);
 
@@ -32,12 +32,12 @@ int main()
 			scatterTimeAccum += bestBatchTime;
 			scatterBatchAccum += bestBatchSize;
 		}
-
+		
 		std::cout << "Best time / batchsize average: " << scatterTimeAccum / scatterRuns << ", " << scatterBatchAccum / scatterRuns << std::endl;
 	
 		for (uint32_t i = 0; i < 5000; ++i)
 		{
-			tester.run_consumption_strand_parallel_test(20000, 1.0f);
+			tester.run_consumption_strand_parallel_test(1500, 1.0f);
 		}
 	}
 

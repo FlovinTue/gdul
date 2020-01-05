@@ -40,7 +40,7 @@ struct job_node
 // Memory chunk representation of job_node
 struct alignas(alignof(job_node)) job_node_chunk_rep
 {
-	std::uint8_t dummy[alloc_size_make_shared<job_node, chunk_allocator<jh_detail::job_node, job_node_chunk_rep>>()]{};
+	std::uint8_t dummy[allocate_shared_size<job_node, chunk_allocator<jh_detail::job_node, job_node_chunk_rep>>()]{};
 };
 using job_node_shared_ptr = gdul::shared_ptr<job_node>;
 using job_node_atomic_shared_ptr = gdul::atomic_shared_ptr<job_node>;

@@ -45,11 +45,11 @@ int main()
 	shared_ptr<derived> d5(static_cast<shared_ptr<derived>>(b6));
 
 
-	constexpr std::size_t mksh = gdul::alloc_shared_size<int, std::allocator<int>>();
-	constexpr std::size_t mkar = gdul::alloc_shared_size<int[], std::allocator<int>>(5);
-	constexpr std::size_t claim = gdul::alloc_size_sp_claim<int, std::allocator<int>>();
+	constexpr std::size_t mksh = gdul::allocate_shared_size<int, std::allocator<int>>();
+	constexpr std::size_t mkar = gdul::allocate_shared_size<int[], std::allocator<int>>(5);
+	constexpr std::size_t claim = gdul::sp_claim_size<int, std::allocator<int>>();
 	auto del = [](int*, std::allocator<int>) {};
-	constexpr std::size_t claimdel(gdul::alloc_size_sp_claim_custom_delete<int, std::allocator<int>, decltype(del)>());
+	constexpr std::size_t claimdel(gdul::sp_claim_size_custom_delete<int, std::allocator<int>, decltype(del)>());
 
 	std::allocator<int> alloc;
 
