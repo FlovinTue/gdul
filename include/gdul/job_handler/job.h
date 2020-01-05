@@ -64,6 +64,7 @@ public:
 
 	operator bool() const noexcept;
 
+	// Get the duration of the job. Only valid if GDUL_DEBUG is defined & job has run
 	float get_time() const noexcept;
 
 private:
