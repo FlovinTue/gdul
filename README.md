@@ -1,5 +1,5 @@
 # gdul
- A collection of threading related utilities 
+A collection of (mainly concurrency related) data structures, created with game programming in mind
 
 
 -------------------------------------------------------------------------------------------------------------------------------------------
@@ -37,8 +37,6 @@ Depends on concurrent_queue.h, atomic_shared_ptr.h
 -------------------------------------------------------------------------------------------------------------------------------------------
 
 ## thread_local_member
-####  -- Still fairly new, and may not be the most stable --
-
 Abstraction to enable members to be thread local. Internally, fast path contains only 1 integer comparison before returning object reference. Fast path is potentially invalidated when the accessed object is not-before seen by the accessing thread (Frequently
 recreating and destroying tlm objects may yield poor performance).
 
@@ -49,3 +47,91 @@ For sanity's sake, use alias tlm<T> instead of thread_local_member<T>
 New operators may be added to the interface using the get() accessors.
 
 Depends on atomic_shared_ptr.h
+
+-------------------------------------------------------------------------------------------------------------------------------------------
+## delegate
+####  -- Still fairly new, and may not be the most stable --
+A simple delegate class
+
+Supports (partial or full) binding of arguments in its constructor. The amount of of static storage (used to avoid allocations) may be changed by altering the Delegate_Storage variable
+
+-------------------------------------------------------------------------------------------------------------------------------------------
+## job_handler
+####  -- Still fairly new, and may not be the most stable --
+A job system
+
+Main features would be:
+* Supports (multiple) job dependencies. (if job 'first' depends on job 'second' then 'first' will not be enqueued for consumption until 'second' has completed) 
+* Keeps multiple internal job queues (defined in gdul::jh_detail::Num_Job_Queues), with workers consuming from the further-back queues less frequently
+* Has three types of batch_job (splits an array of items combined with a processing delegate over multiple jobs). 
+
+
+A quick usage example:
+```
+#include <iostream>
+#include <thread>
+#include <gdul/job_handler/job_handler.h>
+
+int main()
+{	
+	gdul::job_handler jh;
+	jh.init();
+
+	for (std::size_t i = 0; i < std::thread::hardware_concurrency(); ++i) {
+		gdul::worker wrk(jh.make_worker());
+		wrk.enable();
+	}
+
+	gdul::job jbA(jh.make_job([]() {std::cout << "Ran A" << std::endl; }));
+	gdul::job jbB(jh.make_job([]() {std::cout << "...then B" << std::endl; }));
+	jbB.add_dependency(jbA);
+	jbB.enable();
+	jbA.enable();
+
+	jbA.wait_until_finished();
+
+	jh.retire_workers();
+}
+```
+And with batch_job:
+```
+#include <thread>
+#include <gdul/job_handler/job_handler.h>
+#include <vector>
+
+int main()
+{	
+	gdul::job_handler jh;
+	jh.init();
+
+	for (std::size_t i = 0; i < std::thread::hardware_concurrency(); ++i) {
+		gdul::worker wrk(jh.make_worker());
+		wrk.enable();
+	}
+
+	std::vector<std::size_t> input;
+	std::vector<std::size_t> output;
+	
+	for (std::size_t i = 0; i < 500; ++i) {
+		input.push_back(i);
+	}
+
+	gdul::batch_job bjb(jh.make_batch_job(input, output, [](std::size_t& input, std::size_t& output) {
+
+		// Output only the items that mod 5 == 0
+		if (input % 5 == 0) {
+			output = input;
+			return true;
+		}
+		return false;
+
+		}, 30/*batch size*/));
+
+	bjb.enable();
+	bjb.wait_until_finished();
+
+	// Here output should contain 0, 5, 10, 15...
+
+	jh.retire_workers();
+}
+```
