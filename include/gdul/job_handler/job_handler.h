@@ -118,7 +118,7 @@ inline batch_job job_handler::make_batch_job(
 	jh_detail::chunk_allocator<batch_type, jh_detail::batch_job_chunk_rep> alloc(get_batch_job_chunk_pool());
 
 	shared_ptr<batch_type> sp;
-	sp = make_shared<batch_type, decltype(alloc)>(alloc, inputOutput, std::move(process), batchSize, this);
+	sp = gdul::allocate_shared<batch_type>(alloc, inputOutput, std::move(process), batchSize, this);
 	return batch_job(std::move(sp));
 }
 // Requirements on Container is begin() / end() iterators as well as resize() and Container::value_type definition
@@ -135,7 +135,7 @@ inline batch_job job_handler::make_batch_job(
 	jh_detail::chunk_allocator<batch_type, jh_detail::batch_job_chunk_rep> alloc(get_batch_job_chunk_pool());
 
 	shared_ptr<batch_type> sp;
-	sp = make_shared<batch_type, decltype(alloc)>(alloc, input, output, std::move(process), batchSize, this);
+	sp = gdul::allocate_shared<batch_type>(alloc, input, output, std::move(process), batchSize, this);
 	return batch_job(std::move(sp));
 }
 }

@@ -40,7 +40,10 @@ public:
 
 	void add_dependency(job& dependency);
 	void set_queue(std::uint8_t target) noexcept;
+
+	// this object may be discarded once enable() has been invoked
 	void enable();
+
 	bool is_finished() const noexcept;
 	void wait_until_finished() noexcept;
 
