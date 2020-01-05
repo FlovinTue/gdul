@@ -244,7 +244,7 @@ void job_handler_tester::run_scatter_test_input_output(std::size_t arraySize, st
 		float result(time.get());
 		job endJob(m_handler.make_job([&time, &result]() {result = time.get(); }));
 		endJob.set_name("batch post job");
-		endJob.add_dependency(scatter.get_endjob());
+		endJob.add_dependency(scatter);
 		endJob.enable();
 	
 		time.reset();

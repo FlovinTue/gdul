@@ -48,12 +48,15 @@ public:
 	void work_until_finished(std::uint8_t queueBegin = jh_detail::Default_Job_Queue, std::uint8_t queueEnd = jh_detail::Default_Job_Queue + 1);
 
 	operator bool() const noexcept;
-	job& get_endjob() noexcept;
 	void set_name(const std::string& name);
 
+	// Get the duration of the job. Only valid if GDUL_DEBUG is defined & job has run
 	float get_time() const noexcept;
 private:
 	friend class job_handler;
+	friend class job;
+
+	job& get_endjob() noexcept;
 
 	template <class InputContainer, class OutputContainer, class Process>
 	batch_job(shared_ptr<jh_detail::batch_job_impl<InputContainer, OutputContainer, Process>>&& job)
