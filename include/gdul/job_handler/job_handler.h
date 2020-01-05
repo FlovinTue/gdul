@@ -49,6 +49,7 @@ public:
 	static thread_local job this_job;
 	static thread_local worker this_worker;
 
+	// Requirements on Container is begin() / end() iterators and Container::value_type definition
 	template <class InputContainer>
 	batch_job make_batch_job(
 		InputContainer& input,
@@ -56,8 +57,7 @@ public:
 		std::size_t batchSize);
 
 	// Requirements on Container is begin() / end() iterators as well as resize() and Container::value_type definition
-	// The process returnvalue signals inclusion/exclusion of an item in the output container. Expected process signature is
-	// bool(inputItem&)
+	// The process returnvalue signals inclusion/exclusion of an item in the output container. 
 	template <class InputOutputContainer>
 	batch_job make_batch_job(
 		InputOutputContainer& inputOutput,
@@ -65,8 +65,7 @@ public:
 		std::size_t batchSize);
 
 	// Requirements on Container is begin() / end() iterators as well as resize() and Container::value_type definition
-	// The process returnvalue signals inclusion/exclusion of an item in the output container. Expected process signature is
-	// bool(inputItem&, outputItem&)
+	// The process returnvalue signals inclusion/exclusion of an item in the output container. 
 	template <class InputContainer, class OutputContainer>
 	batch_job make_batch_job(
 		InputContainer& input,
@@ -90,7 +89,7 @@ private:
 
 	jh_detail::allocator_type m_allocator;
 };
-
+// Requirements on Container is begin() / end() iterators and Container::value_type definition
 template<class InputContainer>
 inline batch_job job_handler::make_batch_job(
 	InputContainer& input,
@@ -107,8 +106,7 @@ inline batch_job job_handler::make_batch_job(
 }
 
 // Requirements on Container is begin() / end() iterators as well as resize() and Container::value_type definition
-// The process returnvalue signals inclusion/exclusion of an item in the output container. Expected process signature is
-// bool(inputItem&, outputItem&)
+// The process returnvalue signals inclusion/exclusion of an item in the output container. 
 template<class InputOutputContainer>
 inline batch_job job_handler::make_batch_job(
 	InputOutputContainer& inputOutput,
@@ -124,8 +122,7 @@ inline batch_job job_handler::make_batch_job(
 	return batch_job(std::move(sp));
 }
 // Requirements on Container is begin() / end() iterators as well as resize() and Container::value_type definition
-// The process returnvalue signals inclusion/exclusion of an item in the output container. Expected process signature is
-// bool(inputItem&, outputItem&)
+// The process returnvalue signals inclusion/exclusion of an item in the output container. 
 template<class InputContainer, class OutputContainer>
 inline batch_job job_handler::make_batch_job(
 	InputContainer& input,

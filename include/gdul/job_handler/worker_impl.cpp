@@ -164,8 +164,6 @@ void worker_impl::idle()
 		std::this_thread::yield();
 	}
 }
-// Maybe find some way to stick around at an index for a while? Better for cache...
-// Also, maybe avoid retrying at a failed index twice in a row.
 std::uint8_t worker_impl::get_queue_target()
 {
 	const std::size_t iteration(++m_queueDistributionIteration);
@@ -174,8 +172,6 @@ std::uint8_t worker_impl::get_queue_target()
 
 	const std::uint8_t range(m_info.m_queueEnd - m_info.m_queueBegin);
 
-	// Find way to remove loop.
-	// Maybe find the highest mod in one check somehow?
 	for (uint8_t i = 1; i < range; ++i) {
 		const std::uint8_t power(((range) - (i + 1)));
 		const float fdesiredSlice(std::powf((float)2, (float)power));
