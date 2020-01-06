@@ -53,7 +53,7 @@ Depends on atomic_shared_ptr.h
 ####  -- Still fairly new, and may not be the most stable --
 A simple delegate class
 
-Supports (partial or full) binding of arguments in its constructor. The amount of of static storage (used to avoid allocations) may be changed by altering the Delegate_Storage variable
+Supports (partial or full) binding of arguments in its constructor. The amount of of local storage (used to avoid allocations) may be changed by altering the Delegate_Storage variable
 
 -------------------------------------------------------------------------------------------------------------------------------------------
 ## job_handler
