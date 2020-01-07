@@ -34,7 +34,9 @@
     <ClCompile Include="..\..\include\gdul\job_handler\job_impl.cpp">
       <Filter>implementation\job</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\include\gdul\job_handler\batch_job.cpp" />
+    <ClCompile Include="..\..\include\gdul\job_handler\batch_job.cpp">
+      <Filter>implementation\job</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="job_handler_tester.h">

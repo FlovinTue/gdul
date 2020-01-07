@@ -180,15 +180,13 @@ void job_handler_impl::work()
 		job_handler::this_job = job(fetch_job());
 
 		if (job_handler::this_job) {
-
 			(*job_handler::this_job.m_impl)();
 
 			t_items.this_worker_impl->refresh_sleep_timer();
-
-			continue;
 		}
-
-		t_items.this_worker_impl->idle();
+		else{
+			t_items.this_worker_impl->idle();
+		}
 	}
 }
 
