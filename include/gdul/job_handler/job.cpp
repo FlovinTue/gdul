@@ -19,69 +19,101 @@
 // SOFTWARE.
 
 #include <cassert>
-#include <gdul\WIP_job_handler\Job.h>
-#include <gdul\WIP_job_handler\job_handler.h>
+#include <gdul/job_handler/Job.h>
+#include <gdul/job_handler/job_handler_impl.h>
+#include <gdul/job_handler/job_impl.h>
+#include <gdul/job_handler/batch_job.h>
 
 namespace gdul
 {
-job::job()
-	: m_enabled(false)
+job::job() noexcept
 {
 }
-job::job(job && other)
+job::~job()
+{
+	assert(!(*this) || m_impl->is_enabled() && "Job destructor ran before enable was called");
+}
+job::job(job && other) noexcept
 {
 	operator=(std::move(other));
 }
-job & job::operator=(job && other)
+job::job(const job & other) noexcept
 {
-	m_enabled.store(other.m_enabled.load(std::memory_order_relaxed), std::memory_order_relaxed);
+	operator=(other);
+}
+job & job::operator=(job && other) noexcept
+{
 	m_impl = std::move(other.m_impl);
-
 	return *this;
 }
-
+job & job::operator=(const job & other) noexcept
+{
+	m_impl = other.m_impl;
+	return *this;
+}
+void job::set_name(const std::string & name)
+{
+	m_impl->set_name(name);
+}
+const std::string & job::get_name() const
+{
+	return m_impl->get_name();
+}
 void job::add_dependency(job & dependency)
 {
 	assert(m_impl && "Job not set");
 
-	if (dependency.m_impl->try_attach_child(m_impl)) {
-		m_impl->add_dependencies(1);
+	if (m_impl->try_add_dependencies(1)) {
+		if (!dependency.m_impl->try_attach_child(m_impl)) {
+			if (!m_impl->remove_dependencies(1)) {
+				m_impl->get_handler()->enqueue_job(m_impl);
+			}
+		}
 	}
+
+}
+void job::add_dependency(batch_job & dependency)
+{
+	add_dependency(dependency.get_endjob());
+}
+void job::set_queue(std::uint8_t target) noexcept
+{
+	m_impl->set_queue(target);
 }
 void job::enable()
 {
-	if (m_enabled.exchange(true ,std::memory_order_relaxed)) {
-		return;
-	}
-
 	assert(m_impl && "Job not set");
 
 	if (m_impl->enable()) {
 		m_impl->get_handler()->enqueue_job(m_impl);
 	}
 }
-bool job::is_finished() const
+bool job::is_finished() const noexcept
 {
 	assert(m_impl && "Job not set");
 
 	return m_impl->is_finished();
 }
-void job::wait_for_finish()
+void job::wait_until_finished() noexcept
 {
 	assert(m_impl && "Job not set");
 
-	while (!is_finished()) {
-		job_handler::this_worker_impl->refresh_sleep_timer();
-		job_handler::this_worker_impl->idle();
-	}
+	m_impl->wait_until_finished();
 }
-job::job(job_impl_shared_ptr impl)
+void job::work_until_finished(std::uint8_t queueBegin, std::uint8_t queueEnd)
+{
+	m_impl->work_until_finished(queueBegin, queueEnd);
+}
+job::job(gdul::shared_ptr<jh_detail::job_impl> impl) noexcept
 	: m_impl(std::move(impl))
-	, m_enabled(false)
 {
 }
 job::operator bool() const noexcept 
 {
 	return m_impl;
+}
+float job::get_time() const noexcept
+{
+	return m_impl->get_time();
 }
 }

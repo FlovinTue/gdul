@@ -3,34 +3,46 @@
 
 #include "job_handler_tester.h"
 #include <iostream>
-namespace gdul
-{
-thread_local double testSum = static_cast<double>(rand() % 100);
-}
-void workFunc()
-{
-	std::size_t random((std::size_t)(rand() % 20) + 100ull);
+#include <functional>
+#include "../Common/timer.h"
+#include <vld.h>
+#include "../Common/tracking_allocator.h"
 
-	for (std::size_t i = 0; i < random;) {
-		double toAdd(std::sqrt(gdul::testSum));
-		gdul::testSum += toAdd;
-		if (gdul::testSum) {
-			++i;
+int main()
+{	
+	{
+		gdul::job_handler_tester tester;
+
+		
+		gdul::job_handler_tester_info info;
+		info.affinity = gdul::JOB_HANDLER_TESTER_WORKER_AFFINITY_DYNAMIC;
+		
+		tester.init(info);
+
+		const uint32_t scatterRuns(40);
+		float scatterTimeAccum(0.f);
+		std::size_t scatterBatchAccum(0);
+
+		for (uint32_t i = 0; i < scatterRuns; ++i)
+		{
+			std::size_t arraySize(1500), batchSize(10);
+			std::size_t bestBatchSize(0);
+			float bestBatchTime(0.f);
+			tester.run_scatter_test_input_output(arraySize, batchSize, bestBatchTime, bestBatchSize);
+			scatterTimeAccum += bestBatchTime;
+			scatterBatchAccum += bestBatchSize;
+		}
+		
+		std::cout << "Best time / batchsize average: " << scatterTimeAccum / scatterRuns << ", " << scatterBatchAccum / scatterRuns << std::endl;
+	
+		for (uint32_t i = 0; i < 5000; ++i)
+		{
+			tester.run_consumption_strand_parallel_test(1500, 1.0f);
 		}
 	}
-}
-int main()
-{
-	gdul::job_handler_tester tester;
 
-	gdul::job_handler_tester_info info;
-	info.affinity = gdul::JOB_HANDLER_TESTER_WORKER_AFFINITY_MIXED;
-
-	tester.init(info);
-
-	for (uint32_t i = 0; i < 50; ++i) {
-		tester.run_consumption_parallel_test(500, workFunc);
-	}
-
+	std::cout << "Final allocated: " << gdul::s_allocated << std::endl;
+	
 	std::cout << "Hello World!\n";
+
 }

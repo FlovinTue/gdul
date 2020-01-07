@@ -7,7 +7,7 @@
 #include "Tester.h"
 
 #include <intrin.h>
-#include "Timer.h"
+#include "../Common/Timer.h"
 #include <functional>
 #include <assert.h>
 #include <vld.h>
@@ -40,13 +40,18 @@ int main()
 	shared_ptr<base> b5;
 	b5 = (shared_ptr<base>)d3;
 
-	constexpr std::size_t mksh = gdul::alloc_size_make_shared<int, std::allocator<int>>();
-	constexpr std::size_t mkar = gdul::alloc_size_make_shared<int[], std::allocator<int>>(5);
-	constexpr std::size_t claim = gdul::alloc_size_sp_claim<int, std::allocator<int>>();
-	auto del = [](int*, std::allocator<int>&) {};
-	constexpr std::size_t claimdel(gdul::alloc_size_sp_claim_custom_delete<int, std::allocator<int>, decltype(del)>());
+	shared_ptr<derived> d4(make_shared<derived>());
+	shared_ptr<base> b6(d4);
+	shared_ptr<derived> d5(static_cast<shared_ptr<derived>>(b6));
 
-	std::allocator<uint8_t> alloc;
+
+	constexpr std::size_t mksh = gdul::allocate_shared_size<int, std::allocator<int>>();
+	constexpr std::size_t mkar = gdul::allocate_shared_size<int[], std::allocator<int>>(5);
+	constexpr std::size_t claim = gdul::sp_claim_size<int, std::allocator<int>>();
+	auto del = [](int*, std::allocator<int>) {};
+	constexpr std::size_t claimdel(gdul::sp_claim_size_custom_delete<int, std::allocator<int>, decltype(del)>());
+
+	std::allocator<int> alloc;
 
 	shared_ptr<int> first;
 	shared_ptr<int> second(nullptr);
@@ -54,9 +59,12 @@ int main()
 	shared_ptr<int> fourth(third);
 	shared_ptr<int> fifth(std::move(fourth));
 	shared_ptr<int> sixth(new int(6));
-	shared_ptr<int> seventh(new int(7), [](int* arg, decltype(alloc)&) { delete arg; });
-	shared_ptr<int> eighth(new int(8), alloc, [](int* arg, decltype(alloc)& alloc) { delete arg; alloc; });
-	shared_ptr<int> ninth(make_shared<int, std::allocator<std::uint8_t>>(alloc, 8));
+
+	// Removed deleter-only constructor as it did not make sense without explicit allocator arg
+	//shared_ptr<int> seventh(new int(7), [](int* arg, decltype(alloc)) { delete arg; });
+	
+	shared_ptr<int> eighth(new int(8), alloc, [](int* arg, decltype(alloc) alloc) { delete arg; alloc; });
+	shared_ptr<int> ninth(gdul::allocate_shared<int>(alloc, 8));
 
 	shared_ptr<int> tenth;
 	tenth = ninth;
@@ -114,7 +122,7 @@ int main()
 	athirteenth.get_raw_ptr();
 	athirteenthdes.get_raw_ptr();
 
-	shared_ptr<int> fourteenth(new int[10]{ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }, alloc, [](int* obj, std::allocator<std::uint8_t>& /*alloc*/)
+	shared_ptr<int> fourteenth(new int[10]{ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }, alloc, [](int* obj, std::allocator<std::uint8_t> /*alloc*/)
 	{
 		delete[] obj;
 	});
@@ -127,7 +135,7 @@ int main()
 
 	shared_ptr<int> sixteenth(new int, alloc);
 
-	shared_ptr<int> seventeenth(make_shared<int, std::allocator<int>>(17));
+	shared_ptr<int> seventeenth(gdul::allocate_shared<int>(std::allocator<int>(), 17));
 	const std::size_t seventeenCount(seventeenth.item_count());
 
 	struct alignas(64) over_aligned
@@ -142,24 +150,14 @@ int main()
 		std::allocator<int[]> alloc_;
 		shared_ptr<int[]> eighteen(make_shared<int[]>(55));
 		const std::size_t eighteenCount(eighteen.item_count());
-		shared_ptr<int[]> nineteen(make_shared<int[], std::allocator<int[]>>(44444, 999999));
-		shared_ptr<int[]> twenty(make_shared<int[], std::allocator<int[]>>(174, alloc_));
+		shared_ptr<int[]> nineteen(gdul::allocate_shared<int[]>(44444, alloc_ , 999999));
+		shared_ptr<int[]> twenty(gdul::allocate_shared<int[]>(174, alloc_));
 	}
 
 	//shared_ptr<int> nulla(nullptr, std::uint8_t(5));
 	raw_ptr<int> nullb(nullptr, 10);
 	const std::size_t nullCount(nullb.item_count());
 	atomic_shared_ptr<int> nullc(nullptr, 15);
-
-	// Removed tagging for now. Made things complicated
-
-	//const shared_ptr<int> preTag(athirteenth.load_and_tag());
-	//const shared_ptr<int> postTag(athirteenth.load_and_tag());
-	//
-	//const bool preTagEval(preTag.get_tag());
-	//const bool postTagEval(postTag.get_tag());
-
-	//const int postTagStore(*athirteenth);
 
 	atomic_shared_ptr<int> tar(make_shared<int>(5));
 	shared_ptr<int> des(make_shared<int>(6));

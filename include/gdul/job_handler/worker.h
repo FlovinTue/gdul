@@ -18,49 +18,58 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <gdul\WIP_job_handler\worker.h>
-#include <gdul\WIP_job_handler\worker_impl.h>
+#pragma once
+
+#include <gdul/job_handler/job_handler_commons.h>
+#include <gdul/delegate/delegate.h>
+#include <string>
 
 namespace gdul
 {
-worker::worker(job_handler_detail::worker_impl * impl)
-	: m_impl(impl)
-{
-}
+template <class Signature>
+class delegate;
 
-worker::~worker()
+struct worker_info
 {
-}
+	delegate<void()> m_onEnable = []() {};
+	delegate<void()> m_onDisable = []() {};
 
-void worker::set_core_affinity(std::uint8_t core)
-{
-	m_impl->set_core_affinity(core);
-}
+	std::uint32_t m_executionPriority = 5;
+	std::uint8_t m_coreAffinity = jh_detail::Worker_Auto_Affinity;
+	std::uint8_t m_queueBegin = 0;
+	std::uint8_t m_queueEnd = jh_detail::Num_Job_Queues;
+};
 
-void worker::set_queue_affinity(std::uint8_t queue)
+namespace jh_detail
 {
-	m_impl->set_queue_affinity(queue);
+class worker_impl;
 }
+class worker
+{
+public:
+	worker(jh_detail::worker_impl* impl);
+	worker(const worker&) = default;
+	worker(worker&&) = default;
+	worker& operator=(const worker&) = default;
+	worker& operator=(worker&&) = default;
 
-void worker::set_execution_priority(std::int32_t priority)
-{
-	m_impl->set_execution_priority(priority);
-}
+	~worker();
 
-void worker::set_name(const char * name)
-{
-	m_impl->set_name(name);
-}
-void worker::activate()
-{
-	m_impl->activate();
-}
-bool worker::deactivate()
-{
-	return m_impl->deactivate();
-}
-bool worker::is_active() const
-{
-	return m_impl->is_active();
-}
+	void set_core_affinity(std::uint8_t core);
+	void set_execution_priority(std::int32_t priority);
+	void set_name(const std::string& name);
+
+	void enable();
+	bool disable();
+
+	void set_run_on_enable(delegate<void()>&& toCall);
+	void set_run_on_disable(delegate<void()>&& toCall);
+
+	bool is_active() const;
+
+private:
+	friend class job_handler_impl;
+
+	jh_detail::worker_impl* m_impl;
+};
 }

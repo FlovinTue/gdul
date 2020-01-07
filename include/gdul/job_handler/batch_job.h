@@ -20,45 +20,52 @@
 
 #pragma once
 
-#include <gdul\WIP_job_handler\job_impl.h>
+#include <gdul/job_handler/job_handler_commons.h>
+#include <gdul/job_handler/job_interface.h>
+#include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
 
 namespace gdul {
+class job;
 
-class job_handler;
-
-namespace job_handler_detail {
-
+namespace jh_detail
+{
+template <class InputContainer, class OutputContainer, class Process>
+class batch_job_impl;
 }
-class job
+
+class batch_job
 {
 public:
-	using job_impl_shared_ptr = job_handler_detail::job_impl::job_impl_shared_ptr;
-	job();
-	job(job&& other);
-	job& operator=(job&& other);
-
-	~job() = default;
-
-	job(const job&) = delete;
-	job& operator=(const job&) = delete;
+	batch_job();
 
 	void add_dependency(job& dependency);
+	void set_queue(std::uint8_t target) noexcept;
 
-	// when enable has been run, this object may be discarded
+	// this object may be discarded once enable() has been invoked
 	void enable();
 
-	bool is_finished() const;
+	bool is_finished() const noexcept;
+	void wait_until_finished() noexcept;
 
-	void wait_for_finish();
+	// Consume jobs until finished. Beware of recursive calls (stack overflow, stalls etc..)
+	void work_until_finished(std::uint8_t queueBegin = jh_detail::Default_Job_Queue, std::uint8_t queueEnd = jh_detail::Default_Job_Queue + 1);
 
 	operator bool() const noexcept;
+	void set_name(const std::string& name);
 
+	// Get the duration of the job. Only valid if GDUL_DEBUG is defined & job has run
+	float get_time() const noexcept;
 private:
 	friend class job_handler;
+	friend class job;
 
-	job(job_impl_shared_ptr impl);
+	job& get_endjob() noexcept;
 
-	job_impl_shared_ptr m_impl;
-	std::atomic_bool m_enabled;
+	template <class InputContainer, class OutputContainer, class Process>
+	batch_job(shared_ptr<jh_detail::batch_job_impl<InputContainer, OutputContainer, Process>>&& job)
+	: m_impl(std::move(job))
+	{}
+
+	shared_ptr<jh_detail::job_interface> m_impl;
 };
 }

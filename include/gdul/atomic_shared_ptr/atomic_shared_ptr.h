@@ -135,34 +135,34 @@ template <class T>
 class raw_ptr;
 
 template <class T, class Allocator, std::enable_if_t<!aspdetail::is_unbounded_array_v<T>> * = nullptr>
-constexpr std::size_t alloc_size_make_shared() noexcept;
+constexpr std::size_t allocate_shared_size() noexcept;
 
 template <class T, class Allocator, std::enable_if_t<aspdetail::is_unbounded_array_v<T>> * = nullptr>
-constexpr std::size_t alloc_size_make_shared(std::size_t count) noexcept;
+constexpr std::size_t allocate_shared_size(std::size_t count) noexcept;
 
 template <class T, class Allocator>
-constexpr std::size_t alloc_size_sp_claim() noexcept;
+constexpr std::size_t sp_claim_size() noexcept;
 
 template <class T, class Allocator, class Deleter>
-constexpr std::size_t alloc_size_sp_claim_custom_delete() noexcept;
+constexpr std::size_t sp_claim_size_custom_delete() noexcept;
 
 template
 <
 	class T,
-	class Allocator,
 	std::enable_if_t<!aspdetail::is_unbounded_array_v<T>>*,
+	class Allocator,
 	class ...Args
 >
-inline shared_ptr<T> make_shared(Allocator& allocator, Args&& ...args);
+inline shared_ptr<T> allocate_shared(Allocator, Args&& ...);
 
 template
 <
 	class T,
-	class Allocator,
 	std::enable_if_t<aspdetail::is_unbounded_array_v<T>>*,
+	class Allocator,
 	class ...Args
 >
-inline shared_ptr<T> make_shared(Allocator& allocator, Args&& ...args);
+inline shared_ptr<T> allocate_shared(std::size_t, Allocator, Args&& ...);
 #pragma endregion
 
 template <class T>
@@ -944,9 +944,9 @@ class control_block_make_shared : public control_block_base<T>
 {
 public:
 	template <class ...Args, class U = T, std::enable_if_t<std::is_array<U>::value> * = nullptr>
-	control_block_make_shared(Allocator& alloc, std::uint8_t blockOffset, Args&& ...args);
+	control_block_make_shared(Allocator alloc, std::uint8_t blockOffset, Args&& ...args);
 	template <class ...Args, class U = T, std::enable_if_t<!std::is_array<U>::value> * = nullptr>
-	control_block_make_shared(Allocator& alloc, std::uint8_t blockOffset, Args&& ...args);
+	control_block_make_shared(Allocator alloc, std::uint8_t blockOffset, Args&& ...args);
 
 	void destroy() noexcept override;
 private:
@@ -955,16 +955,16 @@ private:
 };
 template<class T, class Allocator>
 template <class ...Args, class U, std::enable_if_t<std::is_array<U>::value>*>
-inline control_block_make_shared<T, Allocator>::control_block_make_shared(Allocator& alloc, std::uint8_t blockOffset, Args&& ...args)
+inline control_block_make_shared<T, Allocator>::control_block_make_shared(Allocator alloc, std::uint8_t blockOffset, Args&& ...args)
 	: control_block_base<T>(&m_owned, blockOffset)
-	, m_owned{ std::forward<Args&&>(args)... }
+	, m_owned{ std::forward<Args>(args)... }
 	, m_allocator(alloc)
 {}
 template<class T, class Allocator>
 template <class ...Args, class U, std::enable_if_t<!std::is_array<U>::value>*>
-inline control_block_make_shared<T, Allocator>::control_block_make_shared(Allocator& alloc, std::uint8_t blockOffset, Args&& ...args)
+inline control_block_make_shared<T, Allocator>::control_block_make_shared(Allocator alloc, std::uint8_t blockOffset, Args&& ...args)
 	: control_block_base<T>(&m_owned, blockOffset)
-	, m_owned(std::forward<Args&&>(args)...)
+	, m_owned(std::forward<Args>(args)...)
 	, m_allocator(alloc)
 {}
 template<class T, class Allocator>
@@ -974,7 +974,7 @@ inline void control_block_make_shared<T, Allocator>::destroy() noexcept
 
 	(*this).~control_block_make_shared<T, Allocator>();
 
-	constexpr std::size_t blockSize(gdul::alloc_size_make_shared<T, Allocator>());
+	constexpr std::size_t blockSize(gdul::allocate_shared_size<T, Allocator>());
 	constexpr std::size_t blockAlign(alignof(T));
 
 	using block_type = aspdetail::aligned_storage<blockAlign, blockSize>;
@@ -994,7 +994,7 @@ public:
 	using decayed_type = aspdetail::decay_unbounded_t<T>;
 
 	template <class ...Args>
-	control_block_make_unbounded_array(decayed_type* arr, std::size_t count, Allocator& alloc) noexcept;
+	control_block_make_unbounded_array(decayed_type* arr, std::size_t count, Allocator alloc) noexcept;
 
 	void destroy() noexcept override;
 
@@ -1003,7 +1003,7 @@ private:
 };
 template<class T, class Allocator>
 template <class ...Args>
-inline control_block_make_unbounded_array<T, Allocator>::control_block_make_unbounded_array(decayed_type* arr, std::size_t count, Allocator& alloc) noexcept
+inline control_block_make_unbounded_array<T, Allocator>::control_block_make_unbounded_array(decayed_type* arr, std::size_t count, Allocator alloc) noexcept
 	: control_block_base_count<T>(arr, count)
 	, m_allocator(alloc)
 {
@@ -1030,20 +1030,20 @@ inline void control_block_make_unbounded_array<T, Allocator>::destroy() noexcept
 
 	uint8_t* const block((uint8_t*)this);
 
-	rebound.deallocate(block, alloc_size_make_shared<T, Allocator>(nItems));
+	rebound.deallocate(block, allocate_shared_size<T, Allocator>(nItems));
 }
 template <class T, class Allocator>
 class control_block_claim : public control_block_base<T>
 {
 public:
-	control_block_claim(T* obj, Allocator& alloc) noexcept;
+	control_block_claim(T* obj, Allocator alloc) noexcept;
 	void destroy() noexcept override;
 
 private:
 	Allocator m_allocator;
 };
 template<class T, class Allocator>
-inline control_block_claim<T, Allocator>::control_block_claim(T* obj, Allocator& alloc) noexcept
+inline control_block_claim<T, Allocator>::control_block_claim(T* obj, Allocator alloc) noexcept
 	: control_block_base<T>(obj)
 {
 }
@@ -1059,13 +1059,13 @@ inline void control_block_claim<T, Allocator>::destroy() noexcept
 
 	rebound_alloc rebound(alloc);
 
-	rebound.deallocate(reinterpret_cast<std::uint8_t*>(this), gdul::alloc_size_sp_claim<T, Allocator>());
+	rebound.deallocate(reinterpret_cast<std::uint8_t*>(this), gdul::sp_claim_size<T, Allocator>());
 }
 template <class T, class Allocator, class Deleter>
 class control_block_claim_custom_delete : public control_block_base<T>
 {
 public:
-	control_block_claim_custom_delete(T* obj, Allocator& alloc, Deleter&& deleter) noexcept;
+	control_block_claim_custom_delete(T* obj, Allocator alloc, Deleter&& deleter) noexcept;
 	void destroy() noexcept override;
 
 private:
@@ -1073,7 +1073,7 @@ private:
 	Allocator m_allocator;
 };
 template<class T, class Allocator, class Deleter>
-inline control_block_claim_custom_delete<T, Allocator, Deleter>::control_block_claim_custom_delete(T* obj, Allocator& alloc, Deleter&& deleter) noexcept
+inline control_block_claim_custom_delete<T, Allocator, Deleter>::control_block_claim_custom_delete(T* obj, Allocator alloc, Deleter&& deleter) noexcept
 	: control_block_base<T>(obj)
 	, m_deleter(std::forward<Deleter&&>(deleter))
 	, m_allocator(alloc)
@@ -1092,7 +1092,7 @@ inline void control_block_claim_custom_delete<T, Allocator, Deleter>::destroy() 
 
 	rebound_alloc rebound(alloc);
 
-	rebound.deallocate((std::uint8_t*)this, gdul::alloc_size_sp_claim_custom_delete<T, Allocator, Deleter>());
+	rebound.deallocate((std::uint8_t*)this, gdul::sp_claim_size_custom_delete<T, Allocator, Deleter>());
 }
 
 template <class T>
@@ -1147,14 +1147,14 @@ constexpr void assert_alignment(std::uint8_t* block)
 #if 201700 < __cplusplus || _HAS_CXX17
 	if ((std::uintptr_t)block % alignof(T) != 0)
 	{
-		throw std::runtime_error("conforming with C++17 make_shared expects alignof(T) allocates. Minimally alignof(std::max_align_t)");
+		throw std::runtime_error("conforming with C++17 alloc_shared expects alignof(T) allocates. Minimally alignof(std::max_align_t)");
 	}
 #else
-	static_assert(!(std::numeric_limits<std::uint8_t>::max() < alignof(T)), "make_shared supports only supports up to std::numeric_limits<std::uint8_t>::max() byte aligned types");
+	static_assert(!(std::numeric_limits<std::uint8_t>::max() < alignof(T)), "alloc_shared supports only supports up to std::numeric_limits<std::uint8_t>::max() byte aligned types");
 
 	if ((std::uintptr_t)block % alignof(std::max_align_t) != 0)
 	{
-		throw std::runtime_error("make_shared expects at least alignof(std::max_align_t) allocates");
+		throw std::runtime_error("alloc_shared expects at least alignof(std::max_align_t) allocates");
 	}
 #endif
 }
@@ -1339,21 +1339,36 @@ public:
 	using aspdetail::ptr_base<T>::ptr_base;
 
 	inline shared_ptr(const shared_ptr<T>& other) noexcept;
-	inline shared_ptr(shared_ptr<T>&& other) noexcept;
+
+	template <class U, std::enable_if_t<std::is_convertible_v<U*, T*>> * = nullptr>
+	inline shared_ptr(shared_ptr<U>&& other) noexcept;
 
 	shared_ptr<T>& operator=(const shared_ptr<T>& other) noexcept;
-	shared_ptr<T>& operator=(shared_ptr<T>&& other) noexcept;
 
-	template <class U, class V = T, std::enable_if_t<std::is_convertible_v<V*, U*>> * = nullptr>
-	inline operator shared_ptr<U>() const noexcept;
+	template <class U, std::enable_if_t<std::is_convertible_v<U*, T*>> * = nullptr>
+	shared_ptr<T>& operator=(shared_ptr<U>&& other) noexcept;
+
+	template <class U, std::enable_if_t<std::is_convertible_v<T*, U*>> * = nullptr>
+	inline operator const shared_ptr<U>&() const noexcept;
+	template <class U, std::enable_if_t<std::is_convertible_v<T*, U*>> * = nullptr>
+	inline operator shared_ptr<U>&() noexcept;
+	template <class U, std::enable_if_t<std::is_convertible_v<T*, U*>> * = nullptr>
+	inline explicit operator shared_ptr<U>&&() noexcept;
+
+	template <class U, std::enable_if_t<std::is_base_of_v<T, U>> * = nullptr>
+	inline explicit operator const shared_ptr<U>&() const noexcept;
+
+	template <class U, std::enable_if_t<std::is_base_of_v<T, U>> * = nullptr>
+	inline explicit operator shared_ptr<U>&() noexcept;
+
+	template <class U, std::enable_if_t<std::is_base_of_v<T, U>> * = nullptr>
+	inline explicit operator shared_ptr<U>&&() noexcept;
 
 	inline explicit shared_ptr(T* object);
 	template <class Allocator>
-	inline explicit shared_ptr(T* object, Allocator& allocator);
-	template <class Deleter>
-	inline explicit shared_ptr(T* object, Deleter&& deleter);
-	template <class Deleter, class Allocator>
-	inline explicit shared_ptr(T* object, Allocator& allocator, Deleter&& deleter);
+	inline explicit shared_ptr(T* object, Allocator allocator);
+	template <class Allocator, class Deleter>
+	inline explicit shared_ptr(T* object, Allocator allocator, Deleter&& deleter);
 
 	~shared_ptr() noexcept;
 
@@ -1387,9 +1402,9 @@ private:
 	inline constexpr shared_ptr(union aspdetail::compressed_storage from) noexcept;
 
 	template<class Deleter, class Allocator>
-	inline compressed_storage create_control_block(T* object, Allocator& allocator, Deleter&& deleter);
+	inline compressed_storage create_control_block(T* object, Allocator allocator, Deleter&& deleter);
 	template <class Allocator>
-	inline compressed_storage create_control_block(T* object, Allocator& allocator);
+	inline compressed_storage create_control_block(T* object, Allocator allocator);
 
 	friend class raw_ptr<T>;
 	friend class atomic_shared_ptr<T>;
@@ -1398,20 +1413,20 @@ private:
 	template
 		<
 		class U,
-		class Allocator,
 		std::enable_if_t<!aspdetail::is_unbounded_array_v<U>>*,
+		class Allocator,
 		class ...Args
 		>
-		friend shared_ptr<U> make_shared(Allocator& allocator, Args&& ...args);
+		friend shared_ptr<U> allocate_shared(Allocator, Args&& ...);
 
 	template
 		<
 		class U,
-		class Allocator,
 		std::enable_if_t<aspdetail::is_unbounded_array_v<U>>*,
+		class Allocator,
 		class ...Args
 		>
-		friend shared_ptr<U> make_shared(std::size_t, Allocator&, Args&& ...);
+		friend shared_ptr<U> allocate_shared(std::size_t, Allocator, Args&& ...);
 
 	decayed_type* m_ptr;
 };
@@ -1440,19 +1455,29 @@ inline shared_ptr<T>::~shared_ptr() noexcept
 	}
 }
 template<class T>
-inline shared_ptr<T>::shared_ptr(shared_ptr<T>&& other) noexcept
+template <class U, std::enable_if_t<std::is_convertible_v<U*, T*>>*>
+inline shared_ptr<T>::shared_ptr(shared_ptr<U>&& other) noexcept
 	: shared_ptr<T>()
 {
-	this->m_controlBlockStorage = other.m_controlBlockStorage;
-	this->m_ptr = other.m_ptr;
+	memcpy(this, &other, sizeof(shared_ptr<T>));
+	memset(&other, 0, sizeof(shared_ptr<U>));
 
-	other.clear();
+	this->m_ptr = this->to_object(this->m_controlBlockStorage);
 }
 template<class T>
 inline shared_ptr<T>::shared_ptr(const shared_ptr<T>& other) noexcept
 	: shared_ptr<T>()
 {
-	operator=(other);
+	compressed_storage copy(other.m_controlBlockStorage);
+
+	if (aspdetail::control_block_free_type_base<T>* const cb = this->to_control_block(copy))
+	{
+		copy.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] = aspdetail::Default_Local_Refs;
+		cb->incref(aspdetail::Default_Local_Refs);
+	}
+
+	this->m_controlBlockStorage = copy;
+	this->m_ptr = this->to_object(this->m_controlBlockStorage);
 }
 template <class T>
 inline shared_ptr<T>::shared_ptr(T* object)
@@ -1463,35 +1488,53 @@ inline shared_ptr<T>::shared_ptr(T* object)
 	this->m_ptr = this->to_object(this->m_controlBlockStorage);
 }
 template<class T>
-template <class U, class V, std::enable_if_t<std::is_convertible_v<V*, U*>>*>
-inline shared_ptr<T>::operator shared_ptr<U>() const noexcept
+template <class U, std::enable_if_t<std::is_convertible_v<T*, U*>>*>
+inline shared_ptr<T>::operator const shared_ptr<U>&() const noexcept
 {
-	aspdetail::type_diff_copy_helper<U> helper;
-
-	return helper.construct_from(this->m_controlBlockStorage);
+	return *reinterpret_cast<const shared_ptr<U>*>(this);
+}
+template<class T>
+template <class U, std::enable_if_t<std::is_convertible_v<T*, U*>>*>
+inline shared_ptr<T>::operator shared_ptr<U>&() noexcept
+{
+	return *reinterpret_cast<shared_ptr<U>*>(this);
+}
+template<class T>
+template <class U, std::enable_if_t<std::is_convertible_v<T*, U*>>*>
+inline shared_ptr<T>::operator shared_ptr<U>&&() noexcept
+{
+	return std::move(*reinterpret_cast<shared_ptr<U>*>(this));
+}
+template <class T>
+template <class U, std::enable_if_t<std::is_base_of_v<T, U>>*>
+inline shared_ptr<T>::operator const shared_ptr<U>&() const noexcept 
+{
+	return *reinterpret_cast<const shared_ptr<U>*>(this);
+}
+template <class T>
+template <class U, std::enable_if_t<std::is_base_of_v<T, U>>*>
+inline shared_ptr<T>::operator shared_ptr<U>&() noexcept
+{
+	return *reinterpret_cast<shared_ptr<U>*>(this);
+}
+template <class T>
+template <class U, std::enable_if_t<std::is_base_of_v<T, U>>*>
+inline shared_ptr<T>::operator shared_ptr<U>&&() noexcept
+{
+	return std::move(*reinterpret_cast<shared_ptr<U>*>(this));
 }
 template <class T>
 template <class Allocator>
-inline shared_ptr<T>::shared_ptr(T* object, Allocator& allocator)
+inline shared_ptr<T>::shared_ptr(T* object, Allocator allocator)
 	: shared_ptr<T>()
 {
 	this->m_controlBlockStorage = create_control_block(object, allocator);
 	this->m_ptr = this->to_object(this->m_controlBlockStorage);
 }
-// The Deleter callable has signature void(T* obj, Allocator& alloc)
+// The Deleter callable has signature void(T* obj, Allocator alloc)
 template<class T>
-template<class Deleter>
-inline shared_ptr<T>::shared_ptr(T* object, Deleter&& deleter)
-	: shared_ptr<T>()
-{
-	aspdetail::default_allocator alloc;
-	this->m_controlBlockStorage = create_control_block(object, alloc, std::forward<Deleter&&>(deleter));
-	this->m_ptr = this->to_object(this->m_controlBlockStorage);
-}
-// The Deleter callable has signature void(T* obj, Allocator& alloc)
-template<class T>
-template<class Deleter, class Allocator>
-inline shared_ptr<T>::shared_ptr(T* object, Allocator& allocator, Deleter&& deleter)
+template<class Allocator, class Deleter>
+inline shared_ptr<T>::shared_ptr(T* object, Allocator allocator, Deleter&& deleter)
 	: shared_ptr<T>()
 {
 	this->m_controlBlockStorage = create_control_block(object, allocator, std::forward<Deleter&&>(deleter));
@@ -1603,7 +1646,7 @@ inline std::size_t shared_ptr<T>::item_count() const noexcept
 }
 template <class T>
 template<class Deleter, class Allocator>
-inline union aspdetail::compressed_storage shared_ptr<T>::create_control_block(T* object, Allocator& allocator, Deleter&& deleter)
+inline union aspdetail::compressed_storage shared_ptr<T>::create_control_block(T* object, Allocator allocator, Deleter&& deleter)
 {
 	static_assert(!(8 < alignof(Deleter)), "No support for custom aligned deleter objects");
 
@@ -1613,7 +1656,7 @@ inline union aspdetail::compressed_storage shared_ptr<T>::create_control_block(T
 
 	aspdetail::control_block_claim_custom_delete<T, Allocator, Deleter>* controlBlock(nullptr);
 
-	constexpr std::size_t blockSize(alloc_size_sp_claim_custom_delete<T, Allocator, Deleter>());
+	constexpr std::size_t blockSize(sp_claim_size_custom_delete<T, Allocator, Deleter>());
 
 	void* block(nullptr);
 
@@ -1623,7 +1666,7 @@ inline union aspdetail::compressed_storage shared_ptr<T>::create_control_block(T
 
 		if ((std::uintptr_t)block % alignof(std::max_align_t) != 0)
 		{
-			throw std::runtime_error("make_shared expects at least alignof(max_align_t) allocates");
+			throw std::runtime_error("alloc_shared expects at least alignof(max_align_t) allocates");
 		}
 
 		controlBlock = new (block) aspdetail::control_block_claim_custom_delete<T, Allocator, Deleter>(object, allocator, std::forward<Deleter&&>(deleter));
@@ -1641,7 +1684,7 @@ inline union aspdetail::compressed_storage shared_ptr<T>::create_control_block(T
 }
 template<class T>
 template <class Allocator>
-inline union aspdetail::compressed_storage shared_ptr<T>::create_control_block(T* object, Allocator& allocator)
+inline union aspdetail::compressed_storage shared_ptr<T>::create_control_block(T* object, Allocator allocator)
 {
 	using rebound_alloc = typename std::allocator_traits<Allocator>::template rebind_alloc<std::uint8_t>;
 
@@ -1649,7 +1692,7 @@ inline union aspdetail::compressed_storage shared_ptr<T>::create_control_block(T
 
 	aspdetail::control_block_claim<T, Allocator>* controlBlock(nullptr);
 
-	constexpr std::size_t blockSize(alloc_size_sp_claim<T, Allocator>());
+	constexpr std::size_t blockSize(sp_claim_size<T, Allocator>());
 
 	void* block(nullptr);
 
@@ -1659,7 +1702,7 @@ inline union aspdetail::compressed_storage shared_ptr<T>::create_control_block(T
 
 		if ((std::uintptr_t)block % alignof(std::max_align_t) != 0)
 		{
-			throw std::runtime_error("make_shared expects at least alignof(max_align_t) allocates");
+			throw std::runtime_error("alloc_shared expects at least alignof(max_align_t) allocates");
 		}
 
 		controlBlock = new (block) aspdetail::control_block_claim<T, Allocator>(object, rebound);
@@ -1679,26 +1722,13 @@ inline union aspdetail::compressed_storage shared_ptr<T>::create_control_block(T
 template<class T>
 inline shared_ptr<T>& shared_ptr<T>::operator=(const shared_ptr<T>& other) noexcept
 {
-	compressed_storage copy(other.m_controlBlockStorage);
-
-	if (aspdetail::control_block_free_type_base<T>* const copyCb = this->to_control_block(copy))
-	{
-		copy.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] = aspdetail::Default_Local_Refs;
-		copyCb->incref(copy.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF]);
-	}
-
-	if (aspdetail::control_block_free_type_base<T>* const cb = this->get_control_block())
-	{
-		cb->decref(this->m_controlBlockStorage.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF]);
-	}
-
-	this->m_controlBlockStorage = copy;
-	this->m_ptr = other.m_ptr;
+	shared_ptr<T>(other).swap(*this);
 
 	return *this;
 }
 template<class T>
-inline shared_ptr<T>& shared_ptr<T>::operator=(shared_ptr<T>&& other) noexcept
+template <class U, std::enable_if_t<std::is_convertible_v<U*, T*>>*>
+inline shared_ptr<T>& shared_ptr<T>::operator=(shared_ptr<U>&& other) noexcept
 {
 	shared_ptr<T>(std::move(other)).swap(*this);
 
@@ -1709,7 +1739,7 @@ template<class T>
 inline void shared_ptr<T>::swap(shared_ptr<T>& other) noexcept
 {
 	aspdetail::ptr_base<T>::swap(other);
-	std::swap(this->m_ptr, other.m_ptr);
+	std::swap(m_ptr, other.m_ptr);
 }
 
 // raw_ptr does not share in ownership of the object
@@ -1900,17 +1930,17 @@ inline constexpr raw_ptr<T>::raw_ptr(compressed_storage from) noexcept
 }
 #if 201700 < __cplusplus || _HAS_CXX17
 // The amount of memory requested from the allocator when calling
-// make_shared (object or statically sized array)
+// alloc_shared (object or statically sized array)
 template <class T, class Allocator, std::enable_if_t<!aspdetail::is_unbounded_array_v<T>>*>
-inline constexpr std::size_t alloc_size_make_shared() noexcept
+inline constexpr std::size_t allocate_shared_size() noexcept
 {
 	return sizeof(aspdetail::control_block_make_shared<T, Allocator>);
 }
 #else
 // The amount of memory requested from the allocator when calling
-// make_shared (object or statically sized array)
+// alloc_shared (object or statically sized array)
 template <class T, class Allocator, std::enable_if_t<!aspdetail::is_unbounded_array_v<T>>*>
-inline constexpr std::size_t alloc_size_make_shared() noexcept
+inline constexpr std::size_t allocate_shared_size() noexcept
 {
 	constexpr std::size_t align(alignof(T) < alignof(std::max_align_t) ? alignof(std::max_align_t) : alignof(T));
 	constexpr std::size_t maxExtra(align - alignof(std::max_align_t));
@@ -1918,9 +1948,9 @@ inline constexpr std::size_t alloc_size_make_shared() noexcept
 }
 #endif
 // The amount of memory requested from the allocator when calling
-// make_shared (dynamically sized array)
+// alloc_shared (dynamically sized array)
 template <class T, class Allocator, std::enable_if_t<aspdetail::is_unbounded_array_v<T>>*>
-inline constexpr std::size_t alloc_size_make_shared(std::size_t count) noexcept
+inline constexpr std::size_t allocate_shared_size(std::size_t count) noexcept
 {
 	using decayed_type = aspdetail::decay_unbounded_t<T>;
 
@@ -1931,14 +1961,14 @@ inline constexpr std::size_t alloc_size_make_shared(std::size_t count) noexcept
 // The amount of memory requested from the allocator when 
 // shared_ptr takes ownership of an object using default deleter
 template <class T, class Allocator>
-inline constexpr std::size_t alloc_size_sp_claim() noexcept
+inline constexpr std::size_t sp_claim_size() noexcept
 {
 	return sizeof(aspdetail::control_block_claim<T, Allocator>);
 }
 // The amount of memory requested from the allocator when 
 // shared_ptr takes ownership of an object using a custom deleter
 template<class T, class Allocator, class Deleter>
-inline constexpr std::size_t alloc_size_sp_claim_custom_delete() noexcept
+inline constexpr std::size_t sp_claim_size_custom_delete() noexcept
 {
 	return sizeof(aspdetail::control_block_claim_custom_delete<T, Allocator, Deleter>);
 }
@@ -1946,38 +1976,12 @@ template
 <
 	class T,
 	std::enable_if_t<!aspdetail::is_unbounded_array_v<T>> * = nullptr,
-	class ...Args
->
-// make_shared from object or statically sized array using the default allocator
-inline shared_ptr<T> make_shared(Args&& ...args)
-{
-	aspdetail::default_allocator alloc;
-	return make_shared<T, aspdetail::default_allocator>(alloc, std::forward<Args&&>(args)...);
-}
-template
-<
-	class T,
 	class Allocator,
-	std::enable_if_t<!aspdetail::is_unbounded_array_v<T>> * = nullptr,
 	class ...Args
 >
-// make_shared from object or statically sized array using declared, non-instanced allocator
-inline shared_ptr<T> make_shared(Args&& ...args)
+inline shared_ptr<T> allocate_shared(Allocator allocator, Args&& ...args)
 {
-	Allocator alloc;
-	return make_shared<T, Allocator>(alloc, std::forward<Args&&>(args)...);
-}
-template
-<
-	class T,
-	class Allocator,
-	std::enable_if_t<!aspdetail::is_unbounded_array_v<T>> * = nullptr,
-	class ...Args
->
-// make_shared from object or statically sized array using declared, instanced allocator
-inline shared_ptr<T> make_shared(Allocator& allocator, Args&& ...args)
-{
-	constexpr std::size_t blockSize(alloc_size_make_shared<T, Allocator>());
+	constexpr std::size_t blockSize(allocate_shared_size<T, Allocator>());
 	constexpr std::size_t blockAlign(alignof(T));
 
 	using block_type = aspdetail::aligned_storage<blockAlign, blockSize>;
@@ -1996,16 +2000,14 @@ inline shared_ptr<T> make_shared(Allocator& allocator, Args&& ...args)
 
 		aspdetail::assert_alignment<T>(block);
 
-		controlBlock = new (reinterpret_cast<std::uint8_t*>(block + offset)) aspdetail::control_block_make_shared<T, Allocator>(allocator, (std::uint8_t)offset, std::forward<Args&&>(args)...);
+		controlBlock = new (reinterpret_cast<std::uint8_t*>(block + offset)) aspdetail::control_block_make_shared<T, Allocator>(allocator, (std::uint8_t)offset, std::forward<Args>(args)...);
 	}
 	catch (...)
 	{
-		if (controlBlock)
-		{
+		if (controlBlock){
 			(*controlBlock).~control_block_make_shared();
 		}
-		if (typedBlock)
-		{
+		if (typedBlock){
 			rebound.deallocate(typedBlock, 1);
 		}
 		throw;
@@ -2019,16 +2021,15 @@ inline shared_ptr<T> make_shared(Allocator& allocator, Args&& ...args)
 template
 <
 	class T,
-	class Allocator,
 	std::enable_if_t<aspdetail::is_unbounded_array_v<T>> * = nullptr,
+	class Allocator,
 	class ...Args
 >
-// make_shared from dynamically sized array using declared, instanced allocator
-inline shared_ptr<T> make_shared(std::size_t count, Allocator& allocator, Args&& ...args)
+inline shared_ptr<T> allocate_shared(std::size_t count, Allocator allocator, Args&& ...args)
 {
 	using decayed_type = aspdetail::decay_unbounded_t<T>;
 
-	const std::size_t blockSize(alloc_size_make_shared<T, Allocator>(count));
+	const std::size_t blockSize(allocate_shared_size<T, Allocator>(count));
 
 	using rebound_alloc = typename std::allocator_traits<Allocator>::template rebind_alloc<uint8_t>;
 
@@ -2049,9 +2050,8 @@ inline shared_ptr<T> make_shared(std::size_t count, Allocator& allocator, Args&&
 
 		arrayloc = (decayed_type*)(cbend + offset);
 
-		for (std::size_t i = 0; i < count; ++i)
-		{
-			new (&arrayloc[i]) decayed_type(std::forward<Args&&>(args)...);
+		for (std::size_t i = 0; i < count; ++i){
+			new (&arrayloc[i]) decayed_type(std::forward<Args>(args)...);
 		}
 
 		aspdetail::assert_alignment<std::max_align_t>(block);
@@ -2060,16 +2060,13 @@ inline shared_ptr<T> make_shared(std::size_t count, Allocator& allocator, Args&&
 	}
 	catch (...)
 	{
-		if (controlBlock)
-		{
+		if (controlBlock){
 			(*controlBlock).~control_block_make_unbounded_array();
 		}
-		for (std::size_t i = 0; i < constructed; ++i)
-		{
+		for (std::size_t i = 0; i < constructed; ++i){
 			arrayloc[i].~decayed_type();
 		}
-		if (block)
-		{
+		if (block){
 			rebound.deallocate(block, blockSize);
 		}
 		throw;
@@ -2083,27 +2080,22 @@ inline shared_ptr<T> make_shared(std::size_t count, Allocator& allocator, Args&&
 template
 <
 	class T,
-	std::enable_if_t<aspdetail::is_unbounded_array_v<T>> * = nullptr,
+	std::enable_if_t<!aspdetail::is_unbounded_array_v<T>> * = nullptr,
 	class ...Args
 >
-// make_shared from dynamically sized array using the default allocator
-inline shared_ptr<T> make_shared(std::size_t count, Args&& ...args)
+inline shared_ptr<T> make_shared(Args&& ...args)
 {
-	aspdetail::default_allocator alloc;
-	return make_shared<T, aspdetail::default_allocator>(count, alloc, std::forward<Args&&>(args)...);
+	return gdul::allocate_shared<T>(aspdetail::default_allocator(), std::forward<Args>(args)...);
 }
 template
 <
 	class T,
-	class Allocator,
 	std::enable_if_t<aspdetail::is_unbounded_array_v<T>> * = nullptr,
 	class ...Args
 >
-// make_shared from dynamically sized array using declared, non-instanced allocator
 inline shared_ptr<T> make_shared(std::size_t count, Args&& ...args)
 {
-	Allocator alloc;
-	return make_shared<T, Allocator>(count, alloc, std::forward<Args&&>(args)...);
+	return gdul::allocate_shared<T>(count, aspdetail::default_allocator(), std::forward<Args>(args)...);
 }
 };
 #pragma warning(pop)

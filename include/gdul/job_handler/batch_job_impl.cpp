@@ -18,33 +18,17 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#pragma once
+#include "batch_job_impl.h"
+#include <gdul/delegate/delegate.h>
+#include <gdul/job_handler/job_handler.h>
 
-#include <gdul\WIP_job_handler\callable_base.h>
-
-namespace gdul {
-namespace job_handler_detail {
-
-template <class Callable>
-class callable : public callable_base
+namespace gdul
 {
-public:
-	callable(Callable&& callable);
-
-	void operator()() override;
-
-private:
-	Callable m_callable;
-};
-template<class Callable>
-inline callable<Callable>::callable(Callable && callable)
-	: m_callable(std::forward<Callable&&>(callable))
+namespace jh_detail
 {
-}
-template<class Callable>
-inline void callable<Callable>::operator()()
+job gdul::jh_detail::_redirect_make_job(job_handler * handler, gdul::delegate<void()>&& workUnit)
 {
-	m_callable();
+	return handler->make_job(std::move(workUnit));
 }
 }
 }

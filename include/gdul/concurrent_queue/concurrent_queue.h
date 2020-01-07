@@ -469,7 +469,7 @@ inline typename concurrent_queue<T, Allocator>::shared_ptr_slot_type concurrent_
 	const std::size_t bufferByteSize(sizeof(buffer_type));
 	const std::size_t dataBlockByteSize(sizeof(cqdetail::item_container<T>) * log2size);
 
-	constexpr std::size_t controlBlockByteSize(gdul::alloc_size_sp_claim_custom_delete<buffer_type, allocator_adapter_type, cqdetail::buffer_deleter<buffer_type, allocator_adapter_type>>());
+	constexpr std::size_t controlBlockByteSize(gdul::sp_claim_size_custom_delete<buffer_type, allocator_adapter_type, cqdetail::buffer_deleter<buffer_type, allocator_adapter_type>>());
 
 	constexpr std::size_t controlBlockSize(cqdetail::aligned_size<void>(controlBlockByteSize, 8));
 	constexpr std::size_t bufferSize(cqdetail::aligned_size<void>(bufferByteSize, 8));
@@ -551,7 +551,7 @@ void concurrent_queue<T, Allocator>::ensure_producer_slots_capacity(std::uint16_
 
 		if (swapArray.item_count() < minCapacity){
 			const float growth((float)minCapacity * 1.4f);
-			shared_ptr_array_type grown(make_shared<atomic_shared_ptr_slot_type[], allocator_type>((size_type)growth, m_allocator));
+			shared_ptr_array_type grown(gdul::allocate_shared<atomic_shared_ptr_slot_type[]>((size_type)growth, m_allocator));
 
 			raw_ptr<atomic_shared_ptr_slot_type[]> exp(swapArray);
 			m_producerSlotsSwap.compare_exchange_strong(exp, std::move(grown));

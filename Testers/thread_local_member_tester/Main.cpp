@@ -10,7 +10,7 @@
 #include <vector>
 #include "tester.h"
 #include "../Common/Timer.h"
-
+#include <type_traits>
 struct int_iter
 {
 	int_iter()
@@ -29,7 +29,7 @@ int int_iter::iters = 0;
 
 int main()
 {
-	timer<float> time;
+	gdul::timer<float> time;
 
 	for(uint32_t i =0; i < 20; ++i)
 	{
@@ -44,8 +44,6 @@ int main()
 		}
 	std::cout << "allocated" << gdul::s_allocated << " and " << time.get() << " total time" << std::endl;
 	}
-
-	gdul::doPrint = true;
 
 	return 0;
 }

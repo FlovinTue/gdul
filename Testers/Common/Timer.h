@@ -2,6 +2,8 @@
 
 #include <chrono>
 
+namespace gdul
+{
 template <class T>
 class timer
 {
@@ -13,8 +15,8 @@ public:
 	void reset();
 
 private:
-	std::chrono::high_resolution_clock myClock;
-	std::chrono::high_resolution_clock::time_point myFromTime;
+	mutable std::chrono::high_resolution_clock myClock;
+	mutable std::chrono::high_resolution_clock::time_point myFromTime;
 };
 template<class T>
 inline timer<T>::timer()
@@ -30,4 +32,5 @@ template<class T>
 inline void timer<T>::reset()
 {
 	myFromTime = myClock.now();
+}
 }

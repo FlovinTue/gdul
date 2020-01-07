@@ -20,46 +20,24 @@
 
 #pragma once
 
-#include <gdul\WIP_job_handler\job_handler_commons.h>
+#include <gdul/job_handler/job_handler_commons.h>
+#include <string>
 
-namespace gdul
-{
-namespace job_handler_detail
-{
-class worker_impl;
-}
-class worker
+namespace gdul {
+class job;
+namespace jh_detail {
+class job_interface
 {
 public:
-	worker(job_handler_detail::worker_impl* impl);
-	worker(const worker&) = default;
-	worker(worker&&) = default;
-	worker& operator=(const worker&) = default;
-	worker& operator=(worker&&) = default;
-
-	~worker();
-
-	// Sets core affinity. job_handler_detail::Worker_Auto_Affinity represents automatic setting
-	void set_core_affinity(std::uint8_t core = job_handler_detail::Worker_Auto_Affinity);
-
-	// Sets which job queue to consume from. job_handler_detail::Worker_Auto_Affinity represents
-	// dynamic runtime selection
-	void set_queue_affinity(std::uint8_t queue = job_handler_detail::Worker_Auto_Affinity);
-
-	// Thread priority as defined in WinBase.h
-	void set_execution_priority(std::int32_t priority);
-
-	// Thread name
-	void set_name(const char* name);
-
-	void activate();
-	bool deactivate();
-
-	bool is_active() const;
-
-private:
-	friend class job_handler;
-
-	job_handler_detail::worker_impl* m_impl;
+	virtual void add_dependency(job& dependency) = 0;
+	virtual void set_queue(std::uint8_t target) noexcept = 0;
+	virtual void enable() = 0;
+	virtual bool is_finished() const noexcept = 0;
+	virtual void wait_until_finished() noexcept = 0;
+	virtual void work_until_finished(std::uint8_t queueBegin, std::uint8_t queueEnd) = 0;
+	virtual job& get_endjob() noexcept = 0;
+	virtual void set_name(const std::string&) = 0;
+	virtual float get_time() const noexcept = 0;
 };
+}
 }
