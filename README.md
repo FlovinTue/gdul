@@ -88,7 +88,7 @@ int main()
 	jbB.enable();
 	jbA.enable();
 
-	jbA.wait_until_finished();
+	jbB.wait_until_finished();
 
 	jh.retire_workers();
 }
