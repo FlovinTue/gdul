@@ -448,12 +448,9 @@ inline void batch_job_impl<InputContainer, OutputContainer, Process>::finalize()
 	m_time = m_timer.get();
 #endif
 }
-// Memory chunk representation of batch_job_impl
-struct dummy_container
-{
-	using value_type = int;
-};
+struct dummy_container{using value_type = int;};
 
+// Memory chunk representation of batch_job_impl
 struct alignas(alignof(std::max_align_t)) batch_job_chunk_rep
 {
 	std::uint8_t dummy[allocate_shared_size<batch_job_impl<dummy_container, dummy_container, gdul::delegate<bool(int&, int&)>>, chunk_allocator<batch_job_impl<dummy_container, dummy_container, gdul::delegate<bool(int&, int&)>>, batch_job_chunk_rep>>()]{};
