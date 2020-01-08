@@ -109,18 +109,18 @@ int main()
 		wrk.enable();
 	}
 
-	std::vector<std::size_t> input;
-	std::vector<std::size_t> output;
+	std::vector<std::size_t> inputs;
+	std::vector<std::size_t> outputs;
 	
 	for (std::size_t i = 0; i < 500; ++i) {
-		input.push_back(i);
+		inputs.push_back(i);
 	}
 
-	gdul::batch_job bjb(jh.make_batch_job(input, output, [](std::size_t& input, std::size_t& output) {
+	gdul::batch_job bjb(jh.make_batch_job(inputs, outputs, [](std::size_t& inputItem, std::size_t& outputItem) {
 
 		// Output only the items that mod 5 == 0
-		if (input % 5 == 0) {
-			output = input;
+		if (inputItem % 5 == 0) {
+			outputItem = inputItem;
 			return true;
 		}
 		return false;
@@ -130,7 +130,7 @@ int main()
 	bjb.enable();
 	bjb.wait_until_finished();
 
-	// Here output should contain 0, 5, 10, 15...
+	// Here outputs should contain 0, 5, 10, 15...
 
 	jh.retire_workers();
 }
