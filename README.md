@@ -122,7 +122,6 @@ int main()
 
 	gdul::batch_job bjb(jh.make_batch_job(inputs, outputs, [](std::size_t& inputItem, std::size_t& outputItem)
 	{
-
 		// Output only the items that mod 5 == 0
 		if (inputItem % 5 == 0)
 		{
