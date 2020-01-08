@@ -100,35 +100,43 @@ And with batch_job:
 #include <vector>
 
 int main()
-{	
+{
 	gdul::job_handler jh;
 	jh.init();
 
-	for (std::size_t i = 0; i < std::thread::hardware_concurrency(); ++i) {
+	for (std::size_t i = 0; i < std::thread::hardware_concurrency(); ++i)
+	{
 		gdul::worker wrk(jh.make_worker());
 		wrk.enable();
 	}
 
 	std::vector<std::size_t> inputs;
 	std::vector<std::size_t> outputs;
-	
-	for (std::size_t i = 0; i < 500; ++i) {
+
+	for (std::size_t i = 0; i < 500; ++i)
+	{
 		inputs.push_back(i);
 	}
 
-	gdul::batch_job bjb(jh.make_batch_job(inputs, outputs, [](std::size_t& inputItem, std::size_t& outputItem) {
+	outputs.resize(inputs.size());
+
+	gdul::batch_job bjb(jh.make_batch_job(inputs, outputs, [](std::size_t& inputItem, std::size_t& outputItem)
+	{
 
 		// Output only the items that mod 5 == 0
-		if (inputItem % 5 == 0) {
+		if (inputItem % 5 == 0)
+		{
 			outputItem = inputItem;
 			return true;
 		}
 		return false;
 
-		}, 30/*batch size*/));
+	}, 30/*batch size*/));
 
 	bjb.enable();
 	bjb.wait_until_finished();
+
+	outputs.resize(bjb.get_output_size());
 
 	// Here outputs should contain 0, 5, 10, 15...
 
