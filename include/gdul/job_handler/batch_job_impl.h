@@ -118,8 +118,8 @@ private:
 
 #if defined(GDUL_DEBUG)
 	std::string m_name;
-	float m_time;
 	timer m_timer;
+	float m_time;
 #endif
 
 	std::array<std::uint32_t, Batch_Job_Max_Batches> m_batchTracker;
@@ -404,7 +404,6 @@ template<class InputContainer, class OutputContainer, class Process>
 template <class U, std::enable_if_t<!U::Specialize_Update>*>
 inline void batch_job_impl<InputContainer, OutputContainer, Process>::initialize()
 {
-	std::uninitialized_fill(m_batchTracker.begin(), m_batchTracker.end(), 0);
 	make_jobs<>();
 }
 template<class InputContainer, class OutputContainer, class Process>
