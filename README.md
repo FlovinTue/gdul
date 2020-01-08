@@ -120,7 +120,7 @@ int main()
 
 	outputs.resize(inputs.size());
 
-	gdul::batch_job bjb(jh.make_batch_job(inputs, outputs, [](std::size_t& inputItem, std::size_t& outputItem)
+	gdul::delegate<bool(std::size_t&, std::size_t&)> process([](std::size_t& inputItem, std::size_t& outputItem)
 	{
 		// Output only the items that mod 5 == 0
 		if (inputItem % 5 == 0)
@@ -129,8 +129,9 @@ int main()
 			return true;
 		}
 		return false;
+	});
 
-	}, 30/*batch size*/));
+	gdul::batch_job bjb(jh.make_batch_job(inputs, outputs, process, 30/*batch size*/));
 
 	bjb.enable();
 	bjb.wait_until_finished();
