@@ -56,7 +56,7 @@ public:
 		gdul::delegate<void(typename InputContainer::value_type&)> process,
 		std::size_t batchSize);
 
-	// Requirements on Container is begin() / end() iterators as well as resize() and Container::value_type definition
+	// Requirements on Container is begin() / end() iterators and Container::value_type definition
 	// The process returnvalue signals inclusion/exclusion of an item in the output container. 
 	template <class InputOutputContainer>
 	batch_job make_batch_job(
@@ -64,7 +64,7 @@ public:
 		gdul::delegate<bool(typename InputOutputContainer::value_type&)> process,
 		std::size_t batchSize);
 
-	// Requirements on Container is begin() / end() iterators as well as resize() and Container::value_type definition
+	// Requirements on Container is begin() / end() iterators and Container::value_type definition
 	// The process returnvalue signals inclusion/exclusion of an item in the output container. 
 	template <class InputContainer, class OutputContainer>
 	batch_job make_batch_job(

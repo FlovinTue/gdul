@@ -99,7 +99,7 @@
     <ClInclude Include="..\..\include\gdul\job_handler\job_handler_commons.h" />
     <ClInclude Include="..\..\include\gdul\job_handler\job_handler_impl.h" />
     <ClInclude Include="..\..\include\gdul\job_handler\job_impl.h" />
-    <ClInclude Include="..\..\include\gdul\job_handler\job_interface.h" />
+    <ClInclude Include="..\..\include\gdul\job_handler\batch_job_interface.h" />
     <ClInclude Include="..\..\include\gdul\job_handler\job_node.h" />
     <ClInclude Include="..\..\include\gdul\job_handler\worker.h" />
     <ClInclude Include="..\..\include\gdul\job_handler\worker_impl.h" />

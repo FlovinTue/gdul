@@ -26,7 +26,7 @@
 namespace gdul {
 class job;
 namespace jh_detail {
-class job_interface
+class batch_job_interface
 {
 public:
 	virtual void add_dependency(job& dependency) = 0;
@@ -38,6 +38,7 @@ public:
 	virtual job& get_endjob() noexcept = 0;
 	virtual void set_name(const std::string&) = 0;
 	virtual float get_time() const noexcept = 0;
+	virtual std::size_t get_output_size() const noexcept = 0;
 };
 }
 }
