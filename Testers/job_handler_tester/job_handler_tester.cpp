@@ -231,18 +231,20 @@ void job_handler_tester::run_scatter_test_input_output(std::size_t arraySize, st
 		for (std::size_t j = 0; j < arraySize; ++j) {
 			m_scatterInput[j] = (int*)(std::uintptr_t(j));
 		}
+
+		m_scatterOutput.resize(arraySize);
 	
-		//delegate<bool(int*&, int*&)> process(&work_tracker::scatter_process, &m_work);
+		delegate<bool(int*&, int*&)> process(&work_tracker::scatter_process, &m_work);
 		//delegate<bool(int*&)> process(&work_tracker::scatter_process_input, &m_work);
-		delegate<void(int*&)> process(&work_tracker::scatter_process_update, &m_work);
+		//delegate<void(int*&)> process(&work_tracker::scatter_process_update, &m_work);
 	
-		//gdul::batch_job scatter(m_handler.make_batch_job(m_scatterInput, m_scatterOutput, std::move(process) , /*batchSize*/30));
+		gdul::batch_job scatter(m_handler.make_batch_job(m_scatterInput, m_scatterOutput, std::move(process) , /*batchSize*/30));
 		//gdul::batch_job scatter(m_handler.make_batch_job(m_scatterInput, std::move(process) , /*batchSize*/30));
-		gdul::batch_job scatter(m_handler.make_batch_job(m_scatterInput, std::move(process) , /*batchSize*/30));
+		//gdul::batch_job scatter(m_handler.make_batch_job(m_scatterInput, std::move(process) , /*batchSize*/30));
 	
 	
 		float result(time.get());
-		job endJob(m_handler.make_job([&time, &result]() {result = time.get(); }));
+		job endJob(m_handler.make_job([&time, &result, &scatter, this]() { result = time.get(); m_scatterOutput.resize(scatter.get_output_size()); }));
 		endJob.set_name("batch post job");
 		endJob.add_dependency(scatter);
 		endJob.enable();

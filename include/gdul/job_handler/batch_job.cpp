@@ -39,6 +39,10 @@ float batch_job::get_time() const noexcept
 {
 	return m_impl->get_time();
 }
+std::size_t batch_job::get_output_size() const noexcept
+{
+	return m_impl->get_output_size();
+}
 job & batch_job::get_endjob() noexcept
 {
 	return m_impl->get_endjob();
