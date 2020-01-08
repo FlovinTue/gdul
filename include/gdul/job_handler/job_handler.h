@@ -64,7 +64,8 @@ public:
 		gdul::delegate<bool(typename InputOutputContainer::value_type&)> process,
 		std::size_t batchSize);
 
-	// Requirements on Container is begin() / end() iterators and Container::value_type definition
+	// Requirements on Container is begin() / end() iterators and Container::value_type definition.
+	// Output container size must be >= input container size
 	// The process returnvalue signals inclusion/exclusion of an item in the output container. 
 	template <class InputContainer, class OutputContainer>
 	batch_job make_batch_job(
@@ -105,7 +106,7 @@ inline batch_job job_handler::make_batch_job(
 	return batch_job(std::move(sp));
 }
 
-// Requirements on Container is begin() / end() iterators as well as resize() and Container::value_type definition
+// Requirements on Container is begin() / end() iterators and Container::value_type definition
 // The process returnvalue signals inclusion/exclusion of an item in the output container. 
 template<class InputOutputContainer>
 inline batch_job job_handler::make_batch_job(
@@ -121,7 +122,8 @@ inline batch_job job_handler::make_batch_job(
 	sp = gdul::allocate_shared<batch_type>(alloc, inputOutput, std::move(process), batchSize, this);
 	return batch_job(std::move(sp));
 }
-// Requirements on Container is begin() / end() iterators as well as resize() and Container::value_type definition
+// Requirements on Container is begin() / end() iterators and Container::value_type definition.
+// Output container size must be >= input container size
 // The process returnvalue signals inclusion/exclusion of an item in the output container. 
 template<class InputContainer, class OutputContainer>
 inline batch_job job_handler::make_batch_job(
