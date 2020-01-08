@@ -75,7 +75,7 @@ worker job_handler_impl::make_worker()
 	worker_info info;
 	info.m_coreAffinity = jh_detail::Worker_Auto_Affinity;
 	info.m_queueBegin = 0;
-	info.m_queueEnd = Num_Job_Queues;
+	info.m_queueEnd = job_queue_count;
 
 	worker w(make_worker(info));
 	w.set_name("worker");
@@ -124,7 +124,7 @@ std::size_t job_handler_impl::num_enqueued() const noexcept
 {
 	std::size_t accum(0);
 
-	for (std::uint8_t i = 0; i < jh_detail::Num_Job_Queues; ++i) {
+	for (std::uint8_t i = 0; i < job_queue_count; ++i) {
 		accum += m_jobQueues[i].size();
 	}
 
@@ -198,7 +198,7 @@ job_handler_impl::job_impl_shared_ptr job_handler_impl::fetch_job()
 
 	for (uint8_t i = 0; i < t_items.this_worker_impl->get_fetch_retries(); ++i) {
 
-		const uint8_t index((queueIndex + i) % jh_detail::Num_Job_Queues);
+		const uint8_t index((queueIndex + i) % job_queue_count);
 
 		if (m_jobQueues[index].try_pop(out)) {
 			return out;

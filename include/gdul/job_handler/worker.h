@@ -37,7 +37,7 @@ struct worker_info
 	std::uint32_t m_executionPriority = 5;
 	std::uint8_t m_coreAffinity = jh_detail::Worker_Auto_Affinity;
 	std::uint8_t m_queueBegin = 0;
-	std::uint8_t m_queueEnd = jh_detail::Num_Job_Queues;
+	std::uint8_t m_queueEnd = job_queue_count;
 };
 
 namespace jh_detail

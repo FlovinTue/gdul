@@ -92,7 +92,7 @@ private:
 	concurrent_object_pool<job_node_chunk_rep, allocator_type> m_jobNodeChunkPool;
 	concurrent_object_pool<batch_job_chunk_rep, allocator_type> m_scatterJobChunkPool;
 
-	concurrent_queue<job_impl_shared_ptr, allocator_type> m_jobQueues[Num_Job_Queues];
+	concurrent_queue<job_impl_shared_ptr, allocator_type> m_jobQueues[job_queue_count];
 
 	std::array<worker_impl, Job_Handler_Max_Workers> m_workers;
 

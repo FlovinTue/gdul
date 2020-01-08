@@ -54,7 +54,7 @@ worker_impl::worker_impl(worker_info&& info, std::thread&& thrd, allocator_type 
 	, m_sleepThreshhold(250)
 	, m_isActive(false)
 {
-	m_info.m_queueEnd = std::min<std::uint8_t>(m_info.m_queueEnd, Num_Job_Queues);
+	m_info.m_queueEnd = std::min<std::uint8_t>(m_info.m_queueEnd, job_queue_count);
 	m_info.m_queueBegin = std::min<std::uint8_t>(m_info.m_queueBegin, m_info.m_queueEnd - 1);
 
 	m_distributionChunks = jh_detail::pow2summation(m_info.m_queueBegin + 1, m_info.m_queueEnd);
