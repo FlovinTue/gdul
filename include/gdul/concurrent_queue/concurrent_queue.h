@@ -20,12 +20,10 @@
 
 #pragma once
 
-#include <vector>
 #include <limits>
-#include <cassert>
+#include <assert.h>
 #include <cmath>
 #include <atomic>
-#include <stdexcept>
 #include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
 #include <gdul/thread_local_member/thread_local_member.h>
 
