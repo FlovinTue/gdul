@@ -45,7 +45,7 @@ using size_type = std::uint32_t;
 static constexpr size_type Static_Alloc_Size = 3;
 
 template <class T, class Allocator>
-class alignas(alignof(T) < 8 ? 8 : alignof(T)) flexible_storage;
+class alignas(alignof(T) < alignof(std::max_align_t) ? alignof(std::max_align_t) : alignof(T)) flexible_storage;
 
 template <class T>
 struct instance_tracker;
