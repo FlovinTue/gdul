@@ -17,13 +17,14 @@ enum job_queue : std::uint8_t
 	job_queue_2,
 	job_queue_3,
 
+
 	// Leave in place
 	job_queue_count,
 };
 
 namespace jh_detail
 {
-constexpr std::uint8_t Default_Job_Queue = job_queue_1;
+constexpr std::uint8_t Default_Job_Queue = job_queue(0);
 
 constexpr std::uint16_t Job_Handler_Max_Workers = 32;
 

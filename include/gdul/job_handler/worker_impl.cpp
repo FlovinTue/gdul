@@ -42,7 +42,7 @@ worker_impl::worker_impl()
 	, m_sleepThreshhold(std::numeric_limits<std::uint16_t>::max())
 	, m_isActive(false)
 {
-	m_distributionChunks = jh_detail::pow2summation(m_info.m_queueBegin + 1, m_info.m_queueEnd);
+	m_distributionChunks = jh_detail::pow2summation(m_info.m_queueFirst + 1, m_info.m_queueLast + 1);
 }
 worker_impl::worker_impl(worker_info&& info, std::thread&& thrd, allocator_type allocator)
 	: m_thread(std::move(thrd))
@@ -54,10 +54,9 @@ worker_impl::worker_impl(worker_info&& info, std::thread&& thrd, allocator_type 
 	, m_sleepThreshhold(250)
 	, m_isActive(false)
 {
-	m_info.m_queueEnd = std::min<std::uint8_t>(m_info.m_queueEnd, job_queue_count);
-	m_info.m_queueBegin = std::min<std::uint8_t>(m_info.m_queueBegin, m_info.m_queueEnd - 1);
+	assert(!(m_info.m_queueLast < m_info.m_queueFirst) && "Worker cannot consume from queues in reverse order");
 
-	m_distributionChunks = jh_detail::pow2summation(m_info.m_queueBegin + 1, m_info.m_queueEnd);
+	m_distributionChunks = jh_detail::pow2summation(m_info.m_queueFirst + 1, m_info.m_queueLast + 1);
 
 	jh_detail::set_thread_core_affinity(m_info.m_coreAffinity, m_threadHandle);
 
@@ -170,7 +169,7 @@ std::uint8_t worker_impl::get_queue_target()
 
 	uint8_t index(0);
 
-	const std::uint8_t range(m_info.m_queueEnd - m_info.m_queueBegin);
+	const std::uint8_t range((1 + m_info.m_queueLast) - m_info.m_queueFirst);
 
 	for (uint8_t i = 1; i < range; ++i) {
 		const std::uint8_t power(((range) - (i + 1)));
@@ -183,11 +182,11 @@ std::uint8_t worker_impl::get_queue_target()
 		index -= prev * eval;
 	}
 
-	return m_info.m_queueBegin + index;
+	return m_info.m_queueFirst + index;
 }
 std::uint8_t worker_impl::get_fetch_retries() const
 {
-	return m_info.m_queueEnd - m_info.m_queueBegin;
+	return (1 + m_info.m_queueLast) - m_info.m_queueFirst;
 }
 allocator_type worker_impl::get_allocator() const
 {

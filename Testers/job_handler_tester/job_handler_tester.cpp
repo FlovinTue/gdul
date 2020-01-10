@@ -52,8 +52,8 @@ void job_handler_tester::setup_workers()
 		worker_info info;
 		info.m_coreAffinity = (std::uint8_t)i;
 		info.m_executionPriority = 5;
-		info.m_queueBegin = 0;
-		info.m_queueEnd = 2;
+		info.m_queueFirst = job_queue_1;
+		info.m_queueLast = job_queue_3;
 		worker wrk(m_handler.make_worker(info));
 		wrk.set_name(std::string(std::string("DynamicWorker#") + std::to_string(i + 1)));
 		wrk.enable();

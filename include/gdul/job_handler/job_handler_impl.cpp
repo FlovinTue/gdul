@@ -72,12 +72,7 @@ void job_handler_impl::retire_workers()
 
 worker job_handler_impl::make_worker()
 {
-	worker_info info;
-	info.m_coreAffinity = jh_detail::Worker_Auto_Affinity;
-	info.m_queueBegin = 0;
-	info.m_queueEnd = job_queue_count;
-
-	worker w(make_worker(info));
+	worker w(make_worker(worker_info()));
 	w.set_name("worker");
 
 	return w;
