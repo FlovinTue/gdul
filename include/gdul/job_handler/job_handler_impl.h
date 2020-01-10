@@ -29,7 +29,7 @@
 #include <gdul/concurrent_queue/concurrent_queue.h>
 
 #include <gdul/job_handler/job.h>
-#include <gdul/job_handler/job_handler_commons.h>
+#include <gdul/job_handler/job_handler_utility.h>
 #include <gdul/job_handler/job_impl.h>
 #include <gdul/job_handler/chunk_allocator.h>
 #include <gdul/job_handler/worker_impl.h>

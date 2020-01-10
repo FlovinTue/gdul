@@ -20,7 +20,7 @@
 
 #pragma once
 
-#include <gdul/job_handler/job_handler_commons.h>
+#include <gdul/job_handler/job_handler_utility.h>
 #include <gdul/job_handler/batch_job_interface.h>
 #include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
 

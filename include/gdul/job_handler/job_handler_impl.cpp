@@ -41,7 +41,7 @@ thread_local job_handler_impl::tl_container job_handler_impl::t_items{ &job_hand
 job_handler_impl::job_handler_impl()
 	: m_jobImplChunkPool(jh_detail::Job_Impl_Allocator_Block_Size, m_mainAllocator)
 	, m_jobNodeChunkPool(jh_detail::Job_Impl_Allocator_Block_Size, m_mainAllocator)
-	, m_scatterJobChunkPool(batch_job_Allocator_Block_Size, m_mainAllocator)
+	, m_scatterJobChunkPool(Batch_Job_Allocator_Block_Size, m_mainAllocator)
 	, m_workerCount(0)
 {
 }
@@ -50,7 +50,7 @@ job_handler_impl::job_handler_impl(allocator_type & allocator)
 	: m_mainAllocator(allocator)
 	, m_jobImplChunkPool(jh_detail::Job_Impl_Allocator_Block_Size, m_mainAllocator)
 	, m_jobNodeChunkPool(jh_detail::Job_Impl_Allocator_Block_Size, m_mainAllocator)
-	, m_scatterJobChunkPool(batch_job_Allocator_Block_Size, m_mainAllocator)
+	, m_scatterJobChunkPool(Batch_Job_Allocator_Block_Size, m_mainAllocator)
 	, m_workerCount(0)
 {
 }
