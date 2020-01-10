@@ -48,9 +48,10 @@ public:
 	void wait_until_finished() noexcept;
 
 	// Consume jobs until finished. Beware of recursive calls (stack overflow, stalls etc..)
-	void work_until_finished(std::uint8_t queueBegin = jh_detail::Default_Job_Queue, std::uint8_t queueEnd = jh_detail::Default_Job_Queue + 1);
+	void work_until_finished(job_queue consumeFrom);
 
 	operator bool() const noexcept;
+
 	void set_name(const std::string& name);
 
 	// Get the duration of the job. Only valid if GDUL_DEBUG is defined & job has run

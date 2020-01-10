@@ -11,7 +11,7 @@
 namespace gdul
 {
 
-enum
+enum job_queue : std::uint8_t
 {
 	job_queue_1,
 	job_queue_2,

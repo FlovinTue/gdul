@@ -100,9 +100,9 @@ void job::wait_until_finished() noexcept
 
 	m_impl->wait_until_finished();
 }
-void job::work_until_finished(std::uint8_t queueBegin, std::uint8_t queueEnd)
+void job::work_until_finished(job_queue consumeFrom)
 {
-	m_impl->work_until_finished(queueBegin, queueEnd);
+	m_impl->work_until_finished(consumeFrom);
 }
 job::job(gdul::shared_ptr<jh_detail::job_impl> impl) noexcept
 	: m_impl(std::move(impl))

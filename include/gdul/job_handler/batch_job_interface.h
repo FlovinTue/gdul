@@ -34,7 +34,7 @@ public:
 	virtual void enable() = 0;
 	virtual bool is_finished() const noexcept = 0;
 	virtual void wait_until_finished() noexcept = 0;
-	virtual void work_until_finished(std::uint8_t queueBegin, std::uint8_t queueEnd) = 0;
+	virtual void work_until_finished(job_queue) = 0;
 	virtual job& get_endjob() noexcept = 0;
 	virtual void set_name(const std::string&) = 0;
 	virtual float get_time() const noexcept = 0;

@@ -55,7 +55,7 @@ public:
 	void set_name(const std::string& name) override final;
 
 	void wait_until_finished() noexcept override final;
-	void work_until_finished(std::uint8_t queueBegin, std::uint8_t queueEnd) override final;
+	void work_until_finished(job_queue consumeFrom) override final;
 
 	void enable();
 	bool is_finished() const noexcept override final;
@@ -236,9 +236,9 @@ inline void batch_job_impl<InputContainer, OutputContainer, Process>::wait_until
 	m_end.wait_until_finished();
 }
 template<class InputContainer, class OutputContainer, class Process>
-inline void batch_job_impl<InputContainer, OutputContainer, Process>::work_until_finished(std::uint8_t queueBegin, std::uint8_t queueEnd)
+inline void batch_job_impl<InputContainer, OutputContainer, Process>::work_until_finished(job_queue consumeFrom)
 {
-	m_end.work_until_finished(queueBegin, queueEnd);
+	m_end.work_until_finished(consumeFrom);
 }
 template<class InputContainer, class OutputContainer, class Process>
 inline void batch_job_impl<InputContainer, OutputContainer, Process>::enable()

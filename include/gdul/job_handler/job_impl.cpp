@@ -148,10 +148,10 @@ float job_impl::get_time() const noexcept
 	return 0.0f;
 #endif
 }
-void job_impl::work_until_finished(std::uint8_t queueBegin, std::uint8_t queueEnd)
+void job_impl::work_until_finished(job_queue consumeFrom)
 {
 	while (!is_finished()) {
-		if (!m_handler->consume_from(queueBegin, queueEnd)) {
+		if (!m_handler->try_consume_from_once(consumeFrom)) {
 			jh_detail::job_handler_impl::t_items.this_worker_impl->refresh_sleep_timer();
 			jh_detail::job_handler_impl::t_items.this_worker_impl->idle();
 		}

@@ -27,9 +27,9 @@ void batch_job::wait_until_finished() noexcept
 {
 	m_impl->wait_until_finished();
 }
-void batch_job::work_until_finished(std::uint8_t queueBegin, std::uint8_t queueEnd)
+void batch_job::work_until_finished(job_queue consumeFrom)
 {
-	m_impl->work_until_finished(queueBegin, queueEnd);
+	m_impl->work_until_finished(consumeFrom);
 }
 batch_job::operator bool() const noexcept
 {

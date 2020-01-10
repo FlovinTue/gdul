@@ -61,7 +61,7 @@ public:
 	void wait_until_finished() noexcept;
 
 	// Consume jobs until finished. Beware of recursive calls (stack overflow, stalls etc..)
-	void work_until_finished(std::uint8_t queueBegin = jh_detail::Default_Job_Queue, std::uint8_t queueEnd = jh_detail::Default_Job_Queue + 1);
+	void work_until_finished(job_queue consumeFrom);
 
 	operator bool() const noexcept;
 

@@ -70,7 +70,7 @@ public:
 
 	float get_time() const noexcept;
 
-	void work_until_finished(std::uint8_t queueBegin, std::uint8_t queueEnd);
+	void work_until_finished(job_queue consumeFrom);
 	void wait_until_finished() noexcept;
 private:
 
