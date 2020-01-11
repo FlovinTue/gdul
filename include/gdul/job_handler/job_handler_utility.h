@@ -20,7 +20,7 @@
 
 #pragma once
 
-#include <gdul/globals.h>
+#include <gdul/job_handler/globals.h>
 
 #include <limits>
 #include <memory>
