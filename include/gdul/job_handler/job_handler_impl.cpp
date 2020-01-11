@@ -150,7 +150,7 @@ bool job_handler_impl::try_consume_from_once(job_queue consumeFrom)
 
 		job_handler::this_job = job(std::move(jb));
 
-		jb->operator()();
+		job_handler::this_job.m_impl->operator()();
 
 		job_handler::this_job = std::move(swap);
 
