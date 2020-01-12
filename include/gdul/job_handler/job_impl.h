@@ -55,8 +55,8 @@ public:
 	void set_name(const std::string& name);
 	const std::string& get_name() const;
 
-	std::uint8_t get_queue() const;
-	void set_queue(std::uint8_t target);
+	job_queue get_target_queue() const noexcept;
+	void set_target_queue(job_queue target) noexcept;
 
 	bool try_add_dependencies(std::uint32_t n = 1);
 	std::uint32_t remove_dependencies(std::uint32_t n = 1);
@@ -92,7 +92,7 @@ private:
 	std::atomic_bool m_finished;
 	std::atomic_bool m_enabled;
 
-	std::uint8_t m_targetQueue;
+	job_queue m_targetQueue;
 };
 // Memory chunk representation of job_impl
 struct alignas(alignof(job_impl)) job_impl_chunk_rep

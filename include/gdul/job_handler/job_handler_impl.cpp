@@ -137,7 +137,7 @@ concurrent_object_pool<batch_job_chunk_rep, allocator_type>* job_handler_impl::g
 
 void job_handler_impl::enqueue_job(job_impl_shared_ptr job)
 {
-	const std::uint8_t target(job->get_queue());
+	const std::uint8_t target(job->get_target_queue());
 
 	m_jobQueues[target].push(std::move(job));
 }

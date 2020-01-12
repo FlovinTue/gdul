@@ -74,7 +74,7 @@ struct callable_wrapper_impl_call : public callable_wrapper_base<Ret, Args...>
 	callable_wrapper_impl_call(Callable callable)
 		: m_callable(callable) {}
 
-	inline Ret operator()(Args&&... args) override {
+	inline Ret operator()(Args&&... args) override final{
 		return call_with_tuple(m_callable, std::forward_as_tuple(std::forward<Args>(args)...));
 	}
 
@@ -92,16 +92,16 @@ struct callable_wrapper_impl_call_alloc : public callable_wrapper_impl_call<Ret,
 		: callable_wrapper_impl_call<Ret, Callable, Args...>(callable)
 		, m_allocator(alloc) {}
 
-	std::uint8_t* allocate() override { 
+	std::uint8_t* allocate() override final{ 
 		return m_allocator.allocate(sizeof(decltype(*this)));
 	}
-	void destruct_allocated(callable_wrapper_base<Ret, Args...>* obj) override { 
+	void destruct_allocated(callable_wrapper_base<Ret, Args...>* obj) override final{ 
 		Allocator alloc(m_allocator);
 		constexpr std::size_t size(sizeof(decltype(*this)));
 		obj->~callable_wrapper_base();
 		alloc.deallocate((std::uint8_t*)obj, size);
 	}
-	callable_wrapper_base<Ret, Args...>* copy_construct_at(std::uint8_t* block) override {
+	callable_wrapper_base<Ret, Args...>* copy_construct_at(std::uint8_t* block) override final{
 		return new (block) (callable_wrapper_impl_call_alloc<Ret, Callable, Allocator, Args...>)(this->m_callable, m_allocator);
 	}
 
@@ -115,7 +115,7 @@ struct callable_wrapper_impl_call_bind : public callable_wrapper_base<Ret, Args.
 		: m_callable(callable)
 		, m_boundTuple(std::forward<BindTuple>(bind)) {}
 
-	inline Ret operator()(Args&&... args) override {
+	inline Ret operator()(Args&&... args) override final{
 		return call_with_tuple(m_callable, std::tuple_cat(m_boundTuple, std::forward_as_tuple(std::forward<Args>(args)...)));
 	}
 
@@ -133,16 +133,16 @@ struct callable_wrapper_impl_call_bind_alloc : public callable_wrapper_impl_call
 		: callable_wrapper_impl_call_bind<Ret, Callable, BindTuple, Args...>(callable, std::forward<BindTuple>(bind))
 		, m_allocator(alloc) {}
 
-	std::uint8_t* allocate() override {
+	std::uint8_t* allocate() override final{
 		return m_allocator.allocate(sizeof(decltype(*this)));
 	}
-	void destruct_allocated(callable_wrapper_base<Ret, Args...>* obj) override {
+	void destruct_allocated(callable_wrapper_base<Ret, Args...>* obj) override final{
 		Allocator alloc(m_allocator);
 		constexpr std::size_t size(sizeof(decltype(*this)));
 		obj->~callable_wrapper_base();
 		alloc.deallocate((std::uint8_t*)obj, size);
 	}
-	callable_wrapper_base<Ret, Args...>* copy_construct_at(std::uint8_t* block) override {
+	callable_wrapper_base<Ret, Args...>* copy_construct_at(std::uint8_t* block) override final{
 		return new (block) (callable_wrapper_impl_call_bind_alloc<Ret, Callable, Allocator, BindTuple, Args...>)(Callable(this->m_callable), BindTuple(this->m_boundTuple), m_allocator);
 	}
 	Allocator m_allocator;

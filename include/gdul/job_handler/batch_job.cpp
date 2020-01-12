@@ -11,9 +11,13 @@ void batch_job::add_dependency(job & dependency)
 {
 	m_impl->add_dependency(dependency);
 }
-void batch_job::set_queue(std::uint8_t target) noexcept
+void batch_job::set_target_queue(job_queue target) noexcept
 {
-	m_impl->set_queue(target);
+	m_impl->set_target_queue(target);
+}
+job_queue batch_job::get_target_queue() const noexcept 
+{
+	return m_impl->get_target_queue();
 }
 void batch_job::enable()
 {

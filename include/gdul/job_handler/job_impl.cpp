@@ -101,11 +101,11 @@ const std::string & job_impl::get_name() const
 	return "";
 #endif
 }
-std::uint8_t job_impl::get_queue() const
+job_queue job_impl::get_target_queue() const noexcept
 {
 	return m_targetQueue;
 }
-void job_impl::set_queue(std::uint8_t target)
+void job_impl::set_target_queue(job_queue target) noexcept
 {
 	m_targetQueue = target;
 }

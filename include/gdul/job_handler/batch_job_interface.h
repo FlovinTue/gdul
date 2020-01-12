@@ -30,7 +30,7 @@ class batch_job_interface
 {
 public:
 	virtual void add_dependency(job& dependency) = 0;
-	virtual void set_queue(std::uint8_t target) noexcept = 0;
+	virtual void set_target_queue(job_queue target) noexcept = 0;
 	virtual void enable() = 0;
 	virtual bool is_finished() const noexcept = 0;
 	virtual void wait_until_finished() noexcept = 0;
@@ -39,6 +39,7 @@ public:
 	virtual void set_name(const std::string&) = 0;
 	virtual float get_time() const noexcept = 0;
 	virtual std::size_t get_output_size() const noexcept = 0;
+	virtual job_queue get_target_queue() const noexcept = 0;
 };
 }
 }

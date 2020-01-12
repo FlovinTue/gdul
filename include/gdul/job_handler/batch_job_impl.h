@@ -51,7 +51,9 @@ public:
 
 	void add_dependency(job& dependency);
 
-	void set_queue(std::uint8_t target) noexcept override final;
+	void set_target_queue(job_queue target) noexcept override final;
+	job_queue get_target_queue() const noexcept override final;
+
 	void set_name(const std::string& name) override final;
 
 	void wait_until_finished() noexcept override final;
@@ -137,7 +139,7 @@ private:
 	const std::uint32_t m_batchSize;
 	const std::uint16_t m_batchCount;
 
-	std::uint8_t m_targetQueue;
+	job_queue m_targetQueue;
 };
 template<class InputContainer, class OutputContainer, class Process>
 inline batch_job_impl<InputContainer, OutputContainer, Process>::batch_job_impl(InputContainer& inputOutput, typename batch_job_impl<InputContainer, OutputContainer, Process>::process_type&& process, std::size_t batchSize, job_handler* handler)
@@ -153,7 +155,7 @@ inline batch_job_impl<InputContainer, OutputContainer, Process>::batch_job_impl(
 	, m_input(input)
 	, m_output(output)
 	, m_batchSize(clamp_batch_size(batchSize + !(bool)batchSize))
-	, m_batchCount((std::uint16_t)(container_size(m_input) / m_batchSize + ((bool)(container_size(m_input) % m_batchSize))))
+	, m_batchCount((std::uint16_t)(container_size(m_input) / m_batchSize + ((bool)(container_size(m_input) % m_batchSize))) + !(bool)(container_size(m_input)))
 	, m_targetQueue(jh_detail::Default_Job_Queue)
 #if defined(GDUL_DEBUG)
 	, m_time(0.f)
@@ -216,9 +218,14 @@ inline void batch_job_impl<InputContainer, OutputContainer, Process>::add_depend
 	m_root.add_dependency(dependency);
 }
 template<class InputContainer, class OutputContainer, class Process>
-inline void batch_job_impl<InputContainer, OutputContainer, Process>::set_queue(std::uint8_t target) noexcept
+inline void batch_job_impl<InputContainer, OutputContainer, Process>::set_target_queue(job_queue target) noexcept
 {
 	m_targetQueue = target;
+}
+template<class InputContainer, class OutputContainer, class Process>
+inline job_queue batch_job_impl<InputContainer, OutputContainer, Process>::get_target_queue() const noexcept
+{
+	return m_targetQueue;
 }
 template<class InputContainer, class OutputContainer, class Process>
 inline void batch_job_impl<InputContainer, OutputContainer, Process>::set_name(const std::string & name)
@@ -279,7 +286,7 @@ template<class Fun>
 inline job batch_job_impl<InputContainer, OutputContainer, Process>::make_work_slice(Fun fun, std::size_t batchIndex)
 {
 	job newJob(_redirect_make_job(m_handler, delegate<void()>(fun, this, batchIndex)));
-	newJob.set_queue(m_targetQueue);
+	newJob.set_target_queue(m_targetQueue);
 
 	return newJob;
 }

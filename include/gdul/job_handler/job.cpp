@@ -76,9 +76,13 @@ void job::add_dependency(batch_job & dependency)
 {
 	add_dependency(dependency.get_endjob());
 }
-void job::set_queue(std::uint8_t target) noexcept
+void job::set_target_queue(job_queue target) noexcept
 {
-	m_impl->set_queue(target);
+	m_impl->set_target_queue(target);
+}
+job_queue job::get_target_queue() const noexcept
+{
+	return m_impl->get_target_queue();
 }
 void job::enable()
 {

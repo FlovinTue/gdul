@@ -39,7 +39,8 @@ public:
 	batch_job();
 
 	void add_dependency(job& dependency);
-	void set_queue(std::uint8_t target) noexcept;
+	void set_target_queue(job_queue target) noexcept;
+	job_queue get_target_queue() const noexcept;
 
 	// this object may be discarded once enable() has been invoked
 	void enable();

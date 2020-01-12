@@ -194,15 +194,13 @@ allocator_type worker_impl::get_allocator() const
 }
 void worker_impl::set_name(const std::string& name)
 {
-#if defined(GDUL_DEBUG)
 	assert(is_active() && "Cannot set name to inactive worker");
-
-	jh_detail::set_thread_name(name.c_str(), m_threadHandle);
-	
+#if defined(GDUL_DEBUG)
 	m_name = name;
 #else
 	(void)name;
 #endif
+	jh_detail::set_thread_name(name.c_str(), m_threadHandle);
 }
 }
 }
