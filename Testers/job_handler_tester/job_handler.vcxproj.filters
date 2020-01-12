@@ -78,14 +78,14 @@
     <ClInclude Include="..\..\include\gdul\job_handler\batch_job_interface.h">
       <Filter>implementation\job</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\gdul\globals.h">
-      <Filter>implementation</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\include\gdul\job_handler\job_handler_utility.h">
       <Filter>implementation</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\gdul\job_handler\job_node.h">
       <Filter>implementation\job</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\gdul\job_handler\globals.h">
+      <Filter>implementation</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

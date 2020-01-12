@@ -64,7 +64,7 @@ float job_handler_tester::run_consumption_parallel_test(std::size_t jobs, float 
 {
 	auto wrap = []() {}; overDuration;
 	job root(m_handler.make_job(gdul::delegate<void()>(wrap)));
-	root.set_queue(0);
+	root.set_target_queue(gdul::job_queue_1);
 	job end(m_handler.make_job(gdul::delegate<void()>([this]() { std::cout << "Finished run_consumption_parallel_test. Number of enqueued jobs: " << m_handler.num_enqueued() << std::endl; })));
 
 	for (std::size_t i = 0; i < jobs; ++i)
@@ -72,7 +72,7 @@ float job_handler_tester::run_consumption_parallel_test(std::size_t jobs, float 
 		for (std::size_t j = 0; j < m_handler.num_workers(); ++j)
 		{
 			job jb(m_handler.make_job(gdul::delegate<void()>(wrap)));
-			jb.set_queue((j + i) % gdul::job_queue_count);
+			jb.set_target_queue((gdul::job_queue((j + i) % gdul::job_queue_count)));
 
 			end.add_dependency(jb);
 
@@ -116,7 +116,7 @@ float job_handler_tester::run_consumption_strand_parallel_test(std::size_t jobs,
 		for (std::uint8_t j = 0; j < children; ++j, ++i)
 		{
 			intermediate[j] = m_handler.make_job(gdul::delegate<void()>(&work_tracker::main_work, &m_work));
-			intermediate[j].set_queue((j + i) % gdul::job_queue_count);
+			intermediate[j].set_target_queue((gdul::job_queue((j + i) % gdul::job_queue_count)));
 			end.add_dependency(intermediate[j]);
 
 			for (std::uint8_t dependencies = 0; dependencies < nextNum; ++dependencies)
@@ -192,7 +192,7 @@ float job_handler_tester::run_consumption_strand_test(std::size_t jobs, float /*
 	for (std::size_t i = 0; i < jobs; ++i)
 	{
 		job next = m_handler.make_job(gdul::delegate<void()>(&work_tracker::main_work, &m_work));
-		next.set_queue(i % gdul::job_queue_count);
+		next.set_target_queue(job_queue(i % gdul::job_queue_count));
 
 		next.add_dependency(previous);
 		next.enable();
