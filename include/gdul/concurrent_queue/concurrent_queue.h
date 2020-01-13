@@ -201,7 +201,6 @@ private:
 
 	inline shared_ptr_slot_type create_producer_buffer(std::size_t withSize);
 	inline void push_producer_buffer(shared_ptr_slot_type buffer);
-	inline void try_swap_producer_array(std::uint8_t aromStoreArraySlot);
 	inline void try_swap_producer_count(std::uint16_t toValue);
 
 	inline std::uint16_t claim_producer_slot();
