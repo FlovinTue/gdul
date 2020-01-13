@@ -22,6 +22,7 @@ void job_handler::init() {
 }
 job_handler::~job_handler()
 {
+	retire_workers();
 }
 void job_handler::retire_workers()
 {
@@ -31,9 +32,9 @@ worker job_handler::make_worker()
 {
 	return m_impl->make_worker();
 }
-worker job_handler::make_worker(const worker_info & info)
+worker job_handler::make_worker(gdul::delegate<void()> entryPoint)
 {
-	return m_impl->make_worker(info);
+	return m_impl->make_worker(std::move(entryPoint));
 }
 std::size_t job_handler::num_workers() const
 {
@@ -47,8 +48,8 @@ concurrent_object_pool<jh_detail::batch_job_chunk_rep, jh_detail::allocator_type
 {
 	return m_impl->get_batch_job_chunk_pool();
 }
-job job_handler::make_job(gdul::delegate<void()>&& workUnit)
+job job_handler::make_job(gdul::delegate<void()> workUnit)
 {
-	return m_impl->make_job(std::forward<delegate<void()>>(workUnit));
+	return m_impl->make_job(std::move(workUnit));
 }
 }

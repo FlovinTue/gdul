@@ -72,31 +72,30 @@ void job_handler_impl::retire_workers()
 
 worker job_handler_impl::make_worker()
 {
-	worker w(make_worker(worker_info()));
+	gdul::delegate<void()> entryPoint(&job_handler_impl::work, this);
+
+	worker w(make_worker(entryPoint));
 	w.set_name("worker");
 
 	return w;
 }
-
-worker job_handler_impl::make_worker(const worker_info & w)
+worker job_handler_impl::make_worker(gdul::delegate<void()> entryPoint)
 {
-	worker_info info(w);
-
 	const std::uint16_t index(m_workerCount.fetch_add(1, std::memory_order_relaxed));
 
-	if (info.m_coreAffinity == jh_detail::Worker_Auto_Affinity) {
-		info.m_coreAffinity = static_cast<std::uint8_t>(index % std::thread::hardware_concurrency());
-	}
+	const std::uint8_t autoCoreAffinity(static_cast<std::uint8_t>(index % std::thread::hardware_concurrency()));	
 
 	std::thread thread(&job_handler_impl::launch_worker, this, index);
 
-	jh_detail::worker_impl impl(std::move(info), std::move(thread), m_mainAllocator);
+	jh_detail::worker_impl impl(std::move(thread), m_mainAllocator);
+	impl.set_core_affinity(autoCoreAffinity);
+
+	impl.set_entry_point(std::move(entryPoint));
 
 	m_workers[index] = std::move(impl);
 
 	return worker(&m_workers[index]);
 }
-
 job job_handler_impl::make_job(delegate<void()>&& workUnit)
 {
 	job_impl_allocator alloc(&m_jobImplChunkPool);
@@ -171,9 +170,7 @@ void job_handler_impl::launch_worker(std::uint16_t index) noexcept
 	t_items.this_worker_impl->refresh_sleep_timer();
 
 	t_items.this_worker_impl->on_enable();
-
-	work();
-
+	t_items.this_worker_impl->entry_point();
 	t_items.this_worker_impl->on_disable();
 }
 void job_handler_impl::work()

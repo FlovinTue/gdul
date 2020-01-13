@@ -29,21 +29,6 @@ namespace gdul
 template <class Signature>
 class delegate;
 
-struct worker_info
-{
-	delegate<void()> m_onEnable = []() {};
-	delegate<void()> m_onDisable = []() {};
-
-	std::uint32_t m_executionPriority = 5;
-	std::uint8_t m_coreAffinity = jh_detail::Worker_Auto_Affinity;
-
-	// Highest priority consumption
-	job_queue m_queueFirst = job_queue(0);
-
-	// Lowest priority consumption
-	job_queue m_queueLast = job_queue(job_queue_count - 1);
-};
-
 namespace jh_detail
 {
 class worker_impl;
@@ -66,8 +51,11 @@ public:
 	void enable();
 	bool disable();
 
-	void set_run_on_enable(delegate<void()>&& toCall);
-	void set_run_on_disable(delegate<void()>&& toCall);
+	void set_run_on_enable(delegate<void()> toCall);
+	void set_run_on_disable(delegate<void()> toCall);
+
+	void set_queue_consume_first(job_queue firstQueue) noexcept;
+	void set_queue_consume_last(job_queue lastQueue) noexcept;
 
 	bool is_active() const;
 

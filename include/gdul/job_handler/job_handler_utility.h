@@ -39,7 +39,6 @@ namespace jh_detail
 {
 
 constexpr std::uint32_t Job_Max_Dependencies = std::numeric_limits<std::uint32_t>::max() / 2;
-constexpr std::uint8_t Worker_Auto_Affinity = std::numeric_limits<std::uint8_t>::max();
 
 using allocator_type = std::allocator<uint8_t>;
 

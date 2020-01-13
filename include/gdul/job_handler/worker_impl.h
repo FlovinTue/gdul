@@ -41,7 +41,7 @@ class alignas(64) worker_impl
 {
 public:
 	worker_impl();
-	worker_impl(worker_info&& info, std::thread&& thrd, allocator_type allocator);
+	worker_impl(std::thread&& thrd, allocator_type allocator);
 	~worker_impl();
 
 	worker_impl& operator=(worker_impl&& other) noexcept;
@@ -50,6 +50,9 @@ public:
 	void set_execution_priority(std::uint32_t priority);
 	void set_sleep_threshhold(std::uint16_t ms);
 	void set_name(const std::string & name);
+
+	void set_queue_consume_first(job_queue firstQueue) noexcept;
+	void set_queue_consume_last(job_queue lastQueue) noexcept;
 
 	void enable();
 
@@ -63,9 +66,11 @@ public:
 
 	void set_run_on_enable(delegate<void()> && toCall);
 	void set_run_on_disable(delegate<void()> && toCall);
+	void set_entry_point(delegate<void()> && toCall);
 
 	void on_enable();
 	void on_disable();
+	void entry_point();
 
 	void idle();
 
@@ -78,17 +83,21 @@ private:
 #ifdef GDUL_DEBUG
 	std::string m_name;
 #endif
-	worker_info m_info;
-
 	std::thread m_thread;
 
 	thread_handle m_threadHandle;
-	
+
+	gdul::delegate<void()> m_onEnable;
+	gdul::delegate<void()> m_onDisable;
+	gdul::delegate<void()> m_entryPoint;
+
 	std::size_t m_queueDistributionIteration;
 	std::size_t m_distributionChunks;
 
 	std::chrono::high_resolution_clock::time_point m_lastJobTimepoint;
 	std::chrono::high_resolution_clock m_sleepTimer;
+
+	std::int32_t m_executionPriority;
 
 	std::uint16_t m_sleepThreshhold;
 
@@ -96,6 +105,11 @@ private:
 
 	std::atomic_bool m_isEnabled;
 	std::atomic_bool m_isActive;
+
+	job_queue m_firstQueue;
+	job_queue m_lastQueue;
+
+	std::uint8_t m_coreAffinity;
 };
 }
 }

@@ -61,7 +61,7 @@ public:
  	void retire_workers();
 
 	worker make_worker();
-	worker make_worker(const worker_info& w);
+	worker make_worker(gdul::delegate<void()> entryPoint);
 
 	job make_job(delegate<void()>&& workUnit);
 

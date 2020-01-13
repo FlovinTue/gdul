@@ -49,12 +49,11 @@ void job_handler_tester::setup_workers()
 	}
 	
 	for (std::size_t i = 0; i < dynamicWorkers; ++i) {
-		worker_info info;
-		info.m_coreAffinity = (std::uint8_t)i;
-		info.m_executionPriority = 5;
-		info.m_queueFirst = job_queue_1;
-		info.m_queueLast = job_queue_3;
-		worker wrk(m_handler.make_worker(info));
+		worker wrk(m_handler.make_worker());
+		wrk.set_core_affinity((std::uint8_t)i);
+		wrk.set_execution_priority(5);
+		wrk.set_queue_consume_first(job_queue_1);
+		wrk.set_queue_consume_last(job_queue_3);
 		wrk.set_name(std::string(std::string("DynamicWorker#") + std::to_string(i + 1)));
 		wrk.enable();
 	}

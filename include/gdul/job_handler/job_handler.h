@@ -49,6 +49,11 @@ public:
 	static thread_local job this_job;
 	static thread_local worker this_worker;
 
+	worker make_worker();
+	worker make_worker(gdul::delegate<void()> entryPoint);
+
+	job make_job(gdul::delegate<void()> workUnit);
+
 	// Requirements on Container is begin() / end() iterators and Container::value_type definition
 	template <class InputContainer>
 	batch_job make_batch_job(
@@ -73,11 +78,6 @@ public:
 		OutputContainer& output,
 		gdul::delegate<bool(typename InputContainer::value_type&, typename OutputContainer::value_type&)> process,
 		std::size_t batchSize);
-
-	worker make_worker();
-	worker make_worker(const worker_info& info);
-
-	job make_job(gdul::delegate<void()>&& workUnit);
 
 	void retire_workers();
 

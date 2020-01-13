@@ -55,13 +55,21 @@ bool worker::disable()
 {
 	return m_impl->disable();
 }
-void worker::set_run_on_enable(delegate<void()>&& toCall)
+void worker::set_run_on_enable(delegate<void()> toCall)
 {
-	m_impl->set_run_on_enable(std::forward<delegate<void()>>(toCall));
+	m_impl->set_run_on_enable(std::move(toCall));
 }
-void worker::set_run_on_disable(delegate<void()>&& toCall)
+void worker::set_run_on_disable(delegate<void()> toCall)
 {
-	m_impl->set_run_on_disable(std::forward<delegate<void()>>(toCall));
+	m_impl->set_run_on_disable(std::move(toCall));
+}
+void worker::set_queue_consume_first(job_queue firstQueue) noexcept
+{
+	m_impl->set_queue_consume_first(firstQueue);
+}
+void worker::set_queue_consume_last(job_queue lastQueue) noexcept
+{
+	m_impl->set_queue_consume_last(lastQueue);
 }
 bool worker::is_active() const
 {
