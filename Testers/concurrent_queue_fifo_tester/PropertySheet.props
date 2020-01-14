@@ -1,0 +1,33 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <OutDir>$(SolutionDir)Bin\</OutDir>
+    <IntDir>C:\Visual Studio\Projects\$(SolutionName)\$(ProjectName)\Intermediate\</IntDir>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)\External\Include\;</IncludePath>
+    <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64;$(SolutionDir)\External\Lib\;$(SolutionDir)\Lib\;</LibraryPath>
+    <TargetName Condition="'$(Configuration)'!='Debug'">$(ProjectName)_$(Configuration)</TargetName>
+    <TargetName Condition="'$(Configuration)'=='Debug'">$(ProjectName)_$(Configuration)</TargetName>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <BuildLog>
+      <Path>$(IntDir)Logs\$(MSBuildProjectName).log</Path>
+    </BuildLog>
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+    </ClCompile>
+    <ClCompile>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <PrecompiledHeader>Create</PrecompiledHeader>
+      <PrecompiledHeaderOutputFile>$(IntDir)Precompiled\$(TargetName).pch</PrecompiledHeaderOutputFile>
+      <AssemblerListingLocation>$(IntDir)Compiler\</AssemblerListingLocation>
+      <ObjectFileName>$(IntDir)Compiler\</ObjectFileName>
+      <ProgramDataBaseFileName>$(IntDir)PDB\vc$(PlatformToolsetVersion).pdb</ProgramDataBaseFileName>
+    </ClCompile>
+    <Link>
+      <ProgramDatabaseFile>$(IntDir)PDB\$(TargetName).pdb</ProgramDatabaseFile>
+    </Link>
+    <FxCompile>
+      <ShaderModel>5.0</ShaderModel>
+    </FxCompile>
+  </ItemDefinitionGroup>
+</Project>

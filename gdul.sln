@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 16
-VisualStudioVersion = 16.0.29418.71
+# Visual Studio 15
+VisualStudioVersion = 15.0.28307.902
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "atomic_128", "Testers\atomic_uint128_tester\atomic_uint128.vcxproj", "{F2B36960-1C2E-402A-91BE-CD8C1539E38B}"
 EndProject
@@ -19,7 +19,9 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "concurrent_priority_queue_u
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "thread_local_member", "Testers\thread_local_member_tester\thread_local_member_tester.vcxproj", "{14B2FC84-037B-47A3-A99A-9F61F4F021B9}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "delegate_tester", "Testers\delegate_tester\delegate_tester.vcxproj", "{6294E62E-CE95-40D8-A176-D30D0046235B}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "delegate", "Testers\delegate_tester\delegate_tester.vcxproj", "{6294E62E-CE95-40D8-A176-D30D0046235B}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "concurrent_queue_fifo", "Testers\concurrent_queue_fifo_tester\concurrent_queue_fifo\concurrent_queue_fifo.vcxproj", "{1FFC44D2-F701-4925-8987-768C3F623870}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -79,6 +81,12 @@ Global
 		{6294E62E-CE95-40D8-A176-D30D0046235B}.Release|x64.ActiveCfg = Release|x64
 		{6294E62E-CE95-40D8-A176-D30D0046235B}.Release|x64.Build.0 = Release|x64
 		{6294E62E-CE95-40D8-A176-D30D0046235B}.Release|x86.ActiveCfg = Release|x64
+		{1FFC44D2-F701-4925-8987-768C3F623870}.Debug|x64.ActiveCfg = Debug|x64
+		{1FFC44D2-F701-4925-8987-768C3F623870}.Debug|x64.Build.0 = Debug|x64
+		{1FFC44D2-F701-4925-8987-768C3F623870}.Debug|x86.ActiveCfg = Debug|x64
+		{1FFC44D2-F701-4925-8987-768C3F623870}.Release|x64.ActiveCfg = Release|x64
+		{1FFC44D2-F701-4925-8987-768C3F623870}.Release|x64.Build.0 = Release|x64
+		{1FFC44D2-F701-4925-8987-768C3F623870}.Release|x86.ActiveCfg = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
