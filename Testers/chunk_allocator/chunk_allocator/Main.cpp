@@ -13,7 +13,7 @@ struct alignas(32) test_object
 
 int main()
 {
-	gdul::sp_concurrent_chunk_pool<test_object> chunkPool(16);
+	gdul::allocate_shared_chunk_pool<test_object> chunkPool(16);
 
 	gdul::chunk_allocator<int*, decltype(chunkPool)> allocator(chunkPool);
 

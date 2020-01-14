@@ -30,8 +30,8 @@
 namespace gdul
 {
 
-// A utility allocator that forwards allocates to a chunk pool. ChunkPool is required
-// to implement void* get_chunk() and recycle_chunk(void*)
+// A wrapper allocator that forwards allocate / deallocate to a chunk pool. ChunkPool is
+// required to implement void* get_chunk() and recycle_chunk(void*)
 template <class T, class ChunkPool>
 class chunk_allocator
 {
@@ -86,7 +86,7 @@ inline chunk_allocator<T, ChunkPool>::chunk_allocator(const chunk_allocator<U, C
 
 // An appropriate chunk pool for use with gdul::allocate_shared
 template <class T, class Allocator = std::allocator<T>>
-class sp_concurrent_chunk_pool
+class allocate_shared_chunk_pool
 {
 	static constexpr std::size_t Chunk_Rep_Size = allocate_shared_size<T, Allocator>();
 	struct alignas(alignof(T)) chunk_rep
@@ -95,10 +95,10 @@ class sp_concurrent_chunk_pool
 	};
 
 public:
-	sp_concurrent_chunk_pool(std::size_t chunksPerBlock)
+	allocate_shared_chunk_pool(std::size_t chunksPerBlock)
 		: m_chunks(chunksPerBlock)
 	{}
-	sp_concurrent_chunk_pool(std::size_t chunksPerBlock, Allocator allocator)
+	allocate_shared_chunk_pool(std::size_t chunksPerBlock, Allocator allocator)
 		: m_chunks(chunksPerBlock, allocator)
 	{}
 	void* get_chunk(){
