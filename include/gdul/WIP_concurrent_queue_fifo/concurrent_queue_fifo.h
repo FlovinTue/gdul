@@ -17,9 +17,9 @@ class concurrent_queue_fifo
 public:
 
 	using value_type = T;
-	using item_type = struct { T m_item; };
 	using allocator_type = Allocator;
 	using size_type = std::size_t;
+	using item_type = struct { T m_item; };
 
 	void push(T&& in);
 	void push(const T& in);
@@ -33,8 +33,27 @@ public:
 private:
 	using padding_type = const std::uint8_t[64];
 
+	struct items_array_node
+	{
+		atomic_shared_ptr<item_type[]> m_items;
+		atomic_shared_ptr<items_array_node> m_nextItems;
+	};
 
+
+	void try_advance_rear_read_itr(const_iterator from) noexcept;
+	void try_advance_rear_write_itr(const_iterator from) noexcept;
+
+	iterator try_claim_write_slot() noexcept;
+	iterator try_claim_read_slot() noexcept;
+
+	void try_set_new_items_array(shared_ptr<item_type[]> arr);
+	void try_set_new_items_array_store(); // or something?
+
+	// Want to keep things simple. No weird block construction one after another thing.
+	// Maybe keep a separate linked list? 
 	atomic_shared_ptr<item_type[]> m_items;
+
+	atomic_shared_ptr<items_array_node> m_nextItems;
 
 	// Consumers will only change t_items whenever they run out of items.. 
 	// Which would then look like: 
