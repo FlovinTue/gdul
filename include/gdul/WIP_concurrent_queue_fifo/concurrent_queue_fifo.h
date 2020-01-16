@@ -9,6 +9,16 @@
 namespace gdul
 {
 
+namespace cq_fifo_detail
+{
+enum item_state: std::uint8_t
+{
+	item_valid,
+	item_empty,
+	item_failed, // argh... 
+};
+}
+
 // Would be really cool to make a queue with comparable performance to regular concurrent_queue
 // but with (much) less complexity and with best-effort FIFO
 template <class T, class Allocator>
@@ -19,7 +29,7 @@ public:
 	using value_type = T;
 	using allocator_type = Allocator;
 	using size_type = std::size_t;
-	using item_type = struct { T m_item; };
+	using item_type = struct { T m_item; cq_fifo_detail::item_state m_state; };
 
 	void push(T&& in);
 	void push(const T& in);
@@ -31,6 +41,12 @@ public:
 	using const_reverse_iterator = const_iterator;
 
 private:
+
+	iterator begin();
+	const_iterator cbegin() const;
+	iterator end();
+	const_iterator cend() const;
+
 	using padding_type = const std::uint8_t[64];
 
 	struct items_array_node
@@ -108,5 +124,17 @@ private:
 	std::atomic<iterator> m_readAt;
 	std::atomic<iterator> m_readRear;
 };
+
+template<class T, class Allocator>
+inline typename concurrent_queue_fifo<T, Allocator>::iterator concurrent_queue_fifo<T, Allocator>::begin()
+{
+	return t_items.get().get();
+}
+
+template<class T, class Allocator>
+inline typename concurrent_queue_fifo<T, Allocator>::const_iterator concurrent_queue_fifo<T, Allocator>::cbegin() const
+{
+	return t_items.get().get();
+}
 
 }
