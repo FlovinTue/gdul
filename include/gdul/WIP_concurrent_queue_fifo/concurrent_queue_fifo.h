@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <atomic>
 #include <stdint.h>
 
@@ -19,7 +20,7 @@ public:
 	using value_type = T;
 	using allocator_type = Allocator;
 	using size_type = std::size_t;
-	using item_type = struct { T m_item; };
+	using item_type = struct { T m_item; bool m_written; };
 
 	template <class U>
 	void push(U&& in);
@@ -27,8 +28,6 @@ public:
 
 	using iterator = item_type * ;
 	using const_iterator = const item_type*;
-	using reverse_iterator = iterator;
-	using const_reverse_iterator = const_iterator;
 
 private:
 	struct items_node
@@ -37,102 +36,56 @@ private:
 		shared_ptr<item_type[]> m_items;
 	};
 	
-	iterator begin();
-	const_iterator cbegin() const;
-	iterator end();
-	const_iterator cend() const;
+	void try_advance_written(size_type from);
 
-	void push_items_node(shared_ptr<items_node> node);
-	void try_pop_items_node();
+	shared_ptr<item_type[]> m_items;
+	
+	std::atomic<size_type> m_writeReserve;
+	std::atomic<size_type> m_readReserve;
 
-	tlm<shared_ptr<item_type[]>> t_items;
-	
-	// Keep a single hierarchy of items_nodes.
-	atomic_shared_ptr<items_node> m_items;
-	
-	std::atomic<iterator> m_writeAt;
-	std::atomic<iterator> m_writeRear;
-	std::atomic<iterator> m_readAt;
-	std::atomic<iterator> m_readRear;
+	std::atomic<size_type> m_writeAt;
+	std::atomic<size_type> m_readAt;
+
+	std::atomic<size_type> m_written;
+	std::atomic<size_type> m_read;
+
+	std::atomic<size_type> m_writeArray;
+	std::atomic<size_type> m_readArray;
 };
 
 template<class T, class Allocator>
 template<class U>
 inline void concurrent_queue_fifo<T, Allocator>::push(U && in)
 {
-	// iterator itr = acquire iterator;
-	// while (itr outside)
-	// push new array
-	// itr = acquire iterator
+	const size_type reserved(m_writeReserve.fetch_add(1));
+	const size_type written(m_written.load());
+	const size_type used(reserved - written);
+	const size_type capacity(m_items.item_count());
+	const size_type avaliable(capacity - used);
 
-	// write(std::forward<U>(in), itr)
+	if (!avaliable){
+		m_writeReserve.fetch_sub(1);
+		return;
+	}
+
+	const size_type at(m_writeAt.fetch_add(1));
+	const size_type atLocal(at % capacity);
+
+	m_items[atLocal] = std::forward<U>(in);
+	m_items[atLocal].m_written = true;
+
+	try_advance_written(at);
 }
 template<class T, class Allocator>
 inline bool concurrent_queue_fifo<T, Allocator>::try_pop(T & out)
 {
-	// iterator itr = acquire iterator;
-	// while (itr outside)
-	// if (!swap_items_array())
-	// break
-
-	// itr = acquire iterator
-	
-	// write(*itr, (iterator)&out)
-}
-
-template<class T, class Allocator>
-inline typename concurrent_queue_fifo<T, Allocator>::iterator concurrent_queue_fifo<T, Allocator>::begin()
-{
-	return t_items.get().get();
-}
-
-template<class T, class Allocator>
-inline typename concurrent_queue_fifo<T, Allocator>::const_iterator concurrent_queue_fifo<T, Allocator>::cbegin() const
-{
-	return t_items.get().get();
-}
-
-template<class T, class Allocator>
-inline typename concurrent_queue_fifo<T, Allocator>::iterator concurrent_queue_fifo<T, Allocator>::end()
-{
-	return t_items.get().get();
-}
-
-template<class T, class Allocator>
-inline typename concurrent_queue_fifo<T, Allocator>::const_iterator concurrent_queue_fifo<T, Allocator>::cend() const
-{
-	return t_items.get().get();
+	(void)out;
+	const size_type reserved(m_readReserve.fetch_add(1));
 }
 template<class T, class Allocator>
-inline void concurrent_queue_fifo<T, Allocator>::push_items_node(shared_ptr<items_node> node)
+inline void concurrent_queue_fifo<T, Allocator>::try_advance_written(size_type from)
 {
-	// Probably races here...
-
-	atomic_shared_ptr<items_node>* rawref(&m_items);
-	do{
-		shared_ptr<items_node> ref(rawref.load(std::memory_order_relaxed));
-
-		while (*rawref){
-			rawref = &ref->m_next;
-			ref->m_next.load(std::memory_order_relaxed);
-		}
-
-		raw_ptr<items_node> exp(nullptr, 0);
-	} while (!rawref.compare_exchange_strong(exp, std::move(node), std::memory_order_acquire, std::memory_order_relaxed));
-}
-template<class T, class Allocator>
-inline void concurrent_queue_fifo<T, Allocator>::try_pop_items_node()
-{
-	shared_ptr<items_node> items(m_items.load(std::memory_order_relaxed);
-
-	if (!items){
-		return;
-	}
-
-	shared_ptr<items_node> desired(items->m_next.load(std::memory_order_relaxed));
-
-	raw_ptr<items_node> exp(items);
-	m_items.compare_exchange_strong(exp, std::move(desired));
+	(void)from;
 }
 }
 
