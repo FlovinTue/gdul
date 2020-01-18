@@ -48,9 +48,6 @@ private:
 
 	std::atomic<size_type> m_written;
 	std::atomic<size_type> m_read;
-
-	std::atomic<size_type> m_writeArray;
-	std::atomic<size_type> m_readArray;
 };
 
 template<class T, class Allocator>
@@ -85,7 +82,26 @@ inline bool concurrent_queue_fifo<T, Allocator>::try_pop(T & out)
 template<class T, class Allocator>
 inline void concurrent_queue_fifo<T, Allocator>::try_advance_written(size_type from)
 {
-	(void)from;
+	size_type written(m_written.load());
+	const size_type at(m_writeAt.load());
+
+	if (written == at) {
+		return;
+	}
+
+	while (written != m_writeAt.load()) {
+		
+		size_type incr(0);
+		for (; m_items[(written + incr) % m_items.item_count()].m_written == true; ++icr);
+
+		if (!incr) {
+			break;
+		}
+
+		if (m_written.compare_exchange_strong(written, written + incr)) {
+			break;
+		}
+	}
 }
 }
 
