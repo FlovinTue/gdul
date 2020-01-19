@@ -49,7 +49,7 @@ worker_impl::worker_impl()
 	, m_coreAffinity(0)
 	, m_executionPriority(0)
 {
-	m_distributionChunks = jh_detail::pow2summation(m_firstQueue + 1, m_lastQueue + 1);
+	m_distributionChunks = jh_detail::pow2summation(0, (1 + m_lastQueue) - m_firstQueue);
 }
 worker_impl::worker_impl(std::thread&& thrd, allocator_type allocator)
 	: m_thread(std::move(thrd))
@@ -67,7 +67,7 @@ worker_impl::worker_impl(std::thread&& thrd, allocator_type allocator)
 	, m_coreAffinity(0)
 	, m_executionPriority(0)
 {
-	m_distributionChunks = jh_detail::pow2summation(m_firstQueue + 1, m_lastQueue + 1);
+	m_distributionChunks = jh_detail::pow2summation(0, (1 + m_lastQueue) - m_firstQueue);
 
 	m_isActive.store(true, std::memory_order_release);
 }
