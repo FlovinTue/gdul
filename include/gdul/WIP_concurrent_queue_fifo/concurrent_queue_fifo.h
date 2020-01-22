@@ -26,17 +26,8 @@ public:
 	void push(U&& in);
 	bool try_pop(T& out);
 
-	using iterator = item_type * ;
-	using const_iterator = const item_type*;
-
 private:
-	struct items_node
-	{
-		atomic_shared_ptr<items_node> m_next;
-		shared_ptr<item_type[]> m_items;
-	};
-	
-	void try_advance_written(size_type from);
+	void try_advance_write_check(size_type from, std::atomic<size_type>& index, std::atomic<size_type>& performed, bool desirableValue);
 
 	shared_ptr<item_type[]> m_items;
 	
@@ -54,9 +45,9 @@ template<class T, class Allocator>
 template<class U>
 inline void concurrent_queue_fifo<T, Allocator>::push(U && in)
 {
-	const size_type reserved(m_writeReserve.fetch_add(1));
+	const size_type reserve(m_writeReserve.fetch_add(1));
 	const size_type written(m_written.load());
-	const size_type used(reserved - written);
+	const size_type used(reserve - written);
 	const size_type capacity(m_items.item_count());
 	const size_type avaliable(capacity - used);
 
@@ -71,34 +62,50 @@ inline void concurrent_queue_fifo<T, Allocator>::push(U && in)
 	m_items[atLocal] = std::forward<U>(in);
 	m_items[atLocal].m_written = true;
 
-	try_advance_written(at);
+	try_advance_read(at, m_writeAt, m_written, false);
 }
 template<class T, class Allocator>
 inline bool concurrent_queue_fifo<T, Allocator>::try_pop(T & out)
 {
-	(void)out;
-	const size_type reserved(m_readReserve.fetch_add(1));
+	const size_type reserve(m_readReserve.fetch_add(1));
+	const size_type written(m_written.load());
+	
+	if (!(reserve < written)){
+		m_readReserve.fetch_sub(1);
+	}
+
+	const size_type capacity(m_items.item_count());
+	const size_type at(m_readAt.fetch_add(1));
+	const size_type atLocal(at % capacity);
+
+	out = std::move(m_items[atLocal]);
+
+	m_items[atLocal].m_written = false;
+
+	try_advance_read(at, m_readAt, m_read, false);
 }
 template<class T, class Allocator>
-inline void concurrent_queue_fifo<T, Allocator>::try_advance_written(size_type from)
+inline void concurrent_queue_fifo<T, Allocator>::try_advance_write_check(size_type from, std::atomic<size_type>& index, std::atomic<size_type>& performed, bool desirableValue)
 {
-	size_type written(m_written.load());
-	const size_type at(m_writeAt.load());
+	from;
 
-	if (written == at) {
+	size_type perf(performed.load());
+	const size_type at(index.load());
+
+	if (perf == at) {
 		return;
 	}
 
-	while (written != m_writeAt.load()) {
+	while (perf != index.load()) {
 		
 		size_type incr(0);
-		for (; m_items[(written + incr) % m_items.item_count()].m_written == true; ++icr);
+		for (; m_items[(perf + incr) % m_items.item_count()].m_written == desirableValue; ++icr);
 
 		if (!incr) {
 			break;
 		}
 
-		if (m_written.compare_exchange_strong(written, written + incr)) {
+		if (performed.compare_exchange_strong(perf, perf + incr)) {
 			break;
 		}
 	}
