@@ -97,8 +97,6 @@ class dummy_container;
 
 template <class T, class Allocator>
 class buffer_deleter;
-template <class T, class Allocator>
-class store_array_deleter;
 
 enum class item_state : std::uint8_t
 {
@@ -179,15 +177,15 @@ private:
 	inline buffer_type* this_producer_cached();
 	inline buffer_type* this_consumer_cached();
 
+	inline void refresh_producer();
+
 	inline void refresh_cached_consumer();
 	inline void refresh_cached_producer();
 
 	tlm<shared_ptr_slot_type, allocator_type> t_producer;
 	tlm<shared_ptr_slot_type, allocator_type> t_consumer;
 
-	struct cache_container { cq_fifo_detail::accessor_cache<T, allocator_type> m_lastConsumer, m_lastProducer; };
-
-	static thread_local cache_container t_cachedAccesses;
+	static thread_local struct cache_container { cq_fifo_detail::accessor_cache<T, allocator_type> m_lastConsumer, m_lastProducer; } t_cachedAccesses;
 
 	static cq_fifo_detail::dummy_container<T, allocator_type> s_dummyContainer;
 
@@ -200,6 +198,9 @@ template<class T, class Allocator>
 inline concurrent_queue_fifo<T, Allocator>::concurrent_queue_fifo()
 	: concurrent_queue_fifo<T, Allocator>(Allocator())
 {
+	// Test
+	m_itemBuffer->store(create_item_buffer(32));
+	//
 }
 template<class T, class Allocator>
 inline concurrent_queue_fifo<T, Allocator>::concurrent_queue_fifo(Allocator allocator)
@@ -214,7 +215,6 @@ inline concurrent_queue_fifo<T, Allocator>::~concurrent_queue_fifo() noexcept
 {
 	unsafe_reset();
 }
-
 template<class T, class Allocator>
 void concurrent_queue_fifo<T, Allocator>::push(const T& in)
 {
@@ -262,31 +262,14 @@ bool concurrent_queue_fifo<T, Allocator>::try_pop(T& out)
 template<class T, class Allocator>
 inline void concurrent_queue_fifo<T, Allocator>::reserve(typename concurrent_queue_fifo<T, Allocator>::size_type capacity)
 {
-	shared_ptr_slot_type& producer(t_producer);
-
-	if (!producer->is_valid())
-	{
-		init_producer(capacity);
-	}
-	else if (producer->get_capacity() < capacity)
-	{
-		const size_type log2Capacity(cq_fifo_detail::log2_align<void>(capacity, cq_fifo_detail::Buffer_Capacity_Max));
-		shared_ptr_slot_type buffer(create_item_buffer(log2Capacity));
-		producer->push_front(buffer);
-		producer = std::move(buffer);
-	}
-	refresh_cached_producer();
+	(void)capacity;
 }
 template<class T, class Allocator>
 inline void concurrent_queue_fifo<T, Allocator>::unsafe_clear()
 {
 	std::atomic_thread_fence(std::memory_order_acquire);
 
-	shared_ptr_array_type producerArray(m_producerSlots.unsafe_load(std::memory_order_relaxed));
-	for (std::uint16_t i = 0; i < m_producerCount.load(std::memory_order_relaxed); ++i)
-	{
-		producerArray[i].unsafe_get()->unsafe_clear();
-	}
+	m_itemBuffer->unsafe_load()->unsafe_clear();
 
 	std::atomic_thread_fence(std::memory_order_release);
 }
@@ -295,12 +278,7 @@ inline void concurrent_queue_fifo<T, Allocator>::unsafe_reset()
 {
 	std::atomic_thread_fence(std::memory_order_acquire);
 
-	//for (std::uint16_t i = 0; i < producerCount; ++i)
-	//{
-	//	buffer_type* slot(slots[i].unsafe_get());
-	//	slot->invalidate();
-	//}
-
+	m_itemBuffer.unsafe_load(std::memory_order_relaxed)->unsafe_reset();
 	m_itemBuffer.unsafe_store(shared_ptr_slot_type(nullptr), std::memory_order_relaxed);
 
 	std::atomic_thread_fence(std::memory_order_release);
@@ -308,32 +286,12 @@ inline void concurrent_queue_fifo<T, Allocator>::unsafe_reset()
 template<class T, class Allocator>
 inline typename concurrent_queue_fifo<T, Allocator>::size_type concurrent_queue_fifo<T, Allocator>::size() const
 {
-	const std::uint16_t producerCount(m_producerCount.load(std::memory_order_acquire));
-
-	shared_ptr_array_type producerArray(m_producerSlots.load(std::memory_order_relaxed));
-
-	size_type accumulatedSize(0);
-	for (std::uint16_t i = 0; i < producerCount; ++i)
-	{
-		const shared_ptr_slot_type slot(producerArray[i].load(std::memory_order_relaxed));
-		accumulatedSize += slot->size();
-	}
-	return accumulatedSize;
+	m_itemBuffer.load(std::memory_order_relaxed)->size();
 }
 template<class T, class Allocator>
 inline typename concurrent_queue_fifo<T, Allocator>::size_type concurrent_queue_fifo<T, Allocator>::unsafe_size() const
 {
-	const std::uint16_t producerCount(m_producerCount.load(std::memory_order_acquire));
-
-	const atomic_shared_ptr_slot_type* const producerArray(m_producerSlots.unsafe_get());
-
-	size_type accumulatedSize(0);
-	for (std::uint16_t i = 0; i < producerCount; ++i)
-	{
-		const buffer_type* const slot(producerArray[i].unsafe_get());
-		accumulatedSize += slot->size();
-	}
-	return accumulatedSize;
+	m_itemBuffer.unsafe_get()->size();
 }
 template<class T, class Allocator>
 inline bool concurrent_queue_fifo<T, Allocator>::try_pop_item_buffer()
@@ -342,7 +300,6 @@ inline bool concurrent_queue_fifo<T, Allocator>::try_pop_item_buffer()
 		return false;
 	}
 
-	refresh_cached_consumer();
 
 	return true;
 }
@@ -437,9 +394,14 @@ inline typename concurrent_queue_fifo<T, Allocator>::buffer_type* concurrent_que
 }
 
 template<class T, class Allocator>
+inline void concurrent_queue_fifo<T, Allocator>::refresh_producer()
+{
+
+}
+
+template<class T, class Allocator>
 inline void concurrent_queue_fifo<T, Allocator>::refresh_cached_consumer()
 {
-	if (!)
 	t_cachedAccesses.m_lastConsumer.m_buffer = t_consumer.get().m_buffer.get();
 	t_cachedAccesses.m_lastConsumer.m_addr = this;
 }
@@ -492,12 +454,16 @@ public:
 	inline void invalidate();
 
 	// Searches the buffer list towards the front for
+	// the front-most buffer
+	inline shared_ptr_slot_type find_front();
+
+	// Searches the buffer list towards the front for
 	// the first buffer contining entries
 	inline shared_ptr_slot_type find_back();
 
 	// Pushes a newly allocated buffer buffer to the front of the
 	// buffer list
-	inline void push_front(shared_ptr_slot_type newBuffer);
+	inline bool try_push_front(shared_ptr_slot_type newBuffer);
 
 	inline void unsafe_clear();
 
@@ -597,6 +563,18 @@ inline void item_buffer<T, Allocator>::invalidate()
 	}
 }
 template<class T, class Allocator>
+inline typename item_buffer<T, Allocator>::shared_ptr_slot_type item_buffer<T, Allocator>::find_front()
+{
+	shared_ptr_slot_type front(nullptr);
+	item_buffer<T, allocator_type>* inspect(this);
+
+	while (inspect->m_next){
+		front = inspect->m_next.load(std::memory_order_relaxed);
+		inspect = front.get();
+	}
+	return front;
+}
+template<class T, class Allocator>
 inline typename item_buffer<T, Allocator>::shared_ptr_slot_type item_buffer<T, Allocator>::find_back()
 {
 	shared_ptr_slot_type back(nullptr);
@@ -653,23 +631,20 @@ template<class T, class Allocator>
 template <class U, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) && !GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>*>
 inline bool item_buffer<T, Allocator>::verify_successor(const shared_ptr_slot_type& successor)
 {
-	if (!m_next)
-	{
+#if defined(GDUL_CQ_ENABLE_EXCEPTIONHANDLING)
+	if (!m_next){
 		return false;
 	}
 
 	shared_ptr_slot_type next(nullptr);
 	item_buffer<T, Allocator>* inspect(this);
 
-	do
-	{
+	do{
 		const size_type preRead(inspect->m_preReadIterator.load(std::memory_order_relaxed));
-		for (size_type i = 0; i < inspect->m_capacity; ++i)
-		{
+		for (size_type i = 0; i < inspect->m_capacity; ++i){
 			const size_type index((preRead - i) % inspect->m_capacity);
 
-			if (inspect->m_dataBlock[index].get_state_local() != item_state::Empty)
-			{
+			if (inspect->m_dataBlock[index].get_state_local() != item_state::Empty){
 				return false;
 			}
 		}
@@ -682,7 +657,9 @@ inline bool item_buffer<T, Allocator>::verify_successor(const shared_ptr_slot_ty
 			break;
 		}
 	} while (inspect->m_next);
-
+#else
+	(void)successor;
+#endif
 	return true;
 }
 template<class T, class Allocator>
@@ -728,16 +705,20 @@ inline void item_buffer<T, Allocator>::check_for_damage()
 #endif
 }
 template<class T, class Allocator>
-inline void item_buffer<T, Allocator>::push_front(shared_ptr_slot_type newBuffer)
+inline bool item_buffer<T, Allocator>::try_push_front(shared_ptr_slot_type newBuffer)
 {
 	item_buffer<T, allocator_type>* last(this);
 
-	while (last->m_next)
-	{
+	while (last->m_next){
 		last = last->m_next.unsafe_get();
 	}
 
-	last->m_next.store(std::move(newBuffer), std::memory_order_seq_cst);
+	if (!(last->get_capacity() < newBuffer->get_capacity())){
+		return false;
+	}
+
+	raw_ptr<item_buffer<T, Allocator>> exp(nullptr);
+	return last->m_next.compare_exchange_strong(exp, std::move(newBuffer))
 }
 template<class T, class Allocator>
 inline void item_buffer<T, Allocator>::unsafe_clear()
@@ -1259,37 +1240,6 @@ inline void buffer_deleter<T, Allocator>::operator()(T* obj, Allocator&)
 {
 	(*obj).~T();
 }
-template <class T, class Allocator>
-class store_array_deleter
-{
-public:
-	store_array_deleter(std::uint16_t capacity);
-	store_array_deleter(store_array_deleter<T, Allocator>&& other) noexcept;
-	void operator()(T* obj, Allocator& alloc);
-
-private:
-	std::uint16_t m_capacity;
-};
-template<class T, class Allocator>
-inline store_array_deleter<T, Allocator>::store_array_deleter(std::uint16_t capacity)
-	: m_capacity(capacity)
-{
-}
-template<class T, class Allocator>
-inline store_array_deleter<T, Allocator>::store_array_deleter(store_array_deleter<T, Allocator>&& other) noexcept
-	: m_capacity(other.m_capacity)
-{
-}
-template<class T, class Allocator>
-inline void store_array_deleter<T, Allocator>::operator()(T* obj, Allocator& alloc)
-{
-	for (std::uint16_t i = 0; i < m_capacity; ++i)
-	{
-		obj[i].~T();
-	}
-	alloc.deallocate(reinterpret_cast<std::uint8_t*>(obj), m_capacity * sizeof(T));
-}
-
 }
 template <class T, class Allocator>
 cq_fifo_detail::dummy_container<T, typename concurrent_queue_fifo<T, Allocator>::allocator_type> concurrent_queue_fifo<T, Allocator>::s_dummyContainer;
