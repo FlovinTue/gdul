@@ -189,9 +189,6 @@ private:
 	using atomic_shared_ptr_array_type = atomic_shared_ptr<atomic_shared_ptr_slot_type[]>;
 	using shared_ptr_array_type = shared_ptr<atomic_shared_ptr_slot_type[]>;
 
-	using consumer_vector_allocator = typename std::allocator_traits<allocator_type>::template rebind_alloc<cqdetail::consumer_wrapper<shared_ptr_slot_type, shared_ptr_array_type>>;
-	using producer_vector_allocator = typename std::allocator_traits<allocator_type>::template rebind_alloc<shared_ptr_slot_type>;
-
 	template <class ...Arg>
 	void push_internal(Arg&&... in);
 
