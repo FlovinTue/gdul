@@ -121,6 +121,7 @@ class shared_ptr_allocator_adaptor;
 // Not quite size_type max because we need some leaway in case we
 // need to throw consumers out of a buffer whilst repairing it
 static constexpr size_type Buffer_Capacity_Max = ~(std::numeric_limits<size_type>::max() >> 3) / 2;
+static constexpr size_type Buffer_Capacity_Default = 8;
 
 static constexpr std::uint64_t Ptr_Mask = (std::uint64_t(std::numeric_limits<std::uint32_t>::max()) << 16 | std::uint64_t(std::numeric_limits<std::uint16_t>::max()));
 }
@@ -164,32 +165,37 @@ private:
 
 	using buffer_type = cq_fifo_detail::item_buffer<T, allocator_type>;
 	using allocator_adapter_type = cq_fifo_detail::shared_ptr_allocator_adaptor<std::uint8_t, allocator_type>;
-	using shared_ptr_slot_type = shared_ptr<buffer_type>;
-	using atomic_shared_ptr_slot_type = atomic_shared_ptr<buffer_type>;
+
+	using raw_ptr_buffer_type = raw_ptr<buffer_type>;
+	using shared_ptr_buffer_type = shared_ptr<buffer_type>;
+	using atomic_shared_ptr_buffer_type = atomic_shared_ptr<buffer_type>;
 
 	template <class ...Arg>
 	void push_internal(Arg&&... in);
 
-	inline bool try_pop_item_buffer();
 
-	inline shared_ptr_slot_type create_item_buffer(std::size_t withSize);
+	inline shared_ptr_buffer_type create_item_buffer(std::size_t withSize);
 
 	inline buffer_type* this_producer_cached();
 	inline buffer_type* this_consumer_cached();
 
+	inline bool initialize_consumer();
+	inline void initialize_producer();
+
+	inline bool refresh_consumer();
 	inline void refresh_producer();
 
 	inline void refresh_cached_consumer();
 	inline void refresh_cached_producer();
 
-	tlm<shared_ptr_slot_type, allocator_type> t_producer;
-	tlm<shared_ptr_slot_type, allocator_type> t_consumer;
+	tlm<shared_ptr_buffer_type, allocator_type> t_producer;
+	tlm<shared_ptr_buffer_type, allocator_type> t_consumer;
 
 	static thread_local struct cache_container { cq_fifo_detail::accessor_cache<T, allocator_type> m_lastConsumer, m_lastProducer; } t_cachedAccesses;
 
 	static cq_fifo_detail::dummy_container<T, allocator_type> s_dummyContainer;
 
-	atomic_shared_ptr_slot_type m_itemBuffer;
+	atomic_shared_ptr_buffer_type m_itemBuffer;
 
 	allocator_type m_allocator;
 };
@@ -197,19 +203,14 @@ private:
 template<class T, class Allocator>
 inline concurrent_queue_fifo<T, Allocator>::concurrent_queue_fifo()
 	: concurrent_queue_fifo<T, Allocator>(Allocator())
-{
-	// Test
-	m_itemBuffer->store(create_item_buffer(32));
-	//
-}
+{}
 template<class T, class Allocator>
 inline concurrent_queue_fifo<T, Allocator>::concurrent_queue_fifo(Allocator allocator)
 	: t_producer(s_dummyContainer.m_dummyBuffer, allocator)
 	, t_consumer(s_dummyContainer.m_dummyBuffer, allocator)
 	, m_itemBuffer(nullptr)
 	, m_allocator(allocator)
-{
-}
+{}
 template<class T, class Allocator>
 inline concurrent_queue_fifo<T, Allocator>::~concurrent_queue_fifo() noexcept
 {
@@ -229,14 +230,12 @@ template<class T, class Allocator>
 template<class ...Arg>
 inline void concurrent_queue_fifo<T, Allocator>::push_internal(Arg&& ...in)
 {
-	buffer_type* const cachedProducer(this_producer_cached());
-
-	while (!cachedProducer->try_push(std::forward<Arg>(in)...)){
-		if (cachedProducer->is_valid()){
+	while (!this_producer_cached()->try_push(std::forward<Arg>(in)...)){
+		if (this_producer_cached()->is_valid()){
 			refresh_producer();
 		}
 		else{
-			t_producer = m_itemBuffer.load();
+			initialize_producer();
 		}
 		refresh_cached_producer();
 	}
@@ -244,16 +243,16 @@ inline void concurrent_queue_fifo<T, Allocator>::push_internal(Arg&& ...in)
 template<class T, class Allocator>
 bool concurrent_queue_fifo<T, Allocator>::try_pop(T& out)
 {
-	buffer_type* const cachedConsumer(this_consumer_cached());
-
-	while (!cachedConsumer->try_pop(out)){
-		if (cachedConsumer->is_valid()){
-			if (!try_pop_item_buffer()){
+	while (!this_consumer_cached()->try_pop(out)){
+		if (this_consumer_cached()->is_valid()){
+			if (!refresh_consumer()){
 				return false;
 			}
 		}
 		else{
-			t_consumer = m_itemBuffer.load();
+			if (!initialize_consumer()){
+				return false;
+			}
 		}
 		refresh_cached_consumer();
 	}
@@ -278,8 +277,8 @@ inline void concurrent_queue_fifo<T, Allocator>::unsafe_reset()
 {
 	std::atomic_thread_fence(std::memory_order_acquire);
 
-	m_itemBuffer.unsafe_load(std::memory_order_relaxed)->unsafe_reset();
-	m_itemBuffer.unsafe_store(shared_ptr_slot_type(nullptr), std::memory_order_relaxed);
+	m_itemBuffer.unsafe_get()->invalidate();
+	m_itemBuffer.unsafe_store(shared_ptr_buffer_type(nullptr), std::memory_order_relaxed);
 
 	std::atomic_thread_fence(std::memory_order_release);
 }
@@ -294,17 +293,25 @@ inline typename concurrent_queue_fifo<T, Allocator>::size_type concurrent_queue_
 	m_itemBuffer.unsafe_get()->size();
 }
 template<class T, class Allocator>
-inline bool concurrent_queue_fifo<T, Allocator>::try_pop_item_buffer()
+inline bool concurrent_queue_fifo<T, Allocator>::refresh_consumer()
 {
+	assert(t_consumer.get()->is_valid() && "refresh_consumer assumes a valid consumer");
+
 	if (!m_itemBuffer){
 		return false;
 	}
 
+	shared_ptr_buffer_type buffer(m_itemBuffer.load(std::memory_order_relaxed));
+	
+	if (buffer.get() != t_consumer.get().get()){
+		t_consumer = std::move(buffer);
+		return true;
+	}
 
 	return true;
 }
 template<class T, class Allocator>
-inline typename concurrent_queue_fifo<T, Allocator>::shared_ptr_slot_type concurrent_queue_fifo<T, Allocator>::create_item_buffer(std::size_t withSize)
+inline typename concurrent_queue_fifo<T, Allocator>::shared_ptr_buffer_type concurrent_queue_fifo<T, Allocator>::create_item_buffer(std::size_t withSize)
 {
 	const std::size_t log2size(cq_fifo_detail::log2_align<void>(withSize, cq_fifo_detail::Buffer_Capacity_Max));
 
@@ -369,7 +376,7 @@ inline typename concurrent_queue_fifo<T, Allocator>::shared_ptr_slot_type concur
 
 	allocator_adapter_type allocAdaptor(totalBlock, totalBlockSize);
 
-	shared_ptr_slot_type returnValue(buffer, allocAdaptor, cq_fifo_detail::buffer_deleter<buffer_type, allocator_adapter_type>());
+	shared_ptr_buffer_type returnValue(buffer, allocAdaptor, cq_fifo_detail::buffer_deleter<buffer_type, allocator_adapter_type>());
 
 	return returnValue;
 }
@@ -394,15 +401,61 @@ inline typename concurrent_queue_fifo<T, Allocator>::buffer_type* concurrent_que
 }
 
 template<class T, class Allocator>
+inline bool concurrent_queue_fifo<T, Allocator>::initialize_consumer()
+{
+	assert(!t_consumer.get()->is_valid() && "initialize_consumer assumes an invalid consumer");
+
+	if (!m_itemBuffer){
+		return false;
+	}
+	t_consumer = m_itemBuffer.load(std::memory_order_relaxed);
+
+	return true;
+}
+
+template<class T, class Allocator>
+inline void concurrent_queue_fifo<T, Allocator>::initialize_producer()
+{
+	if (!m_itemBuffer){
+		shared_ptr_buffer_type initialBuffer(create_item_buffer(cq_fifo_detail::Buffer_Capacity_Default));
+		raw_ptr_buffer_type exp(nullptr);
+		m_itemBuffer.compare_exchange_strong(exp, std::move(initialBuffer));
+	}
+	t_producer = m_itemBuffer.load(std::memory_order_relaxed);
+}
+
+template<class T, class Allocator>
 inline void concurrent_queue_fifo<T, Allocator>::refresh_producer()
 {
+	assert(t_producer.get()->is_valid() && "producer needs to be initialized");
 
+	const buffer_type* const initial(t_producer.get().get());
+
+	do{
+		shared_ptr_buffer_type front(t_producer.get()->find_front());
+
+		const bool same(front.get() == t_producer.get().get());
+		const bool null(front);
+
+		if (same | null){
+			const size_type capacity(front.item_count());
+			const size_type newCapacity(capacity * 2);
+
+			shared_ptr_buffer_type newBuffer(create_item_buffer(newCapacity));
+
+			front->try_push_front(std::move(newBuffer));
+		}
+		else{
+			t_producer = std::move(front);
+		}
+
+	} while (t_producer.get().get() == initial);
 }
 
 template<class T, class Allocator>
 inline void concurrent_queue_fifo<T, Allocator>::refresh_cached_consumer()
 {
-	t_cachedAccesses.m_lastConsumer.m_buffer = t_consumer.get().m_buffer.get();
+	t_cachedAccesses.m_lastConsumer.m_buffer = t_consumer.get().get();
 	t_cachedAccesses.m_lastConsumer.m_addr = this;
 }
 
@@ -420,9 +473,9 @@ template <class T, class Allocator>
 class item_buffer
 {
 private:
-	using atomic_shared_ptr_slot_type = typename concurrent_queue_fifo<T, Allocator>::atomic_shared_ptr_slot_type;
-	using shared_ptr_slot_type = typename concurrent_queue_fifo<T, Allocator>::shared_ptr_slot_type;
-
+	using atomic_shared_ptr_buffer_type = typename concurrent_queue_fifo<T, Allocator>::atomic_shared_ptr_buffer_type;
+	using shared_ptr_buffer_type = typename concurrent_queue_fifo<T, Allocator>::shared_ptr_buffer_type;
+	using raw_ptr_buffer_type = typename concurrent_queue_fifo<T, Allocator>::raw_ptr_buffer_type;
 public:
 	typedef typename concurrent_queue_fifo<T, Allocator>::size_type size_type;
 	typedef typename concurrent_queue_fifo<T, Allocator>::allocator_type allocator_type;
@@ -440,9 +493,9 @@ public:
 
 	// Makes sure that it is entirely safe to replace this buffer with a successor
 	template <class U = T, std::enable_if_t<GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) || GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)> * = nullptr>
-	inline bool verify_successor(const shared_ptr_slot_type&);
+	inline bool verify_successor(const shared_ptr_buffer_type&);
 	template <class U = T, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) && !GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)> * = nullptr>
-	inline bool verify_successor(const shared_ptr_slot_type& successor);
+	inline bool verify_successor(const shared_ptr_buffer_type& successor);
 
 	// Contains entries and / or has no next buffer
 	inline bool is_active() const;
@@ -455,15 +508,15 @@ public:
 
 	// Searches the buffer list towards the front for
 	// the front-most buffer
-	inline shared_ptr_slot_type find_front();
+	inline shared_ptr_buffer_type find_front();
 
 	// Searches the buffer list towards the front for
 	// the first buffer contining entries
-	inline shared_ptr_slot_type find_back();
+	inline shared_ptr_buffer_type find_back();
 
 	// Pushes a newly allocated buffer buffer to the front of the
 	// buffer list
-	inline bool try_push_front(shared_ptr_slot_type newBuffer);
+	inline bool try_push_front(shared_ptr_buffer_type newBuffer);
 
 	inline void unsafe_clear();
 
@@ -512,7 +565,7 @@ private:
 	size_type m_writeSlot;
 	GDUL_ATOMIC_WITH_VIEW(size_type, m_postWriteIterator);
 	GDUL_CQ_PADDING(GDUL_CACHELINE_SIZE - sizeof(size_type) * 2);
-	atomic_shared_ptr_slot_type m_next;
+	atomic_shared_ptr_buffer_type m_next;
 
 	const size_type m_capacity;
 	item_slot<T>* const m_dataBlock;
@@ -563,9 +616,9 @@ inline void item_buffer<T, Allocator>::invalidate()
 	}
 }
 template<class T, class Allocator>
-inline typename item_buffer<T, Allocator>::shared_ptr_slot_type item_buffer<T, Allocator>::find_front()
+inline typename item_buffer<T, Allocator>::shared_ptr_buffer_type item_buffer<T, Allocator>::find_front()
 {
-	shared_ptr_slot_type front(nullptr);
+	shared_ptr_buffer_type front(nullptr);
 	item_buffer<T, allocator_type>* inspect(this);
 
 	while (inspect->m_next){
@@ -575,9 +628,9 @@ inline typename item_buffer<T, Allocator>::shared_ptr_slot_type item_buffer<T, A
 	return front;
 }
 template<class T, class Allocator>
-inline typename item_buffer<T, Allocator>::shared_ptr_slot_type item_buffer<T, Allocator>::find_back()
+inline typename item_buffer<T, Allocator>::shared_ptr_buffer_type item_buffer<T, Allocator>::find_back()
 {
-	shared_ptr_slot_type back(nullptr);
+	shared_ptr_buffer_type back(nullptr);
 	item_buffer<T, allocator_type>* inspect(this);
 
 	while (inspect)
@@ -623,20 +676,20 @@ inline typename item_buffer<T, Allocator>::size_type item_buffer<T, Allocator>::
 }
 template<class T, class Allocator>
 template <class U, std::enable_if_t<GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) || GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>*>
-inline bool item_buffer<T, Allocator>::verify_successor(const shared_ptr_slot_type&)
+inline bool item_buffer<T, Allocator>::verify_successor(const shared_ptr_buffer_type&)
 {
 	return true;
 }
 template<class T, class Allocator>
 template <class U, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) && !GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>*>
-inline bool item_buffer<T, Allocator>::verify_successor(const shared_ptr_slot_type& successor)
+inline bool item_buffer<T, Allocator>::verify_successor(const shared_ptr_buffer_type& successor)
 {
 #if defined(GDUL_CQ_ENABLE_EXCEPTIONHANDLING)
 	if (!m_next){
 		return false;
 	}
 
-	shared_ptr_slot_type next(nullptr);
+	shared_ptr_buffer_type next(nullptr);
 	item_buffer<T, Allocator>* inspect(this);
 
 	do{
@@ -705,7 +758,7 @@ inline void item_buffer<T, Allocator>::check_for_damage()
 #endif
 }
 template<class T, class Allocator>
-inline bool item_buffer<T, Allocator>::try_push_front(shared_ptr_slot_type newBuffer)
+inline bool item_buffer<T, Allocator>::try_push_front(shared_ptr_buffer_type newBuffer)
 {
 	item_buffer<T, allocator_type>* last(this);
 
@@ -717,8 +770,8 @@ inline bool item_buffer<T, Allocator>::try_push_front(shared_ptr_slot_type newBu
 		return false;
 	}
 
-	raw_ptr<item_buffer<T, Allocator>> exp(nullptr);
-	return last->m_next.compare_exchange_strong(exp, std::move(newBuffer))
+	raw_ptr_buffer_type exp(nullptr);
+	return last->m_next.compare_exchange_strong(exp, std::move(newBuffer));
 }
 template<class T, class Allocator>
 inline void item_buffer<T, Allocator>::unsafe_clear()
@@ -1208,7 +1261,7 @@ class dummy_container
 {
 public:
 	dummy_container();
-	using shared_ptr_slot_type = typename concurrent_queue_fifo<T, Allocator>::shared_ptr_slot_type;
+	using shared_ptr_buffer_type = typename concurrent_queue_fifo<T, Allocator>::shared_ptr_buffer_type;
 	using allocator_adapter_type = typename concurrent_queue_fifo<T, Allocator>::allocator_adapter_type;
 	using buffer_type = typename concurrent_queue_fifo<T, Allocator>::buffer_type;
 	using allocator_type = typename concurrent_queue_fifo<T, Allocator>::allocator_type;
@@ -1217,7 +1270,7 @@ public:
 
 	}
 
-	shared_ptr_slot_type m_dummyBuffer;
+	shared_ptr_buffer_type m_dummyBuffer;
 	item_slot<T> m_dummyItem;
 	buffer_type m_dummyRawBuffer;
 };
@@ -1227,7 +1280,7 @@ inline dummy_container<T, Allocator>::dummy_container()
 	, m_dummyRawBuffer(1, &m_dummyItem)
 {
 	Allocator alloc;
-	m_dummyBuffer = shared_ptr_slot_type(&m_dummyRawBuffer, alloc, [](buffer_type*, Allocator&) {});
+	m_dummyBuffer = shared_ptr_buffer_type(&m_dummyRawBuffer, alloc, [](buffer_type*, Allocator&) {});
 }
 template <class T, class Allocator>
 class buffer_deleter
