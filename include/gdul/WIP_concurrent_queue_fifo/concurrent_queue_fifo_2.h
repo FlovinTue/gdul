@@ -106,13 +106,10 @@ enum class item_state : std::uint8_t
 	Dummy
 };
 
-template <class Dummy>
+template <class Dummy = void>
 std::size_t log2_align(std::size_t from, std::size_t clamp);
 
-template <class Dummy>
-constexpr std::size_t next_aligned_to(std::size_t addr, std::size_t align);
-
-template <class Dummy>
+template <class Dummy = void>
 constexpr std::size_t aligned_size(std::size_t byteSize, std::size_t align);
 
 template <class T, class Allocator>
@@ -261,7 +258,33 @@ bool concurrent_queue_fifo<T, Allocator>::try_pop(T& out)
 template<class T, class Allocator>
 inline void concurrent_queue_fifo<T, Allocator>::reserve(typename concurrent_queue_fifo<T, Allocator>::size_type capacity)
 {
+	assert(false && "Cannot guarantee ordering.. ");
 	(void)capacity;
+#if 0
+	const size_type alignedCapacity(cq_fifo_detail::log2_align<>(capacity, cq_fifo_detail::Buffer_Capacity_Max));
+
+	if (!m_itemBuffer){
+		raw_ptr_buffer_type exp(nullptr, m_itemBuffer.get_version());
+		m_itemBuffer.compare_exchange_strong(exp, create_item_buffer(alignedCapacity));
+	}
+
+	shared_ptr_buffer_type active(nullptr);
+	shared_ptr_buffer_type  front(nullptr);
+
+	do{
+		active = m_itemBuffer.load();
+		front = active->find_front();
+
+		if (!front){
+			front = active;
+		}
+
+		if (!(active->get_capacity() < capacity && front->get_capacity() < capacity)){
+			break;
+		}
+
+	} while (!active->try_push_front(create_item_buffer(alignedCapacity)));
+#endif
 }
 template<class T, class Allocator>
 inline void concurrent_queue_fifo<T, Allocator>::unsafe_clear()
@@ -324,7 +347,7 @@ inline bool concurrent_queue_fifo<T, Allocator>::refresh_consumer()
 template<class T, class Allocator>
 inline typename concurrent_queue_fifo<T, Allocator>::shared_ptr_buffer_type concurrent_queue_fifo<T, Allocator>::create_item_buffer(std::size_t withSize)
 {
-	const std::size_t log2size(cq_fifo_detail::log2_align<void>(withSize, cq_fifo_detail::Buffer_Capacity_Max));
+	const std::size_t log2size(cq_fifo_detail::log2_align<>(withSize, cq_fifo_detail::Buffer_Capacity_Max));
 
 	const std::size_t alignOfData(alignof(T));
 
@@ -333,8 +356,8 @@ inline typename concurrent_queue_fifo<T, Allocator>::shared_ptr_buffer_type conc
 
 	constexpr std::size_t controlBlockByteSize(gdul::sp_claim_size_custom_delete<buffer_type, allocator_adapter_type, cq_fifo_detail::buffer_deleter<buffer_type, allocator_adapter_type>>());
 
-	constexpr std::size_t controlBlockSize(cq_fifo_detail::aligned_size<void>(controlBlockByteSize, 8));
-	constexpr std::size_t bufferSize(cq_fifo_detail::aligned_size<void>(bufferByteSize, 8));
+	constexpr std::size_t controlBlockSize(cq_fifo_detail::aligned_size<>(controlBlockByteSize, 8));
+	constexpr std::size_t bufferSize(cq_fifo_detail::aligned_size<>(bufferByteSize, 8));
 	const std::size_t dataBlockSize(dataBlockByteSize);
 
 	const std::size_t totalBlockSize(controlBlockSize + bufferSize + dataBlockSize + (8 < alignOfData ? alignOfData : 0));
@@ -428,9 +451,7 @@ template<class T, class Allocator>
 inline void concurrent_queue_fifo<T, Allocator>::initialize_producer()
 {
 	if (!m_itemBuffer){
-		shared_ptr_buffer_type initialBuffer(create_item_buffer(cq_fifo_detail::Buffer_Capacity_Default));
-		raw_ptr_buffer_type exp(nullptr, m_itemBuffer.get_version());
-		m_itemBuffer.compare_exchange_strong(exp, std::move(initialBuffer));
+		reserve(cq_fifo_detail::Buffer_Capacity_Default);
 	}
 	t_producer = m_itemBuffer.load(std::memory_order_relaxed);
 }
@@ -1163,15 +1184,6 @@ template <class Dummy>
 std::uint16_t to_store_array_capacity(std::uint16_t storeSlot)
 {
 	return std::uint16_t(static_cast<std::uint16_t>(powf(2.f, static_cast<float>(storeSlot + 1))));
-}
-template <class Dummy>
-constexpr std::size_t next_aligned_to(std::size_t addr, std::size_t align)
-{
-	const std::size_t mod(addr % align);
-	const std::size_t remainder(align - mod);
-	const std::size_t offset(remainder == align ? 0 : remainder);
-
-	return addr + offset;
 }
 template <class Dummy>
 constexpr std::size_t aligned_size(std::size_t byteSize, std::size_t align)

@@ -9,6 +9,10 @@
 int main()
 {
 	gdul::concurrent_queue_fifo<int> que;
+
+	que.reserve(8);
+	que.reserve(14);
+
 	for (uint32_t i = 0; i < 9; ++i)
 	{
 		que.push(i + 1);
