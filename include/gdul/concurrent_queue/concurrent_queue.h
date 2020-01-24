@@ -116,9 +116,6 @@ template <class Dummy>
 std::size_t log2_align(std::size_t from, std::size_t clamp);
 
 template <class Dummy>
-constexpr std::size_t next_aligned_to(std::size_t addr, std::size_t align);
-
-template <class Dummy>
 constexpr std::size_t aligned_size(std::size_t byteSize, std::size_t align);
 
 template <class T, class Allocator>
@@ -1282,15 +1279,6 @@ template <class Dummy>
 std::uint16_t to_store_array_capacity(std::uint16_t storeSlot)
 {
 	return std::uint16_t(static_cast<std::uint16_t>(powf(2.f, static_cast<float>(storeSlot + 1))));
-}
-template <class Dummy>
-constexpr std::size_t next_aligned_to(std::size_t addr, std::size_t align)
-{
-	const std::size_t mod(addr % align);
-	const std::size_t remainder(align - mod);
-	const std::size_t offset(remainder == align ? 0 : remainder);
-
-	return addr + offset;
 }
 template <class Dummy>
 constexpr std::size_t aligned_size(std::size_t byteSize, std::size_t align)
