@@ -960,7 +960,7 @@ inline bool producer_buffer<T, Allocator>::try_push(Arg&& ...in)
 template<class T, class Allocator>
 inline bool producer_buffer<T, Allocator>::try_pop(T& out)
 {
-	const size_type lastWritten(m_postWriteIterator.load(std::memory_order_acquire));
+	const size_type lastWritten(m_postWriteIterator.load(std::memory_order_relaxed));
 	const size_type slotReserved(m_preReadIterator.fetch_add(1, std::memory_order_relaxed) + 1);
 	const size_type avaliable(lastWritten - slotReserved);
 
@@ -971,7 +971,7 @@ inline bool producer_buffer<T, Allocator>::try_pop(T& out)
 #endif
 		return false;
 	}
-	const size_type readSlotTotal(m_readSlot.fetch_add(1, std::memory_order_relaxed));
+	const size_type readSlotTotal(m_readSlot.fetch_add(1, std::memory_order_acquire));
 	const size_type readSlot(readSlotTotal % m_capacity);
 
 	write_out(readSlot, out);
