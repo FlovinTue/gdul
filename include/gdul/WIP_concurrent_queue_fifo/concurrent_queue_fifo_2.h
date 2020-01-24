@@ -301,14 +301,25 @@ inline bool concurrent_queue_fifo<T, Allocator>::refresh_consumer()
 		return false;
 	}
 
-	shared_ptr_buffer_type buffer(m_itemBuffer.load(std::memory_order_relaxed));
-	
-	if (buffer.get() != t_consumer.get().get()){
-		t_consumer = std::move(buffer);
+	shared_ptr_buffer_type activeBuffer(m_itemBuffer.load(std::memory_order_relaxed));
+
+	if (activeBuffer.get() != t_consumer.get().get()){
+		t_consumer = std::move(activeBuffer);
 		return true;
 	}
 
-	return true;
+	shared_ptr_buffer_type listBack(activeBuffer->find_back());
+	if (listBack){
+		if (m_itemBuffer.compare_exchange_strong(activeBuffer, listBack)){
+			t_consumer = std::move(listBack);
+		}
+		else{
+			t_consumer = std::move(activeBuffer);
+		}
+		return true;
+	}
+
+	return false;
 }
 template<class T, class Allocator>
 inline typename concurrent_queue_fifo<T, Allocator>::shared_ptr_buffer_type concurrent_queue_fifo<T, Allocator>::create_item_buffer(std::size_t withSize)
@@ -418,7 +429,7 @@ inline void concurrent_queue_fifo<T, Allocator>::initialize_producer()
 {
 	if (!m_itemBuffer){
 		shared_ptr_buffer_type initialBuffer(create_item_buffer(cq_fifo_detail::Buffer_Capacity_Default));
-		raw_ptr_buffer_type exp(nullptr);
+		raw_ptr_buffer_type exp(nullptr, m_itemBuffer.get_version());
 		m_itemBuffer.compare_exchange_strong(exp, std::move(initialBuffer));
 	}
 	t_producer = m_itemBuffer.load(std::memory_order_relaxed);
@@ -434,11 +445,12 @@ inline void concurrent_queue_fifo<T, Allocator>::refresh_producer()
 	do{
 		shared_ptr_buffer_type front(t_producer.get()->find_front());
 
-		const bool same(front.get() == t_producer.get().get());
-		const bool null(front);
+		if (!front){
+			front = t_producer.get();
+		}
 
-		if (same | null){
-			const size_type capacity(front.item_count());
+		if (front.get() == t_producer.get().get()){
+			const size_type capacity(front->get_capacity());
 			const size_type newCapacity(capacity * 2);
 
 			shared_ptr_buffer_type newBuffer(create_item_buffer(newCapacity));
