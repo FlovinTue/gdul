@@ -118,8 +118,7 @@ class shared_ptr_allocator_adaptor;
 // Not quite size_type max because we need some leaway in case we
 // need to throw consumers out of a buffer whilst repairing it
 static constexpr size_type Buffer_Capacity_Default = 8;
-static constexpr size_type Buffer_Lock_Offset = std::numeric_limits<size_type>::max() - std::numeric_limits<std::int16_t>::max();
-static constexpr size_type Buffer_Lock_Tolerance = std::numeric_limits<size_type>::max() - std::numeric_limits<std::int16_t>::max();
+static constexpr size_type Buffer_Lock_Offset = std::numeric_limits<std::uint16_t>::max();
 
 static constexpr std::uint64_t Ptr_Mask = (std::uint64_t(std::numeric_limits<std::uint32_t>::max()) << 16 | std::uint64_t(std::numeric_limits<std::uint16_t>::max()));
 }
@@ -259,9 +258,6 @@ bool concurrent_queue_fifo<T, Allocator>::try_pop(T& out)
 template<class T, class Allocator>
 inline void concurrent_queue_fifo<T, Allocator>::reserve(typename concurrent_queue_fifo<T, Allocator>::size_type capacity)
 {
-	assert(false && "Cannot guarantee ordering.. ");
-	(void)capacity;
-#if 0
 	const size_type alignedCapacity(cq_fifo_detail::log2_align<>(capacity));
 
 	if (!m_itemBuffer){
@@ -285,7 +281,6 @@ inline void concurrent_queue_fifo<T, Allocator>::reserve(typename concurrent_que
 		}
 
 	} while (!active->try_push_front(create_item_buffer(alignedCapacity)));
-#endif
 }
 template<class T, class Allocator>
 inline void concurrent_queue_fifo<T, Allocator>::unsafe_clear()
@@ -553,6 +548,7 @@ public:
 	inline void unsafe_invalidate();
 	inline void unsafe_clear();
 
+	inline void block_writers();
 private:
 	template <class U = T, std::enable_if_t<GDUL_CQ_BUFFER_NOTHROW_PUSH_MOVE(U)> * = nullptr>
 	inline void write_in(size_type slot, U&& in);
@@ -580,7 +576,6 @@ private:
 	template <class U = T, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) && !GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)> * = nullptr>
 	inline void check_for_damage();
 
-	inline void block_writers();
 	inline void try_advance_performed(size_type from, std::atomic<size_type>& index, std::atomic<size_type>& performed, item_state desiredState);
 
 	inline void reintegrate_failed_entries(size_type failCount);
@@ -839,6 +834,7 @@ inline void item_buffer<T, Allocator>::unsafe_clear()
 template<class T, class Allocator>
 inline void item_buffer<T, Allocator>::block_writers()
 {
+	m_preWriteIterator.fetch_add(m_capacity + Buffer_Lock_Offset, std::memory_order_relaxed);
 }
 template<class T, class Allocator>
 template<class ...Arg>
@@ -891,9 +887,10 @@ inline bool item_buffer<T, Allocator>::try_pop(T& out)
 template<class T, class Allocator>
 inline void item_buffer<T, Allocator>::try_advance_performed(size_type from, std::atomic<size_type>& index, std::atomic<size_type>& performed, item_state desiredState)
 {
-	size_type perf(performed.load());
-	size_type ix;
-	while (ix = index.load() != perf){
+	size_type perf(performed.load(std::memory_order_relaxed));
+	size_type ix(index.load(std::memory_order_relaxed));
+
+	while (ix != perf){
 		size_type incr(0);
 		for (size_type i = from; i < ix; ++i, ++incr){
 			if (m_items[i % m_capacity].get_state_local() != desiredState){
@@ -905,9 +902,10 @@ inline void item_buffer<T, Allocator>::try_advance_performed(size_type from, std
 			break;
 		}
 
-		if (performed.compare_exchange_strong(perf, perf + incr), std::memory_order_release, std::memory_order_relaxed){
+		if (performed.compare_exchange_strong(perf, perf + incr, std::memory_order_release, std::memory_order_relaxed)){
 			break;
 		}
+		ix = index.load(std::memory_order_relaxed);
 	}
 }
 template <class T, class Allocator>
@@ -1324,6 +1322,8 @@ inline dummy_container<T, Allocator>::dummy_container()
 	: m_dummyItem(item_state::Dummy)
 	, m_dummyRawBuffer(1, &m_dummyItem)
 {
+	m_dummyRawBuffer.block_writers();
+
 	Allocator alloc;
 	m_dummyBuffer = shared_ptr_buffer_type(&m_dummyRawBuffer, alloc, [](buffer_type*, Allocator&) {});
 }
