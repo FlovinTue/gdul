@@ -653,7 +653,7 @@ inline bool item_buffer<T, Allocator>::is_active() const
 template<class T, class Allocator>
 inline bool item_buffer<T, Allocator>::is_valid() const
 {
-	return m_items[m_writeAt % m_capacity].get_state_local() != item_state::Dummy;
+	return m_items[m_writeAt.load(std::memory_order_relaxed) % m_capacity].get_state_local() != item_state::Dummy;
 }
 template<class T, class Allocator>
 inline void item_buffer<T, Allocator>::unsafe_invalidate()
@@ -661,9 +661,7 @@ inline void item_buffer<T, Allocator>::unsafe_invalidate()
 	block_readers();
 	block_writers();
 
-	for (size_type i = 0; i < m_capacity; ++i){
-		m_items[i].set_state(item_state::Dummy);
-	}
+	m_items[m_writeAt.load(std::memory_order_relaxed) % m_capacity].set_state(item_state::Dummy);
 
 	if (m_next){
 		m_next.unsafe_get()->unsafe_invalidate();
@@ -896,7 +894,7 @@ inline bool item_buffer<T, Allocator>::try_push(Arg&& ...in)
 		return false;
 	}
 
-	const size_type at(m_writeAt.fetch_add(1, std::memory_order_acquire));
+	const size_type at(m_writeAt.fetch_add(1, std::memory_order_relaxed));
 	const size_type atLocal(at % m_capacity);
 
 	write_in(atLocal, std::forward<Arg>(in)...);
@@ -926,9 +924,12 @@ inline bool item_buffer<T, Allocator>::try_pop(T& out)
 
 	write_out(atLocal, out);
 
-	m_items[atLocal].set_state(item_state::Empty);
-
 	post_pop_cleanup(atLocal);
+
+
+	// Propagate to readers.. Via publisher? 
+	// set_state + get_state acquire / release ?
+	m_items[atLocal].set_state(item_state::Empty);
 
 	try_publish_changes(m_readAt, m_read, item_state::Empty);
 
@@ -1128,11 +1129,11 @@ private:
 		struct
 		{
 			std::uint16_t trash[3];
-			item_state m_state;
+			std::atomic<item_state> m_state;
 		};
 	};
 #else
-	item_state m_state;
+	std::atomic<item_state> m_state;
 #endif
 };
 template<class T>
@@ -1192,16 +1193,16 @@ template<class T>
 inline void item_slot<T>::set_state(item_state state)
 {
 #ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
-	reference().m_state = state;
+	reference().set_state_local(state);
 #else
-	m_state = state;
+	set_state_local(state);
 #endif
 }
 
 template<class T>
 inline void item_slot<T>::set_state_local(item_state state)
 {
-	m_state = state;
+	m_state.store(state, std::memory_order_release);
 }
 template<class T>
 inline void item_slot<T>::reset_ref()
@@ -1213,7 +1214,7 @@ inline void item_slot<T>::reset_ref()
 template<class T>
 inline item_state item_slot<T>::get_state_local() const
 {
-	return m_state;
+	return m_state.load(std::memory_order_acquire);
 }
 #ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
 template<class T>
@@ -1256,18 +1257,6 @@ std::size_t log2_align(std::size_t from)
 	return nextVal;
 }
 template <class Dummy>
-inline std::uint8_t to_store_array_slot(std::uint16_t producerIndex)
-{
-	const float fSourceStoreSlot(log2f(static_cast<float>(producerIndex)));
-	const std::uint8_t sourceStoreSlot(static_cast<std::uint8_t>(fSourceStoreSlot));
-	return sourceStoreSlot;
-}
-template <class Dummy>
-std::uint16_t to_store_array_capacity(std::uint16_t storeSlot)
-{
-	return std::uint16_t(static_cast<std::uint16_t>(powf(2.f, static_cast<float>(storeSlot + 1))));
-}
-template <class Dummy>
 constexpr std::size_t aligned_size(std::size_t byteSize, std::size_t align)
 {
 	const std::size_t div(byteSize / align);
@@ -1276,22 +1265,6 @@ constexpr std::size_t aligned_size(std::size_t byteSize, std::size_t align)
 
 	return align * total;
 }
-template <class SharedPtrSlotType, class SharedPtrArrayType>
-struct consumer_wrapper
-{
-	consumer_wrapper()
-		: consumer_wrapper<SharedPtrSlotType, SharedPtrArrayType>::consumer_wrapper(SharedPtrSlotType(nullptr))
-	{}
-
-	consumer_wrapper(SharedPtrSlotType buffer)
-		: m_buffer(std::move(buffer))
-		, m_popCounter(0)
-	{}
-
-	SharedPtrSlotType m_buffer;
-	SharedPtrArrayType m_lastKnownArray;
-	std::uint16_t m_popCounter;
-};
 template <class T, class Allocator>
 class shared_ptr_allocator_adaptor : public Allocator
 {
