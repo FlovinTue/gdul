@@ -262,14 +262,14 @@ inline void concurrent_queue_fifo<T, Allocator>::reserve(typename concurrent_que
 
 	if (!m_itemBuffer){
 		raw_ptr_buffer_type exp(nullptr, m_itemBuffer.get_version());
-		m_itemBuffer.compare_exchange_strong(exp, create_item_buffer(alignedCapacity));
+		m_itemBuffer.compare_exchange_strong(exp, create_item_buffer(alignedCapacity), std::memory_order_release, std::memory_order_relaxed);
 	}
 
 	shared_ptr_buffer_type active(nullptr);
 	shared_ptr_buffer_type  front(nullptr);
 
 	do{
-		active = m_itemBuffer.load();
+		active = m_itemBuffer.load(std::memory_order_relaxed);
 		front = active->find_front();
 
 		if (!front){
@@ -291,7 +291,13 @@ inline void concurrent_queue_fifo<T, Allocator>::unsafe_clear()
 
 	std::atomic_thread_fence(std::memory_order_acquire);
 
-	m_itemBuffer.unsafe_load()->unsafe_clear();
+	buffer_type* const active(m_itemBuffer.unsafe_get());
+	active->unsafe_clear();
+
+	shared_ptr_buffer_type front(active->find_front());
+	if (front){
+		m_itemBuffer.store(std::move(front), std::memory_order_relaxed);
+	}
 
 	std::atomic_thread_fence(std::memory_order_release);
 }
@@ -478,9 +484,7 @@ inline void concurrent_queue_fifo<T, Allocator>::refresh_producer()
 			const size_type capacity(front->get_capacity());
 			const size_type newCapacity(capacity * 2);
 
-			shared_ptr_buffer_type newBuffer(create_item_buffer(newCapacity));
-
-			front->try_push_front(std::move(newBuffer));
+			reserve(newCapacity);
 		}
 		else{
 			t_producer = std::move(front);
@@ -827,9 +831,11 @@ inline bool item_buffer<T, Allocator>::try_push_front(shared_ptr_buffer_type new
 template<class T, class Allocator>
 inline void item_buffer<T, Allocator>::unsafe_clear()
 {
-	m_written.store(0, std::memory_order_relaxed);
+	m_preWriteIterator.store(0, std::memory_order_relaxed);
 	m_preReadIterator.store(0, std::memory_order_relaxed);
+	m_writeAt.store(0, std::memory_order_relaxed);
 	m_readAt.store(0, std::memory_order_relaxed);
+	m_written.store(0, std::memory_order_relaxed);
 	m_read.store(0, std::memory_order_relaxed);
 
 	for (size_type i = 0; i < m_capacity; ++i)
