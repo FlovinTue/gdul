@@ -5,8 +5,10 @@
 #include <gdul\concurrent_queue\concurrent_queue.h>
 #include "../Common/Timer.h"
 #include <concurrent_queue.h>
+#include <gdul/WIP_concurrent_queue_fifo/concurrent_queue_fifo.h>
 #include <queue>
 #include <mutex>
+#include "../Common/util.h"
 
 
 // Test queue
@@ -67,8 +69,10 @@ private:
 	void Write(std::uint32_t writes);
 	void Read(std::uint32_t writes);
 
-#ifdef GDUL
+#if defined( GDUL)
 	gdul::concurrent_queue<T, Allocator> m_queue;
+#elif defined(GDUL_FIFO)
+	gdul::concurrent_queue_fifo<T, Allocator> m_queue;
 #elif defined(MSC_RUNTIME)
 	concurrency::concurrent_queue<T> m_queue;
 #elif defined(MOODYCAMEL)
@@ -310,6 +314,8 @@ inline double tester<T, Allocator>::ExecuteWrite(std::uint32_t runs)
 			std::this_thread::yield();
 
 		result += time.get();
+
+		GDUL_ASSERT(m_queue.unsafe_size() == Writes);
 
 #ifdef GDUL
 		m_queue.unsafe_clear();

@@ -207,7 +207,7 @@ template<class T, class Allocator>
 inline concurrent_queue_fifo<T, Allocator>::concurrent_queue_fifo(Allocator allocator)
 	: t_producer(s_dummyContainer.m_dummyBuffer, allocator)
 	, t_consumer(s_dummyContainer.m_dummyBuffer, allocator)
-	, m_itemBuffer(nullptr)
+	, m_itemBuffer(s_dummyContainer.m_dummyBuffer)
 	, m_allocator(allocator)
 {}
 template<class T, class Allocator>
@@ -298,7 +298,7 @@ inline void concurrent_queue_fifo<T, Allocator>::unsafe_clear()
 
 	shared_ptr_buffer_type front(active->find_front());
 	if (front){
-		m_itemBuffer.store(std::move(front), std::memory_order_relaxed);
+		m_itemBuffer.unsafe_store(std::move(front), std::memory_order_relaxed);
 	}
 
 	std::atomic_thread_fence(std::memory_order_release);
@@ -306,26 +306,22 @@ inline void concurrent_queue_fifo<T, Allocator>::unsafe_clear()
 template<class T, class Allocator>
 inline void concurrent_queue_fifo<T, Allocator>::unsafe_reset()
 {
-	if (!m_itemBuffer){
-		return;
-	}
-
 	std::atomic_thread_fence(std::memory_order_acquire);
 
 	m_itemBuffer.unsafe_get()->unsafe_invalidate();
-	m_itemBuffer.unsafe_store(shared_ptr_buffer_type(nullptr), std::memory_order_relaxed);
+	m_itemBuffer.unsafe_store(s_dummyContainer.m_dummyBuffer, std::memory_order_relaxed);
 
 	std::atomic_thread_fence(std::memory_order_release);
 }
 template<class T, class Allocator>
 inline typename concurrent_queue_fifo<T, Allocator>::size_type concurrent_queue_fifo<T, Allocator>::size() const
 {
-	m_itemBuffer.load(std::memory_order_relaxed)->size();
+	return m_itemBuffer.load(std::memory_order_relaxed)->size();
 }
 template<class T, class Allocator>
 inline typename concurrent_queue_fifo<T, Allocator>::size_type concurrent_queue_fifo<T, Allocator>::unsafe_size() const
 {
-	m_itemBuffer.unsafe_get()->size();
+	return m_itemBuffer.unsafe_get()->size();
 }
 template<class T, class Allocator>
 inline bool concurrent_queue_fifo<T, Allocator>::refresh_consumer()
@@ -651,6 +647,12 @@ inline item_buffer<T, Allocator>::~item_buffer()
 template<class T, class Allocator>
 inline bool item_buffer<T, Allocator>::is_active() const
 {
+#ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
+	const bool broken(inspect->m_failureCount.load(std::memory_order_relaxed) != inspect->m_failureIndex.load(std::memory_order_relaxed));
+	if (broken){
+		return true;
+	}
+#endif
 	return (!m_next || (m_read.load(std::memory_order_relaxed) != m_written.load(std::memory_order_relaxed)));
 }
 template<class T, class Allocator>
@@ -689,23 +691,12 @@ inline typename item_buffer<T, Allocator>::shared_ptr_buffer_type item_buffer<T,
 	item_buffer<T, allocator_type>* inspect(this);
 
 	do{
-		const size_type read(inspect->m_read.load(std::memory_order_relaxed));
-		const size_type written(inspect->m_written.load(std::memory_order_relaxed));
-
-		const bool thisBufferEmpty(read == written);
-#ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
-		const bool veto(inspect->m_failureCount.load(std::memory_order_relaxed) != inspect->m_failureIndex.load(std::memory_order_relaxed));
-		const bool valid(!thisBufferEmpty | veto);
-#else
-		const bool valid(!thisBufferEmpty);
-#endif
-		if (valid){
+		if (inspect->is_active()){
 			break;
 		}
-
 		back = inspect->m_next.load(std::memory_order_seq_cst);
 		inspect = back.get();
-	} while (inspect);
+	} while (back);
 
 	return back;
 }
