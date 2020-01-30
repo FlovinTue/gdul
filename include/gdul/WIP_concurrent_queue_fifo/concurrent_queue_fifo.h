@@ -98,12 +98,12 @@ class dummy_container;
 template <class T, class Allocator>
 class buffer_deleter;
 
-enum class item_state : std::uint8_t
+enum item_state : std::uint8_t
 {
-	Empty,
-	Valid,
-	Failed,
-	Dummy
+	item_state_empty,
+	item_state_valid,
+	item_state_failed,
+	item_state_dummy
 };
 
 template <class Dummy = void>
@@ -118,6 +118,8 @@ class shared_ptr_allocator_adaptor;
 // Not quite size_type max because we need some leaway in case we
 // need to throw consumers out of a buffer whilst repairing it
 static constexpr size_type Buffer_Capacity_Default = 8;
+
+// Users are assumed to not have more than std::numeric_limits<std::uint16_t>::max() / 2 threads
 static constexpr size_type Buffer_Lock_Offset = std::numeric_limits<std::uint16_t>::max();
 
 static constexpr std::uint64_t Ptr_Mask = (std::uint64_t(std::numeric_limits<std::uint32_t>::max()) << 16 | std::uint64_t(std::numeric_limits<std::uint16_t>::max()));
@@ -563,7 +565,7 @@ public:
 	inline void block_writers();
 	inline void block_readers();
 private:
-	inline void apply_blockage_offset(std::atomic<size_type>& preVar, std::atomic<size_type>& indexVar);
+	inline void apply_blockage_offset(std::atomic<size_type>& preVar, std::atomic<size_type>& postVar);
 
 	template <class U = T, std::enable_if_t<GDUL_CQ_BUFFER_NOTHROW_PUSH_MOVE(U)> * = nullptr>
 	inline void write_in(size_type slot, U&& in);
@@ -591,13 +593,13 @@ private:
 	template <class U = T, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) && !GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)> * = nullptr>
 	inline void check_for_damage();
 
-	inline void try_publish_changes(std::atomic<size_type>& index, std::atomic<size_type>& publishVar, item_state desiredState);
+	inline void try_publish_changes(size_type untilAt, std::atomic<size_t>& publishVar);
 
 	inline void reintegrate_failed_entries(size_type failCount);
 
 	std::atomic<size_type> m_preReadIterator;
 	std::atomic<size_type> m_readAt;
-
+	std::atomic<size_type> m_postReadIterator;
 	GDUL_CQ_PADDING(64);
 	GDUL_ATOMIC_WITH_VIEW(size_type, m_read);
 
@@ -605,13 +607,13 @@ private:
 	std::atomic<size_type> m_read;
 	std::atomic<std::uint16_t> m_failureCount;
 	std::atomic<std::uint16_t> m_failureIndex;
-	GDUL_CQ_PADDING((GDUL_CACHELINE_SIZE * 2) - ((sizeof(size_type) * 3) + (sizeof(std::uint16_t) * 2)));
-#else
-	GDUL_CQ_PADDING(64);
 #endif
+	GDUL_CQ_PADDING(64);
 	std::atomic<size_type> m_preWriteIterator;
 	std::atomic<size_type> m_writeAt;
+	std::atomic<size_type> m_postWriteIterator;
 	GDUL_CQ_PADDING(64);
+
 	GDUL_ATOMIC_WITH_VIEW(size_type, m_written);
 	atomic_shared_ptr_buffer_type m_next;
 
@@ -626,9 +628,11 @@ inline item_buffer<T, Allocator>::item_buffer(typename item_buffer<T, Allocator>
 	, m_capacity(capacity)
 	, m_preReadIterator(0)
 	, m_readAt(0)
+	, m_postReadIterator(0)
 	, m_read(0)
 	, m_preWriteIterator(0)
 	, m_writeAt(0)
+	, m_postWriteIterator(0)
 	, m_written(0)
 #ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
 	, m_failureIndex(0)
@@ -640,8 +644,7 @@ inline item_buffer<T, Allocator>::item_buffer(typename item_buffer<T, Allocator>
 template<class T, class Allocator>
 inline item_buffer<T, Allocator>::~item_buffer()
 {
-	for (size_type i = 0; i < m_capacity; ++i)
-	{
+	for (size_type i = 0; i < m_capacity; ++i){
 		m_items[i].~item_slot<T>();
 	}
 }
@@ -653,7 +656,7 @@ inline bool item_buffer<T, Allocator>::is_active() const
 template<class T, class Allocator>
 inline bool item_buffer<T, Allocator>::is_valid() const
 {
-	return m_items[m_writeAt.load(std::memory_order_relaxed) % m_capacity].get_state_local() != item_state::Dummy;
+	return m_items[m_writeAt.load(std::memory_order_relaxed) % m_capacity].get_state_local() != item_state_dummy;
 }
 template<class T, class Allocator>
 inline void item_buffer<T, Allocator>::unsafe_invalidate()
@@ -661,7 +664,7 @@ inline void item_buffer<T, Allocator>::unsafe_invalidate()
 	block_readers();
 	block_writers();
 
-	m_items[m_writeAt.load(std::memory_order_relaxed) % m_capacity].set_state(item_state::Dummy);
+	m_items[m_writeAt.load(std::memory_order_relaxed) % m_capacity].set_state(item_state_dummy);
 
 	if (m_next){
 		m_next.unsafe_get()->unsafe_invalidate();
@@ -714,9 +717,9 @@ inline typename item_buffer<T, Allocator>::size_type item_buffer<T, Allocator>::
 	size_type accumulatedSize(m_written.load(std::memory_order_relaxed));
 	accumulatedSize -= readSlot;
 
-	if (m_next)
+	if (m_next){
 		accumulatedSize += m_next.unsafe_get()->size();
-
+	}
 	return accumulatedSize;
 }
 
@@ -748,7 +751,7 @@ inline bool item_buffer<T, Allocator>::verify_successor(const shared_ptr_buffer_
 		for (size_type i = 0; i < inspect->m_capacity; ++i){
 			const size_type index((preRead - i) % inspect->m_capacity);
 
-			if (inspect->m_items[index].get_state_local() != item_state::Empty){
+			if (inspect->m_items[index].get_state_local() != item_state_empty){
 				return false;
 			}
 		}
@@ -838,7 +841,7 @@ inline void item_buffer<T, Allocator>::unsafe_clear()
 
 	for (size_type i = 0; i < m_capacity; ++i)
 	{
-		m_items[i].set_state_local(item_state::Empty);
+		m_items[i].set_state_local(item_state_empty);
 	}
 
 #ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
@@ -862,23 +865,21 @@ inline void item_buffer<T, Allocator>::block_readers()
 	apply_blockage_offset(m_preReadIterator, m_readAt);
 }
 template<class T, class Allocator>
-inline void item_buffer<T, Allocator>::apply_blockage_offset(std::atomic<size_type>& preVar, std::atomic<size_type>& indexVar)
+inline void item_buffer<T, Allocator>::apply_blockage_offset(std::atomic<size_type>& preVar, std::atomic<size_type>& postVar)
 {
-	size_type preWrite(preVar.load(std::memory_order_relaxed));
+	size_type pre(preVar.load(std::memory_order_relaxed));
 	size_type offset;
-	do
-	{
-		const size_type read(indexVar.load(std::memory_order_relaxed));
-		const size_type difference(preWrite - read);
+	do{
+		const size_type post(postVar.load(std::memory_order_relaxed));
+		const size_type difference(pre - post);
 
-		if (Buffer_Lock_Offset < difference)
-		{
+		if (Buffer_Lock_Offset < difference){
 			break;
 		}
 
-		offset = preWrite + m_capacity + Buffer_Lock_Offset;
+		offset = pre + m_capacity + Buffer_Lock_Offset;
 
-	} while (!preVar.compare_exchange_strong(preWrite, offset), std::memory_order_relaxed);
+	} while (!preVar.compare_exchange_strong(pre, offset), std::memory_order_relaxed);
 }
 template<class T, class Allocator>
 template<class ...Arg>
@@ -899,9 +900,11 @@ inline bool item_buffer<T, Allocator>::try_push(Arg&& ...in)
 
 	write_in(atLocal, std::forward<Arg>(in)...);
 
-	m_items[atLocal].set_state_local(item_state::Valid);
-
-	try_publish_changes(m_writeAt, m_written, item_state::Valid);
+	const size_type postVar(m_postWriteIterator.fetch_add(1, std::memory_order_acq_rel));
+	
+	if (postVar == at){
+		try_publish_changes(at + 1, m_written);
+	}
 
 	return true;
 }
@@ -924,52 +927,26 @@ inline bool item_buffer<T, Allocator>::try_pop(T& out)
 
 	write_out(atLocal, out);
 
-	post_pop_cleanup(atLocal);
+	const size_type postVar(m_postReadIterator.fetch_add(1, std::memory_order_acq_rel));
 
-
-	// Propagate to readers.. Via publisher? 
-	// set_state + get_state acquire / release ?
-	m_items[atLocal].set_state(item_state::Empty);
-
-	try_publish_changes(m_readAt, m_read, item_state::Empty);
+	if (postVar == at){
+		try_publish_changes(at + 1, m_read);
+	}
 
 	return true;
 }
 template<class T, class Allocator>
-inline void item_buffer<T, Allocator>::try_publish_changes(std::atomic<size_type>& slotVar, std::atomic<size_type>& publishVar, item_state desiredState)
+inline void item_buffer<T, Allocator>::try_publish_changes(size_type untilAt, std::atomic<size_t>& publishVar)
 {
-	const size_type initialPublished(publishVar.load(std::memory_order_seq_cst));
-	const size_type latestSlot(slotVar.load(std::memory_order_relaxed));
-
-	if (!(initialPublished < latestSlot)){
-		return;
-	}
-
-	size_type foundAvaliableForPublish(0);
-
-	for (size_type i = initialPublished; i < latestSlot; ++i){
-		if (m_items[i % m_capacity].get_state_local() != desiredState){
+	size_type expected(publishVar.load(std::memory_order_relaxed));
+	size_type desired(0);
+	do{
+		if (!(expected < untilAt)){
 			break;
 		}
-		++foundAvaliableForPublish;
-	}
+		desired = untilAt;
 
-	const size_type desired(initialPublished + foundAvaliableForPublish);
-	size_type expected(initialPublished);
-	while (foundAvaliableForPublish){
-		if (publishVar.compare_exchange_strong(expected, desired, std::memory_order_release, std::memory_order_relaxed)){
-			break;
-		}
-
-		if (!(expected < latestSlot)){
-			return;
-		}
-
-		const size_type newDifference(expected - initialPublished);
-
-		foundAvaliableForPublish -= newDifference;
-
-	} 
+	} while (!publishVar.compare_exchange_strong(expected, desired, std::memory_order_release, std::memory_order_relaxed));
 }
 template <class T, class Allocator>
 template <class U, std::enable_if_t<GDUL_CQ_BUFFER_NOTHROW_PUSH_MOVE(U)>*>
@@ -1050,7 +1027,7 @@ inline void item_buffer<T, Allocator>::write_out(typename item_buffer<T, Allocat
 		if (m_failureCount.fetch_add(1, std::memory_order_relaxed) == m_failureIndex.load(std::memory_order_relaxed)){
 			m_preReadIterator.fetch_add(Buffer_Lock_Offset, std::memory_order_release);
 		}
-		m_items[slot].set_state(item_state::Failed);
+		m_items[slot].set_state(item_state_failed);
 		m_read.fetch_add(1, std::memory_order_release);
 		throw;
 	}
@@ -1072,13 +1049,13 @@ inline void item_buffer<T, Allocator>::reintegrate_failed_entries(typename item_
 		item_slot<T>& currentItem(m_items[currentIndex]);
 		const item_state currentState(currentItem.get_state_local());
 
-		if (currentState == item_state::Failed)
+		if (currentState == item_state_failed)
 		{
 			const size_type toRedirectIndex((startIndex - numRedirected) % m_capacity);
 			item_slot<T>& toRedirect(m_items[toRedirectIndex]);
 
 			toRedirect.redirect(currentItem);
-			currentItem.set_state_local(item_state::Valid);
+			currentItem.set_state_local(item_state_valid);
 			++numRedirected;
 		}
 	}
@@ -1129,11 +1106,11 @@ private:
 		struct
 		{
 			std::uint16_t trash[3];
-			std::atomic<item_state> m_state;
+			item_state m_state;
 		};
 	};
 #else
-	std::atomic<item_state> m_state;
+	item_state m_state;
 #endif
 };
 template<class T>
@@ -1142,7 +1119,7 @@ inline item_slot<T>::item_slot()
 #ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
 	, m_reference(this)
 #else
-	, m_state(item_state::Empty)
+	, m_state(item_state_empty)
 #endif
 {}
 template<class T>
@@ -1202,7 +1179,7 @@ inline void item_slot<T>::set_state(item_state state)
 template<class T>
 inline void item_slot<T>::set_state_local(item_state state)
 {
-	m_state.store(state, std::memory_order_release);
+	m_state = state;
 }
 template<class T>
 inline void item_slot<T>::reset_ref()
@@ -1214,7 +1191,7 @@ inline void item_slot<T>::reset_ref()
 template<class T>
 inline item_state item_slot<T>::get_state_local() const
 {
-	return m_state.load(std::memory_order_acquire);
+	return m_state;
 }
 #ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
 template<class T>
@@ -1349,7 +1326,7 @@ public:
 };
 template<class T, class Allocator>
 inline dummy_container<T, Allocator>::dummy_container()
-	: m_dummyItem(item_state::Dummy)
+	: m_dummyItem(item_state_dummy)
 	, m_dummyRawBuffer(1, &m_dummyItem)
 {
 	m_dummyRawBuffer.block_writers();
