@@ -120,7 +120,7 @@ inline tester<T, Allocator>::~tester()
 template<class T, class Allocator>
 inline double tester<T, Allocator>::ExecuteConcurrent(std::uint32_t runs)
 {
-#ifdef GDUL
+#if  defined(GDUL) | defined(GDUL_FIFO)
 	m_queue.unsafe_reset();
 #endif
 
@@ -143,7 +143,7 @@ inline double tester<T, Allocator>::ExecuteConcurrent(std::uint32_t runs)
 		while (m_writer.has_unfinished_tasks() | m_reader.has_unfinished_tasks())
 			std::this_thread::yield();
 
-#ifdef GDUL
+#if  defined(GDUL) | defined(GDUL_FIFO)
 		m_queue.unsafe_clear();
 #elif defined(MSC_RUNTIME) || defined(MTX_WRAPPER)
 		m_queue.clear();
@@ -166,7 +166,7 @@ inline double tester<T, Allocator>::ExecuteConcurrent(std::uint32_t runs)
 template<class T, class Allocator>
 inline double tester<T, Allocator>::ExecuteSingleThread(std::uint32_t runs)
 {
-#ifdef GDUL
+#if  defined(GDUL) | defined(GDUL_FIFO)
 	m_queue.unsafe_reset();
 #endif
 	double result(0.0);
@@ -202,7 +202,7 @@ inline double tester<T, Allocator>::ExecuteSingleThread(std::uint32_t runs)
 template<class T, class Allocator>
 inline double tester<T, Allocator>::ExecuteSingleProducerSingleConsumer(std::uint32_t runs)
 {
-#ifdef GDUL
+#if  defined(GDUL) | defined(GDUL_FIFO)
 	m_queue.unsafe_reset();
 #endif
 
@@ -225,6 +225,8 @@ inline double tester<T, Allocator>::ExecuteSingleProducerSingleConsumer(std::uin
 		while (m_writer.has_unfinished_tasks() | m_reader.has_unfinished_tasks())
 			std::this_thread::yield();
 
+		GDUL_ASSERT(m_queue.unsafe_size() == 0);
+
 		result += time.get();
 
 		m_waiting = 0;
@@ -243,7 +245,7 @@ inline double tester<T, Allocator>::ExecuteSingleProducerSingleConsumer(std::uin
 template<class T, class Allocator>
 inline double tester<T, Allocator>::ExecuteRead(std::uint32_t runs)
 {
-#ifdef GDUL
+#if  defined(GDUL) | defined(GDUL_FIFO)
 	m_queue.unsafe_reset();
 #endif
 
@@ -291,7 +293,7 @@ inline double tester<T, Allocator>::ExecuteRead(std::uint32_t runs)
 template<class T, class Allocator>
 inline double tester<T, Allocator>::ExecuteWrite(std::uint32_t runs)
 {
-#ifdef GDUL
+#if  defined(GDUL) | defined(GDUL_FIFO)
 	m_queue.unsafe_reset();
 #endif
 
@@ -314,10 +316,11 @@ inline double tester<T, Allocator>::ExecuteWrite(std::uint32_t runs)
 			std::this_thread::yield();
 
 		result += time.get();
+		std::size_t outSize = m_queue.unsafe_size();
+		std::size_t expectedSize = WritesPerThread * Writers;
+		GDUL_ASSERT(outSize == expectedSize);
 
-		GDUL_ASSERT(m_queue.unsafe_size() == Writes);
-
-#ifdef GDUL
+#if  defined(GDUL) | defined(GDUL_FIFO)
 		m_queue.unsafe_clear();
 #elif defined(MSC_RUNTIME)
 		m_queue.clear();
@@ -335,6 +338,7 @@ inline double tester<T, Allocator>::ExecuteWrite(std::uint32_t runs)
 
 	return result;
 }
+		
 template<class T, class Allocator>
 inline bool tester<T, Allocator>::CheckResults() const
 {

@@ -328,13 +328,13 @@ inline bool concurrent_queue_fifo<T, Allocator>::refresh_consumer()
 {
 	assert(t_consumer.get()->is_valid() && "refresh_consumer assumes a valid consumer");
 
-	if (!m_itemBuffer){
+	if (m_itemBuffer == s_dummyContainer.m_dummyBuffer){
 		return false;
 	}
 
 	shared_ptr_buffer_type activeBuffer(m_itemBuffer.load(std::memory_order_relaxed));
 
-	if (activeBuffer.get() != t_consumer.get().get()){
+	if (activeBuffer != t_consumer.get()){
 		t_consumer = std::move(activeBuffer);
 		return true;
 	}
@@ -447,7 +447,7 @@ inline bool concurrent_queue_fifo<T, Allocator>::initialize_consumer()
 {
 	assert(!t_consumer.get()->is_valid() && "initialize_consumer assumes an invalid consumer");
 
-	if (!m_itemBuffer){
+	if (m_itemBuffer == s_dummyContainer.m_dummyBuffer){
 		return false;
 	}
 	t_consumer = m_itemBuffer.load(std::memory_order_relaxed);
@@ -458,7 +458,7 @@ inline bool concurrent_queue_fifo<T, Allocator>::initialize_consumer()
 template<class T, class Allocator>
 inline void concurrent_queue_fifo<T, Allocator>::initialize_producer()
 {
-	if (!m_itemBuffer){
+	if (m_itemBuffer == s_dummyContainer.m_dummyBuffer){
 		reserve(cq_fifo_detail::Buffer_Capacity_Default);
 	}
 	t_producer = m_itemBuffer.load(std::memory_order_relaxed);
@@ -831,6 +831,9 @@ inline void item_buffer<T, Allocator>::unsafe_clear()
 	m_writeAt.store(0, std::memory_order_relaxed);
 	m_readAt.store(0, std::memory_order_relaxed);
 
+	m_postWriteIterator.store(0, std::memory_order_relaxed);
+	m_postReadIterator.store(0, std::memory_order_relaxed);
+
 	const size_type written(m_written.exchange(0, std::memory_order_relaxed));
 	const size_type read(m_read.exchange(0, std::memory_order_relaxed));
 
@@ -918,9 +921,10 @@ inline bool item_buffer<T, Allocator>::try_push(Arg&& ...in)
 	write_in(atLocal, std::forward<Arg>(in)...);
 
 	const size_type postVar(m_postWriteIterator.fetch_add(1, std::memory_order_acq_rel));
-	
-	if (postVar == at){
-		try_publish_changes(at + 1, m_written);
+	const size_type postAt(m_writeAt.load(std::memory_order_relaxed));
+
+	if ((postVar + 1) == postAt){
+		try_publish_changes(postAt, m_written);
 	}
 
 	return true;
@@ -945,9 +949,10 @@ inline bool item_buffer<T, Allocator>::try_pop(T& out)
 	write_out(atLocal, out);
 
 	const size_type postVar(m_postReadIterator.fetch_add(1, std::memory_order_acq_rel));
+	const size_type postAt(m_readAt.load(std::memory_order_relaxed));
 
-	if (postVar == at){
-		try_publish_changes(at + 1, m_read);
+	if ((postVar + 1) == postAt){
+		try_publish_changes(postAt, m_read);
 	}
 
 	return true;
@@ -1285,8 +1290,7 @@ public:
 	{}
 
 	T* allocate(std::size_t count){
-		if (!m_address)
-		{
+		if (!m_address){
 			m_address = this->Allocator::allocate(count);
 			m_size = count;
 		}
