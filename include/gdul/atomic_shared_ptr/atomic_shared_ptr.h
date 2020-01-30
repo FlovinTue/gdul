@@ -197,28 +197,28 @@ public:
 	inline bool compare_exchange_strong(shared_ptr<T>& expected, const shared_ptr<T>& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept;
 	inline bool compare_exchange_strong(shared_ptr<T>& expected, shared_ptr<T>&& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept;
 
-	// compare_exchange_weak may fail spuriously if another thread loads this value while attempting a swap, 
+	// Compare_exchange_weak may fail spuriously if another thread loads this value while attempting a swap, 
 	// in addition to the regular compare_exchange_weak internal spurious failure
 	inline bool compare_exchange_weak(raw_ptr<T>& expected, const shared_ptr<T>& desired, std::memory_order order = std::memory_order_seq_cst) noexcept;
-	// compare_exchange_weak may fail spuriously if another thread loads this value while attempting a swap, 
+	// Compare_exchange_weak may fail spuriously if another thread loads this value while attempting a swap, 
 	// in addition to the regular compare_exchange_weak internal spurious failure
 	inline bool compare_exchange_weak(raw_ptr<T>& expected, shared_ptr<T>&& desired, std::memory_order order = std::memory_order_seq_cst) noexcept;
-	// compare_exchange_weak may fail spuriously if another thread loads this value while attempting a swap, 
+	// Compare_exchange_weak may fail spuriously if another thread loads this value while attempting a swap, 
 	// in addition to the regular compare_exchange_weak internal spurious failure
 	inline bool compare_exchange_weak(raw_ptr<T>& expected, const shared_ptr<T>& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept;
-	// compare_exchange_weak may fail spuriously if another thread loads this value while attempting a swap, 
+	// Compare_exchange_weak may fail spuriously if another thread loads this value while attempting a swap, 
 	// in addition to the regular compare_exchange_weak internal spurious failure
 	inline bool compare_exchange_weak(raw_ptr<T>& expected, shared_ptr<T>&& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept;
-	// compare_exchange_weak may fail spuriously if another thread loads this value while attempting a swap, 
+	// Compare_exchange_weak may fail spuriously if another thread loads this value while attempting a swap, 
 	// in addition to the regular compare_exchange_weak internal spurious failure
 	inline bool compare_exchange_weak(shared_ptr<T>& expected, const shared_ptr<T>& desired, std::memory_order order = std::memory_order_seq_cst) noexcept;
-	// compare_exchange_weak may fail spuriously if another thread loads this value while attempting a swap, 
+	// Compare_exchange_weak may fail spuriously if another thread loads this value while attempting a swap, 
 	// in addition to the regular compare_exchange_weak internal spurious failure
 	inline bool compare_exchange_weak(shared_ptr<T>& expected, shared_ptr<T>&& desired, std::memory_order order = std::memory_order_seq_cst) noexcept;
-	// compare_exchange_weak may fail spuriously if another thread loads this value while attempting a swap, 
+	// Compare_exchange_weak may fail spuriously if another thread loads this value while attempting a swap, 
 	// in addition to the regular compare_exchange_weak internal spurious failure
 	inline bool compare_exchange_weak(shared_ptr<T>& expected, const shared_ptr<T>& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept;
-	// compare_exchange_weak may fail spuriously if another thread loads this value while attempting a swap, 
+	// Compare_exchange_weak may fail spuriously if another thread loads this value while attempting a swap, 
 	// in addition to the regular compare_exchange_weak internal spurious failure
 	inline bool compare_exchange_weak(shared_ptr<T>& expected, shared_ptr<T>&& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept;
 
@@ -240,13 +240,13 @@ public:
 	inline void unsafe_store(const shared_ptr<T>& from, std::memory_order order = std::memory_order_seq_cst);
 	inline void unsafe_store(shared_ptr<T>&& from, std::memory_order order = std::memory_order_seq_cst);
 
-	// cheap hint to see if this object holds a value
+	// Cheap hint to see if this object holds a value
 	operator bool() const noexcept;
 
-	// cheap hint comparison to ptr_base derivatives
+	// Cheap hint comparison to ptr_base derivatives. Does not take version into account
 	bool operator==(const aspdetail::ptr_base<T>& other) const noexcept;
 
-	// cheap hint comparison to ptr_base derivatives
+	// Cheap hint comparison to ptr_base derivatives. Does not take version into account
 	bool operator!=(const aspdetail::ptr_base<T>& other) const noexcept;
 
 	raw_ptr<T> get_raw_ptr() const noexcept;
@@ -469,8 +469,7 @@ inline bool atomic_shared_ptr<T>::compare_exchange_weak(typename aspdetail::disa
 
 	const std::uint64_t preCompare(expected_.m_u64 & aspdetail::Versioned_Cb_Mask);
 
-	if (compare_exchange_weak_internal(expected_, desired_, static_cast<aspdetail::CAS_FLAG>(flags), orders))
-	{
+	if (compare_exchange_weak_internal(expected_, desired_, static_cast<aspdetail::CAS_FLAG>(flags), orders)){
 
 		desired.clear();
 
@@ -479,9 +478,7 @@ inline bool atomic_shared_ptr<T>::compare_exchange_weak(typename aspdetail::disa
 
 	const std::uint64_t postCompare(expected_.m_u64 & aspdetail::Versioned_Cb_Mask);
 
-	// Failed, but not spuriously (other thread loaded, or compare_exchange_weak spurious fail)
-	if (preCompare != postCompare)
-	{
+	if (preCompare != postCompare){
 		expected = raw_type(expected_);
 	}
 
@@ -636,13 +633,13 @@ inline constexpr bool operator!=(const atomic_shared_ptr<T>& ptr, std::nullptr_t
 {
 	return ptr;
 }
-// cheap hint comparison to ptr_base derivatives
+// Cheap hint comparison to ptr_base derivatives. Does not take version into account
 template<class T>
 inline bool atomic_shared_ptr<T>::operator==(const aspdetail::ptr_base<T>& other) const noexcept
 {
-	return !((m_storage.load(std::memory_order_relaxed) ^ other.m_controlBlockStorage.m_u64) & aspdetail::Versioned_Cb_Mask);
+	return !((m_storage.load(std::memory_order_relaxed) ^ other.m_controlBlockStorage.m_u64) & aspdetail::Cb_Mask);
 }
-// cheap hint comparison to ptr_base derivatives
+// Cheap hint comparison to ptr_base derivatives. Does not take version into account
 template<class T>
 inline bool atomic_shared_ptr<T>::operator!=(const aspdetail::ptr_base<T>& other) const noexcept
 {
@@ -695,8 +692,7 @@ inline bool atomic_shared_ptr<T>::compare_exchange_weak_internal(compressed_stor
 template<class T>
 inline void atomic_shared_ptr<T>::try_fill_local_refs(compressed_storage& expected) const noexcept
 {
-	if (!(expected.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] < aspdetail::Local_Ref_Fill_Boundary))
-	{
+	if (!(expected.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] < aspdetail::Local_Ref_Fill_Boundary)){
 		return;
 	}
 
@@ -704,8 +700,7 @@ inline void atomic_shared_ptr<T>::try_fill_local_refs(compressed_storage& expect
 
 	const compressed_storage initialPtrBlock(expected.m_u64 & aspdetail::Versioned_Cb_Mask);
 
-	do
-	{
+	do{
 		const std::uint8_t localRefs(expected.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF]);
 		const std::uint8_t newRefs(std::numeric_limits<std::uint8_t>::max() - localRefs);
 
@@ -713,18 +708,15 @@ inline void atomic_shared_ptr<T>::try_fill_local_refs(compressed_storage& expect
 		desired.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] = std::numeric_limits<std::uint8_t>::max();
 
 		// Accept 'null' refs, to be able to avoid using compare_exchange_strong during copy_internal
-		if (cb)
-		{
+		if (cb){
 			cb->incref(newRefs);
 		}
 
-		if (m_storage.compare_exchange_weak(expected.m_u64, desired.m_u64, std::memory_order_relaxed))
-		{
+		if (m_storage.compare_exchange_weak(expected.m_u64, desired.m_u64, std::memory_order_relaxed)){
 			return;
 		}
 
-		if (cb)
-		{
+		if (cb){
 			cb->decref(newRefs);
 		}
 
@@ -800,13 +792,11 @@ inline void atomic_shared_ptr<T>::unsafe_fill_local_refs() const noexcept
 	const compressed_storage current(m_storage.load(std::memory_order_relaxed));
 	aspdetail::control_block_free_type_base<T>* const cb(to_control_block(current));
 
-	if (current.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] < aspdetail::Local_Ref_Fill_Boundary)
-	{
+	if (current.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] < aspdetail::Local_Ref_Fill_Boundary){
 		const std::uint8_t newRefs(std::numeric_limits<std::uint8_t>::max() - current.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF]);
 
 		// Accept 'null' refs, to be able to avoid using compare_exchange_strong during copy_internal
-		if (cb)
-		{
+		if (cb){
 			cb->incref(newRefs);
 		}
 
@@ -1168,10 +1158,14 @@ public:
 
 	inline constexpr operator bool() const noexcept;
 
+	// Cheap hint comparison to ptr_base derivatives. Does not take version into account
 	inline constexpr bool operator==(const ptr_base<T>& other) const noexcept;
+	// Cheap hint comparison to ptr_base derivatives. Does not take version into account
 	inline constexpr bool operator!=(const ptr_base<T>& other) const noexcept;
 
+	// Cheap hint comparison to atomic_shared_ptr. Does not take version into account
 	inline bool operator==(const atomic_shared_ptr<T>& other) const noexcept;
+	// Cheap hint comparison to atomic_shared_ptr. Does not take version into account
 	inline bool operator!=(const atomic_shared_ptr<T>& other) const noexcept;
 
 	inline constexpr std::uint16_t get_version() const noexcept;
@@ -1224,21 +1218,25 @@ inline constexpr ptr_base<T>::operator bool() const noexcept
 {
 	return m_controlBlockStorage.m_u64 & aspdetail::Cb_Mask;
 }
+// Cheap hint comparison to ptr_base derivatives. Does not take version into account
 template <class T>
 inline constexpr bool ptr_base<T>::operator==(const ptr_base<T>& other) const noexcept
 {
-	return !((m_controlBlockStorage.m_u64 ^ other.m_controlBlockStorage.m_u64) & aspdetail::Versioned_Cb_Mask);
+	return !((m_controlBlockStorage.m_u64 ^ other.m_controlBlockStorage.m_u64) & aspdetail::Cb_Mask);
 }
+// Cheap hint comparison to ptr_base derivatives. Does not take version into account
 template <class T>
 inline constexpr bool ptr_base<T>::operator!=(const ptr_base<T>& other) const noexcept
 {
 	return !operator==(other);
 }
+// Cheap hint comparison to atomic_shared_ptr. Does not take version into account
 template<class T>
 inline bool ptr_base<T>::operator==(const atomic_shared_ptr<T>& other) const noexcept
 {
 	return other == *this;
 }
+// Cheap hint comparison to atomic_shared_ptr. Does not take version into account
 template<class T>
 inline bool ptr_base<T>::operator!=(const atomic_shared_ptr<T>& other) const noexcept
 {
