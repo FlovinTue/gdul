@@ -119,8 +119,9 @@ class shared_ptr_allocator_adaptor;
 // need to throw consumers out of a buffer whilst repairing it
 static constexpr size_type Buffer_Capacity_Default = 8;
 
-// Users are assumed to not have more than std::numeric_limits<std::uint16_t>::max() / 2 threads
 static constexpr size_type Buffer_Lock_Offset = std::numeric_limits<std::uint16_t>::max();
+// Users are assumed to not have more than Buffer_Lock_Threshhold threads
+static constexpr size_type Buffer_Lock_Threshhold = Buffer_Lock_Offset / 2;
 
 static constexpr std::uint64_t Ptr_Mask = (std::uint64_t(std::numeric_limits<std::uint32_t>::max()) << 16 | std::uint64_t(std::numeric_limits<std::uint16_t>::max()));
 }
@@ -262,9 +263,9 @@ inline void concurrent_queue_fifo<T, Allocator>::reserve(typename concurrent_que
 {
 	const size_type alignedCapacity(cq_fifo_detail::log2_align<>(capacity));
 
-	if (!m_itemBuffer){
-		raw_ptr_buffer_type exp(nullptr, m_itemBuffer.get_version());
-		m_itemBuffer.compare_exchange_strong(exp, create_item_buffer(alignedCapacity), std::memory_order_release, std::memory_order_relaxed);
+	raw_ptr_buffer_type rawPeek(m_itemBuffer);
+	if (rawPeek == s_dummyContainer.m_dummyBuffer){
+		m_itemBuffer.compare_exchange_strong(rawPeek, create_item_buffer(alignedCapacity), std::memory_order_release, std::memory_order_relaxed);
 	}
 
 	shared_ptr_buffer_type active(nullptr);
@@ -287,18 +288,17 @@ inline void concurrent_queue_fifo<T, Allocator>::reserve(typename concurrent_que
 template<class T, class Allocator>
 inline void concurrent_queue_fifo<T, Allocator>::unsafe_clear()
 {
-	if (!m_itemBuffer){
-		return;
-	}
-
 	std::atomic_thread_fence(std::memory_order_acquire);
 
 	buffer_type* const active(m_itemBuffer.unsafe_get());
-	active->unsafe_clear();
 
-	shared_ptr_buffer_type front(active->find_front());
-	if (front){
-		m_itemBuffer.unsafe_store(std::move(front), std::memory_order_relaxed);
+	if (active->is_valid()){
+		active->unsafe_clear();
+
+		shared_ptr_buffer_type front(active->find_front());
+		if (front){
+			m_itemBuffer.unsafe_store(std::move(front), std::memory_order_relaxed);
+		}
 	}
 
 	std::atomic_thread_fence(std::memory_order_release);
@@ -560,7 +560,12 @@ public:
 
 	inline void block_writers();
 	inline void block_readers();
+
+	bool is_readers_blocked() const;
+	bool is_writers_blocked() const;
+
 private:
+	inline bool has_blockage_offset(size_type preVar, size_type postVar);
 	inline void apply_blockage_offset(std::atomic<size_type>& preVar, std::atomic<size_type>& postVar);
 
 	template <class U = T, std::enable_if_t<GDUL_CQ_BUFFER_NOTHROW_PUSH_MOVE(U)> * = nullptr>
@@ -823,15 +828,16 @@ inline bool item_buffer<T, Allocator>::try_push_front(shared_ptr_buffer_type new
 template<class T, class Allocator>
 inline void item_buffer<T, Allocator>::unsafe_clear()
 {
-	m_preWriteIterator.store(0, std::memory_order_relaxed);
-	m_preReadIterator.store(0, std::memory_order_relaxed);
 	m_writeAt.store(0, std::memory_order_relaxed);
 	m_readAt.store(0, std::memory_order_relaxed);
-	m_written.store(0, std::memory_order_relaxed);
-	m_read.store(0, std::memory_order_relaxed);
 
-	for (size_type i = 0; i < m_capacity; ++i)
-	{
+	const size_type written(m_written.exchange(0, std::memory_order_relaxed));
+	const size_type read(m_read.exchange(0, std::memory_order_relaxed));
+
+	m_preWriteIterator.fetch_sub(written, std::memory_order_relaxed);
+	m_preReadIterator.fetch_sub(read, std::memory_order_relaxed);
+
+	for (size_type i = 0; i < m_capacity; ++i){
 		m_items[i].set_state_local(item_state_empty);
 	}
 
@@ -848,29 +854,49 @@ inline void item_buffer<T, Allocator>::unsafe_clear()
 template<class T, class Allocator>
 inline void item_buffer<T, Allocator>::block_writers()
 {
-	apply_blockage_offset(m_preWriteIterator, m_writeAt);
+	apply_blockage_offset(m_preWriteIterator, m_written);
 }
 template<class T, class Allocator>
 inline void item_buffer<T, Allocator>::block_readers()
 {
-	apply_blockage_offset(m_preReadIterator, m_readAt);
+	apply_blockage_offset(m_preReadIterator, m_read);
+}
+template<class T, class Allocator>
+inline bool item_buffer<T, Allocator>::is_readers_blocked() const
+{
+	return has_blockage_offset(m_preReadIterator.load(std::memory_order_relaxed), m_read.load(std::memory_order_relaxed));
+}
+template<class T, class Allocator>
+inline bool item_buffer<T, Allocator>::is_writers_blocked() const
+{
+	return has_blockage_offset(m_preWriteIterator.load(std::memory_order_relaxed), m_written.load(std::memory_order_relaxed));
+}
+template<class T, class Allocator>
+inline bool item_buffer<T, Allocator>::has_blockage_offset(size_type preVar, size_type postVar)
+{
+	const size_type threshHold(m_capacity + Buffer_Lock_Threshhold);
+	const size_type post(postVar);
+	const size_type pre(preVar);
+
+	return threshHold < (pre - post);
 }
 template<class T, class Allocator>
 inline void item_buffer<T, Allocator>::apply_blockage_offset(std::atomic<size_type>& preVar, std::atomic<size_type>& postVar)
 {
+	const size_type offset(m_capacity + Buffer_Lock_Offset);
+
 	size_type pre(preVar.load(std::memory_order_relaxed));
-	size_type offset;
+	size_type desired;
 	do{
 		const size_type post(postVar.load(std::memory_order_relaxed));
-		const size_type difference(pre - post);
 
-		if (Buffer_Lock_Offset < difference){
+		if (has_blockage_offset(pre, post)){
 			break;
 		}
 
-		offset = pre + m_capacity + Buffer_Lock_Offset;
+		desired = pre + offset;
 
-	} while (!preVar.compare_exchange_strong(pre, offset), std::memory_order_relaxed);
+	} while (!preVar.compare_exchange_strong(pre, offset, std::memory_order_relaxed));
 }
 template<class T, class Allocator>
 template<class ...Arg>
