@@ -129,9 +129,9 @@ inline double tester<T, Allocator>::ExecuteConcurrent(std::uint32_t runs)
 	m_writtenSum = 0;
 	m_readSum = 0;
 	
-#if defined(GDUL_FIFO)
-	m_queue.reserve(Writes);
-#endif
+//#if defined(GDUL_FIFO)
+//	m_queue.reserve(Writes);
+//#endif
 
 	for (std::uint32_t i = 0; i < runs; ++i) {
 
