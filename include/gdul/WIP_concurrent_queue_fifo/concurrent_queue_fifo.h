@@ -559,7 +559,7 @@ public:
 	bool is_writers_blocked() const;
 
 private:
-	inline bool has_blockage_offset(size_type preVar, size_type postVar);
+	inline bool has_blockage_offset(size_type postVar, size_type preVar) const;
 	inline void apply_blockage_offset(std::atomic<size_type>& preVar, std::atomic<size_type>& postVar);
 
 	inline size_type blockage_offset() const;
@@ -630,13 +630,26 @@ inline item_buffer<T, Allocator>::~item_buffer()
 template<class T, class Allocator>
 inline bool item_buffer<T, Allocator>::is_active() const
 {
-#ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
-	const bool broken(inspect->m_failureCount.load(std::memory_order_relaxed) != inspect->m_failureIndex.load(std::memory_order_relaxed));
-	if (broken){
+	if (!m_next){
 		return true;
 	}
-#endif
-	return (!m_next || (m_read.load(std::memory_order_relaxed) != m_written.load(std::memory_order_relaxed)));
+
+	if (!is_writers_blocked()){
+		return true;
+	}
+
+	const size_type read(m_read.load(std::memory_order_relaxed));
+	const size_type written(m_written.load(std::memory_order_acquire));
+
+	if (read != written){
+		return true;
+	}
+
+	const size_type preWriteOffset(m_preWriteIterator.load(std::memory_order_acquire));
+	const size_type preWrite(preWriteOffset - blockage_offset());
+	const size_type activeAccessors(preWrite - written);
+
+	return activeAccessors;
 }
 template<class T, class Allocator>
 inline bool item_buffer<T, Allocator>::is_valid() const
@@ -756,15 +769,15 @@ inline void item_buffer<T, Allocator>::block_readers()
 template<class T, class Allocator>
 inline bool item_buffer<T, Allocator>::is_readers_blocked() const
 {
-	return has_blockage_offset(m_preReadIterator.load(std::memory_order_relaxed), m_read.load(std::memory_order_relaxed));
+	return has_blockage_offset(m_read.load(std::memory_order_relaxed), m_preReadIterator.load(std::memory_order_relaxed));
 }
 template<class T, class Allocator>
 inline bool item_buffer<T, Allocator>::is_writers_blocked() const
 {
-	return has_blockage_offset(m_preWriteIterator.load(std::memory_order_relaxed), m_written.load(std::memory_order_relaxed));
+	return has_blockage_offset(m_written.load(std::memory_order_relaxed), m_preWriteIterator.load(std::memory_order_relaxed));
 }
 template<class T, class Allocator>
-inline bool item_buffer<T, Allocator>::has_blockage_offset(size_type preVar, size_type postVar)
+inline bool item_buffer<T, Allocator>::has_blockage_offset(size_type postVar, size_type preVar) const
 {
 	const size_type post(postVar);
 	const size_type pre(preVar);
@@ -779,7 +792,7 @@ inline void item_buffer<T, Allocator>::apply_blockage_offset(std::atomic<size_ty
 	do{
 		const size_type post(postVar.load(std::memory_order_relaxed));
 
-		if (has_blockage_offset(pre, post)){
+		if (has_blockage_offset(post, pre)){
 			break;
 		}
 
