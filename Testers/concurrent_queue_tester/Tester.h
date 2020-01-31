@@ -128,9 +128,12 @@ inline double tester<T, Allocator>::ExecuteConcurrent(std::uint32_t runs)
 	m_thrown = 0;
 	m_writtenSum = 0;
 	m_readSum = 0;
+	
+#if defined(GDUL_FIFO)
+	m_queue.reserve(Writes);
+#endif
 
 	for (std::uint32_t i = 0; i < runs; ++i) {
-
 
 		for (std::uint32_t j = 0; j < Writers; ++j)
 			m_writer.add_task(std::bind(&tester::Write, this, WritesPerThread));

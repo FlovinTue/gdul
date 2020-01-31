@@ -905,8 +905,16 @@ template<class T, class Allocator>
 template<class ...Arg>
 inline bool item_buffer<T, Allocator>::try_push(Arg&& ...in)
 {
-	const size_type reserve(m_preWriteIterator.fetch_add(1, std::memory_order_relaxed));
-	const size_type read(m_read.load(std::memory_order_relaxed));
+	// Here we reserve a slot. If there are slots avaliable this should *guarantee* that
+	// we will keep it. How many slots are avaliable is seen as the relationship between
+	// read and preWrite. preWrite will always stay ahead of read. If we load m_read first
+	// this will potentially mean that we get a lower-than-current value at the time of comparison.
+	// That should be fine, as this only means writes will be a little restrictive?
+	//
+	// 1. Load -> 0
+	// 2. fetch_add -> m_cap - 1
+	const size_type read(m_read.load(std::memory_order_acquire));
+	const size_type reserve(m_preWriteIterator.fetch_add(1, std::memory_order_acquire));
 	const size_type used(reserve - read);
 	const size_type avaliable(m_capacity - used);
 
@@ -932,9 +940,9 @@ inline bool item_buffer<T, Allocator>::try_push(Arg&& ...in)
 template<class T, class Allocator>
 inline bool item_buffer<T, Allocator>::try_pop(T& out)
 {
-	const size_type lastWritten(m_written.load(std::memory_order_relaxed));
-	const size_type reserve(m_preReadIterator.fetch_add(1, std::memory_order_relaxed));
-	const size_type avaliable(lastWritten - reserve);
+	const size_type reserve(m_preReadIterator.fetch_add(1, std::memory_order_acquire));
+	const size_type written(m_written.load(std::memory_order_acquire));
+	const size_type avaliable(written - reserve);
 
 	if (!((avaliable - 1) < m_capacity)){
 		m_preReadIterator.fetch_sub(1, std::memory_order_relaxed);
