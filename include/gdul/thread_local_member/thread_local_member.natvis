@@ -24,16 +24,16 @@
 <AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
 
 	<Type Name="gdul::thread_local_member&lt;*&gt;">
-		<DisplayString Condition="m_index &lt; s_tl_container.m_items.m_capacity &amp;&amp; !(s_tl_container.m_iteration &lt; m_iteration)">{s_tl_container.m_items.m_arrayRef[m_index]}</DisplayString>
-		<DisplayString Condition="!(m_index &lt; s_tl_container.m_items.m_capacity) || (s_tl_container.m_iteration &lt; m_iteration)">
+		<DisplayString Condition="m_index &lt; t_tl_container.m_items.m_capacity &amp;&amp; !(t_tl_container.m_iteration &lt; m_iteration)">{t_tl_container.m_items.m_arrayRef[m_index]}</DisplayString>
+		<DisplayString Condition="!(m_index &lt; t_tl_container.m_items.m_capacity) || (t_tl_container.m_iteration &lt; m_iteration)">
 			{*(value_type*)((((((uint64_t*)((*(uint64_t*)((s_st_container.m_instanceTrackers.m_debugView.m_u64 &amp; aspdetail::Cb_Mask) + 8)) &amp; aspdetail::Owned_Mask))[m_index] &amp; aspdetail::Cb_Mask) + 24) &amp; aspdetail::Owned_Mask))}
 		</DisplayString>
 		<Expand>
-			<ExpandedItem Condition="!(m_index &lt; s_tl_container.m_items.m_capacity) || (s_tl_container.m_iteration &lt; m_iteration)">
+			<ExpandedItem Condition="!(m_index &lt; t_tl_container.m_items.m_capacity) || (t_tl_container.m_iteration &lt; m_iteration)">
 				(value_type*)((((((uint64_t*)((*(uint64_t*)((s_st_container.m_instanceTrackers.m_debugView.m_u64 &amp; aspdetail::Cb_Mask) + 8)) &amp; aspdetail::Owned_Mask))[m_index] &amp; aspdetail::Cb_Mask) + 24) &amp; aspdetail::Owned_Mask))
 			</ExpandedItem>
-			<ExpandedItem Condition="m_index &lt; s_tl_container.m_items.m_capacity &amp;&amp; !(s_tl_container.m_iteration &lt; m_iteration)">
-				(&amp;s_tl_container.m_items.m_arrayRef[m_index])
+			<ExpandedItem Condition="m_index &lt; t_tl_container.m_items.m_capacity &amp;&amp; !(t_tl_container.m_iteration &lt; m_iteration)">
+				(&amp;t_tl_container.m_items.m_arrayRef[m_index])
 			</ExpandedItem>
 		</Expand>
 	</Type>
