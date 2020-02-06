@@ -116,9 +116,6 @@ template <class Dummy>
 std::size_t log2_align(std::size_t from, std::size_t clamp);
 
 template <class Dummy>
-constexpr std::size_t next_aligned_to(std::size_t addr, std::size_t align);
-
-template <class Dummy>
 constexpr std::size_t aligned_size(std::size_t byteSize, std::size_t align);
 
 template <class T, class Allocator>
@@ -188,9 +185,6 @@ private:
 	using atomic_shared_ptr_slot_type = atomic_shared_ptr<buffer_type>;
 	using atomic_shared_ptr_array_type = atomic_shared_ptr<atomic_shared_ptr_slot_type[]>;
 	using shared_ptr_array_type = shared_ptr<atomic_shared_ptr_slot_type[]>;
-
-	using consumer_vector_allocator = typename std::allocator_traits<allocator_type>::template rebind_alloc<cqdetail::consumer_wrapper<shared_ptr_slot_type, shared_ptr_array_type>>;
-	using producer_vector_allocator = typename std::allocator_traits<allocator_type>::template rebind_alloc<shared_ptr_slot_type>;
 
 	template <class ...Arg>
 	void push_internal(Arg&&... in);
@@ -977,7 +971,7 @@ inline bool producer_buffer<T, Allocator>::try_pop(T& out)
 #endif
 		return false;
 	}
-	const size_type readSlotTotal(m_readSlot.fetch_add(1, std::memory_order_relaxed));
+	const size_type readSlotTotal(m_readSlot.fetch_add(1, std::memory_order_acquire));
 	const size_type readSlot(readSlotTotal % m_capacity);
 
 	write_out(readSlot, out);
@@ -1285,15 +1279,6 @@ template <class Dummy>
 std::uint16_t to_store_array_capacity(std::uint16_t storeSlot)
 {
 	return std::uint16_t(static_cast<std::uint16_t>(powf(2.f, static_cast<float>(storeSlot + 1))));
-}
-template <class Dummy>
-constexpr std::size_t next_aligned_to(std::size_t addr, std::size_t align)
-{
-	const std::size_t mod(addr % align);
-	const std::size_t remainder(align - mod);
-	const std::size_t offset(remainder == align ? 0 : remainder);
-
-	return addr + offset;
 }
 template <class Dummy>
 constexpr std::size_t aligned_size(std::size_t byteSize, std::size_t align)

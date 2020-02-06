@@ -197,9 +197,7 @@ job_handler_impl::job_impl_shared_ptr job_handler_impl::fetch_job()
 
 	for (uint8_t i = 0; i < t_items.this_worker_impl->get_fetch_retries(); ++i) {
 
-		const uint8_t index((queueIndex + i) % job_queue_count);
-
-		if (m_jobQueues[index].try_pop(out)) {
+		if (m_jobQueues[queueIndex].try_pop(out)) {
 			return out;
 		}
 	}

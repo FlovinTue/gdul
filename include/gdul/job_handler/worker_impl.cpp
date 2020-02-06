@@ -45,11 +45,12 @@ worker_impl::worker_impl()
 	, m_sleepThreshhold(std::numeric_limits<std::uint16_t>::max())
 	, m_isActive(false)
 	, m_firstQueue(job_queue(0))
-	, m_lastQueue(job_queue(job_queue_count - 1))
+	, m_lastQueue(job_queue(0))
 	, m_coreAffinity(0)
 	, m_executionPriority(0)
 {
-	m_distributionChunks = jh_detail::pow2summation(m_firstQueue + 1, m_lastQueue + 1);
+	set_queue_consume_first(job_queue(0));
+	set_queue_consume_last(job_queue(job_queue_count - 1));
 }
 worker_impl::worker_impl(std::thread&& thrd, allocator_type allocator)
 	: m_thread(std::move(thrd))
@@ -63,11 +64,12 @@ worker_impl::worker_impl(std::thread&& thrd, allocator_type allocator)
 	, m_sleepThreshhold(250)
 	, m_isActive(false)
 	, m_firstQueue(job_queue(0))
-	, m_lastQueue(job_queue(job_queue_count - 1))
+	, m_lastQueue(job_queue(0))
 	, m_coreAffinity(0)
 	, m_executionPriority(0)
 {
-	m_distributionChunks = jh_detail::pow2summation(m_firstQueue + 1, m_lastQueue + 1);
+	set_queue_consume_first(job_queue(0));
+	set_queue_consume_last(job_queue(job_queue_count - 1));
 
 	m_isActive.store(true, std::memory_order_release);
 }
@@ -236,7 +238,7 @@ void worker_impl::set_queue_consume_first(job_queue firstQueue) noexcept
 	}
 	m_firstQueue = firstQueue;
 
-	m_distributionChunks = jh_detail::pow2summation(m_firstQueue + 1, m_lastQueue + 1);
+	m_distributionChunks = jh_detail::pow2summation(0, (1 + m_lastQueue) - m_firstQueue);
 }
 void worker_impl::set_queue_consume_last(job_queue lastQueue) noexcept
 {
@@ -245,7 +247,7 @@ void worker_impl::set_queue_consume_last(job_queue lastQueue) noexcept
 	}
 	m_lastQueue = lastQueue;
 
-	m_distributionChunks = jh_detail::pow2summation(m_firstQueue + 1, m_lastQueue + 1);
+	m_distributionChunks = jh_detail::pow2summation(0, (1 + m_lastQueue) - m_firstQueue);
 }
 }
 }

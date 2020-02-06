@@ -107,11 +107,11 @@ inline void tester<T>::test_assignment(uint32_t tasks)
 {
 	auto lam = [this]()
 	{
-		gdul::tlm<T, alloc_t> first;
-		gdul::tlm<T, alloc_t> second;
-		gdul::tlm<T, alloc_t> third;
-		gdul::tlm<T, alloc_t> fourth;
-		gdul::tlm<T, alloc_t> fifth;
+		gdul::tlm<T, alloc_t> first(0);
+		gdul::tlm<T, alloc_t> second(1);
+		gdul::tlm<T, alloc_t> third(2);
+		gdul::tlm<T, alloc_t> fourth(3);
+		gdul::tlm<T, alloc_t> fifth(4);
 
 		const T firstExp = T();
 		const T secondExp = T();
