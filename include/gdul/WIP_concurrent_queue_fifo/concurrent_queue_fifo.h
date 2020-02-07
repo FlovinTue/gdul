@@ -581,10 +581,13 @@ private:
 	template <class U = T, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) && !GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)> * = nullptr>
 	inline void write_out(size_type slot, U& out);
 
-	inline void try_publish_changes(size_type untilAt, std::atomic<size_t>& publishVar);
+	inline void try_publish_changes(size_type untilAt, std::atomic<size_t>& publishVar, item_state publishedState);
+	//inline void try_publish_changes(size_type untilAt, std::atomic<size_t>& publishVar);
 
 	std::atomic<size_type> m_preReadIterator;
+	GDUL_CQ_PADDING(64);
 	std::atomic<size_type> m_readAt;
+	GDUL_CQ_PADDING(64);
 	std::atomic<size_type> m_postReadIterator;
 	GDUL_CQ_PADDING(64);
 
@@ -592,11 +595,15 @@ private:
 
 	GDUL_CQ_PADDING(64);
 	std::atomic<size_type> m_preWriteIterator;
+	GDUL_CQ_PADDING(64);
 	std::atomic<size_type> m_writeAt;
+	GDUL_CQ_PADDING(64);
 	std::atomic<size_type> m_postWriteIterator;
 	GDUL_CQ_PADDING(64);
 
 	GDUL_ATOMIC_WITH_VIEW(size_type, m_written);
+
+	GDUL_CQ_PADDING(64);
 
 	atomic_shared_ptr_buffer_type m_next;
 
@@ -815,7 +822,7 @@ template<class ...Arg>
 inline bool item_buffer<T, Allocator>::try_push(Arg&& ...in)
 {
 	const size_type read(m_read.load(std::memory_order_acquire));
-	const size_type reserve(m_preWriteIterator.fetch_add(1, std::memory_order_acquire));
+	const size_type reserve(m_preWriteIterator.fetch_add(1, std::memory_order_relaxed));
 	const size_type used(reserve - read);
 	const size_type avaliable(m_capacity - used);
 
@@ -829,27 +836,43 @@ inline bool item_buffer<T, Allocator>::try_push(Arg&& ...in)
 
 	write_in(atLocal, std::forward<Arg>(in)...);
 
-	const size_type postVar(m_postWriteIterator.fetch_add(1, std::memory_order_acq_rel));
-	const size_type postAt(m_writeAt.load(std::memory_order_relaxed));
+	m_items[atLocal].set_state(item_state_valid);
 
-	if ((postVar + 1) == postAt){
-		try_publish_changes(postAt, m_written);
-	}
+	//// Something here??
+	//const size_type postVar(m_postWriteIterator.fetch_add(1, std::memory_order_acq_rel));
+	//const size_type postAt(m_writeAt.load(std::memory_order_relaxed));
+
+	//if ((postVar + 1) == postAt){
+	//	try_publish_changes(postAt, m_written);
+	//}
+
+	try_publish_changes(m_writeAt.load(std::memory_order_acquire), m_written, item_state_valid);
 
 	return true;
 }
 template<class T, class Allocator>
 inline bool item_buffer<T, Allocator>::try_pop(T& out)
 {
-	const size_type reserve(m_preReadIterator.fetch_add(1, std::memory_order_acquire));
+	// Need to reduce synchronization traffic. 
+
+	// The minimum synchronization needed would be:
+	// Knowing the buffer state, that is avaliability of slots within the circular buffer.
+	// For that, we need a minimum of one(1!) variable.
+
+	// Using a singular variable would mean that both writers & readers would compete to update
+	// this variable after a performed operation, and would all have to synchronize with 
+
+
+	// If we instead use two variables, the synchronization would take place between readers
+	// entering try_pop & writers leaving try_push aswell as the inverse. This seems more appropriate.
+	// 
+
 	const size_type written(m_written.load(std::memory_order_acquire));
+	const size_type reserve(m_preReadIterator.fetch_add(1, std::memory_order_relaxed));
 	const size_type avaliable(written - reserve);
 
 	if (!((avaliable - 1) < m_capacity)){
 		m_preReadIterator.fetch_sub(1, std::memory_order_relaxed);
-#ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
-		check_for_damage();
-#endif
 		return false;
 	}
 	const size_type at(m_readAt.fetch_add(1, std::memory_order_acquire));
@@ -857,28 +880,64 @@ inline bool item_buffer<T, Allocator>::try_pop(T& out)
 
 	write_out(atLocal, out);
 
-	const size_type postVar(m_postReadIterator.fetch_add(1, std::memory_order_acq_rel));
-	const size_type postAt(m_readAt.load(std::memory_order_relaxed));
+	m_items[atLocal].set_state(item_state_empty);
 
-	if ((postVar + 1) == postAt){
-		try_publish_changes(postAt, m_read);
-	}
+	// Something here??
+	//const size_type postVar(m_postReadIterator.fetch_add(1, std::memory_order_acq_rel));
+	//const size_type postAt(m_readAt.load(std::memory_order_relaxed));
+	//
+	//if ((postVar + 1) == postAt){
+	//	try_publish_changes(postAt, m_read);
+	//}
+
+	try_publish_changes(m_readAt.load(std::memory_order_acquire), m_read, item_state_empty);
 
 	return true;
 }
 template<class T, class Allocator>
-inline void item_buffer<T, Allocator>::try_publish_changes(size_type untilAt, std::atomic<size_t>& publishVar)
+inline void item_buffer<T, Allocator>::try_publish_changes(size_type untilAt, std::atomic<size_t>& publishVar, item_state publishedState)
 {
-	size_type expected(publishVar.load(std::memory_order_relaxed));
-	size_type desired(0);
+	// *Someone* must see untilAt as the last item
+	// For that one to fail, it must arrive at forward probe, and 
+	// not see publishedState.
+
+	// For the OTHER caller, that one must fail to publish up UNTIL last slot
+	// because untilAt was second to last.... That doesn't make sense. Because
+	// for the OTHER caller to load second to last slot into untilAt, it would have
+	// had to written proper state to it's item. And it also means the last caller
+	// would not have even iterated upon the syncVariable. 
+
+	// Is the error somewhere in here?. compare_exchange improperly sequenced?
+
+	size_type published(publishVar.load(std::memory_order_acquire));
 	do{
-		if (!(expected < untilAt)){
+		size_type toPublish(0);
+		for (size_type forwardProbe(published); forwardProbe < untilAt; ++forwardProbe, ++toPublish){
+			if (m_items[forwardProbe % m_capacity].get_state() != publishedState){
+				// Early out, relying on other other caller to patch things up.
+				return;
+			}
+		}
+
+		const size_type desired(published + toPublish);
+		if (publishVar.compare_exchange_strong(published, desired, std::memory_order_release, std::memory_order_relaxed)){
 			break;
 		}
-		desired = untilAt;
 
-	} while (!publishVar.compare_exchange_strong(expected, desired, std::memory_order_release, std::memory_order_relaxed));
+	} while (!(published < untilAt));
 }
+//template<class T, class Allocator>
+//inline void item_buffer<T, Allocator>::try_publish_changes(size_type untilAt, std::atomic<size_t>& publishVar)
+//{
+//	size_type expected(publishVar.load(std::memory_order_relaxed));
+//	const size_type desired(untilAt);
+//	do{
+//		if (!(expected < untilAt)){
+//			break;
+//		}
+//
+//	} while (!publishVar.compare_exchange_strong(expected, desired, std::memory_order_release, std::memory_order_relaxed));
+//}
 template <class T, class Allocator>
 template <class U, std::enable_if_t<GDUL_CQ_BUFFER_NOTHROW_PUSH_MOVE(U)>*>
 inline void item_buffer<T, Allocator>::write_in(typename item_buffer<T, Allocator>::size_type slot, U&& in)

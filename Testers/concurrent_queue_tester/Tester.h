@@ -129,9 +129,9 @@ inline double tester<T, Allocator>::ExecuteConcurrent(std::uint32_t runs)
 	m_writtenSum = 0;
 	m_readSum = 0;
 	
-//#if defined(GDUL_FIFO)
-//	m_queue.reserve(Writes);
-//#endif
+#if defined(GDUL_FIFO)
+	m_queue.reserve(Writes);
+#endif
 
 	for (std::uint32_t i = 0; i < runs; ++i) {
 
@@ -177,6 +177,10 @@ inline double tester<T, Allocator>::ExecuteSingleThread(std::uint32_t runs)
 	m_writtenSum = 0;
 	m_readSum = 0;
 
+#if defined(GDUL_FIFO)
+	m_queue.reserve(Writes);
+#endif
+
 	for (std::uint32_t i = 0; i < runs; ++i) {
 		m_waiting = Readers + Writers;
 
@@ -209,6 +213,10 @@ inline double tester<T, Allocator>::ExecuteSingleProducerSingleConsumer(std::uin
 	m_queue.unsafe_reset();
 #endif
 
+#if defined(GDUL_FIFO)
+	m_queue.reserve(Writes);
+#endif
+
 	double result(0.0);
 	m_thrown = 0;
 	m_writtenSum = 0;
@@ -228,8 +236,9 @@ inline double tester<T, Allocator>::ExecuteSingleProducerSingleConsumer(std::uin
 		while (m_writer.has_unfinished_tasks() | m_reader.has_unfinished_tasks())
 			std::this_thread::yield();
 
+#if defined(GDUL) || defined(GDUL_FIFO)
 		GDUL_ASSERT(m_queue.unsafe_size() == 0);
-
+#endif
 		result += time.get();
 
 		m_waiting = 0;
@@ -250,6 +259,10 @@ inline double tester<T, Allocator>::ExecuteRead(std::uint32_t runs)
 {
 #if  defined(GDUL) | defined(GDUL_FIFO)
 	m_queue.unsafe_reset();
+#endif
+
+#if defined(GDUL_FIFO)
+	m_queue.reserve(Writes);
 #endif
 
 	double result(0.0);
@@ -300,6 +313,10 @@ inline double tester<T, Allocator>::ExecuteWrite(std::uint32_t runs)
 	m_queue.unsafe_reset();
 #endif
 
+#if defined(GDUL_FIFO)
+	m_queue.reserve(Writes);
+#endif
+
 	double result(0.0);
 	m_thrown = 0;
 	m_writtenSum = 0;
@@ -319,9 +336,11 @@ inline double tester<T, Allocator>::ExecuteWrite(std::uint32_t runs)
 			std::this_thread::yield();
 
 		result += time.get();
+#if defined(GDUL) || defined(GDUL_FIFO)
 		std::size_t outSize = m_queue.unsafe_size();
 		std::size_t expectedSize = WritesPerThread * Writers;
 		GDUL_ASSERT(outSize == expectedSize);
+#endif
 
 #if  defined(GDUL) | defined(GDUL_FIFO)
 		m_queue.unsafe_clear();
@@ -364,7 +383,8 @@ inline void tester<T, Allocator>::Write(std::uint32_t writes)
 		std::this_thread::yield();
 	}
 
-	while (!m_isRunning);
+	while (!m_isRunning)
+		std::this_thread::yield();
 
 	uint32_t sum(0);
 
@@ -408,7 +428,8 @@ inline void tester<T, Allocator>::Read(std::uint32_t reads)
 		std::this_thread::yield();
 	}
 
-	while (!m_isRunning);
+	while (!m_isRunning)
+		std::this_thread::yield();
 	
 	uint32_t sum(0);
 
