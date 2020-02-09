@@ -42,6 +42,7 @@ job_handler_impl::job_handler_impl()
 	: m_jobImplChunkPool(jh_detail::Job_Impl_Allocator_Block_Size, m_mainAllocator)
 	, m_jobNodeChunkPool(jh_detail::Job_Impl_Allocator_Block_Size, m_mainAllocator)
 	, m_scatterJobChunkPool(Batch_Job_Allocator_Block_Size, m_mainAllocator)
+	, m_workerIndices(0)
 	, m_workerCount(0)
 {
 }
@@ -51,6 +52,7 @@ job_handler_impl::job_handler_impl(allocator_type & allocator)
 	, m_jobImplChunkPool(jh_detail::Job_Impl_Allocator_Block_Size, m_mainAllocator)
 	, m_jobNodeChunkPool(jh_detail::Job_Impl_Allocator_Block_Size, m_mainAllocator)
 	, m_scatterJobChunkPool(Batch_Job_Allocator_Block_Size, m_mainAllocator)
+	, m_workerIndices(0)
 	, m_workerCount(0)
 {
 }
@@ -63,7 +65,8 @@ job_handler_impl::~job_handler_impl()
 
 void job_handler_impl::retire_workers()
 {
-	const std::uint16_t workers(m_workerCount.exchange(0, std::memory_order_seq_cst));
+	m_workerCount.store(0, std::memory_order_relaxed);
+	const std::uint16_t workers(m_workerIndices.exchange(0, std::memory_order_seq_cst));
 
 	for (size_t i = 0; i < workers; ++i) {
 		m_workers[i].disable();
@@ -77,11 +80,13 @@ worker job_handler_impl::make_worker()
 	worker w(make_worker(entryPoint));
 	w.set_name("worker");
 
+	m_workerCount.fetch_add(1, std::memory_order_relaxed);
+
 	return w;
 }
 worker job_handler_impl::make_worker(gdul::delegate<void()> entryPoint)
 {
-	const std::uint16_t index(m_workerCount.fetch_add(1, std::memory_order_relaxed));
+	const std::uint16_t index(m_workerIndices.fetch_add(1, std::memory_order_relaxed));
 
 	const std::uint8_t autoCoreAffinity(static_cast<std::uint8_t>(index % std::thread::hardware_concurrency()));	
 
@@ -109,12 +114,15 @@ job job_handler_impl::make_job(delegate<void()>&& workUnit)
 	return job(jobImpl);
 }
 
-std::size_t job_handler_impl::num_workers() const noexcept
+std::size_t job_handler_impl::internal_worker_count() const noexcept
 {
-	return m_workerCount;
+	return m_workerCount.load(std::memory_order_relaxed);
 }
-
-std::size_t job_handler_impl::num_enqueued() const noexcept
+std::size_t job_handler_impl::external_worker_count() const noexcept
+{
+	return m_workerIndices.load(std::memory_order_relaxed) - m_workerCount.load(std::memory_order_relaxed);
+}
+std::size_t job_handler_impl::active_job_count() const noexcept
 {
 	std::size_t accum(0);
 

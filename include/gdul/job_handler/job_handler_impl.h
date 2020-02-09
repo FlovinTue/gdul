@@ -65,8 +65,9 @@ public:
 
 	job make_job(delegate<void()>&& workUnit);
 
-	std::size_t num_workers() const noexcept;
-	std::size_t num_enqueued() const noexcept;
+	std::size_t internal_worker_count() const noexcept;
+	std::size_t external_worker_count() const noexcept;
+	std::size_t active_job_count() const noexcept;
 
 	concurrent_object_pool<job_node_chunk_rep, allocator_type>* get_job_node_chunk_pool() noexcept;
 	concurrent_object_pool<batch_job_chunk_rep, allocator_type>* get_batch_job_chunk_pool() noexcept;
@@ -97,6 +98,7 @@ private:
 	std::array<worker_impl, Job_Handler_Max_Workers> m_workers;
 
 	std::atomic<std::uint16_t> m_workerCount;
+	std::atomic<std::uint16_t> m_workerIndices;
 };
 }
 }
