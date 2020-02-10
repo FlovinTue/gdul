@@ -582,7 +582,7 @@ private:
 	inline void write_out(size_type slot, U& out);
 
 	inline void try_publish_changes(size_type untilAt, std::atomic<size_t>& publishVar, item_state publishedState);
-	//inline void try_publish_changes(size_type untilAt, std::atomic<size_t>& publishVar);
+	inline void try_publish_changes(size_type untilAt, std::atomic<size_t>& publishVar);
 
 	std::atomic<size_type> m_preReadIterator;
 	GDUL_CQ_PADDING(64);
@@ -838,15 +838,17 @@ inline bool item_buffer<T, Allocator>::try_push(Arg&& ...in)
 
 	m_items[atLocal].set_state(item_state_valid);
 
+	std::atomic_thread_fence(std::memory_order_release);
+
 	//// Something here??
-	//const size_type postVar(m_postWriteIterator.fetch_add(1, std::memory_order_acq_rel));
-	//const size_type postAt(m_writeAt.load(std::memory_order_relaxed));
+	const size_type postVar(m_postWriteIterator.fetch_add(1, std::memory_order_acq_rel));
+	const size_type postAt(m_writeAt.load(std::memory_order_relaxed));
 
-	//if ((postVar + 1) == postAt){
-	//	try_publish_changes(postAt, m_written);
-	//}
+	if ((postVar + 1) == postAt){
+		try_publish_changes(postAt, m_written);
+	}
 
-	try_publish_changes(m_writeAt.load(std::memory_order_acquire), m_written, item_state_valid);
+	//try_publish_changes(m_writeAt.load(std::memory_order_acquire), m_written, item_state_valid);
 
 	return true;
 }
@@ -882,15 +884,16 @@ inline bool item_buffer<T, Allocator>::try_pop(T& out)
 
 	m_items[atLocal].set_state(item_state_empty);
 
+	std::atomic_thread_fence(std::memory_order_release);
 	// Something here??
-	//const size_type postVar(m_postReadIterator.fetch_add(1, std::memory_order_acq_rel));
-	//const size_type postAt(m_readAt.load(std::memory_order_relaxed));
-	//
-	//if ((postVar + 1) == postAt){
-	//	try_publish_changes(postAt, m_read);
-	//}
+	const size_type postVar(m_postReadIterator.fetch_add(1, std::memory_order_acq_rel));
+	const size_type postAt(m_readAt.load(std::memory_order_relaxed));
+	
+	if ((postVar + 1) == postAt){
+		try_publish_changes(postAt, m_read);
+	}
 
-	try_publish_changes(m_readAt.load(std::memory_order_acquire), m_read, item_state_empty);
+	//try_publish_changes(m_readAt.load(std::memory_order_acquire), m_read, item_state_empty);
 
 	return true;
 }
@@ -910,7 +913,7 @@ inline void item_buffer<T, Allocator>::try_publish_changes(size_type untilAt, st
 	// Is the error somewhere in here?. compare_exchange improperly sequenced?
 
 	size_type published(publishVar.load(std::memory_order_acquire));
-	do{
+	while (published < untilAt){
 		size_type toPublish(0);
 		for (size_type forwardProbe(published); forwardProbe < untilAt; ++forwardProbe, ++toPublish){
 			if (m_items[forwardProbe % m_capacity].get_state() != publishedState){
@@ -923,21 +926,20 @@ inline void item_buffer<T, Allocator>::try_publish_changes(size_type untilAt, st
 		if (publishVar.compare_exchange_strong(published, desired, std::memory_order_release, std::memory_order_relaxed)){
 			break;
 		}
-
-	} while (!(published < untilAt));
+	};
 }
-//template<class T, class Allocator>
-//inline void item_buffer<T, Allocator>::try_publish_changes(size_type untilAt, std::atomic<size_t>& publishVar)
-//{
-//	size_type expected(publishVar.load(std::memory_order_relaxed));
-//	const size_type desired(untilAt);
-//	do{
-//		if (!(expected < untilAt)){
-//			break;
-//		}
-//
-//	} while (!publishVar.compare_exchange_strong(expected, desired, std::memory_order_release, std::memory_order_relaxed));
-//}
+template<class T, class Allocator>
+inline void item_buffer<T, Allocator>::try_publish_changes(size_type untilAt, std::atomic<size_t>& publishVar)
+{
+	size_type expected(publishVar.load(std::memory_order_relaxed));
+	const size_type desired(untilAt);
+	do{
+		if (!(expected < untilAt)){
+			break;
+		}
+
+	} while (!publishVar.compare_exchange_strong(expected, desired, std::memory_order_release, std::memory_order_relaxed));
+}
 template <class T, class Allocator>
 template <class U, std::enable_if_t<GDUL_CQ_BUFFER_NOTHROW_PUSH_MOVE(U)>*>
 inline void item_buffer<T, Allocator>::write_in(typename item_buffer<T, Allocator>::size_type slot, U&& in)
@@ -948,12 +950,10 @@ template <class T, class Allocator>
 template <class U, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_PUSH_MOVE(U)>*>
 inline void item_buffer<T, Allocator>::write_in(typename item_buffer<T, Allocator>::size_type slot, U&& in)
 {
-	try
-	{
+	try{
 		m_items[slot].store(std::move(in));
 	}
-	catch (...)
-	{
+	catch (...){
 		--m_writeAt;
 		throw;
 	}
@@ -968,12 +968,10 @@ template <class T, class Allocator>
 template <class U, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_PUSH_ASSIGN(U)>*>
 inline void item_buffer<T, Allocator>::write_in(typename item_buffer<T, Allocator>::size_type slot, const U& in)
 {
-	try
-	{
+	try{
 		m_items[slot].store(in);
 	}
-	catch (...)
-	{
+	catch (...){
 		--m_writeAt;
 		throw;
 	}
