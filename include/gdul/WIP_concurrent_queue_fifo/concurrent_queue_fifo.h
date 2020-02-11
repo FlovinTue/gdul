@@ -831,20 +831,21 @@ inline bool item_buffer<T, Allocator>::try_push(Arg&& ...in)
 		return false;
 	}
 
-	const size_type at(m_writeAt.fetch_add(1, std::memory_order_relaxed));
+	const size_type at(m_writeAt.fetch_add(1, std::memory_order_release));
 	const size_type atLocal(at % m_capacity);
 
 	write_in(atLocal, std::forward<Arg>(in)...);
 
 	m_items[atLocal].set_state(item_state_valid);
 
-	std::atomic_thread_fence(std::memory_order_release);
-
-	//// Something here??
-	const size_type postVar(m_postWriteIterator.fetch_add(1, std::memory_order_acq_rel));
+	const size_type postVar(m_postWriteIterator.fetch_add(1, std::memory_order_release));
 	const size_type postAt(m_writeAt.load(std::memory_order_relaxed));
 
 	if ((postVar + 1) == postAt){
+		// Can we modify this to use fetch_add ? 
+		// Would need to know the difference to the last add.. ? 
+		// ANOTHER syncronization variable
+		// 
 		try_publish_changes(postAt, m_written);
 	}
 
@@ -855,21 +856,7 @@ inline bool item_buffer<T, Allocator>::try_push(Arg&& ...in)
 template<class T, class Allocator>
 inline bool item_buffer<T, Allocator>::try_pop(T& out)
 {
-	// Need to reduce synchronization traffic. 
-
-	// The minimum synchronization needed would be:
-	// Knowing the buffer state, that is avaliability of slots within the circular buffer.
-	// For that, we need a minimum of one(1!) variable.
-
-	// Using a singular variable would mean that both writers & readers would compete to update
-	// this variable after a performed operation, and would all have to synchronize with 
-
-
-	// If we instead use two variables, the synchronization would take place between readers
-	// entering try_pop & writers leaving try_push aswell as the inverse. This seems more appropriate.
-	// 
-
-	const size_type written(m_written.load(std::memory_order_acquire));
+	const size_type written(m_written.load(std::memory_order_relaxed));
 	const size_type reserve(m_preReadIterator.fetch_add(1, std::memory_order_relaxed));
 	const size_type avaliable(written - reserve);
 
@@ -877,16 +864,14 @@ inline bool item_buffer<T, Allocator>::try_pop(T& out)
 		m_preReadIterator.fetch_sub(1, std::memory_order_relaxed);
 		return false;
 	}
-	const size_type at(m_readAt.fetch_add(1, std::memory_order_acquire));
+	const size_type at(m_readAt.fetch_add(1, std::memory_order_release));
 	const size_type atLocal(at % m_capacity);
 
 	write_out(atLocal, out);
 
 	m_items[atLocal].set_state(item_state_empty);
 
-	std::atomic_thread_fence(std::memory_order_release);
-	// Something here??
-	const size_type postVar(m_postReadIterator.fetch_add(1, std::memory_order_acq_rel));
+	const size_type postVar(m_postReadIterator.fetch_add(1, std::memory_order_release));
 	const size_type postAt(m_readAt.load(std::memory_order_relaxed));
 	
 	if ((postVar + 1) == postAt){
@@ -900,18 +885,6 @@ inline bool item_buffer<T, Allocator>::try_pop(T& out)
 template<class T, class Allocator>
 inline void item_buffer<T, Allocator>::try_publish_changes(size_type untilAt, std::atomic<size_t>& publishVar, item_state publishedState)
 {
-	// *Someone* must see untilAt as the last item
-	// For that one to fail, it must arrive at forward probe, and 
-	// not see publishedState.
-
-	// For the OTHER caller, that one must fail to publish up UNTIL last slot
-	// because untilAt was second to last.... That doesn't make sense. Because
-	// for the OTHER caller to load second to last slot into untilAt, it would have
-	// had to written proper state to it's item. And it also means the last caller
-	// would not have even iterated upon the syncVariable. 
-
-	// Is the error somewhere in here?. compare_exchange improperly sequenced?
-
 	size_type published(publishVar.load(std::memory_order_acquire));
 	while (published < untilAt){
 		size_type toPublish(0);
@@ -926,7 +899,7 @@ inline void item_buffer<T, Allocator>::try_publish_changes(size_type untilAt, st
 		if (publishVar.compare_exchange_strong(published, desired, std::memory_order_release, std::memory_order_relaxed)){
 			break;
 		}
-	};
+	}
 }
 template<class T, class Allocator>
 inline void item_buffer<T, Allocator>::try_publish_changes(size_type untilAt, std::atomic<size_t>& publishVar)
