@@ -344,22 +344,22 @@ inline const T& thread_local_member<T, Allocator>::get() const
 	return t_tl_container.m_items[m_index];
 }
 template<class T, class Allocator>
-inline typename tlm<T, Allocator>::deref_type* thread_local_member<T, Allocator>::operator->()
+inline typename thread_local_member<T, Allocator>::deref_type* thread_local_member<T, Allocator>::operator->()
 {
 	return get();
 }
 template<class T, class Allocator>
-inline const typename tlm<T, Allocator>::deref_type* thread_local_member<T, Allocator>::operator->() const
+inline const typename thread_local_member<T, Allocator>::deref_type* thread_local_member<T, Allocator>::operator->() const
 {
 	return get();
 }
 template<class T, class Allocator>
-inline typename tlm<T, Allocator>::deref_type& thread_local_member<T, Allocator>::operator*()
+inline typename thread_local_member<T, Allocator>::deref_type& thread_local_member<T, Allocator>::operator*()
 {
 	return *get();
 }
 template<class T, class Allocator>
-inline const typename tlm<T, Allocator>::deref_type& thread_local_member<T, Allocator>::operator*() const
+inline const typename thread_local_member<T, Allocator>::deref_type& thread_local_member<T, Allocator>::operator*() const
 {
 	return *get();
 }
