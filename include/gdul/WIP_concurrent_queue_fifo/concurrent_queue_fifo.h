@@ -822,6 +822,9 @@ template<class T, class Allocator>
 template<class ...Arg>
 inline bool item_buffer<T, Allocator>::try_push(Arg&& ...in)
 {
+	// Thread 1 enters, claims 0, fails avaliability check, then stalls
+	// Thread 2 enters, claims 1, writes to 1
+	// Thread 1 resumes, 
 	const size_type read(m_read.load(std::memory_order_acquire));
 	const size_type reserve(m_preWriteIterator.fetch_add(1, std::memory_order_relaxed));
 	const size_type used(reserve - read);
@@ -843,13 +846,13 @@ inline bool item_buffer<T, Allocator>::try_push(Arg&& ...in)
 		const size_type reUsed(reserve - reRead);
 		const size_type reAvaliable(m_capacity - reUsed);
 
-		if (!((avaliable - 1) < m_capacity)){
+		if (!((reAvaliable - 1) < m_capacity)){
 			m_preWriteIterator.fetch_sub(1, std::memory_order_relaxed);
 			return false;
 		}
 	}
-
-	const size_type at(m_writeAt.fetch_add(1, std::memory_order_relaxed));
+	m_writeAt.fetch_add(1, std::memory_order_relaxed);
+	const size_type at(reserve);
 	const size_type atLocal(at % m_capacity);
 
 	write_in(atLocal, std::forward<Arg>(in)...);
