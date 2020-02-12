@@ -827,9 +827,26 @@ inline bool item_buffer<T, Allocator>::try_push(Arg&& ...in)
 	const size_type used(reserve - read);
 	const size_type avaliable(m_capacity - used);
 
+	// If we can guarantee that one fail == all future fail here
+	// then we can get rid of m_writeAt and simply use preIterator 
+	// (only writers)
+
 	if (!((avaliable - 1) < m_capacity)){
-		m_preWriteIterator.fetch_sub(1, std::memory_order_relaxed);
-		return false;
+		// Perhaps have some kind of catch mechanic in here for above case. 
+		// compare_exchange something something?
+
+		// Maybe just apply write block and recheck if the current reserve is valid?
+
+		apply_blockage_offset(m_preWriteIterator, m_written);
+
+		const size_type reRead(m_read.load(std::memory_order_acquire));
+		const size_type reUsed(reserve - reRead);
+		const size_type reAvaliable(m_capacity - reUsed);
+
+		if (!((avaliable - 1) < m_capacity)){
+			m_preWriteIterator.fetch_sub(1, std::memory_order_relaxed);
+			return false;
+		}
 	}
 
 	const size_type at(m_writeAt.fetch_add(1, std::memory_order_relaxed));
@@ -846,10 +863,6 @@ inline bool item_buffer<T, Allocator>::try_push(Arg&& ...in)
 	const size_type postAt(m_writeAt.load(std::memory_order_relaxed));
 
 	if ((postVar + 1) == postAt){
-		// Can we modify this to use fetch_add ? 
-		// Would need to know the difference to the last add.. ? 
-		// ANOTHER syncronization variable
-		// 
 		try_publish_changes(postAt, m_written);
 	}
 #endif
