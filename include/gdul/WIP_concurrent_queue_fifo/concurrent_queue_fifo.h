@@ -26,6 +26,7 @@
 #include <atomic>
 #include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
 #include <gdul/thread_local_member/thread_local_member.h>
+#include "../../../Testers/Common/util.h"
 
 // Exception handling may be enabled for basic exception safety at the cost of
 // a slight performance decrease
@@ -831,25 +832,27 @@ inline bool item_buffer<T, Allocator>::try_push(Arg&& ...in)
 		return false;
 	}
 
-	const size_type at(m_writeAt.fetch_add(1, std::memory_order_release));
+	const size_type at(m_writeAt.fetch_add(1, std::memory_order_seq_cst));
 	const size_type atLocal(at % m_capacity);
 
 	write_in(atLocal, std::forward<Arg>(in)...);
 
-	m_items[atLocal].set_state(item_state_valid);
+	{
+		m_items[atLocal].set_state(item_state_valid);
 
-	const size_type postVar(m_postWriteIterator.fetch_add(1, std::memory_order_release));
-	const size_type postAt(m_writeAt.load(std::memory_order_relaxed));
-
-	if ((postVar + 1) == postAt){
-		// Can we modify this to use fetch_add ? 
-		// Would need to know the difference to the last add.. ? 
-		// ANOTHER syncronization variable
-		// 
-		try_publish_changes(postAt, m_written);
+		try_publish_changes(m_writeAt.load(std::memory_order_seq_cst), m_written, item_state_valid);
 	}
 
-	//try_publish_changes(m_writeAt.load(std::memory_order_acquire), m_written, item_state_valid);
+	//const size_type postVar(m_postWriteIterator.fetch_add(1, std::memory_order_release));
+	//const size_type postAt(m_writeAt.load(std::memory_order_relaxed));
+
+	//if ((postVar + 1) == postAt){
+	//	// Can we modify this to use fetch_add ? 
+	//	// Would need to know the difference to the last add.. ? 
+	//	// ANOTHER syncronization variable
+	//	// 
+	//	try_publish_changes(postAt, m_written);
+	//}
 
 	return true;
 }
@@ -864,21 +867,41 @@ inline bool item_buffer<T, Allocator>::try_pop(T& out)
 		m_preReadIterator.fetch_sub(1, std::memory_order_relaxed);
 		return false;
 	}
-	const size_type at(m_readAt.fetch_add(1, std::memory_order_release));
+	const size_type at(m_readAt.fetch_add(1, std::memory_order_seq_cst));
 	const size_type atLocal(at % m_capacity);
 
 	write_out(atLocal, out);
 
-	m_items[atLocal].set_state(item_state_empty);
+	{
+		m_items[atLocal].set_state(item_state_empty);
 
-	const size_type postVar(m_postReadIterator.fetch_add(1, std::memory_order_release));
-	const size_type postAt(m_readAt.load(std::memory_order_relaxed));
-	
-	if ((postVar + 1) == postAt){
-		try_publish_changes(postAt, m_read);
+		// Want to skip loading here. 
+		// at + 1 is guaranteed to cover 'this' item.. But not if we want to guarantee
+		// covering any changes that happened in between..... 
+		// That is to say. If we take slot 0 and stall
+		// and another thread takes slot 1 and is unable to publish
+		// the first thread resuming will be unable to assist with publishing slot 1
+		// This means one item may be indefinitely lost.
+
+		// To alleviate this, we may load latest slot taken before we try to publish.
+
+		// In fact. Hmm. Could it be possible that a thread stalling after this load could introduce
+		// the same scenario, just at a later stage? ..  ?
+
+		// I think not. The main point of re-loading is that we do it AFTER we have written the state, which means
+		// That any thread arriving at this point will have written.... and will catch any potential in-betweener? (seq-cst? ) 
+
+		// The idea being that any thread arriving here will be prepared to publish all items written
+		try_publish_changes(m_readAt.load(std::memory_order_seq_cst), m_read, item_state_empty);
 	}
 
-	//try_publish_changes(m_readAt.load(std::memory_order_acquire), m_read, item_state_empty);
+	//const size_type postVar(m_postReadIterator.fetch_add(1, std::memory_order_release));
+	//const size_type postAt(m_readAt.load(std::memory_order_relaxed));
+	//
+	//if ((postVar + 1) == postAt){
+	//	try_publish_changes(postAt, m_read);
+	//}
+
 
 	return true;
 }
@@ -886,13 +909,31 @@ template<class T, class Allocator>
 inline void item_buffer<T, Allocator>::try_publish_changes(size_type untilAt, std::atomic<size_t>& publishVar, item_state publishedState)
 {
 	size_type published(publishVar.load(std::memory_order_acquire));
+
+	// Since we may end up with a state looking like pre == 8190, at == 8190, post == 8189 and
+	// this loop's condition guards against aborting when published is less than untilAt
+	// It goes to reason that the problem would lie with either untilAt being 8189 or
+	// forward probe failing.
+
+
+
+	// ... Need to rebuild and reload at var intermediately.
 	while (published < untilAt){
 		size_type toPublish(0);
 		for (size_type forwardProbe(published); forwardProbe < untilAt; ++forwardProbe, ++toPublish){
 			if (m_items[forwardProbe % m_capacity].get_state() != publishedState){
-				// Early out, relying on other other caller to patch things up.
-				return;
+				break;
 			}
+		}
+	// What can happen is:
+	// thread 1 takes slot 0, continues here, then stalls.
+	// thread 2 takes slot 1, enters this method, loads published, stalls
+	// thread 1 resumes, publishes slot 0, and leaves
+	// thread X consumes slot 0 and changes state into unpublished
+	// thread 2 resumes, fails forward probe. slot 1 is lost.
+
+		if (!toPublish){
+
 		}
 
 		const size_type desired(published + toPublish);
