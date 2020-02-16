@@ -54,7 +54,7 @@ public:
 	void set_target_queue(job_queue target) noexcept override final;
 	job_queue get_target_queue() const noexcept override final;
 
-	void set_name(const std::string& name) override final;
+	void set_name(const char* name) override final;
 
 	void wait_until_finished() noexcept override final;
 	void work_until_finished(job_queue consumeFrom) override final;
@@ -87,7 +87,7 @@ private:
 
 	std::uint32_t clamp_batch_size(std::size_t desired) const;
 
-	void set_name_to(job& jb, const std::string& postfix);
+	void set_name_to(job& jb, const char* postfix);
 
 	bool is_input_output() const;
 
@@ -199,10 +199,10 @@ inline std::uint32_t batch_job_impl<InputContainer, OutputContainer, Process>::c
 	return returnValue;
 }
 template<class InputContainer, class OutputContainer, class Process>
-inline void batch_job_impl<InputContainer, OutputContainer, Process>::set_name_to(job & jb, const std::string & postfix)
+inline void batch_job_impl<InputContainer, OutputContainer, Process>::set_name_to(job & jb, const char* postfix)
 {
 #if defined(GDUL_DEFINED)
-	jb.set_name(m_name + postfix);
+	jb.set_name(m_name + std::string(postfix));
 #else
 	(void)jb; (void)postfix;
 #endif
@@ -228,11 +228,11 @@ inline job_queue batch_job_impl<InputContainer, OutputContainer, Process>::get_t
 	return m_targetQueue;
 }
 template<class InputContainer, class OutputContainer, class Process>
-inline void batch_job_impl<InputContainer, OutputContainer, Process>::set_name(const std::string & name)
+inline void batch_job_impl<InputContainer, OutputContainer, Process>::set_name(const char* name)
 {
 #if defined(GDUL_DEBUG)
 	m_name = name;
-	m_root.set_name(m_name + " initialize");
+	m_root.set_name(std::string(m_name).append(" initialize").c_str());
 #else
 	(void)name;
 #endif
@@ -363,11 +363,15 @@ inline void batch_job_impl<InputContainer, OutputContainer, Process>::make_jobs(
 
 	for (std::size_t i = 1; i < m_batchCount; ++i) {
 		job nextProcessJob(make_work_slice(&batch_job_impl::work_process<>, i));
-		set_name_to(nextProcessJob, " process batch " + std::to_string(i + 1));
+#if defined(GDUL_DEBUG)
+		set_name_to(nextProcessJob, std::string(" process batch " + std::to_string(i + 1)).c_str());
+#endif
 
 		if (i < (m_batchCount - 1)) {
 			job nextPackJob(make_work_slice(&batch_job_impl::work_pack, i));
-			set_name_to(nextPackJob, " pack batch " + std::to_string(i));
+#if defined(GDUL_DEBUG)
+			set_name_to(nextPackJob, std::string(" pack batch " + std::to_string(i)).c_str());
+#endif
 			nextPackJob.add_dependency(currentPackJob);
 			nextPackJob.add_dependency(nextProcessJob);
 			nextPackJob.enable();
@@ -393,7 +397,9 @@ inline void batch_job_impl<InputContainer, OutputContainer, Process>::make_jobs(
 {
 	for (std::size_t i = 0; i < m_batchCount; ++i) {
 		job processJob(make_work_slice(&batch_job_impl::work_process<>, i));
-		set_name_to(processJob, " process batch " + std::to_string(i + 1));
+#if defined(GDUL_DEBUG)
+		set_name_to(processJob, std::string(" process batch " + std::to_string(i + 1)).c_str());
+#endif
 		m_end.add_dependency(processJob);
 		processJob.enable();
 	}

@@ -52,7 +52,7 @@ job & batch_job::get_endjob() noexcept
 	return m_impl->get_endjob();
 }
 
-void batch_job::set_name(const std::string & name)
+void batch_job::set_name(const char* name)
 {
 	m_impl->set_name(name);
 }

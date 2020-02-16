@@ -21,7 +21,6 @@
 #pragma once
 
 #include <gdul/job_handler/job_handler_utility.h>
-#include <string>
 
 namespace gdul {
 class job;
@@ -36,7 +35,7 @@ public:
 	virtual void wait_until_finished() noexcept = 0;
 	virtual void work_until_finished(job_queue) = 0;
 	virtual job& get_endjob() noexcept = 0;
-	virtual void set_name(const std::string&) = 0;
+	virtual void set_name(const char*) = 0;
 	virtual float get_time() const noexcept = 0;
 	virtual std::size_t get_output_size() const noexcept = 0;
 	virtual job_queue get_target_queue() const noexcept = 0;
