@@ -86,17 +86,17 @@ bool job_impl::try_attach_child(job_impl_shared_ptr child)
 
 	return true;
 }
-void job_impl::set_name(const std::string & name)
+void job_impl::set_name(const char* name)
 {
 	(void)name;
 #if defined GDUL_DEBUG
 	m_name = name;
 #endif
 }
-const std::string & job_impl::get_name() const
+const char* job_impl::get_name() const
 {
 #if defined(GDUL_DEBUG)
-	return m_name;
+	return m_name.c_str();
 #else
 	return "";
 #endif

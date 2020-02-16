@@ -51,11 +51,11 @@ job & job::operator=(const job & other) noexcept
 	m_impl = other.m_impl;
 	return *this;
 }
-void job::set_name(const std::string & name)
+void job::set_name(const char* name)
 {
 	m_impl->set_name(name);
 }
-const std::string & job::get_name() const
+const char* job::get_name() const
 {
 	return m_impl->get_name();
 }

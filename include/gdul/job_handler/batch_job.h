@@ -53,7 +53,7 @@ public:
 
 	operator bool() const noexcept;
 
-	void set_name(const std::string& name);
+	void set_name(const char* name);
 
 	// Get the duration of the job. Only valid if GDUL_DEBUG is defined & job has run
 	float get_time() const noexcept;
