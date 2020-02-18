@@ -719,11 +719,11 @@ private:
 
 	inline void reintegrate_failed_entries(size_type failCount);
 
-	std::atomic<size_type> m_preReadIterator;
+	std::atomic<size_type> m_preReadSync;
 	GDUL_ATOMIC_WITH_VIEW(size_type, m_readSlot);
 
 #ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
-	std::atomic<size_type> m_postReadIterator;
+	std::atomic<size_type> m_read;
 	std::atomic<std::uint16_t> m_failureCount;
 	std::atomic<std::uint16_t> m_failureIndex;
 	GDUL_CQ_PADDING((GDUL_CACHELINE_SIZE * 2) - ((sizeof(size_type) * 3) + (sizeof(std::uint16_t) * 2)));
@@ -732,7 +732,7 @@ private:
 	GDUL_CQ_PADDING((GDUL_CACHELINE_SIZE * 2) - sizeof(size_type) * 2);
 #endif
 	size_type m_writeSlot;
-	GDUL_ATOMIC_WITH_VIEW(size_type, m_postWriteIterator);
+	GDUL_ATOMIC_WITH_VIEW(size_type, m_written);
 	GDUL_CQ_PADDING(GDUL_CACHELINE_SIZE - sizeof(size_type) * 2);
 	atomic_shared_ptr_slot_type m_next;
 
@@ -746,13 +746,13 @@ inline producer_buffer<T, Allocator>::producer_buffer(typename producer_buffer<T
 	, m_dataBlock(dataBlock)
 	, m_capacity(capacity)
 	, m_readSlot(0)
-	, m_preReadIterator(0)
+	, m_preReadSync(0)
 	, m_writeSlot(0)
-	, m_postWriteIterator(0)
+	, m_written(0)
 #ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
 	, m_failureIndex(0)
 	, m_failureCount(0)
-	, m_postReadIterator(0)
+	, m_read(0)
 #endif
 {
 }
@@ -767,7 +767,7 @@ inline producer_buffer<T, Allocator>::~producer_buffer()
 template<class T, class Allocator>
 inline bool producer_buffer<T, Allocator>::is_active() const
 {
-	return (!m_next || (m_readSlot.load(std::memory_order_relaxed) != m_postWriteIterator.load(std::memory_order_relaxed)));
+	return (!m_next || (m_readSlot.load(std::memory_order_relaxed) != m_written.load(std::memory_order_relaxed)));
 }
 template<class T, class Allocator>
 inline bool producer_buffer<T, Allocator>::is_valid() const
@@ -790,9 +790,9 @@ inline typename producer_buffer<T, Allocator>::shared_ptr_slot_type producer_buf
 
 	while (inspect) {
 		const size_type readSlot(inspect->m_readSlot.load(std::memory_order_relaxed));
-		const size_type postWrite(inspect->m_postWriteIterator.load(std::memory_order_relaxed));
+		const size_type written(inspect->m_written.load(std::memory_order_relaxed));
 
-		const bool thisBufferEmpty(readSlot == postWrite);
+		const bool thisBufferEmpty(readSlot == written);
 #ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
 		const bool veto(inspect->m_failureCount.load(std::memory_order_relaxed) != inspect->m_failureIndex.load(std::memory_order_relaxed));
 		const bool valid(!thisBufferEmpty | veto);
@@ -813,7 +813,7 @@ template<class T, class Allocator>
 inline typename producer_buffer<T, Allocator>::size_type producer_buffer<T, Allocator>::size() const
 {
 	const size_type readSlot(m_readSlot.load(std::memory_order_relaxed));
-	size_type accumulatedSize(m_postWriteIterator.load(std::memory_order_relaxed));
+	size_type accumulatedSize(m_written.load(std::memory_order_relaxed));
 	accumulatedSize -= readSlot;
 
 	if (m_next)
@@ -845,7 +845,7 @@ inline bool producer_buffer<T, Allocator>::verify_successor(const shared_ptr_slo
 	producer_buffer<T, Allocator>* inspect(this);
 
 	do {
-		const size_type preRead(inspect->m_preReadIterator.load(std::memory_order_relaxed));
+		const size_type preRead(inspect->m_preReadSync.load(std::memory_order_relaxed));
 		for (size_type i = 0; i < inspect->m_capacity; ++i) {
 			const size_type index((preRead - i) % inspect->m_capacity);
 
@@ -874,9 +874,9 @@ template <class U, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) && !GDUL
 inline void producer_buffer<T, Allocator>::check_for_damage()
 {
 #ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
-	const size_type preRead(m_preReadIterator.load(std::memory_order_relaxed));
+	const size_type preRead(m_preReadSync.load(std::memory_order_relaxed));
 	const size_type preReadLockOffset(preRead - Buffer_Lock_Offset);
-	if (preReadLockOffset != m_postReadIterator.load(std::memory_order_relaxed)) {
+	if (preReadLockOffset != m_read.load(std::memory_order_relaxed)) {
 		return;
 	}
 
@@ -897,9 +897,9 @@ inline void producer_buffer<T, Allocator>::check_for_damage()
 	if (m_failureIndex.compare_exchange_strong(expected, desired, std::memory_order_relaxed, std::memory_order_relaxed)) {
 		reintegrate_failed_entries(toReintegrate);
 
-		m_postReadIterator.fetch_sub(toReintegrate);
+		m_read.fetch_sub(toReintegrate);
 		m_readSlot.fetch_sub(toReintegrate);
-		m_preReadIterator.fetch_sub(Buffer_Lock_Offset + toReintegrate);
+		m_preReadSync.fetch_sub(Buffer_Lock_Offset + toReintegrate);
 	}
 #endif
 }
@@ -917,9 +917,9 @@ inline void producer_buffer<T, Allocator>::push_front(shared_ptr_slot_type newBu
 template<class T, class Allocator>
 inline void producer_buffer<T, Allocator>::unsafe_clear()
 {
-	const size_type postWrite(m_postWriteIterator.load(std::memory_order_relaxed));
-	m_preReadIterator.store(postWrite, std::memory_order_relaxed);
-	m_readSlot.store(postWrite, std::memory_order_relaxed);
+	const size_type written(m_written.load(std::memory_order_relaxed));
+	m_preReadSync.store(written, std::memory_order_relaxed);
+	m_readSlot.store(written, std::memory_order_relaxed);
 
 	for (size_type i = 0; i < m_capacity; ++i) {
 		m_dataBlock[i].set_state_local(item_state::Empty);
@@ -929,7 +929,7 @@ inline void producer_buffer<T, Allocator>::unsafe_clear()
 	m_failureCount.store(0, std::memory_order_relaxed);
 	m_failureIndex.store(0, std::memory_order_relaxed);
 
-	m_postReadIterator.store(postWrite, std::memory_order_relaxed);
+	m_read.store(written, std::memory_order_relaxed);
 #endif
 	if (m_next) {
 		m_next.unsafe_get()->unsafe_clear();
@@ -953,19 +953,19 @@ inline bool producer_buffer<T, Allocator>::try_push(Arg&& ...in)
 
 	m_dataBlock[slot].set_state_local(item_state::Valid);
 
-	m_postWriteIterator.fetch_add(1, std::memory_order_release);
+	m_written.fetch_add(1, std::memory_order_release);
 
 	return true;
 }
 template<class T, class Allocator>
 inline bool producer_buffer<T, Allocator>::try_pop(T& out)
 {
-	const size_type lastWritten(m_postWriteIterator.load(std::memory_order_relaxed));
-	const size_type slotReserved(m_preReadIterator.fetch_add(1, std::memory_order_relaxed) + 1);
+	const size_type lastWritten(m_written.load(std::memory_order_relaxed));
+	const size_type slotReserved(m_preReadSync.fetch_add(1, std::memory_order_relaxed) + 1);
 	const size_type avaliable(lastWritten - slotReserved);
 
 	if (m_capacity < avaliable) {
-		m_preReadIterator.fetch_sub(1, std::memory_order_relaxed);
+		m_preReadSync.fetch_sub(1, std::memory_order_relaxed);
 #ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
 		check_for_damage();
 #endif
@@ -1036,7 +1036,7 @@ inline void producer_buffer<T, Allocator>::post_pop_cleanup(typename producer_bu
 	m_dataBlock[readSlot].set_state(item_state::Empty);
 #ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
 	m_dataBlock[readSlot].reset_ref();
-	m_postReadIterator.fetch_add(1, std::memory_order_release);
+	m_read.fetch_add(1, std::memory_order_release);
 #else
 	std::atomic_thread_fence(std::memory_order_release);
 #endif
@@ -1059,10 +1059,10 @@ inline void producer_buffer<T, Allocator>::write_out(typename producer_buffer<T,
 	}
 	catch (...) {
 		if (m_failureCount.fetch_add(1, std::memory_order_relaxed) == m_failureIndex.load(std::memory_order_relaxed)) {
-			m_preReadIterator.fetch_add(Buffer_Lock_Offset, std::memory_order_release);
+			m_preReadSync.fetch_add(Buffer_Lock_Offset, std::memory_order_release);
 		}
 		m_dataBlock[slot].set_state(item_state::Failed);
-		m_postReadIterator.fetch_add(1, std::memory_order_release);
+		m_read.fetch_add(1, std::memory_order_release);
 		throw;
 	}
 #endif

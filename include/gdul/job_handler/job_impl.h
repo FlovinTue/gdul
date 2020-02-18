@@ -52,8 +52,8 @@ public:
 
 	bool try_attach_child(job_impl_shared_ptr child);
 
-	void set_name(const std::string& name);
-	const std::string& get_name() const;
+	void set_name(const char* name);
+	const char* get_name() const;
 
 	job_queue get_target_queue() const noexcept;
 	void set_target_queue(job_queue target) noexcept;

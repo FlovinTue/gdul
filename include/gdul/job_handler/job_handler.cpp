@@ -36,13 +36,17 @@ worker job_handler::make_worker(gdul::delegate<void()> entryPoint)
 {
 	return m_impl->make_worker(std::move(entryPoint));
 }
-std::size_t job_handler::num_workers() const
+std::size_t job_handler::internal_worker_count() const noexcept
 {
-	return m_impl->num_workers();
+	return m_impl->internal_worker_count();
 }
-std::size_t job_handler::num_enqueued() const
+std::size_t job_handler::external_worker_count() const noexcept
 {
-	return m_impl->num_enqueued();
+	return m_impl->external_worker_count();
+}
+std::size_t job_handler::active_job_count() const noexcept
+{
+	return m_impl->active_job_count();
 }
 concurrent_object_pool<jh_detail::batch_job_chunk_rep, jh_detail::allocator_type>* job_handler::get_batch_job_chunk_pool()
 {
