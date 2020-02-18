@@ -120,7 +120,7 @@ inline tester<T, Allocator>::~tester()
 template<class T, class Allocator>
 inline double tester<T, Allocator>::ExecuteConcurrent(std::uint32_t runs)
 {
-#if  defined(GDUL) | defined(GDUL_FIFO)
+#if defined(GDUL) | defined(GDUL_FIFO)
 	m_queue.unsafe_reset();
 #endif
 
@@ -146,7 +146,7 @@ inline double tester<T, Allocator>::ExecuteConcurrent(std::uint32_t runs)
 		while (m_writer.has_unfinished_tasks() | m_reader.has_unfinished_tasks())
 			std::this_thread::yield();
 
-#if  defined(GDUL) | defined(GDUL_FIFO)
+#if defined(GDUL) | defined(GDUL_FIFO)
 		m_queue.unsafe_clear();
 #elif defined(MSC_RUNTIME) || defined(MTX_WRAPPER)
 		m_queue.clear();
