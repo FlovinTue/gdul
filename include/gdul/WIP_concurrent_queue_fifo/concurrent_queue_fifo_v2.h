@@ -590,7 +590,7 @@ private:
 	template <class U = T, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) && !GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)> * = nullptr>
 	inline void write_out(size_type slot, U& out);
 
-	inline void try_publish_changes(size_type untilAt, std::atomic<size_t>& publishVar, std::int8_t writeState);
+	inline void try_publish_changes(size_type untilAt, std::atomic<size_t>& publishVar, std::uint8_t writeState);
 
 	std::atomic<size_type> m_preReadIterator;
 	GDUL_CQ_PADDING(64);
@@ -603,7 +603,6 @@ private:
 
 	GDUL_CQ_PADDING(64);
 	std::atomic<size_type> m_preWriteIterator;
-	std::atomic<size_type> m_failedWrites;
 	GDUL_CQ_PADDING(64);
 	std::atomic<size_type> m_postWriteIterator;
 	GDUL_CQ_PADDING(64);
@@ -628,7 +627,6 @@ inline item_buffer<T, Allocator>::item_buffer(typename item_buffer<T, Allocator>
 	, m_postReadIterator(0)
 	, m_read(0)
 	, m_preWriteIterator(0)
-	, m_failedWrites(0)
 	, m_postWriteIterator(0)
 	, m_written(0)
 {
@@ -672,7 +670,7 @@ inline bool item_buffer<T, Allocator>::is_active() const
 template<class T, class Allocator>
 inline bool item_buffer<T, Allocator>::is_valid() const
 {
-	return m_items[m_written.load(std::memory_order_relaxed) % m_capacity].get_iteration() != std::int8_t(-1);
+	return m_items[m_written.load(std::memory_order_relaxed) % m_capacity].get_iteration() != std::numeric_limits<size_type>::max();
 }
 template<class T, class Allocator>
 inline void item_buffer<T, Allocator>::unsafe_invalidate()
@@ -680,7 +678,7 @@ inline void item_buffer<T, Allocator>::unsafe_invalidate()
 	block_readers();
 	block_writers();
 
-	m_items[m_written.load(std::memory_order_relaxed) % m_capacity].set_iteration(std::int8_t(-1));
+	m_items[m_written.load(std::memory_order_relaxed) % m_capacity].set_iteration(std::numeric_limits<size_type>::max());
 
 	if (m_next)
 	{
@@ -765,9 +763,8 @@ inline void item_buffer<T, Allocator>::unsafe_clear()
 
 	const size_type written(m_written.exchange(0, std::memory_order_relaxed));
 	const size_type read(m_read.exchange(0, std::memory_order_relaxed));
-	const size_type failedWrites(m_failedWrites.exchange(0, std::memory_order_relaxed));
 
-	m_preWriteIterator.fetch_sub(written + failedWrites, std::memory_order_relaxed);
+	m_preWriteIterator.fetch_sub(written, std::memory_order_relaxed);
 	m_preReadIterator.fetch_sub(read, std::memory_order_relaxed);
 
 	m_postReadIterator.store(0, std::memory_order_relaxed);
@@ -848,8 +845,7 @@ inline bool item_buffer<T, Allocator>::try_push(Arg&& ...in)
 	const size_type used(reserve - read);
 	const size_type avaliable(m_capacity - used);
 
-	if (!((avaliable - 1) < m_capacity))
-	{
+	if (!((avaliable - 1) < m_capacity)){
 		apply_blockage_offset(m_preWriteIterator, m_written);
 		
 		const size_type reRead(m_read.load(std::memory_order_acquire));
@@ -857,7 +853,7 @@ inline bool item_buffer<T, Allocator>::try_push(Arg&& ...in)
 		const size_type reAvaliable(m_capacity - reUsed);
 
 		if (!((reAvaliable - 1) < m_capacity)){
-			m_failedWrites.fetch_add(1, std::memory_order_relaxed);
+			m_preWriteIterator.fetch_add(1, std::memory_order_relaxed);
 			return false;
 		}
 	}
@@ -879,8 +875,7 @@ inline bool item_buffer<T, Allocator>::try_pop(T& out)
 	const size_type reserve(m_preReadIterator.fetch_add(1, std::memory_order_relaxed));
 	const size_type avaliable(written - reserve);
 
-	if (!((avaliable - 1) < m_capacity))
-	{
+	if (!((avaliable - 1) < m_capacity)){
 		m_preReadIterator.fetch_sub(1, std::memory_order_relaxed);
 		return false;
 	}
@@ -897,7 +892,7 @@ inline bool item_buffer<T, Allocator>::try_pop(T& out)
 	return true;
 }
 template<class T, class Allocator>
-inline void item_buffer<T, Allocator>::try_publish_changes(size_type from, std::atomic<size_t>& publishVar, std::int8_t iterationOffset)
+inline void item_buffer<T, Allocator>::try_publish_changes(size_type from, std::atomic<size_t>& publishVar, std::uint8_t iterationOffset)
 {
 	size_type published(publishVar.load(std::memory_order_relaxed));
 	const size_type adjustedFrom(published < from ? published : from);
@@ -915,11 +910,26 @@ inline void item_buffer<T, Allocator>::try_publish_changes(size_type from, std::
 
 		const size_type itemIteration(m_items[item].get_iteration());
 
+		// What kind of iteration states can this item have here?
+		
+		// It may be lower. This is always undesirable. A fact.
+		// If it is lower, and also lower than 'from', another 
+		// caller is pretty much guranteed to take care of publishing. 
+		// (Because that caller will be in the middle of its operation)
 		if (itemIteration < desiredIteration)
 			break;
 		
+		// It may be the desired iteration. That would mean we are looking at
+		// an item that has just been incremented to be in-line with this callee's 
+		// timeline. 
 		if (itemIteration == desiredIteration)
 			lastValid = i;
+
+		// It may be *not* the desired iteration. This SHOULD mean that this caller
+		// stalled/lagged behind, and is reading future state. It does not mean that
+		// this caller's absolved of responsibility, since there may have been callers 
+		// relying ono this caller for publishing (that were not caught by the caller responsible for
+		// publishing this)...
 		else
 			lastValid = invalidIndex;
 	}

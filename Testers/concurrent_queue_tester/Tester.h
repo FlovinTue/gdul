@@ -5,7 +5,7 @@
 #include <gdul\concurrent_queue\concurrent_queue.h>
 #include "../Common/Timer.h"
 #include <concurrent_queue.h>
-#include <gdul/WIP_concurrent_queue_fifo/concurrent_queue_fifo.h>
+#include <gdul/WIP_concurrent_queue_fifo/concurrent_queue_fifo_v2.h>
 #include <queue>
 #include <mutex>
 #include "../Common/util.h"
