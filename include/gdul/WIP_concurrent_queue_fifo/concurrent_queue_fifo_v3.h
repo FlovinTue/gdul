@@ -905,6 +905,73 @@ inline void item_buffer<T, Allocator>::try_publish_changes(size_type from, std::
 	// New idea: 
 	// Some kind of 'pack-back' publishing mechanism. Where a caller will 'push' publishing responsibility
 	// backwards if it has to... ?
+
+	// The main feature would be that a would-be publisher only have to interact with the owner of the previous entry, 
+	// and in case of self-publishing, the publishing variable.. 
+
+	// How would this work? 
+	// Each item contains some kind of publishing buffer? One for read and one for write?.. ? 
+	// Or maybe something along the line of a single one, with writers working with positives, and readers with negatives?
+
+	// 1 - register own? or maybe not?
+	// 2 - publish own? 
+	// 3 - publish deferred?
+
+	// or
+
+	// 1 - try defer
+	// 2 - try publish?
+
+	// The main idea should be that each caller is only responsible for deferring publishing backwards one step. 
+	// This would in the worst case mean that callers would form a chain to push publishing back towards the back-most item holder.
+	// ...Which would mean....? That we first need to try and defer by pushing to earlier item. 
+
+	// What if, say item 0..2 is en route for writing.
+	// 0 stalls
+	// 2 stalls
+	// 1 tries to publish, deferring publishing to 0
+	// what about 2 ?
+	// This sounds like a bad idea.. All together.
+	
+	// ----------------------BAD------------------------------------------------------------------
+	// What about trying to deferr everything to m_items[published]
+	// if none is stored there
+	// Must make it work with exchange/store/load/fetch_xxx. Don't want to get in to cumbersome CAS loops. 
+	// An item is guaranteed to not be re used while it's user has not entered the publishing step.
+	// Also not unless the publishing variable actually has been incremented. 
+	// We're going to have to cas, arent we.. 
+
+	// The upside is, as mentioned, the main sync will be between the two item owners, rather than between
+	// all writers or all readers... 
+	// So. Say items 0 .. 2 is en route for writing
+	// 0 stalls
+	// 1 stalls
+	// 2 tries to publish. Defers publishing to items[0]
+	// That should work.. 
+	// Hmm.. Can it loop around?
+	// What if 
+
+	// 0 publishes
+	// 1 stalls
+	// 2 stalls
+	// 0 is read
+	// 0 is partly re-published.. ? This seems like I missed a step. Right. Uhm
+	// So 0 would defer it's publishing to 1. Hmm. Maybe that could work anyway?
+	// Say in this scenario 2 tries to defer publishing to 0 (which is no longer item[published])
+	// but since it has gone through a whole loop, deferring can succeed, and it will simply pick up the 
+	// slack(that is take ownership of 
+
+	// Wait wait wait.. 
+	// So
+
+	// 0 stalls
+	// 1 stalls
+	// 2 defers to 0
+	// 0 publishes 0 and 2
+	// Illegal.. 
+
+	// Would have been neat though.. 
+	// --------------------------------------------------------------------------------------------------------------
 }
 template <class T, class Allocator>
 template <class U, std::enable_if_t<GDUL_CQ_BUFFER_NOTHROW_PUSH_MOVE(U)>*>
