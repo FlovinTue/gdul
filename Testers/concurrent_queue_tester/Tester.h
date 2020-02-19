@@ -160,7 +160,7 @@ inline double tester<T, Allocator>::ExecuteConcurrent(std::uint32_t runs)
 
 	std::cout << "ExecuteConcurrent Threw " << m_thrown;
 	if (!CheckResults()) {
-		std::cout << " and failed check";
+		std::cout << " and failed check (w" << m_writtenSum << " / r" << m_readSum << ")";
 	}
 	std::cout << std::endl;
 
@@ -200,7 +200,7 @@ inline double tester<T, Allocator>::ExecuteSingleThread(std::uint32_t runs)
 
 	std::cout << "ExecuteSingleThread Threw " << m_thrown;
 	if (!CheckResults()) {
-		std::cout << " and failed check";
+		std::cout << " and failed check (w" << m_writtenSum << " / r" << m_readSum << ")";
 	}
 
 	std::cout << std::endl;
@@ -248,7 +248,7 @@ inline double tester<T, Allocator>::ExecuteSingleProducerSingleConsumer(std::uin
 
 	std::cout << "ExecuteSingleProducerSingleConsumer Threw " << m_thrown;
 	if (!CheckResults()) {
-		std::cout << " and failed check";
+		std::cout << " and failed check (w" << m_writtenSum << " / r" << m_readSum << ")";
 	}
 	std::cout << std::endl;
 
@@ -300,7 +300,7 @@ inline double tester<T, Allocator>::ExecuteRead(std::uint32_t runs)
 
 	std::cout << "ExecuteRead Threw " << m_thrown;
 	if (!CheckResults()) {
-		std::cout << " and failed check";
+		std::cout << " and failed check (w" << m_writtenSum << " / r" << m_readSum << ")";
 	}
 
 	std::cout << std::endl;
@@ -406,6 +406,7 @@ inline void tester<T, Allocator>::Write(std::uint32_t writes)
 	for (std::uint32_t j = 0; j < writes; ++j) {
 		T in;
 		in.count = seed % (j + 1);
+		//in.count = 1;
 		sum += in.count;
 #ifndef MOODYCAMEL
 		m_queue.push(in);
