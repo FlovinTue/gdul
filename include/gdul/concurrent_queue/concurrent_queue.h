@@ -732,7 +732,8 @@ private:
 	GDUL_CQ_PADDING((GDUL_CACHELINE_SIZE * 2) - sizeof(size_type) * 2);
 #endif
 	size_type m_writeSlot;
-	GDUL_ATOMIC_WITH_VIEW(size_type, m_written);
+	size_type m_written;
+
 	GDUL_CQ_PADDING(GDUL_CACHELINE_SIZE - sizeof(size_type) * 2);
 	atomic_shared_ptr_slot_type m_next;
 
@@ -767,7 +768,7 @@ inline producer_buffer<T, Allocator>::~producer_buffer()
 template<class T, class Allocator>
 inline bool producer_buffer<T, Allocator>::is_active() const
 {
-	return (!m_next || (m_readSlot.load(std::memory_order_relaxed) != m_written.load(std::memory_order_relaxed)));
+	return (!m_next || (m_readSlot.load(std::memory_order_relaxed) != m_written));
 }
 template<class T, class Allocator>
 inline bool producer_buffer<T, Allocator>::is_valid() const
@@ -790,9 +791,8 @@ inline typename producer_buffer<T, Allocator>::shared_ptr_slot_type producer_buf
 
 	while (inspect) {
 		const size_type readSlot(inspect->m_readSlot.load(std::memory_order_relaxed));
-		const size_type written(inspect->m_written.load(std::memory_order_relaxed));
 
-		const bool thisBufferEmpty(readSlot == written);
+		const bool thisBufferEmpty(readSlot == inspect->m_written);
 #ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
 		const bool veto(inspect->m_failureCount.load(std::memory_order_relaxed) != inspect->m_failureIndex.load(std::memory_order_relaxed));
 		const bool valid(!thisBufferEmpty | veto);
@@ -813,7 +813,7 @@ template<class T, class Allocator>
 inline typename producer_buffer<T, Allocator>::size_type producer_buffer<T, Allocator>::size() const
 {
 	const size_type readSlot(m_readSlot.load(std::memory_order_relaxed));
-	size_type accumulatedSize(m_written.load(std::memory_order_relaxed));
+	size_type accumulatedSize(m_written);
 	accumulatedSize -= readSlot;
 
 	if (m_next)
@@ -917,9 +917,8 @@ inline void producer_buffer<T, Allocator>::push_front(shared_ptr_slot_type newBu
 template<class T, class Allocator>
 inline void producer_buffer<T, Allocator>::unsafe_clear()
 {
-	const size_type written(m_written.load(std::memory_order_relaxed));
-	m_preReadSync.store(written, std::memory_order_relaxed);
-	m_readSlot.store(written, std::memory_order_relaxed);
+	m_preReadSync.store(m_written, std::memory_order_relaxed);
+	m_readSlot.store(m_written, std::memory_order_relaxed);
 
 	for (size_type i = 0; i < m_capacity; ++i) {
 		m_dataBlock[i].set_state_local(item_state::Empty);
@@ -953,15 +952,17 @@ inline bool producer_buffer<T, Allocator>::try_push(Arg&& ...in)
 
 	m_dataBlock[slot].set_state_local(item_state::Valid);
 
-	m_written.fetch_add(1, std::memory_order_release);
+	std::atomic_thread_fence(std::memory_order_release);
+
+	m_written++;
 
 	return true;
 }
 template<class T, class Allocator>
 inline bool producer_buffer<T, Allocator>::try_pop(T& out)
 {
-	const size_type lastWritten(m_written.load(std::memory_order_relaxed));
-	const size_type slotReserved(m_preReadSync.fetch_add(1, std::memory_order_relaxed) + 1);
+	const size_type lastWritten(m_written);
+	const size_type slotReserved(m_preReadSync.fetch_add(1, std::memory_order_acq_rel) + 1);
 	const size_type avaliable(lastWritten - slotReserved);
 
 	if (m_capacity < avaliable) {
