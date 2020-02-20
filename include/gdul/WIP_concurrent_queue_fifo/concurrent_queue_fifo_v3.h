@@ -442,7 +442,7 @@ inline typename concurrent_queue_fifo<T, Allocator>::shared_ptr_buffer_type conc
 		m_allocator.deallocate(totalBlock, totalBlockSize);
 		for (std::size_t i = 0; i < constructed; ++i)
 		{
-			data[i].~item_slot<T>();
+			data[i].~T();
 		}
 		throw;
 	}
@@ -620,7 +620,7 @@ private:
 	template <class U = T, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) && !GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)> * = nullptr>
 	inline void write_out(size_type slot, U& out);
 
-	inline void try_publish_changes(size_type untilAt, std::atomic<size_t>& publishVar, std::uint8_t writeState);
+	inline void try_publish_changes(size_type untilAt, std::atomic<size_t>& publishVar);
 
 	std::atomic<size_type> m_readReservationSync;
 	GDUL_CQ_PADDING(64);
@@ -641,8 +641,8 @@ private:
 
 	const size_type m_capacity;
 	T* const m_items;
-	std::atomic_int16_t* const m_readDeferState;
-	std::atomic_int16_t* const m_writeDeferState;
+	std::atomic_uint16_t* const m_readDeferState;
+	std::atomic_uint16_t* const m_writeDeferState;
 };
 
 template<class T, class Allocator>
@@ -665,18 +665,13 @@ inline item_buffer<T, Allocator>::~item_buffer()
 {
 	for (size_type i = 0; i < m_capacity; ++i)
 	{
-		m_items[i].~item_slot<T>();
+		m_items[i].~T();
 	}
 }
 template<class T, class Allocator>
 inline bool item_buffer<T, Allocator>::is_active() const
 {
 	if (!m_next)
-	{
-		return true;
-	}
-
-	if (!is_writers_blocked())
 	{
 		return true;
 	}
@@ -698,7 +693,7 @@ inline bool item_buffer<T, Allocator>::is_active() const
 template<class T, class Allocator>
 inline bool item_buffer<T, Allocator>::is_valid() const
 {
-	return m_items[m_written.load(std::memory_order_relaxed) % m_capacity].get_iteration() != std::numeric_limits<size_type>::max();
+	return m_writeDeferState[m_written.load(std::memory_order_relaxed) % m_capacity].load(std::memory_order_relaxed) != std::numeric_limits<std::uint16_t>::max();
 }
 template<class T, class Allocator>
 inline void item_buffer<T, Allocator>::unsafe_invalidate()
@@ -706,7 +701,7 @@ inline void item_buffer<T, Allocator>::unsafe_invalidate()
 	block_readers();
 	block_writers();
 
-	m_items[m_written.load(std::memory_order_relaxed) % m_capacity].set_iteration(std::numeric_limits<size_type>::max());
+	m_writeDeferState[m_written.load(std::memory_order_relaxed) % m_capacity].store(std::numeric_limits<size_type>::max(), std::memory_order_relaxed);
 
 	if (m_next)
 	{
@@ -794,11 +789,6 @@ inline void item_buffer<T, Allocator>::unsafe_clear()
 
 	m_writeAt.fetch_sub(written, std::memory_order_relaxed);
 	m_readReservationSync.fetch_sub(read, std::memory_order_relaxed);
-
-	for (size_type i = 0; i < m_capacity; ++i)
-	{
-		m_items[i].set_iteration(std::uint8_t(0));
-	}
 
 	if (m_next)
 	{
@@ -889,9 +879,7 @@ inline bool item_buffer<T, Allocator>::try_push(Arg&& ...in)
 
 	write_in(atLocal, std::forward<Arg>(in)...);
 
-	m_items[atLocal].increment_iteration();
-
-	try_publish_changes(at, m_written, 1);
+	try_publish_changes(at, m_written);
 
 	return true;
 }
@@ -913,16 +901,14 @@ inline bool item_buffer<T, Allocator>::try_pop(T& out)
 
 	write_out(atLocal, out);
 
-	m_items[atLocal].increment_iteration();
-
-	try_publish_changes(at, m_read, 2);
+	try_publish_changes(at, m_read);
 
 	return true;
 }
 template<class T, class Allocator>
-inline void item_buffer<T, Allocator>::try_publish_changes(size_type from, std::atomic<size_t>& publishVar, std::uint8_t iterationOffset)
+inline void item_buffer<T, Allocator>::try_publish_changes(size_type from, std::atomic<size_t>& publishVar)
 {
-	(void)from; (void)publishVar; (void)iterationOffset;
+	(void)from; (void)publishVar;
 
 	// New idea: 
 	// Some kind of 'pack-back' publishing mechanism. Where a caller will 'push' publishing responsibility
@@ -1155,13 +1141,13 @@ public:
 	}
 
 	shared_ptr_buffer_type m_dummyBuffer;
-	item_slot<T> m_dummyItem;
 	buffer_type m_dummyRawBuffer;
+	std::atomic_uint16_t m_dummyWriteDeferrals;
 };
 template<class T, class Allocator>
 inline dummy_container<T, Allocator>::dummy_container()
-	: m_dummyItem(std::numeric_limits<size_type>::max())
-	, m_dummyRawBuffer(1, &m_dummyItem)
+	: m_dummyRawBuffer(1, nullptr, &m_dummyWriteDeferrals, nullptr)
+	, m_dummyWriteDeferrals(std::numeric_limits<std::uint16_t>::max())
 {
 	m_dummyRawBuffer.block_writers();
 

@@ -640,10 +640,6 @@ inline bool item_buffer<T, Allocator>::is_active() const
 		return true;
 	}
 
-	if (!is_writers_blocked()){
-		return true;
-	}
-
 	const size_type read(m_read.load(std::memory_order_relaxed));
 	const size_type written(m_written.load(std::memory_order_acquire));
 
