@@ -825,7 +825,7 @@ inline bool item_buffer<T, Allocator>::try_push(Arg&& ...in)
 		const size_type reAvaliable(m_capacity - reUsed);
 
 		if (!((reAvaliable - 1) < m_capacity)){
-			m_writeAt.fetch_add(1, std::memory_order_relaxed);
+			m_writeAt.fetch_sub(1, std::memory_order_relaxed);
 			return false;
 		}
 	}

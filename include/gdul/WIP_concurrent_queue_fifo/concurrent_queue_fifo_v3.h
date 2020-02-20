@@ -620,7 +620,7 @@ private:
 	template <class U = T, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) && !GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)> * = nullptr>
 	inline void write_out(size_type slot, U& out);
 
-	inline void try_publish_changes(size_type untilAt, std::atomic<size_t>& publishVar);
+	inline void try_publish_changes(size_type untilAt, std::atomic<size_t>& publishVar, std::atomic<std::uint16_t>* deferArray);
 
 	std::atomic<size_type> m_readReservationSync;
 	GDUL_CQ_PADDING(64);
@@ -870,7 +870,7 @@ inline bool item_buffer<T, Allocator>::try_push(Arg&& ...in)
 
 		if (!((reAvaliable - 1) < m_capacity))
 		{
-			m_writeAt.fetch_add(1, std::memory_order_relaxed);
+			m_writeAt.fetch_sub(1, std::memory_order_relaxed);
 			return false;
 		}
 	}
@@ -878,6 +878,8 @@ inline bool item_buffer<T, Allocator>::try_push(Arg&& ...in)
 	const size_type atLocal(at % m_capacity);
 
 	write_in(atLocal, std::forward<Arg>(in)...);
+
+	m_writeDeferState[atLocal].store(0, std::memory_order_relaxed);
 
 	try_publish_changes(at, m_written);
 
@@ -901,15 +903,15 @@ inline bool item_buffer<T, Allocator>::try_pop(T& out)
 
 	write_out(atLocal, out);
 
+	m_readDeferState[atLocal].store(0, std::memory_order_relaxed);
+
 	try_publish_changes(at, m_read);
 
 	return true;
 }
 template<class T, class Allocator>
-inline void item_buffer<T, Allocator>::try_publish_changes(size_type from, std::atomic<size_t>& publishVar)
+inline void item_buffer<T, Allocator>::try_publish_changes(size_type from, std::atomic<size_t>& publishVar, std::atomic<std::uint16_t>* deferArray)
 {
-	(void)from; (void)publishVar;
-
 	// New idea: 
 	// Some kind of 'pack-back' publishing mechanism. Where a caller will 'push' publishing responsibility
 	// backwards if it has to... ?
@@ -991,6 +993,17 @@ inline void item_buffer<T, Allocator>::try_publish_changes(size_type from, std::
 	// Well. Let's try it. 
 	// Gonna need 2 arrays with publish counters.
 
+	const std::uint16_t deferred(deferArray[from % m_capacity].exchange(0, std::memory_order_relaxed));
+	const size_type lastPublished(publishVar.load(std::memory_order_relaxed));
+
+	if (lastPublished == from){
+		publishVar.fetch_add(deferred, std::memory_order_release);
+	}
+	else{
+		for (size_type i = from;i != lastPublished; ++i){
+
+		}
+	}
 
 }
 template <class T, class Allocator>
