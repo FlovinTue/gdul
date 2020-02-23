@@ -27,9 +27,10 @@ public:
 	}
 
 protected:
-	virtual void register_debug_node(const char* name, constexpr_id id) noexcept { name; id; };
+	virtual void register_debug_node(const char* name, constexpr_id id) noexcept = 0;
 private:
 	friend class job_debug_tracker;
+	friend class job_impl;
 
 	constexpr_id m_debugId;
 #endif

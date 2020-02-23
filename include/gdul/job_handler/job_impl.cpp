@@ -54,6 +54,7 @@ void job_impl::operator()()
 	assert(!m_finished);
 
 #if defined (GDUL_JOB_DEBUG)
+	job_handler::this_job.m_debugId = m_debugId;
 	timer time;
 #endif
 	m_workUnit();
@@ -169,6 +170,8 @@ void job_impl::detach_children()
 #if defined(GDUL_JOB_DEBUG)
 void job_impl::register_debug_node(const char* name, constexpr_id id) noexcept
 {
+	m_debugId = id;
+
 	job_debug_tracker::register_node(id);
 	job_debug_tracker::add_node_variation(id, name);
 }

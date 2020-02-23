@@ -65,7 +65,7 @@ private:
 	friend class job;
 
 #if defined(GDUL_JOB_DEBUG)
-	//void register_debug_node(const char* name, constexpr_id id) noexcept override final;
+	void register_debug_node(const char* name, constexpr_id id) noexcept override final;
 #endif
 
 	job& get_endjob() noexcept;
