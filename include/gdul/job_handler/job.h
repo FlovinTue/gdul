@@ -69,10 +69,11 @@ public:
 
 private:
 	friend class jh_detail::job_handler_impl;
-	friend class jh_detail::job_debug_tracker;
 	friend class job_handler;
 
 #if defined(GDUL_JOB_DEBUG)
+	friend class jh_detail::job_debug_tracker;
+
 	void register_debug_node(const char* name, constexpr_id id) noexcept override final;
 #endif
 

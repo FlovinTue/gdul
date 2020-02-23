@@ -60,11 +60,11 @@ public:
 	// Get the number of items written to the output container
 	std::size_t get_output_size() const noexcept;
 private:
-	friend class jh_detail::job_debug_tracker;
 	friend class job_handler;
 	friend class job;
 
 #if defined(GDUL_JOB_DEBUG)
+	friend class jh_detail::job_debug_tracker;
 	void register_debug_node(const char* name, constexpr_id id) noexcept override final;
 #endif
 

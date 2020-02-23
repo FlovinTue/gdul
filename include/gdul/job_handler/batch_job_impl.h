@@ -383,7 +383,7 @@ inline void batch_job_impl<InputContainer, OutputContainer, Process>::make_jobs(
 	for (std::size_t i = 0; i < m_batchCount; ++i) {
 		job processJob(make_work_slice(&batch_job_impl::work_process<>, i));
 #if defined(GDUL_JOB_DEBUG)
-		activate_debug_tracking(std::string("process batch " + std::to_string(i + 1)).c_str());
+		processJob.activate_debug_tracking(std::string("process batch " + std::to_string(i + 1)).c_str());
 #endif
 		m_end.add_dependency(processJob);
 		processJob.enable();
@@ -458,9 +458,12 @@ inline void batch_job_impl<InputContainer, OutputContainer, Process>::register_d
 struct dummy_container{using value_type = int;};
 
 // Memory chunk representation of batch_job_impl
+#pragma warning(push)
+#pragma warning(disable:4324)
 struct alignas(alignof(std::max_align_t)) batch_job_chunk_rep
 {
 	std::uint8_t dummy[allocate_shared_size<batch_job_impl<dummy_container, dummy_container, gdul::delegate<bool(int&, int&)>>, chunk_allocator<batch_job_impl<dummy_container, dummy_container, gdul::delegate<bool(int&, int&)>>, batch_job_chunk_rep>>()]{};
 };
+#pragma warning(pop)
 }
 }

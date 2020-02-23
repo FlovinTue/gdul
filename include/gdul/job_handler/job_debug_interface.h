@@ -42,7 +42,5 @@ private:
 #if !defined (activate_debug_tracking)
 #if defined(GDUL_JOB_DEBUG)
 #define activate_debug_tracking(name) activate_debug_tracking(name, GDUL_CEXPR_ID())
-#else
-#define activate_debug_tracking(name) activate_debug_tracking(name)
 #endif
 #endif
