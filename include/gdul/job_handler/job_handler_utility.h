@@ -25,7 +25,7 @@
 #include <limits>
 #include <memory>
 
-#if defined (GDUL_DEBUG)
+#if defined (GDUL_JOB_DEBUG)
 #include <chrono>
 #endif
 
@@ -81,7 +81,7 @@ void set_thread_priority(std::int32_t priority, thread_handle handle);
 void set_thread_core_affinity(std::uint8_t core, thread_handle handle);
 thread_handle create_thread_handle();
 
-#if defined(GDUL_DEBUG)
+#if defined(GDUL_JOB_DEBUG)
 class timer
 {
 public:

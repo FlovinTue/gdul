@@ -20,7 +20,7 @@
 
 #include <thread>
 
-#include "job_handler_utility.h"
+#include <gdul/job_handler/job_handler_utility.h>
 
 #if defined(_WIN64) | defined(_WIN32)
 #define NOMINMAX

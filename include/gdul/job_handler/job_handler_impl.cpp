@@ -18,9 +18,9 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <gdul\job_handler\job_handler_impl.h>
 #include <string>
 #include <thread>
+#include <gdul/job_handler/job_handler_impl.h>
 #include <gdul/job_handler/job_handler.h>
 #include <gdul/job_handler/chunk_allocator.h>
 
@@ -41,7 +41,7 @@ thread_local job_handler_impl::tl_container job_handler_impl::t_items{ &job_hand
 job_handler_impl::job_handler_impl()
 	: m_jobImplChunkPool(jh_detail::Job_Impl_Allocator_Block_Size, m_mainAllocator)
 	, m_jobNodeChunkPool(jh_detail::Job_Impl_Allocator_Block_Size, m_mainAllocator)
-	, m_scatterJobChunkPool(Batch_Job_Allocator_Block_Size, m_mainAllocator)
+	, m_batchJobChunkPool(Batch_Job_Allocator_Block_Size, m_mainAllocator)
 	, m_workerIndices(0)
 	, m_workerCount(0)
 {
@@ -51,7 +51,7 @@ job_handler_impl::job_handler_impl(allocator_type & allocator)
 	: m_mainAllocator(allocator)
 	, m_jobImplChunkPool(jh_detail::Job_Impl_Allocator_Block_Size, m_mainAllocator)
 	, m_jobNodeChunkPool(jh_detail::Job_Impl_Allocator_Block_Size, m_mainAllocator)
-	, m_scatterJobChunkPool(Batch_Job_Allocator_Block_Size, m_mainAllocator)
+	, m_batchJobChunkPool(Batch_Job_Allocator_Block_Size, m_mainAllocator)
 	, m_workerIndices(0)
 	, m_workerCount(0)
 {
@@ -139,7 +139,7 @@ concurrent_object_pool<job_node_chunk_rep, allocator_type>* job_handler_impl::ge
 
 concurrent_object_pool<batch_job_chunk_rep, allocator_type>* job_handler_impl::get_batch_job_chunk_pool() noexcept
 {
-	return &m_scatterJobChunkPool;
+	return &m_batchJobChunkPool;
 }
 
 void job_handler_impl::enqueue_job(job_impl_shared_ptr job)
@@ -189,11 +189,14 @@ void job_handler_impl::work()
 		if (job_handler::this_job) {
 			(*job_handler::this_job.m_impl)();
 
+			job_handler::this_job = job();
+
 			t_items.this_worker_impl->refresh_sleep_timer();
 		}
 		else{
 			t_items.this_worker_impl->idle();
 		}
+
 	}
 }
 

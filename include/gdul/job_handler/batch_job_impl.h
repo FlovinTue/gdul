@@ -23,7 +23,7 @@
 #include <gdul/job_handler/job_handler_utility.h>
 #include <gdul/job_handler/job.h>
 #include <gdul/delegate/delegate.h>
-#include <gdul/job_handler/batch_job_interface.h>
+#include <gdul/job_handler/batch_job_impl_interface.h>
 #include <gdul/job_handler/chunk_allocator.h>
 #include <array>
 #include <cassert>
@@ -38,7 +38,7 @@ namespace jh_detail {
 job _redirect_make_job(job_handler* handler, gdul::delegate<void()>&& workUnit);
 
 template <class InputContainer, class OutputContainer, class Process>
-class batch_job_impl : public batch_job_interface
+class batch_job_impl : public batch_job_impl_interface
 {
 public:
 	batch_job_impl() = default;
@@ -54,8 +54,6 @@ public:
 	void set_target_queue(job_queue target) noexcept override final;
 	job_queue get_target_queue() const noexcept override final;
 
-	void set_name(const char* name) override final;
-
 	void wait_until_finished() noexcept override final;
 	void work_until_finished(job_queue consumeFrom) override final;
 
@@ -67,6 +65,10 @@ public:
 	float get_time() const noexcept override final;
 
 	std::size_t get_output_size() const noexcept override final;
+
+#if defined(GDUL_JOB_DEBUG)
+	void register_debug_node(const char* name, constexpr_id id) noexcept override final;
+#endif
 
 	batch_job_impl(intput_container_type& input, output_container_type& output, process_type&& process, std::size_t batchSize, job_handler* handler);
 	batch_job_impl(intput_container_type& inputOutput, process_type&& process, std::size_t batchSize, job_handler* handler);
@@ -86,8 +88,6 @@ private:
 	std::size_t to_batch_end(std::size_t batchIndex) const;
 
 	std::uint32_t clamp_batch_size(std::size_t desired) const;
-
-	void set_name_to(job& jb, const char* postfix);
 
 	bool is_input_output() const;
 
@@ -118,7 +118,8 @@ private:
 
 	void work_pack(std::size_t batchIndex);
 
-#if defined(GDUL_DEBUG)
+#if defined(GDUL_JOB_DEBUG)
+	constexpr_id m_debugId;
 	std::string m_name;
 	timer m_timer;
 	float m_time;
@@ -157,13 +158,12 @@ inline batch_job_impl<InputContainer, OutputContainer, Process>::batch_job_impl(
 	, m_batchSize(clamp_batch_size(batchSize + !(bool)batchSize))
 	, m_batchCount((std::uint16_t)(container_size(m_input) / m_batchSize + ((bool)(container_size(m_input) % m_batchSize))) + !(bool)(container_size(m_input)))
 	, m_targetQueue(jh_detail::Default_Job_Queue)
-#if defined(GDUL_DEBUG)
+#if defined(GDUL_JOB_DEBUG)
+	, m_debugId(constexpr_id::make<0>())
 	, m_time(0.f)
 #endif
 {
 	assert(!(container_size(m_input) < container_size(m_output)) && "Input container size must not exceed output container size");
-
-	m_root.set_name(" initialize");
 }
 template<class InputContainer, class OutputContainer, class Process>
 inline std::size_t batch_job_impl<InputContainer, OutputContainer, Process>::to_batch_begin(std::size_t batchIndex) const
@@ -199,15 +199,6 @@ inline std::uint32_t batch_job_impl<InputContainer, OutputContainer, Process>::c
 	return returnValue;
 }
 template<class InputContainer, class OutputContainer, class Process>
-inline void batch_job_impl<InputContainer, OutputContainer, Process>::set_name_to(job & jb, const char* postfix)
-{
-#if defined(GDUL_DEFINED)
-	jb.set_name(m_name + std::string(postfix));
-#else
-	(void)jb; (void)postfix;
-#endif
-}
-template<class InputContainer, class OutputContainer, class Process>
 inline bool batch_job_impl<InputContainer, OutputContainer, Process>::is_input_output() const
 {
 	return (void*)&m_input == (void*)&m_output;
@@ -228,16 +219,6 @@ inline job_queue batch_job_impl<InputContainer, OutputContainer, Process>::get_t
 	return m_targetQueue;
 }
 template<class InputContainer, class OutputContainer, class Process>
-inline void batch_job_impl<InputContainer, OutputContainer, Process>::set_name(const char* name)
-{
-#if defined(GDUL_DEBUG)
-	m_name = name;
-	m_root.set_name(std::string(m_name).append(" initialize").c_str());
-#else
-	(void)name;
-#endif
-}
-template<class InputContainer, class OutputContainer, class Process>
 inline void batch_job_impl<InputContainer, OutputContainer, Process>::wait_until_finished() noexcept
 {
 	m_end.wait_until_finished();
@@ -250,7 +231,7 @@ inline void batch_job_impl<InputContainer, OutputContainer, Process>::work_until
 template<class InputContainer, class OutputContainer, class Process>
 inline void batch_job_impl<InputContainer, OutputContainer, Process>::enable()
 {
-#if defined(GDUL_DEBUG)
+#if defined(GDUL_JOB_DEBUG)
 	m_timer.reset();
 #endif
 	m_root.enable();
@@ -270,7 +251,7 @@ inline job & batch_job_impl<InputContainer, OutputContainer, Process>::get_endjo
 template<class InputContainer, class OutputContainer, class Process>
 inline float batch_job_impl<InputContainer, OutputContainer, Process>::get_time() const noexcept
 {
-#if defined(GDUL_DEBUG)
+#if defined(GDUL_JOB_DEBUG)
 	return m_time;
 #else
 	return 0.f;
@@ -355,22 +336,26 @@ template<class InputContainer, class OutputContainer, class Process>
 template <class U, std::enable_if_t<!U::Specialize_Update>*>
 inline void batch_job_impl<InputContainer, OutputContainer, Process>::make_jobs()
 {
+	auto setProcessName = [](job& processor, const char* name) {
+		processor.activate_debug_tracking(name);
+	};
+
 	job currentProcessJob = make_work_slice(&batch_job_impl::work_process<>, 0);
-	set_name_to(currentProcessJob, " process batch 1");
+	setProcessName(currentProcessJob, "process batch 1");
 	currentProcessJob.enable();
 
 	job currentPackJob(currentProcessJob);
 
 	for (std::size_t i = 1; i < m_batchCount; ++i) {
 		job nextProcessJob(make_work_slice(&batch_job_impl::work_process<>, i));
-#if defined(GDUL_DEBUG)
-		set_name_to(nextProcessJob, std::string(" process batch " + std::to_string(i + 1)).c_str());
+#if defined(GDUL_JOB_DEBUG)
+		setProcessName(nextProcessJob, std::string("process batch " + std::to_string(i + 1)).c_str());
 #endif
 
 		if (i < (m_batchCount - 1)) {
 			job nextPackJob(make_work_slice(&batch_job_impl::work_pack, i));
-#if defined(GDUL_DEBUG)
-			set_name_to(nextPackJob, std::string(" pack batch " + std::to_string(i)).c_str());
+#if defined(GDUL_JOB_DEBUG)
+			nextPackJob.activate_debug_tracking(std::string("pack batch " + std::to_string(i)).c_str());
 #endif
 			nextPackJob.add_dependency(currentPackJob);
 			nextPackJob.add_dependency(nextProcessJob);
@@ -388,7 +373,7 @@ inline void batch_job_impl<InputContainer, OutputContainer, Process>::make_jobs(
 	}
 
 	m_end.add_dependency(currentProcessJob);
-	set_name_to(m_end, " finalize");
+	m_end.activate_debug_tracking("finalize");
 	m_end.enable();
 }
 template<class InputContainer, class OutputContainer, class Process>
@@ -397,14 +382,14 @@ inline void batch_job_impl<InputContainer, OutputContainer, Process>::make_jobs(
 {
 	for (std::size_t i = 0; i < m_batchCount; ++i) {
 		job processJob(make_work_slice(&batch_job_impl::work_process<>, i));
-#if defined(GDUL_DEBUG)
-		set_name_to(processJob, std::string(" process batch " + std::to_string(i + 1)).c_str());
+#if defined(GDUL_JOB_DEBUG)
+		activate_debug_tracking(std::string("process batch " + std::to_string(i + 1)).c_str());
 #endif
 		m_end.add_dependency(processJob);
 		processJob.enable();
 	}
 
-	set_name_to(m_end, " finalize");
+	m_end.activate_debug_tracking("finalize");
 	m_end.enable();
 }
 template<class InputContainer, class OutputContainer, class Process>
@@ -448,7 +433,7 @@ inline void batch_job_impl<InputContainer, OutputContainer, Process>::finalize()
 		work_pack(m_batchCount - 1);
 	}
 
-#if defined(GDUL_DEBUG)
+#if defined(GDUL_JOB_DEBUG)
 	m_time = m_timer.get();
 #endif
 }
@@ -456,10 +441,20 @@ template<class InputContainer, class OutputContainer, class Process>
 template <class U, std::enable_if_t<U::Specialize_Update>*>
 inline void batch_job_impl<InputContainer, OutputContainer, Process>::finalize()
 {
-#if defined(GDUL_DEBUG)
+#if defined(GDUL_JOB_DEBUG)
 	m_time = m_timer.get();
 #endif
 }
+#if defined(GDUL_JOB_DEBUG)
+template<class InputContainer, class OutputContainer, class Process>
+inline void batch_job_impl<InputContainer, OutputContainer, Process>::register_debug_node(const char* name, constexpr_id id) noexcept
+{
+#pragma push_macro("activate_debug_tracking")
+#undef activate_debug_tracking
+	m_root.activate_debug_tracking(name, id);
+#pragma pop_macro("activate_debug_tracking")
+}
+#endif
 struct dummy_container{using value_type = int;};
 
 // Memory chunk representation of batch_job_impl

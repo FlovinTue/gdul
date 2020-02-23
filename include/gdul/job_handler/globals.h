@@ -4,9 +4,7 @@
 #include <cstddef>
 
 // Define to enable some debug features
-#ifdef _DEBUG
-#define GDUL_DEBUG
-#endif
+#define GDUL_JOB_DEBUG
 
 namespace gdul
 {

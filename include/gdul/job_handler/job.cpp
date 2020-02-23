@@ -51,14 +51,6 @@ job & job::operator=(const job & other) noexcept
 	m_impl = other.m_impl;
 	return *this;
 }
-void job::set_name(const char* name)
-{
-	m_impl->set_name(name);
-}
-const char* job::get_name() const
-{
-	return m_impl->get_name();
-}
 void job::add_dependency(job & dependency)
 {
 	assert(m_impl && "Job not set");
@@ -120,4 +112,10 @@ float job::get_time() const noexcept
 {
 	return m_impl->get_time();
 }
+#if defined(GDUL_JOB_DEBUG)
+void job::register_debug_node(const char* name, constexpr_id id) noexcept
+{
+	m_impl->register_debug_node(name, id);
+}
+#endif
 }

@@ -18,9 +18,10 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <gdul\job_handler\job_impl.h>
-#include <gdul\job_handler\job_handler_impl.h>
-#include <gdul\concurrent_object_pool\concurrent_object_pool.h>
+#include <gdul/job_handler/job_impl.h>
+#include <gdul/job_handler/job_handler_impl.h>
+#include <gdul/concurrent_object_pool/concurrent_object_pool.h>
+#include <gdul/job_handler/job_handler.h>
 
 namespace gdul
 {
@@ -38,7 +39,8 @@ job_impl::job_impl(delegate<void()>&& workUnit, job_handler_impl* handler)
 	, m_targetQueue(Default_Job_Queue)
 	, m_handler(handler)
 	, m_dependencies(Job_Max_Dependencies)
-#if defined (GDUL_DEBUG)
+#if defined (GDUL_JOB_DEBUG)
+	, m_debugId(constexpr_id::make<0>())
 	, m_time(0.f)
 #endif
 {
@@ -51,11 +53,11 @@ void job_impl::operator()()
 {
 	assert(!m_finished);
 
-#if defined (GDUL_DEBUG)
+#if defined (GDUL_JOB_DEBUG)
 	timer time;
 #endif
 	m_workUnit();
-#if defined (GDUL_DEBUG)
+#if defined (GDUL_JOB_DEBUG)
 	m_time = time.get();
 #endif
 
@@ -85,21 +87,6 @@ bool job_impl::try_attach_child(job_impl_shared_ptr child)
 	} while (!m_firstDependee.compare_exchange_strong(rawRep, std::move(dependee), std::memory_order_relaxed, std::memory_order_relaxed));
 
 	return true;
-}
-void job_impl::set_name(const char* name)
-{
-	(void)name;
-#if defined GDUL_DEBUG
-	m_name = name;
-#endif
-}
-const char* job_impl::get_name() const
-{
-#if defined(GDUL_DEBUG)
-	return m_name.c_str();
-#else
-	return "";
-#endif
 }
 job_queue job_impl::get_target_queue() const noexcept
 {
@@ -142,7 +129,7 @@ bool job_impl::is_enabled() const
 }
 float job_impl::get_time() const noexcept
 {
-#if defined (GDUL_DEBUG)
+#if defined (GDUL_JOB_DEBUG)
 	return m_time;
 #else
 	return 0.0f;
@@ -179,5 +166,12 @@ void job_impl::detach_children()
 		dependee = std::move(next);
 	}
 }
+#if defined(GDUL_JOB_DEBUG)
+void job_impl::register_debug_node(const char* name, constexpr_id id) noexcept
+{
+	job_debug_tracker::register_node(id);
+	job_debug_tracker::add_node_variation(id, name);
+}
+#endif
 }
 }

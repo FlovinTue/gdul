@@ -47,14 +47,15 @@ std::size_t batch_job::get_output_size() const noexcept
 {
 	return m_impl->get_output_size();
 }
+#if defined(GDUL_JOB_DEBUG)
+//void batch_job::register_debug_node(const char * name, constexpr_id id) noexcept override final
+//{
+//	m_impl->register_debug_node(name, id);
+//}
+#endif
 job & batch_job::get_endjob() noexcept
 {
 	return m_impl->get_endjob();
-}
-
-void batch_job::set_name(const char* name)
-{
-	m_impl->set_name(name);
 }
 
 }

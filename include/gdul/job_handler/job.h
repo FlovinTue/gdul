@@ -22,6 +22,7 @@
 
 #include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
 #include <gdul/job_handler/job_handler_utility.h>
+#include <gdul/job_handler/job_debug_interface.h>
 
 namespace gdul {
 
@@ -33,7 +34,7 @@ namespace jh_detail {
 class job_handler_impl;
 class job_impl;
 }
-class job
+class job : public jh_detail::job_debug_interface
 {
 public:
 	job() noexcept;
@@ -44,9 +45,6 @@ public:
 	job(const job& other) noexcept;
 	job& operator=(job&& other) noexcept;
 	job& operator=(const job& other) noexcept;
-
-	void set_name(const char* name);
-	const char* get_name() const;
 
 	void add_dependency(job& dependency);
 	void add_dependency(batch_job& dependency);
@@ -66,12 +64,17 @@ public:
 
 	operator bool() const noexcept;
 
-	// Get the duration of the job. Only valid if GDUL_DEBUG is defined & job has run
+	// Get the duration of the job. Only valid if GDUL_JOB_DEBUG is defined & job has run
 	float get_time() const noexcept;
 
 private:
 	friend class jh_detail::job_handler_impl;
+	friend class jh_detail::job_debug_tracker;
 	friend class job_handler;
+
+#if defined(GDUL_JOB_DEBUG)
+	void register_debug_node(const char* name, constexpr_id id) noexcept override final;
+#endif
 
 	job(gdul::shared_ptr<jh_detail::job_impl> impl) noexcept;
 

@@ -22,23 +22,29 @@
 
 #include <gdul/job_handler/job_handler_utility.h>
 
+#if defined(GDUL_JOB_DEBUG)
+#include <gdul/job_handler/job_debug_tracker.h>
+#endif
+
 namespace gdul {
 class job;
 namespace jh_detail {
-class batch_job_interface
+class batch_job_impl_interface
 {
 public:
-	virtual void add_dependency(job& dependency) = 0;
-	virtual void set_target_queue(job_queue target) noexcept = 0;
+	virtual void add_dependency(job&) = 0;
+	virtual void set_target_queue(job_queue) noexcept = 0;
 	virtual void enable() = 0;
 	virtual bool is_finished() const noexcept = 0;
 	virtual void wait_until_finished() noexcept = 0;
 	virtual void work_until_finished(job_queue) = 0;
 	virtual job& get_endjob() noexcept = 0;
-	virtual void set_name(const char*) = 0;
 	virtual float get_time() const noexcept = 0;
 	virtual std::size_t get_output_size() const noexcept = 0;
 	virtual job_queue get_target_queue() const noexcept = 0;
+#if defined(GDUL_JOB_DEBUG)
+	virtual void register_debug_node(const char* name, constexpr_id) noexcept = 0;
+#endif
 };
 }
 }
