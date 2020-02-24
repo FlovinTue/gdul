@@ -25,6 +25,7 @@
 #include <gdul/job_handler/job_handler.h>
 #include <unordered_set>
 #include <fstream>
+#include <atomic>
 
 namespace gdul {
 namespace jh_detail {
@@ -37,20 +38,25 @@ struct job_debug_tracking_node
 	constexpr_id m_id;
 	std::unordered_set<std::uint64_t> m_children;
 	std::unordered_set<std::string> m_variations;
+	std::uint32_t m_createdIndex;
 };
 
 concurrency::concurrent_unordered_map<std::uint64_t, job_debug_tracking_node> g_jobTrackingNodeMap;
+std::atomic_uint32_t g_createdIndexer = 0;
 
 thread_local job_debug_tracking_node* t_lastNode;
 
 void job_debug_tracker::register_node(constexpr_id id)
 {
-	g_jobTrackingNodeMap[id.value()].m_id = id;
+	auto& entry(g_jobTrackingNodeMap[id.value()]);
+	entry.m_id = id;
+	entry.m_createdIndex = g_createdIndexer.fetch_add(1);
 
 	if (job_handler::this_job.m_debugId.value() != 0) {
 		g_jobTrackingNodeMap[job_handler::this_job.m_debugId.value()].m_children.insert(id.value());
 	}
 }
+
 void job_debug_tracker::add_node_variation(constexpr_id id, const char * name)
 {
 	if (!t_lastNode || t_lastNode->m_id.value() != id.value()) {
@@ -60,6 +66,7 @@ void job_debug_tracker::add_node_variation(constexpr_id id, const char * name)
 
 	t_lastNode->m_variations.insert(std::move(variation));
 }
+
 void job_debug_tracker::dump_job_tree(const char* location)
 {
 	const std::string folder(location);
@@ -88,7 +95,7 @@ void job_debug_tracker::dump_job_tree(const char* location)
 
 	outStream << "<Nodes>\n";
 	for (std::size_t i = 0; i < nodes.size(); ++i) {
-		outStream << "<Node Id=\"" << nodes[i].m_id.value() << "\" Label=\"" << *nodes[i].m_variations.begin() << "\" Category=\"Person\" />\n";
+		outStream << "<Node Id=\"" << nodes[i].m_createdIndex << "\" Label=\"" << *nodes[i].m_variations.begin() << "\" Category=\"Person\" />\n";
 	}
 	outStream << "</Nodes>\n";
 	outStream << "<Links>\n";
