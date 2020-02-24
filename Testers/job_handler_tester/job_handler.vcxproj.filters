@@ -37,7 +37,9 @@
     <ClCompile Include="..\..\include\gdul\job_handler\job_handler_utility.cpp">
       <Filter>implementation</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\include\gdul\job_handler\job_debug_tracker.cpp" />
+    <ClCompile Include="..\..\include\gdul\job_handler\job_debug_tracker.cpp">
+      <Filter>implementation\debug</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="job_handler_tester.h">
