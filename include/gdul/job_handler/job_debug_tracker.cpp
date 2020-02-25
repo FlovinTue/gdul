@@ -77,7 +77,7 @@ void job_debug_tracker::dump_job_tree(const char* location)
 	outStream.open(outputFile,std::ofstream::out);
 
 	outStream << "<?xml version=\"1.0\" encoding=\"utf - 8\"?>\n";
-	outStream << "<DirectedGraph Title=\"DrivingTest\" Background=\"Blue\" xmlns=\"http://schemas.microsoft.com/vs/2009/dgml\">\n";
+	outStream << "<DirectedGraph Title=\"DrivingTest\" Background=\"Grey\" xmlns=\"http://schemas.microsoft.com/vs/2009/dgml\">\n";
 
 	std::vector<job_debug_tracking_node> nodes;
 
@@ -95,7 +95,7 @@ void job_debug_tracker::dump_job_tree(const char* location)
 
 	outStream << "<Nodes>\n";
 	for (std::size_t i = 0; i < nodes.size(); ++i) {
-		outStream << "<Node Id=\"" << nodes[i].m_createdIndex << "\" Label=\"" << *nodes[i].m_variations.begin() << "\" Category=\"Person\" />\n";
+		outStream << "<Node Id=\"" << nodes[i].m_id.value() << "\" Label=\"" << *nodes[i].m_variations.begin() << "\" Category=\"Person\" />\n";
 	}
 	outStream << "</Nodes>\n";
 	outStream << "<Links>\n";

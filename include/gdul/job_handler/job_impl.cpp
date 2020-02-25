@@ -171,7 +171,7 @@ void job_impl::detach_children()
 void job_impl::register_debug_node(const char* name, constexpr_id id) noexcept
 {
 	m_debugId = id;
-
+	m_name = name;
 	job_debug_tracker::register_node(id);
 	job_debug_tracker::add_node_variation(id, name);
 }

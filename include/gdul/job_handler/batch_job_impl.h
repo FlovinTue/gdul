@@ -120,7 +120,6 @@ private:
 
 #if defined(GDUL_JOB_DEBUG)
 	constexpr_id m_debugId;
-	std::string m_name;
 	timer m_timer;
 	float m_time;
 #endif

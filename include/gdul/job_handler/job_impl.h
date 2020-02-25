@@ -83,6 +83,7 @@ private:
 	void detach_children();
 
 #if defined(GDUL_JOB_DEBUG)
+	std::string m_name;
 	constexpr_id m_debugId;
 	float m_time;
 #endif
