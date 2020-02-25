@@ -101,8 +101,6 @@ class dummy_container;
 
 template <class T, class Allocator>
 class buffer_deleter;
-template <class T, class Allocator>
-class store_array_deleter;
 
 enum class item_state : std::uint8_t
 {
@@ -1270,18 +1268,6 @@ std::size_t log2_align(std::size_t from, std::size_t clamp)
 	return clampedNextVal;
 }
 template <class Dummy>
-inline std::uint8_t to_store_array_slot(std::uint16_t producerIndex)
-{
-	const float fSourceStoreSlot(log2f(static_cast<float>(producerIndex)));
-	const std::uint8_t sourceStoreSlot(static_cast<std::uint8_t>(fSourceStoreSlot));
-	return sourceStoreSlot;
-}
-template <class Dummy>
-std::uint16_t to_store_array_capacity(std::uint16_t storeSlot)
-{
-	return std::uint16_t(static_cast<std::uint16_t>(powf(2.f, static_cast<float>(storeSlot + 1))));
-}
-template <class Dummy>
 constexpr std::size_t aligned_size(std::size_t byteSize, std::size_t align)
 {
 	const std::size_t div(byteSize / align);
@@ -1410,36 +1396,6 @@ inline void buffer_deleter<T, Allocator>::operator()(T* obj, Allocator&)
 {
 	(*obj).~T();
 }
-template <class T, class Allocator>
-class store_array_deleter
-{
-public:
-	store_array_deleter(std::uint16_t capacity);
-	store_array_deleter(store_array_deleter<T, Allocator>&& other) noexcept;
-	void operator()(T* obj, Allocator& alloc);
-
-private:
-	std::uint16_t m_capacity;
-};
-template<class T, class Allocator>
-inline store_array_deleter<T, Allocator>::store_array_deleter(std::uint16_t capacity)
-	: m_capacity(capacity)
-{
-}
-template<class T, class Allocator>
-inline store_array_deleter<T, Allocator>::store_array_deleter(store_array_deleter<T, Allocator>&& other) noexcept
-	: m_capacity(other.m_capacity)
-{
-}
-template<class T, class Allocator>
-inline void store_array_deleter<T, Allocator>::operator()(T* obj, Allocator& alloc)
-{
-	for (std::uint16_t i = 0; i < m_capacity; ++i) {
-		obj[i].~T();
-	}
-	alloc.deallocate(reinterpret_cast<std::uint8_t*>(obj), m_capacity * sizeof(T));
-}
-
 }
 template <class T, class Allocator>
 cqdetail::dummy_container<T, typename concurrent_queue<T, Allocator>::allocator_type> concurrent_queue<T, Allocator>::s_dummyContainer;
