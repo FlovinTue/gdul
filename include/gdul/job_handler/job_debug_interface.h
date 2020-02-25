@@ -34,9 +34,7 @@ namespace jh_detail {
 class job_debug_interface
 {
 public:
-	void activate_debug_tracking(const char* name) {
-		(void)name;
-	}
+	void activate_debug_tracking([const char* /*name*/) {}
 #if defined(GDUL_JOB_DEBUG)
 	job_debug_interface()
 		: m_debugId(constexpr_id::make<0>())
