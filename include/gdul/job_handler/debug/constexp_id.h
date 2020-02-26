@@ -30,8 +30,7 @@ private:
 
 	constexpr constexpr_id(std::uint64_t id)
 		: m_val(id)
-	{
-	}
+	{}
 };
 }
 

@@ -109,9 +109,9 @@ job::operator bool() const noexcept
 	return m_impl;
 }
 #if defined(GDUL_JOB_DEBUG)
-void job::register_tracking_node(constexpr_id id, const char* name) noexcept
+void job::register_tracking_node(constexpr_id id, const char* name, const char* file, std::uint32_t line)
 {
-	m_impl->register_tracking_node(id, name);
+	m_impl->register_tracking_node(id, name, file, line);
 }
 #endif
 }

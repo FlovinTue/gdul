@@ -65,7 +65,7 @@ public:
 	std::size_t get_output_size() const noexcept override final;
 
 #if defined(GDUL_JOB_DEBUG)
-	void register_tracking_node(constexpr_id id, const char* name) noexcept override final;
+	void register_tracking_node(constexpr_id id, const char* name, const char* file, std::uint32_t line) override final;
 #endif
 
 	batch_job_impl(intput_container_type& input, output_container_type& output, process_type&& process, std::size_t batchSize, job_handler* handler);
@@ -420,8 +420,8 @@ inline void batch_job_impl<InputContainer, OutputContainer, Process>::finalize()
 	}
 
 #if defined(GDUL_JOB_DEBUG)
-	//if (m_trackingNode)
-	//	m_trackingNode->log_time(m_timer.get());
+	if (m_trackingNode)
+		m_trackingNode->add_completion_time(m_timer.get());
 #endif
 }
 template<class InputContainer, class OutputContainer, class Process>
@@ -429,17 +429,17 @@ template <class U, std::enable_if_t<U::Specialize_Update>*>
 inline void batch_job_impl<InputContainer, OutputContainer, Process>::finalize()
 {
 #if defined(GDUL_JOB_DEBUG)
-	//if (m_trackingNode)
-	//	m_trackingNode->log_time(m_timer.get());
+	if (m_trackingNode)
+		m_trackingNode->add_completion_time(m_timer.get());
 #endif
 }
 #if defined(GDUL_JOB_DEBUG)
 template<class InputContainer, class OutputContainer, class Process>
-inline void batch_job_impl<InputContainer, OutputContainer, Process>::register_tracking_node(constexpr_id id, const char* name) noexcept
+inline void batch_job_impl<InputContainer, OutputContainer, Process>::register_tracking_node(constexpr_id id, const char* name, const char* file, std::uint32_t line)
 {
 #pragma push_macro("activate_debug_tracking")
 #undef activate_debug_tracking
-	m_root.activate_debug_tracking(id, name);
+	m_root.activate_debug_tracking(id, name, file, line);
 #pragma pop_macro("activate_debug_tracking")
 }
 #endif

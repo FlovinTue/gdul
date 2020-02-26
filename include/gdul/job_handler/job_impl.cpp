@@ -60,8 +60,8 @@ void job_impl::operator()()
 #endif
 	m_workUnit();
 #if defined(GDUL_JOB_DEBUG)
-	//if (m_trackingNode)
-	//	m_trackingNode->log_time(m_timer.get());
+	if (m_trackingNode)
+		m_trackingNode->add_completion_time(time.get());
 #endif
 
 	m_finished.store(true, std::memory_order_seq_cst);
@@ -162,9 +162,9 @@ void job_impl::detach_children()
 	}
 }
 #if defined(GDUL_JOB_DEBUG)
-void job_impl::register_tracking_node(constexpr_id id, const char* name) noexcept
+void job_impl::register_tracking_node(constexpr_id id, const char* name, const char* file, std::uint32_t line)
 {
-	m_trackingNode = job_tracker::register_node(id, name);
+	m_trackingNode = job_tracker::register_node(id, name, file, line);
 }
 #endif
 }

@@ -26,17 +26,23 @@
 #include <unordered_set>
 #include <fstream>
 #include <atomic>
+#include <filesystem>
 
 namespace gdul {
 namespace jh_detail {
+void write_node(const job_tracker_node& node, std::string& outNodes, std::string& outLinks);
 
 
 concurrency::concurrent_unordered_map<std::uint64_t, job_tracker_node> g_jobTrackingNodeMap;
 thread_local std::string t_bufferString;
 
-job_tracker_node* job_tracker::register_node(constexpr_id id, const char * name)
+job_tracker_node* job_tracker::register_node(constexpr_id id, const char * name, const char* file, std::uint32_t line)
 {
 	t_bufferString = name;
+
+	if (t_bufferString.empty()){
+		t_bufferString = "Unnamed";
+	}
 
 	const std::uint64_t variationHash(std::hash<std::string>{}(t_bufferString));
 
@@ -59,6 +65,16 @@ job_tracker_node* job_tracker::register_node(constexpr_id id, const char * name)
 			auto groupParentItr = g_jobTrackingNodeMap.insert({ groupParent.value(), job_tracker_node() });
 			if (groupParentItr.second){
 				groupParentItr.first->second.m_id = groupParent;
+				std::string matriarchName;
+				matriarchName.append("File:_");
+				matriarchName.append(std::filesystem::path(file).filename().string());
+				matriarchName.append("_Line:_");
+				matriarchName.append(std::to_string(line));
+				matriarchName.append("_Id:_");
+				matriarchName.append(std::to_string(id.value()));
+
+				groupParentItr.first->second.m_name = std::move(matriarchName);
+				
 			}
 		}
 	}
@@ -66,43 +82,67 @@ job_tracker_node* job_tracker::register_node(constexpr_id id, const char * name)
 }
 void job_tracker::dump_job_tree(const char* location)
 {
-	location;
-	//const std::string folder(location);
-	//const std::string programName("myprogram");
-	//const std::string outputFile(folder + programName + "_" + "job_graph.dgml");
-	//
-	//std::ofstream outStream;
-	//outStream.open(outputFile,std::ofstream::out);
-	//
-	//outStream << "<?xml version=\"1.0\" encoding=\"utf - 8\"?>\n";
-	//outStream << "<DirectedGraph Title=\"DrivingTest\" Background=\"Grey\" xmlns=\"http://schemas.microsoft.com/vs/2009/dgml\">\n";
-	//
-	//std::vector<job_tracking_node> nodes;
-	//
-	//for (auto itr = g_jobTrackingNodeMap.begin(); itr != g_jobTrackingNodeMap.end(); ++itr) {
-	//	nodes.push_back(itr->second);
-	//}
+	const std::string folder(location);
+	const std::string programName("myprogram");
+	const std::string outputFile(folder + programName + "_" + "job_graph.dgml");
+	
+	std::string nodes;
+	std::string links;
 
-	//std::vector<std::pair<std::uint64_t, std::uint64_t>> connections;
+	for (auto node : g_jobTrackingNodeMap){
+		write_node(node.second, nodes, links);
+	}
 
-	//for (auto& node : nodes) {
-	//	for (auto& child : node.m_children) {
-	//		connections.push_back({ node.m_id.value(), child });
-	//	}
-	//}
+	std::ofstream outStream;
+	outStream.open(outputFile,std::ofstream::out);
+	
+	outStream << "<?xml version=\"1.0\" encoding=\"utf - 8\"?>\n";
+	outStream << "<DirectedGraph Title=\"DrivingTest\" Background=\"Grey\" xmlns=\"http://schemas.microsoft.com/vs/2009/dgml\">\n";
 
-	//outStream << "<Nodes>\n";
-	//for (std::size_t i = 0; i < nodes.size(); ++i) {
-	//	outStream << "<Node Id=\"" << nodes[i].m_id.value() << "\" Label=\"" << *nodes[i].m_variations.begin() << "\" Category=\"Person\" />\n";
-	//}
-	//outStream << "</Nodes>\n";
-	//outStream << "<Links>\n";
-	//for (std::size_t i = 0; i < connections.size(); ++i) {
-	//	outStream << "<Link Source=\""<< connections[i].first << "\" Target=\""<< connections[i].second <<"\"/>\n";
-	//}
-	//outStream << "</Links>\n";
-	//outStream << "</DirectedGraph>\n";
-	//outStream.close();
+	outStream << std::move(nodes);
+	outStream << std::move(links);
+
+	outStream << "<Nodes>\n";
+
+	outStream << "</Nodes>\n";
+	outStream << "<Links>\n";
+
+	outStream << "</Links>\n";
+	outStream << "</DirectedGraph>\n";
+
+	outStream.close();
+}
+
+void write_node(const job_tracker_node& node, std::string& outNodes, std::string& outLinks)
+{
+	t_bufferString.clear();
+
+	t_bufferString.append("<Node Id=\"");
+	t_bufferString.append(std::to_string(node.id().value()));
+	t_bufferString.append("\"");
+	
+	if (node.get_node_type() == job_tracker_node_matriarch){
+		t_bufferString.append(" Group=\"Expanded\"");
+	}
+
+	t_bufferString.append("  />");
+	t_bufferString.append("\n");
+
+	outNodes.append(t_bufferString);
+
+	t_bufferString.clear();
+	t_bufferString.append("<Link Source=\"");
+	t_bufferString.append(std::to_string(node.parent().value()));
+	t_bufferString.append("\" Target = \"");
+	t_bufferString.append(std::to_string(node.id().value()));
+
+	if (node.get_node_type() == job_tracker_node_default){
+		outLinks.append(" Category=\"Contains\"");
+	}
+
+	t_bufferString.append("\n");
+
+	outLinks.append(t_bufferString);
 }
 }
 }

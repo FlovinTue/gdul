@@ -44,13 +44,23 @@ public:
 
 	virtual ~job_tracker_interface() {}
 
-	void activate_debug_tracking(constexpr_id id, const char* name) {
-		register_tracking_node(id, name);
+	void activate_debug_tracking(
+		constexpr_id id, 
+		const char* name,
+		const char* file,
+		uint32_t line) {
+
+		register_tracking_node(id, name, file, line);
 		m_debugId = id;
 	}
 
 protected:
-	virtual void register_tracking_node(constexpr_id id, const char* name) noexcept = 0;
+	virtual void register_tracking_node(
+		constexpr_id id,
+		const char* name, 
+		const char* file, 
+		std::uint32_t line) = 0;
+
 private:
 	friend class job_tracker;
 	friend class job_impl;
@@ -75,6 +85,9 @@ GDUL_INLINE_PRAGMA(warning(push)) \
 GDUL_INLINE_PRAGMA(warning(disable : 4307)) \
 constexp_str_hash(__FILE__) \
 GDUL_INLINE_PRAGMA(warning(pop)) \
-+ std::size_t(__LINE__)>(), name)
++ std::size_t(__LINE__)>(), \
+name, \
+__FILE__, \
+__LINE__)
 #endif
 #endif

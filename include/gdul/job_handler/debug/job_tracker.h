@@ -39,6 +39,7 @@ constexpr std::size_t constexp_str_hash(const Str& toHash)
 
 	return result;
 }
+#endif
 
 namespace gdul {
 namespace jh_detail {
@@ -46,9 +47,12 @@ namespace jh_detail {
 class job_tracker
 {
 public:
-	static job_tracker_node* register_node(constexpr_id id, const char * name);
+#if defined (GDUL_JOB_DEBUG)
+	static job_tracker_node* register_node(constexpr_id id, const char * name, const char* file, std::uint32_t line);
 	static void dump_job_tree(const char* location);
+#else
+	static void dump_job_tree(const char* /*dummy*/) {};
+#endif
 };
 }
 }
-#endif
