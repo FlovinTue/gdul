@@ -108,14 +108,10 @@ job::operator bool() const noexcept
 {
 	return m_impl;
 }
-float job::get_time() const noexcept
-{
-	return m_impl->get_time();
-}
 #if defined(GDUL_JOB_DEBUG)
-void job::register_debug_node(const char* name, constexpr_id id) noexcept
+void job::register_tracking_node(constexpr_id id, const char* name) noexcept
 {
-	m_impl->register_debug_node(name, id);
+	m_impl->register_tracking_node(id, name);
 }
 #endif
 }

@@ -23,7 +23,7 @@
 #include <gdul/job_handler/globals.h>
 
 #if defined(GDUL_JOB_DEBUG)
-#include <gdul/job_handler/job_debug_tracker.h>
+#include <gdul/job_handler/job_tracker.h>
 #endif
 
 
@@ -31,26 +31,28 @@
 
 namespace gdul {
 namespace jh_detail {
-class job_debug_interface
+class job_tracker_interface
 {
 public:
-	void activate_debug_tracking([const char* /*name*/) {}
+	void activate_debug_tracking(const char* name) {
+		(void)name;
+	}
 #if defined(GDUL_JOB_DEBUG)
-	job_debug_interface()
+	job_tracker_interface()
 		: m_debugId(constexpr_id::make<0>())
 	{}
 
-	virtual ~job_debug_interface() {}
+	virtual ~job_tracker_interface() {}
 
-	void activate_debug_tracking(const char* name, constexpr_id id) {
-		register_debug_node(name, id);
+	void activate_debug_tracking(constexpr_id id, const char* name) {
+		register_tracking_node(id, name);
 		m_debugId = id;
 	}
 
 protected:
-	virtual void register_debug_node(const char* name, constexpr_id id) noexcept = 0;
+	virtual void register_tracking_node(constexpr_id id, const char* name) noexcept = 0;
 private:
-	friend class job_debug_tracker;
+	friend class job_tracker;
 	friend class job_impl;
 
 	constexpr_id m_debugId;
@@ -60,19 +62,19 @@ private:
 }
 
 // A little trick to squeeze in a macro. To enable compile time enumeration of declarations
-#if !defined (activate_debug_tracking)
 #if defined(GDUL_JOB_DEBUG)
+#if !defined (activate_debug_tracking)
 #if  defined(_MSC_VER) || defined(__INTEL_COMPILER)
 #define GDUL_INLINE_PRAGMA(pragma) __pragma(pragma)
 #else
 #define GDUL_STRINGIFY_PRAGMA(pragma) #pragma
 #define GDUL_INLINE_PRAGMA(pragma) _Pragma(GDUL_STRINGIFY_PRAGMA(pragma))
 #endif
-#define activate_debug_tracking(name) activate_debug_tracking(name, gdul::constexpr_id::make< \
+#define activate_debug_tracking(name) activate_debug_tracking(gdul::constexpr_id::make< \
 GDUL_INLINE_PRAGMA(warning(push)) \
 GDUL_INLINE_PRAGMA(warning(disable : 4307)) \
 constexp_str_hash(__FILE__) \
 GDUL_INLINE_PRAGMA(warning(pop)) \
-+ std::size_t(__LINE__)>())
++ std::size_t(__LINE__)>(), name)
 #endif
 #endif

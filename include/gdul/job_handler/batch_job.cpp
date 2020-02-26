@@ -59,18 +59,14 @@ batch_job::operator bool() const noexcept
 {
 	return m_impl;
 }
-float batch_job::get_time() const noexcept
-{
-	return m_impl->get_time();
-}
 std::size_t batch_job::get_output_size() const noexcept
 {
 	return m_impl->get_output_size();
 }
 #if defined(GDUL_JOB_DEBUG)
-void batch_job::register_debug_node(const char * name, constexpr_id id) noexcept
+void batch_job::register_tracking_node(constexpr_id id, const char * name) noexcept
 {
-	m_impl->register_debug_node(name, id);
+	m_impl->register_tracking_node(id, name);
 }
 #endif
 job & batch_job::get_endjob() noexcept

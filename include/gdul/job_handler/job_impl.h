@@ -30,7 +30,7 @@
 #include <gdul/delegate/delegate.h>
 
 #if defined(GDUL_JOB_DEBUG)
-#include <gdul/job_handler/job_debug_tracker.h>
+#include <gdul/job_handler/job_tracker.h>
 #endif
 
 namespace gdul{
@@ -71,10 +71,8 @@ public:
 	bool is_enabled() const;
 
 #if defined(GDUL_JOB_DEBUG)
-	void register_debug_node(const char* name, constexpr_id id) noexcept;
+	void register_tracking_node(constexpr_id id, const char* name) noexcept;
 #endif
-
-	float get_time() const noexcept;
 
 	void work_until_finished(job_queue consumeFrom);
 	void wait_until_finished() noexcept;
@@ -83,9 +81,7 @@ private:
 	void detach_children();
 
 #if defined(GDUL_JOB_DEBUG)
-	std::string m_name;
-	constexpr_id m_debugId;
-	float m_time;
+	job_tracking_node* m_trackingNode;
 #endif
 
 	delegate<void()> m_workUnit;

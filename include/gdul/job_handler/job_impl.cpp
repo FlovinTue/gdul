@@ -40,8 +40,7 @@ job_impl::job_impl(delegate<void()>&& workUnit, job_handler_impl* handler)
 	, m_handler(handler)
 	, m_dependencies(Job_Max_Dependencies)
 #if defined (GDUL_JOB_DEBUG)
-	, m_debugId(constexpr_id::make<0>())
-	, m_time(0.f)
+	, m_trackingNode(nullptr)
 #endif
 {
 }
@@ -54,12 +53,15 @@ void job_impl::operator()()
 	assert(!m_finished);
 
 #if defined (GDUL_JOB_DEBUG)
-	job_handler::this_job.m_debugId = m_debugId;
+	if (m_trackingNode)
+		job_handler::this_job.m_debugId = m_trackingNode->m_id;
+
 	timer time;
 #endif
 	m_workUnit();
-#if defined (GDUL_JOB_DEBUG)
-	m_time = time.get();
+#if defined(GDUL_JOB_DEBUG)
+	//if (m_trackingNode)
+	//	m_trackingNode->log_time(m_timer.get());
 #endif
 
 	m_finished.store(true, std::memory_order_seq_cst);
@@ -128,14 +130,6 @@ bool job_impl::is_enabled() const
 {
 	return m_enabled.load(std::memory_order_relaxed);
 }
-float job_impl::get_time() const noexcept
-{
-#if defined (GDUL_JOB_DEBUG)
-	return m_time;
-#else
-	return 0.0f;
-#endif
-}
 void job_impl::work_until_finished(job_queue consumeFrom)
 {
 	while (!is_finished()) {
@@ -168,12 +162,9 @@ void job_impl::detach_children()
 	}
 }
 #if defined(GDUL_JOB_DEBUG)
-void job_impl::register_debug_node(const char* name, constexpr_id id) noexcept
+void job_impl::register_tracking_node(constexpr_id id, const char* name) noexcept
 {
-	m_debugId = id;
-	m_name = name;
-	job_debug_tracker::register_node(id);
-	job_debug_tracker::add_node_variation(id, name);
+	m_trackingNode = job_tracker::register_node(id, name);
 }
 #endif
 }

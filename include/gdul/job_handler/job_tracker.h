@@ -24,6 +24,7 @@
 
 #if defined (GDUL_JOB_DEBUG)
 
+#include <string>
 #include <type_traits>
 
 // https://stackoverflow.com/questions/48896142/is-it-possible-to-get-hash-values-as-compile-time-constants
@@ -43,7 +44,10 @@ constexpr size_t constexp_str_hash(const Str& toHash)
 namespace gdul {
 class job;
 class batch_job;
-
+namespace jh_detail
+{
+	class job_tracker;
+}
 struct constexpr_id
 {
 template <std::uint64_t Id>
@@ -51,9 +55,14 @@ static constexpr constexpr_id make() {
 	return constexpr_id(Id);
 }
 
+constexpr_id merge(const constexpr_id& other) const{
+	return constexpr_id(m_val + other.m_val);
+}
 std::uint64_t value() const noexcept {return m_val;}
 
 private:
+	friend class jh_detail::job_tracker;
+
 	std::uint64_t m_val;
 
 	constexpr constexpr_id(std::uint64_t id)
@@ -63,15 +72,27 @@ private:
 
 namespace jh_detail {
 
+struct job_tracking_node
+{
+	job_tracking_node()
+		: m_id(constexpr_id::make<0>())
+		, m_parent(constexpr_id::make<0>())
+	{}
+	std::string m_name;
 
-class job_debug_tracker
+	// float m_minTime;
+	// float m_avgTime; // Imlement average time neatly?
+	// float m_maxTime;
+
+	constexpr_id m_id;
+	constexpr_id m_parent;
+};
+
+class job_tracker
 {
 public:
-	static void register_node(constexpr_id id);
-	static void add_node_variation(constexpr_id id, const char* name);
-
+	static job_tracking_node* register_node(constexpr_id id, const char * name);
 	static void dump_job_tree(const char* location);
-
 };
 }
 }
