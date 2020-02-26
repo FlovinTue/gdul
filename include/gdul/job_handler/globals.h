@@ -22,6 +22,7 @@
 
 #include <cstdint>
 #include <cstddef>
+#include <type_traits>
 
 // Define to enable some debug features
 #define GDUL_JOB_DEBUG

@@ -24,14 +24,13 @@
 
 #if defined (GDUL_JOB_DEBUG)
 
-#include <string>
-#include <type_traits>
+#include <gdul/job_handler/debug/job_tracker_node.h>
 
 // https://stackoverflow.com/questions/48896142/is-it-possible-to-get-hash-values-as-compile-time-constants
 template <typename Str>
-constexpr size_t constexp_str_hash(const Str& toHash)
+constexpr std::size_t constexp_str_hash(const Str& toHash)
 {
-	size_t result = 0xcbf29ce484222325ull; 
+	std::size_t result = 0xcbf29ce484222325ull; 
 
 	for (char c : toHash) {
 		result ^= c;
@@ -42,56 +41,12 @@ constexpr size_t constexp_str_hash(const Str& toHash)
 }
 
 namespace gdul {
-class job;
-class batch_job;
-namespace jh_detail
-{
-	class job_tracker;
-}
-struct constexpr_id
-{
-template <std::uint64_t Id>
-static constexpr constexpr_id make() {
-	return constexpr_id(Id);
-}
-
-constexpr_id merge(const constexpr_id& other) const{
-	return constexpr_id(m_val + other.m_val);
-}
-std::uint64_t value() const noexcept {return m_val;}
-
-private:
-	friend class jh_detail::job_tracker;
-
-	std::uint64_t m_val;
-
-	constexpr constexpr_id(std::uint64_t id)
-		: m_val(id)
-	{}
-};
-
 namespace jh_detail {
-
-struct job_tracking_node
-{
-	job_tracking_node()
-		: m_id(constexpr_id::make<0>())
-		, m_parent(constexpr_id::make<0>())
-	{}
-	std::string m_name;
-
-	// float m_minTime;
-	// float m_avgTime; // Imlement average time neatly?
-	// float m_maxTime;
-
-	constexpr_id m_id;
-	constexpr_id m_parent;
-};
 
 class job_tracker
 {
 public:
-	static job_tracking_node* register_node(constexpr_id id, const char * name);
+	static job_tracker_node* register_node(constexpr_id id, const char * name);
 	static void dump_job_tree(const char* location);
 };
 }

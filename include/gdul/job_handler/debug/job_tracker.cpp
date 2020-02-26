@@ -31,10 +31,10 @@ namespace gdul {
 namespace jh_detail {
 
 
-concurrency::concurrent_unordered_map<std::uint64_t, job_tracking_node> g_jobTrackingNodeMap;
+concurrency::concurrent_unordered_map<std::uint64_t, job_tracker_node> g_jobTrackingNodeMap;
 thread_local std::string t_bufferString;
 
-job_tracking_node* job_tracker::register_node(constexpr_id id, const char * name)
+job_tracker_node* job_tracker::register_node(constexpr_id id, const char * name)
 {
 	t_bufferString = name;
 
@@ -44,19 +44,19 @@ job_tracking_node* job_tracker::register_node(constexpr_id id, const char * name
 	const constexpr_id groupMatriarch(id);
 	const constexpr_id localId(variationHash + groupMatriarch.value());
 
-	auto itr = g_jobTrackingNodeMap.insert({ localId.value(), job_tracking_node() });
+	auto itr = g_jobTrackingNodeMap.insert({ localId.value(), job_tracker_node() });
 	if (itr.second){
 		itr.first->second.m_id = id;
 		itr.first->second.m_parent = groupMatriarch;
 		itr.first->second.m_name = name;
 
-		auto matriarchItr = g_jobTrackingNodeMap.insert({ groupMatriarch.value(), job_tracking_node() });
+		auto matriarchItr = g_jobTrackingNodeMap.insert({ groupMatriarch.value(), job_tracker_node() });
 		if (matriarchItr.second){
 			matriarchItr.first->second.m_id = groupMatriarch;
 			matriarchItr.first->second.m_parent = groupParent;
 			matriarchItr.first->second.m_name = std::string("Job#").append(std::to_string(id.value()));
 
-			auto groupParentItr = g_jobTrackingNodeMap.insert({ groupParent.value(), job_tracking_node() });
+			auto groupParentItr = g_jobTrackingNodeMap.insert({ groupParent.value(), job_tracker_node() });
 			if (groupParentItr.second){
 				groupParentItr.first->second.m_id = groupParent;
 			}

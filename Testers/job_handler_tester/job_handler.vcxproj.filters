@@ -37,7 +37,10 @@
     <ClCompile Include="..\..\include\gdul\job_handler\job_handler_utility.cpp">
       <Filter>implementation</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\include\gdul\job_handler\job_debug_tracker.cpp">
+    <ClCompile Include="..\..\include\gdul\job_handler\debug\job_tracker.cpp">
+      <Filter>implementation\debug</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\gdul\job_handler\debug\Job_tracker_node.cpp">
       <Filter>implementation\debug</Filter>
     </ClCompile>
   </ItemGroup>
@@ -90,10 +93,16 @@
     <ClInclude Include="..\..\include\gdul\job_handler\batch_job_impl_interface.h">
       <Filter>implementation\job</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\gdul\job_handler\job_debug_interface.h">
+    <ClInclude Include="..\..\include\gdul\job_handler\debug\job_tracker_interface.h">
       <Filter>implementation\debug</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\gdul\job_handler\job_debug_tracker.h">
+    <ClInclude Include="..\..\include\gdul\job_handler\debug\Job_tracker_node.h">
+      <Filter>implementation\debug</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\gdul\job_handler\debug\constexp_id.h">
+      <Filter>implementation\debug</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\gdul\job_handler\debug\job_tracker.h">
       <Filter>implementation\debug</Filter>
     </ClInclude>
   </ItemGroup>

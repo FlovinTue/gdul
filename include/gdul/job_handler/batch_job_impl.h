@@ -117,7 +117,7 @@ private:
 	void work_pack(std::size_t batchIndex);
 
 #if defined(GDUL_JOB_DEBUG)
-	job_tracking_node* m_trackingNode;
+	job_tracker_node* m_trackingNode;
 	timer m_timer;
 #endif
 

@@ -30,7 +30,7 @@
 #include <gdul/delegate/delegate.h>
 
 #if defined(GDUL_JOB_DEBUG)
-#include <gdul/job_handler/job_tracker.h>
+#include <gdul/job_handler/debug/job_tracker.h>
 #endif
 
 namespace gdul{
@@ -81,7 +81,7 @@ private:
 	void detach_children();
 
 #if defined(GDUL_JOB_DEBUG)
-	job_tracking_node* m_trackingNode;
+	job_tracker_node* m_trackingNode;
 #endif
 
 	delegate<void()> m_workUnit;

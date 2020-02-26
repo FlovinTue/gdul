@@ -54,7 +54,7 @@ void job_impl::operator()()
 
 #if defined (GDUL_JOB_DEBUG)
 	if (m_trackingNode)
-		job_handler::this_job.m_debugId = m_trackingNode->m_id;
+		job_handler::this_job.m_debugId = m_trackingNode->id();
 
 	timer time;
 #endif

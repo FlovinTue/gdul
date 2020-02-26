@@ -42,7 +42,7 @@ int main()
 		}
 	}
 
-	gdul::jh_detail::job_debug_tracker::dump_job_tree("");
+	gdul::jh_detail::job_tracker::dump_job_tree("");
 
 	std::cout << "Final allocated: " << gdul::s_allocated << std::endl;
 	

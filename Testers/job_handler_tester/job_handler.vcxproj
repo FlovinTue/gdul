@@ -93,10 +93,12 @@
     <ClInclude Include="..\..\include\gdul\job_handler\batch_job.h" />
     <ClInclude Include="..\..\include\gdul\job_handler\batch_job_impl.h" />
     <ClInclude Include="..\..\include\gdul\job_handler\chunk_allocator.h" />
-    <ClInclude Include="..\..\include\gdul\job_handler\job_debug_tracker.h" />
+    <ClInclude Include="..\..\include\gdul\job_handler\debug\constexp_id.h" />
+    <ClInclude Include="..\..\include\gdul\job_handler\debug\job_tracker.h" />
+    <ClInclude Include="..\..\include\gdul\job_handler\debug\job_tracker_interface.h" />
+    <ClInclude Include="..\..\include\gdul\job_handler\debug\Job_tracker_node.h" />
     <ClInclude Include="..\..\include\gdul\job_handler\globals.h" />
     <ClInclude Include="..\..\include\gdul\job_handler\job.h" />
-    <ClInclude Include="..\..\include\gdul\job_handler\job_debug_interface.h" />
     <ClInclude Include="..\..\include\gdul\job_handler\job_handler.h" />
     <ClInclude Include="..\..\include\gdul\job_handler\job_handler_utility.h" />
     <ClInclude Include="..\..\include\gdul\job_handler\job_handler_impl.h" />
@@ -112,8 +114,9 @@
   <ItemGroup>
     <ClCompile Include="..\..\include\gdul\job_handler\batch_job.cpp" />
     <ClCompile Include="..\..\include\gdul\job_handler\batch_job_impl.cpp" />
+    <ClCompile Include="..\..\include\gdul\job_handler\debug\job_tracker.cpp" />
+    <ClCompile Include="..\..\include\gdul\job_handler\debug\Job_tracker_node.cpp" />
     <ClCompile Include="..\..\include\gdul\job_handler\job.cpp" />
-    <ClCompile Include="..\..\include\gdul\job_handler\job_debug_tracker.cpp" />
     <ClCompile Include="..\..\include\gdul\job_handler\job_handler.cpp" />
     <ClCompile Include="..\..\include\gdul\job_handler\job_handler_utility.cpp" />
     <ClCompile Include="..\..\include\gdul\job_handler\job_handler_impl.cpp" />
