@@ -60,19 +60,21 @@ job_tracker_node* job_tracker::register_node(constexpr_id id, const char * name,
 		if (matriarchItr.second){
 			matriarchItr.first->second.m_id = groupMatriarch;
 			matriarchItr.first->second.m_parent = groupParent;
-			matriarchItr.first->second.m_name = std::string("Job#").append(std::to_string(id.value()));
+			matriarchItr.first->second.set_node_type(job_tracker_node_matriarch);
+			std::string matriarchName;
+			matriarchName.append("File:_");
+			matriarchName.append(std::filesystem::path(file).filename().string());
+			matriarchName.append("_Line:_");
+			matriarchName.append(std::to_string(line));
+			matriarchName.append("_Id:_");
+			matriarchName.append(std::to_string(id.value()));
+			matriarchItr.first->second.m_name = std::move(matriarchName);
 
 			auto groupParentItr = g_jobTrackingNodeMap.insert({ groupParent.value(), job_tracker_node() });
 			if (groupParentItr.second){
 				groupParentItr.first->second.m_id = groupParent;
-				std::string matriarchName;
-				matriarchName.append("File:_");
-				matriarchName.append(std::filesystem::path(file).filename().string());
-				matriarchName.append("_Line:_");
-				matriarchName.append(std::to_string(line));
-				matriarchName.append("_Id:_");
-				matriarchName.append(std::to_string(id.value()));
 
+				groupParentItr.first->second.set_node_type(job_tracker_node_matriarch);
 				groupParentItr.first->second.m_name = std::move(matriarchName);
 				
 			}
@@ -99,14 +101,12 @@ void job_tracker::dump_job_tree(const char* location)
 	outStream << "<?xml version=\"1.0\" encoding=\"utf - 8\"?>\n";
 	outStream << "<DirectedGraph Title=\"DrivingTest\" Background=\"Grey\" xmlns=\"http://schemas.microsoft.com/vs/2009/dgml\">\n";
 
-	outStream << std::move(nodes);
-	outStream << std::move(links);
-
 	outStream << "<Nodes>\n";
-
+	outStream << std::move(nodes);
 	outStream << "</Nodes>\n";
-	outStream << "<Links>\n";
 
+	outStream << "<Links>\n";
+	outStream << std::move(links);
 	outStream << "</Links>\n";
 	outStream << "</DirectedGraph>\n";
 
@@ -135,11 +135,12 @@ void write_node(const job_tracker_node& node, std::string& outNodes, std::string
 	t_bufferString.append(std::to_string(node.parent().value()));
 	t_bufferString.append("\" Target = \"");
 	t_bufferString.append(std::to_string(node.id().value()));
+	t_bufferString.append("\"");
 
 	if (node.get_node_type() == job_tracker_node_default){
 		outLinks.append(" Category=\"Contains\"");
 	}
-
+	t_bufferString.append("  />");
 	t_bufferString.append("\n");
 
 	outLinks.append(t_bufferString);
