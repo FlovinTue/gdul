@@ -62,11 +62,10 @@ job_tracker_node* job_tracker::register_node(constexpr_id id, const char * name,
 			matriarchItr.first->second.m_parent = groupParent;
 			matriarchItr.first->second.set_node_type(job_tracker_node_matriarch);
 			std::string matriarchName;
-			matriarchName.append("File:_");
 			matriarchName.append(std::filesystem::path(file).filename().string());
-			matriarchName.append("_Line:_");
+			matriarchName.append("__L:_");
 			matriarchName.append(std::to_string(line));
-			matriarchName.append("_Id:_");
+			matriarchName.append("__Id:_");
 			matriarchName.append(std::to_string(id.value()));
 			matriarchItr.first->second.m_name = std::move(matriarchName);
 
@@ -120,7 +119,10 @@ void write_node(const job_tracker_node& node, std::string& outNodes, std::string
 	t_bufferString.append("<Node Id=\"");
 	t_bufferString.append(std::to_string(node.id().value()));
 	t_bufferString.append("\"");
-	
+	t_bufferString.append(" Label=\"");
+	t_bufferString.append(node.name());
+	t_bufferString.append("\"");
+
 	if (node.get_node_type() == job_tracker_node_matriarch){
 		t_bufferString.append(" Group=\"Expanded\"");
 	}
@@ -131,15 +133,17 @@ void write_node(const job_tracker_node& node, std::string& outNodes, std::string
 	outNodes.append(t_bufferString);
 
 	t_bufferString.clear();
-	t_bufferString.append("<Link Source=\"");
+	t_bufferString.append("<Link");
+
+	if (node.get_node_type() == job_tracker_node_default){
+		t_bufferString.append(" Category=\"Contains\"");
+	}
+	t_bufferString.append(" Source=\"");
 	t_bufferString.append(std::to_string(node.parent().value()));
 	t_bufferString.append("\" Target = \"");
 	t_bufferString.append(std::to_string(node.id().value()));
 	t_bufferString.append("\"");
 
-	if (node.get_node_type() == job_tracker_node_default){
-		outLinks.append(" Category=\"Contains\"");
-	}
 	t_bufferString.append("  />");
 	t_bufferString.append("\n");
 
