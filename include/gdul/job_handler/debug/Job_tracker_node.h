@@ -14,6 +14,7 @@ namespace jh_detail
 enum job_tracker_node_type : std::uint8_t
 {
 	job_tracker_node_default,
+	job_tracker_node_batch,
 	job_tracker_node_matriarch,
 };
 struct job_tracker_node

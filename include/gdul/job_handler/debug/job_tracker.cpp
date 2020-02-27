@@ -46,7 +46,7 @@ public:
 
 thread_local std::string t_bufferString;
 
-job_tracker_node* job_tracker::register_node(constexpr_id id, const char * name, const char* file, std::uint32_t line)
+job_tracker_node* job_tracker::register_job_node(constexpr_id id, const char * name, const char* file, std::uint32_t line)
 {
 	t_bufferString = name;
 
@@ -54,11 +54,11 @@ job_tracker_node* job_tracker::register_node(constexpr_id id, const char * name,
 		t_bufferString = "Unnamed";
 	}
 
-	const std::uint64_t variationHash(std::hash<std::string>{}(t_bufferString));
+	const constexpr_id variation(std::hash<std::string>{}(t_bufferString));
 
 	const constexpr_id groupParent(job_handler::this_job.m_debugId);
-	const constexpr_id groupMatriarch(id);
-	const constexpr_id localId(variationHash + groupMatriarch.value());
+	const constexpr_id groupMatriarch(id.merge(groupParent));
+	const constexpr_id localId(variation.merge(groupMatriarch));
 
 	auto itr = g_trackerData.m_nodeMap.insert({ localId.value(), job_tracker_node() });
 	if (itr.second){
@@ -93,6 +93,37 @@ job_tracker_node* job_tracker::register_node(constexpr_id id, const char * name,
 				groupParentItr.first->second.m_name = "Unknown_Group_Parent";
 				
 			}
+		}
+	}
+	return &itr.first->second;
+}
+job_tracker_node * job_tracker::register_batch_node(constexpr_id id, const char * name)
+{
+	t_bufferString = name;
+
+	if (t_bufferString.empty())
+	{
+		t_bufferString = "Unnamed";
+	}
+
+	const constexpr_id groupParent(job_handler::this_job.m_debugId);
+	const constexpr_id batchId(id.merge(groupParent));
+
+	auto itr = g_trackerData.m_nodeMap.insert({ batchId.value(), job_tracker_node() });
+	if (itr.second)
+	{
+		itr.first->second.m_id = batchId;
+		itr.first->second.m_parent = groupParent;
+		itr.first->second.m_name = std::move(t_bufferString);
+		itr.first->second.set_node_type(job_tracker_node_batch);
+
+		auto groupParentItr = g_trackerData.m_nodeMap.insert({ groupParent.value(), job_tracker_node() });
+		if (groupParentItr.second)
+		{
+			groupParentItr.first->second.m_id = groupParent;
+			groupParentItr.first->second.set_node_type(job_tracker_node_matriarch);
+			groupParentItr.first->second.m_name = "Unknown_Group_Parent";
+
 		}
 	}
 	return &itr.first->second;
@@ -169,7 +200,8 @@ void write_node(const job_tracker_node& node, const std::unordered_map<std::uint
 	t_bufferString.clear();
 	t_bufferString.append("<Link");
 
-	if (node.get_node_type() == job_tracker_node_default){
+	if (node.get_node_type() == job_tracker_node_default ||
+		node.get_node_type() == job_tracker_node_batch){
 		t_bufferString.append(" Category=\"Contains\"");
 	}
 
