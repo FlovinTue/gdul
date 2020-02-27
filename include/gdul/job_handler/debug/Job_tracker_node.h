@@ -29,7 +29,6 @@ struct job_tracker_node
 	float max_time() const;
 	float avg_time() const;
 
-	std::size_t children() const;
 	std::size_t completed_count() const;
 
 	void set_node_type(job_tracker_node_type type);
@@ -39,7 +38,6 @@ struct job_tracker_node
 
 private:
 	friend class job_tracker;
-	friend class job_tracker_data;
 
 	std::string m_name;
 

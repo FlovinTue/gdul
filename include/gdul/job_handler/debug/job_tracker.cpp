@@ -23,27 +23,17 @@
 #if defined (GDUL_JOB_DEBUG)
 #include <concurrent_unordered_map.h>
 #include <gdul/job_handler/job_handler.h>
-#include <unordered_map>
+#include <unordered_set>
 #include <fstream>
 #include <atomic>
 #include <filesystem>
 
 namespace gdul {
 namespace jh_detail {
-void write_node(const job_tracker_node& node, const std::unordered_map<std::uint64_t, std::size_t>& childCounter, std::string& outNodes, std::string& outLinks);
+void write_node(const job_tracker_node& node, std::string& outNodes, std::string& outLinks);
 
-class job_tracker_data
-{
-public:
-	job_tracker_data()
-	{
-		auto itr = m_nodeMap.insert({ 0, job_tracker_node() });
-		itr.first->second.m_name = "Undeclared_Root_Node";
-		itr.first->second.m_type = job_tracker_node_default;
-	}
-	concurrency::concurrent_unordered_map<std::uint64_t, job_tracker_node> m_nodeMap;
-}g_trackerData;
 
+concurrency::concurrent_unordered_map<std::uint64_t, job_tracker_node> g_jobTrackingNodeMap;
 thread_local std::string t_bufferString;
 
 job_tracker_node* job_tracker::register_node(constexpr_id id, const char * name, const char* file, std::uint32_t line)
@@ -60,13 +50,13 @@ job_tracker_node* job_tracker::register_node(constexpr_id id, const char * name,
 	const constexpr_id groupMatriarch(id);
 	const constexpr_id localId(variationHash + groupMatriarch.value());
 
-	auto itr = g_trackerData.m_nodeMap.insert({ localId.value(), job_tracker_node() });
+	auto itr = g_jobTrackingNodeMap.insert({ localId.value(), job_tracker_node() });
 	if (itr.second){
-		itr.first->second.m_id = localId;
+		itr.first->second.m_id = id;
 		itr.first->second.m_parent = groupMatriarch;
-		itr.first->second.m_name = std::move(t_bufferString);
+		itr.first->second.m_name = name;
 
-		auto matriarchItr = g_trackerData.m_nodeMap.insert({ groupMatriarch.value(), job_tracker_node() });
+		auto matriarchItr = g_jobTrackingNodeMap.insert({ groupMatriarch.value(), job_tracker_node() });
 		if (matriarchItr.second){
 			matriarchItr.first->second.m_id = groupMatriarch;
 			matriarchItr.first->second.m_parent = groupParent;
@@ -75,22 +65,16 @@ job_tracker_node* job_tracker::register_node(constexpr_id id, const char * name,
 			matriarchName.append(std::filesystem::path(file).filename().string());
 			matriarchName.append("__L:_");
 			matriarchName.append(std::to_string(line));
-			matriarchName.append("__");
-
-			std::string containsHint(name);
-			if (10 < containsHint.size()){
-				containsHint.resize(10);
-				containsHint.append("..");
-			}
-			matriarchName.append(containsHint);
-
+			matriarchName.append("__Id:_");
+			matriarchName.append(std::to_string(id.value()));
 			matriarchItr.first->second.m_name = std::move(matriarchName);
 
-			auto groupParentItr = g_trackerData.m_nodeMap.insert({ groupParent.value(), job_tracker_node() });
+			auto groupParentItr = g_jobTrackingNodeMap.insert({ groupParent.value(), job_tracker_node() });
 			if (groupParentItr.second){
 				groupParentItr.first->second.m_id = groupParent;
+
 				groupParentItr.first->second.set_node_type(job_tracker_node_matriarch);
-				groupParentItr.first->second.m_name = "Unknown_Group_Parent";
+				groupParentItr.first->second.m_name = std::move(matriarchName);
 				
 			}
 		}
@@ -102,26 +86,12 @@ void job_tracker::dump_job_tree(const char* location)
 	const std::string folder(location);
 	const std::string programName("myprogram");
 	const std::string outputFile(folder + programName + "_" + "job_graph.dgml");
-
-	std::vector<job_tracker_node> nodes;
-
-	for (auto node : g_trackerData.m_nodeMap){
-		nodes.push_back(node.second);
-	}
-
-	std::unordered_map<std::uint64_t, std::size_t> childCounter;
-
-	for (auto node : nodes){
-		if (node.get_node_type() == job_tracker_node_default){
-			++childCounter[node.parent().value()];
-		}
-	}
 	
-	std::string nodesOutput;
-	std::string linksOutput;
+	std::string nodes;
+	std::string links;
 
-	for (auto node : nodes){
-		write_node(node, childCounter, nodesOutput, linksOutput);
+	for (auto node : g_jobTrackingNodeMap){
+		write_node(node.second, nodes, links);
 	}
 
 	std::ofstream outStream;
@@ -131,18 +101,18 @@ void job_tracker::dump_job_tree(const char* location)
 	outStream << "<DirectedGraph Title=\"DrivingTest\" Background=\"Grey\" xmlns=\"http://schemas.microsoft.com/vs/2009/dgml\">\n";
 
 	outStream << "<Nodes>\n";
-	outStream << std::move(nodesOutput);
+	outStream << std::move(nodes);
 	outStream << "</Nodes>\n";
 
 	outStream << "<Links>\n";
-	outStream << std::move(linksOutput);
+	outStream << std::move(links);
 	outStream << "</Links>\n";
 	outStream << "</DirectedGraph>\n";
 
 	outStream.close();
 }
 
-void write_node(const job_tracker_node& node, const std::unordered_map<std::uint64_t, std::size_t>& childCounter, std::string& outNodes, std::string& outLinks)
+void write_node(const job_tracker_node& node, std::string& outNodes, std::string& outLinks)
 {
 	t_bufferString.clear();
 
@@ -154,11 +124,7 @@ void write_node(const job_tracker_node& node, const std::unordered_map<std::uint
 	t_bufferString.append("\"");
 
 	if (node.get_node_type() == job_tracker_node_matriarch){
-		auto itr = childCounter.find(node.id().value());
-		if (itr != childCounter.end() && itr->second < 60)
-			t_bufferString.append(" Group=\"Expanded\"");
-		else
-			t_bufferString.append(" Group=\"Collapsed\"");
+		t_bufferString.append(" Group=\"Expanded\"");
 	}
 
 	t_bufferString.append("  />");
@@ -172,19 +138,16 @@ void write_node(const job_tracker_node& node, const std::unordered_map<std::uint
 	if (node.get_node_type() == job_tracker_node_default){
 		t_bufferString.append(" Category=\"Contains\"");
 	}
+	t_bufferString.append(" Source=\"");
+	t_bufferString.append(std::to_string(node.parent().value()));
+	t_bufferString.append("\" Target = \"");
+	t_bufferString.append(std::to_string(node.id().value()));
+	t_bufferString.append("\"");
 
-	if (node.id().value() != 0){
-		t_bufferString.append(" Source=\"");
-		t_bufferString.append(std::to_string(node.parent().value()));
-		t_bufferString.append("\" Target = \"");
-		t_bufferString.append(std::to_string(node.id().value()));
-		t_bufferString.append("\"");
+	t_bufferString.append("  />");
+	t_bufferString.append("\n");
 
-		t_bufferString.append("  />");
-		t_bufferString.append("\n");
-
-		outLinks.append(t_bufferString);
-	}
+	outLinks.append(t_bufferString);
 }
 }
 }
