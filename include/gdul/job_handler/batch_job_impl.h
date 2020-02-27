@@ -66,6 +66,7 @@ public:
 
 #if defined(GDUL_JOB_DEBUG)
 	void register_tracking_node(constexpr_id id, const char* name, const char* file, std::uint32_t line) override final;
+	void track_sub_job(job& job, const char* name);
 #endif
 
 	batch_job_impl(intput_container_type& input, output_container_type& output, process_type&& process, std::size_t batchSize, job_handler* handler);
@@ -119,6 +120,7 @@ private:
 #if defined(GDUL_JOB_DEBUG)
 	job_tracker_node* m_trackingNode;
 	timer m_timer;
+	std::string m_bufferString;
 #endif
 
 	std::array<std::uint32_t, Batch_Job_Max_Batches> m_batchTracker;
@@ -322,12 +324,9 @@ template<class InputContainer, class OutputContainer, class Process>
 template <class U, std::enable_if_t<!U::Specialize_Update>*>
 inline void batch_job_impl<InputContainer, OutputContainer, Process>::make_jobs()
 {
-	auto setProcessName = [](job& processor, const char* name) {
-		processor.activate_debug_tracking(name);
-	};
-
 	job currentProcessJob = make_work_slice(&batch_job_impl::work_process<>, 0);
-	setProcessName(currentProcessJob, "process batch 1");
+	track_sub_job(currentProcessJob, "process batch 1");
+
 	currentProcessJob.enable();
 
 	job currentPackJob(currentProcessJob);
@@ -335,13 +334,17 @@ inline void batch_job_impl<InputContainer, OutputContainer, Process>::make_jobs(
 	for (std::size_t i = 1; i < m_batchCount; ++i) {
 		job nextProcessJob(make_work_slice(&batch_job_impl::work_process<>, i));
 #if defined(GDUL_JOB_DEBUG)
-		setProcessName(nextProcessJob, std::string("process batch " + std::to_string(i + 1)).c_str());
+		m_bufferString = "process batch ";
+		m_bufferString.append(std::to_string(i + 1));
+		track_sub_job(nextProcessJob, m_bufferString.c_str());
 #endif
 
 		if (i < (m_batchCount - 1)) {
 			job nextPackJob(make_work_slice(&batch_job_impl::work_pack, i));
 #if defined(GDUL_JOB_DEBUG)
-			nextPackJob.activate_debug_tracking(std::string("pack batch " + std::to_string(i)).c_str());
+			m_bufferString = "pack batch ";
+			m_bufferString.append(std::to_string(i));
+			track_sub_job(nextPackJob, m_bufferString.c_str());
 #endif
 			nextPackJob.add_dependency(currentPackJob);
 			nextPackJob.add_dependency(nextProcessJob);
@@ -358,8 +361,9 @@ inline void batch_job_impl<InputContainer, OutputContainer, Process>::make_jobs(
 		m_end.add_dependency(currentPackJob);
 	}
 
+	track_sub_job(m_end, "finalize");
+
 	m_end.add_dependency(currentProcessJob);
-	m_end.activate_debug_tracking("finalize");
 	m_end.enable();
 }
 template<class InputContainer, class OutputContainer, class Process>
@@ -369,13 +373,15 @@ inline void batch_job_impl<InputContainer, OutputContainer, Process>::make_jobs(
 	for (std::size_t i = 0; i < m_batchCount; ++i) {
 		job processJob(make_work_slice(&batch_job_impl::work_process<>, i));
 #if defined(GDUL_JOB_DEBUG)
-		processJob.activate_debug_tracking(std::string("process batch " + std::to_string(i + 1)).c_str());
+		m_bufferString = "process batch ";
+		m_bufferString.append(std::to_string(i + 1));
+		track_sub_job(processJob, m_bufferString.c_str());
 #endif
 		m_end.add_dependency(processJob);
 		processJob.enable();
 	}
 
-	m_end.activate_debug_tracking("finalize");
+	track_sub_job(m_end, "finalize");
 	m_end.enable();
 }
 template<class InputContainer, class OutputContainer, class Process>
@@ -440,6 +446,14 @@ inline void batch_job_impl<InputContainer, OutputContainer, Process>::register_t
 #pragma push_macro("activate_debug_tracking")
 #undef activate_debug_tracking
 	m_root.activate_debug_tracking(id, name, file, line);
+#pragma pop_macro("activate_debug_tracking")
+}
+template<class InputContainer, class OutputContainer, class Process>
+inline void batch_job_impl<InputContainer, OutputContainer, Process>::track_sub_job(job & job, const char * name)
+{
+#pragma push_macro("activate_debug_tracking")
+#undef activate_debug_tracking
+	job.activate_debug_tracking(m_root.m_debugId, name, "", 0);
 #pragma pop_macro("activate_debug_tracking")
 }
 #endif
