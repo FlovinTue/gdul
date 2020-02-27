@@ -249,19 +249,14 @@ inline void concurrent_queue_fifo<T, Allocator>::push_internal(Arg&& ...in)
 template<class T, class Allocator>
 bool concurrent_queue_fifo<T, Allocator>::try_pop(T& out)
 {
-	while (!this_consumer_cached()->try_pop(out))
-	{
-		if (this_consumer_cached()->is_valid())
-		{
-			if (!refresh_consumer())
-			{
+	while (!this_consumer_cached()->try_pop(out)){
+		if (this_consumer_cached()->is_valid()){
+			if (!refresh_consumer()){
 				return false;
 			}
 		}
-		else
-		{
-			if (!initialize_consumer())
-			{
+		else{
+			if (!initialize_consumer()){
 				return false;
 			}
 		}
@@ -631,7 +626,6 @@ inline item_buffer<T, Allocator>::item_buffer(typename item_buffer<T, Allocator>
 	, m_capacity(capacity)
 	, m_preReadSync(0)
 	, m_readAt(0)
-	, m_read(0)
 	, m_writeAt(0)
 	, m_postWriteSync(0)
 	, m_written(0)
@@ -659,7 +653,7 @@ inline bool item_buffer<T, Allocator>::is_active() const
 		return true;
 	}
 
-	const size_type read(m_read.load(std::memory_order_relaxed));
+	const size_type read(m_readAt.load(std::memory_order_relaxed));
 	if (read != written){
 		return true;
 	}
@@ -717,9 +711,10 @@ inline typename item_buffer<T, Allocator>::shared_ptr_buffer_type item_buffer<T,
 template<class T, class Allocator>
 inline typename item_buffer<T, Allocator>::size_type item_buffer<T, Allocator>::size() const
 {
-	const size_type readSlot(m_read.load(std::memory_order_relaxed));
+	const size_type readSlot(m_readAt.load(std::memory_order_relaxed));
+	const size_type read(!(m_capacity < readSlot) ? readSlot : m_capacity);
 	size_type accumulatedSize(m_written.load(std::memory_order_relaxed));
-	accumulatedSize -= readSlot;
+	accumulatedSize -= read;
 
 	if (m_next)
 	{
@@ -757,8 +752,7 @@ inline void item_buffer<T, Allocator>::unsafe_clear()
 	m_writeAt.store(0, std::memory_order_relaxed);
 	m_readAt.store(0, std::memory_order_relaxed);
 
-	m_written.store(0, std::memory_order_relaxed));
-	m_read.store(0, std::memory_order_relaxed));
+	m_written.store(0, std::memory_order_relaxed);
 
 	m_preReadSync.store(0, std::memory_order_relaxed);
 	m_postWriteSync.store(0, std::memory_order_relaxed);
@@ -797,15 +791,11 @@ inline bool item_buffer<T, Allocator>::try_push(Arg&& ...in)
 
 	write_in(atLocal, std::forward<Arg>(in)...);
 
-	do{
-		const size_type postSync(m_postWriteSync.fetch_add(1, std::memory_order_release));
-		const size_type postAt(m_writeAt.load(std::memory_order_relaxed));
-
-		if ((postSync + 1) != postAt){
-			break;
-		}
-
-	} while (postAt < m_written.exchange(postAt, std::memory_order_relaxed));
+	const size_type postSync(m_postWriteSync.fetch_add(1, std::memory_order_release));
+	const size_type postAt(m_writeAt.load(std::memory_order_relaxed));
+	if ((postSync + 1) == postAt)
+		while (postAt < m_written.exchange(postAt, std::memory_order_relaxed));
+		
 
 	//const size_type postSync(m_postWriteSync.fetch_add(1, std::memory_order_release));
 	//const size_type postAt(m_writeAt.load(std::memory_order_relaxed));
