@@ -489,30 +489,32 @@ inline void concurrent_queue_fifo<T, Allocator>::refresh_producer()
 {
 	assert(t_producer.get()->is_valid() && "producer needs to be initialized");
 
-	const buffer_type* const initial(t_producer.get().get());
+	//const buffer_type* const initial(t_producer.get().get());
+	//
+	//do
+	//{
+	//	shared_ptr_buffer_type front(t_producer.get()->find_front());
+	//
+	//	if (!front)
+	//	{
+	//		front = t_producer.get();
+	//	}
+	//
+	//	if (front.get() == t_producer.get().get())
+	//	{
+	//		const size_type capacity(front->get_capacity());
+	//		const size_type newCapacity(capacity * 2);
+	//
+	//		reserve(newCapacity);
+	//	}
+	//	else
+	//	{
+	//		t_producer = std::move(front);
+	//	}
+	//
+	//} while (t_producer.get().get() == initial);
 
-	do
-	{
-		shared_ptr_buffer_type front(t_producer.get()->find_front());
-
-		if (!front)
-		{
-			front = t_producer.get();
-		}
-
-		if (front.get() == t_producer.get().get())
-		{
-			const size_type capacity(front->get_capacity());
-			const size_type newCapacity(capacity * 2);
-
-			reserve(newCapacity);
-		}
-		else
-		{
-			t_producer = std::move(front);
-		}
-
-	} while (t_producer.get().get() == initial);
+	t_producer = m_itemBuffer.load(std::memory_order_relaxed);
 }
 
 template<class T, class Allocator>

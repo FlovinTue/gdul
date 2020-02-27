@@ -196,6 +196,12 @@ inline double tester<T, Allocator>::ExecuteSingleThread(std::uint32_t runs)
 		m_waiting = 0;
 
 		m_isRunning = false;
+
+#if defined(GDUL) | defined(GDUL_FIFO)
+		m_queue.unsafe_clear();
+#elif defined(MSC_RUNTIME) || defined(MTX_WRAPPER)
+		m_queue.clear();
+#endif
 	}
 
 	std::cout << "ExecuteSingleThread Threw " << m_thrown;
@@ -236,14 +242,17 @@ inline double tester<T, Allocator>::ExecuteSingleProducerSingleConsumer(std::uin
 		while (m_writer.has_unfinished_tasks() | m_reader.has_unfinished_tasks())
 			std::this_thread::yield();
 
-#if defined(GDUL) || defined(GDUL_FIFO)
-		GDUL_ASSERT(m_queue.unsafe_size() == 0);
-#endif
 		result += time.get();
 
 		m_waiting = 0;
 
 		m_isRunning = false;
+#if defined(GDUL) | defined(GDUL_FIFO)
+		m_queue.unsafe_clear();
+#elif defined(MSC_RUNTIME) || defined(MTX_WRAPPER)
+		m_queue.clear();
+#endif
+
 	}
 
 	std::cout << "ExecuteSingleProducerSingleConsumer Threw " << m_thrown;
@@ -296,6 +305,12 @@ inline double tester<T, Allocator>::ExecuteRead(std::uint32_t runs)
 		m_waiting = 0;
 
 		m_isRunning = false;
+
+#if defined(GDUL) | defined(GDUL_FIFO)
+		m_queue.unsafe_clear();
+#elif defined(MSC_RUNTIME) || defined(MTX_WRAPPER)
+		m_queue.clear();
+#endif
 	}
 
 	std::cout << "ExecuteRead Threw " << m_thrown;
@@ -336,11 +351,10 @@ inline double tester<T, Allocator>::ExecuteWrite(std::uint32_t runs)
 			std::this_thread::yield();
 
 		result += time.get();
-#if defined(GDUL) || defined(GDUL_FIFO)
-		std::size_t outSize = m_queue.unsafe_size();
-		std::size_t expectedSize = WritesPerThread * Writers;
-		GDUL_ASSERT(outSize == expectedSize);
-#endif
+
+		m_waiting = 0;
+
+		m_isRunning = false;
 
 #if  defined(GDUL) | defined(GDUL_FIFO)
 		m_queue.unsafe_clear();
@@ -350,10 +364,6 @@ inline double tester<T, Allocator>::ExecuteWrite(std::uint32_t runs)
 		T out;
 		while (m_queue.try_dequeue(out));
 #endif
-
-		m_waiting = 0;
-
-		m_isRunning = false;
 	}
 
 	std::cout << "ExecuteWrite Threw " << m_thrown << std::endl;
