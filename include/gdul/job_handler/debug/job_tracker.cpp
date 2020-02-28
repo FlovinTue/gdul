@@ -26,7 +26,13 @@
 #include <unordered_map>
 #include <fstream>
 #include <atomic>
+#if (_HAS_CXX17)
 #include <filesystem>
+#define GDUL_FS_PATH(arg) std::filesystem::path(arg)
+#else
+#include <experimental/filesystem>
+#define GDUL_FS_PATH(arg) std::experimental::filesystem::path(arg)
+#endif
 
 namespace gdul {
 namespace jh_detail {
@@ -72,7 +78,7 @@ job_tracker_node* job_tracker::register_full_node(constexpr_id id, const char * 
 			matriarchItr.first->second.m_parent = groupParent;
 			matriarchItr.first->second.set_node_type(job_tracker_node_matriarch);
 			std::string matriarchName;
-			matriarchName.append(std::filesystem::path(file).filename().string());
+			matriarchName.append(GDUL_FS_PATH(file).filename().string());
 			matriarchName.append("__L:_");
 			matriarchName.append(std::to_string(line));
 			matriarchName.append("__");

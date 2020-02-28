@@ -82,6 +82,7 @@ private:
 
 #if defined(GDUL_JOB_DEBUG)
 	job_tracker_node* m_trackingNode;
+	constexpr_id m_physicalId;
 #endif
 
 	delegate<void()> m_workUnit;

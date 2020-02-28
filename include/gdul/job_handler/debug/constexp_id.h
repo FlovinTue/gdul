@@ -23,6 +23,11 @@ struct constexpr_id
 	}
 	std::uint64_t value() const noexcept { return m_val; }
 
+	constexpr_id(const constexpr_id&) = default;
+	constexpr_id(constexpr_id&&) = default;
+	constexpr_id& operator=(const constexpr_id&) = default;
+	constexpr_id& operator=(constexpr_id&&) = default;
+
 private:
 	friend class jh_detail::job_tracker;
 

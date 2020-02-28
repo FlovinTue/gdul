@@ -41,6 +41,7 @@ job_impl::job_impl(delegate<void()>&& workUnit, job_handler_impl* handler)
 	, m_dependencies(Job_Max_Dependencies)
 #if defined (GDUL_JOB_DEBUG)
 	, m_trackingNode(nullptr)
+	, m_physicalId(constexpr_id::make<0>())
 #endif
 {
 }
@@ -54,7 +55,7 @@ void job_impl::operator()()
 
 #if defined (GDUL_JOB_DEBUG)
 	if (m_trackingNode)
-		job_handler::this_job.m_debugId = m_trackingNode->id();
+		job_handler::this_job.m_debugId = m_physicalId;
 
 	timer time;
 #endif
@@ -164,6 +165,7 @@ void job_impl::detach_children()
 #if defined(GDUL_JOB_DEBUG)
 constexpr_id job_impl::register_tracking_node(constexpr_id id, const char* name, const char* file, std::uint32_t line, jh_detail::job_tracker_node_type type)
 {
+	m_physicalId = id;
 	m_trackingNode = type != job_tracker_node_batch_sub ? job_tracker::register_full_node(id, name, file, line) : job_tracker::register_batch_sub_node(id, name);
 	return m_trackingNode->id();
 }
