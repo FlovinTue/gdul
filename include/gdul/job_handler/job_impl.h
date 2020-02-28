@@ -71,7 +71,7 @@ public:
 	bool is_enabled() const;
 
 #if defined(GDUL_JOB_DEBUG)
-	void register_tracking_node(constexpr_id id, const char* name, const char* file, std::uint32_t line);
+	constexpr_id register_tracking_node(constexpr_id id, const char* name, const char* file, std::uint32_t line);
 #endif
 
 	void work_until_finished(job_queue consumeFrom);

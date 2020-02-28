@@ -50,12 +50,11 @@ public:
 		const char* file,
 		uint32_t line) {
 
-		register_tracking_node(id, name, file, line);
-		m_debugId = id;
+		m_debugId = register_tracking_node(id, name, file, line);
 	}
 
 protected:
-	virtual void register_tracking_node(
+	virtual constexpr_id register_tracking_node(
 		constexpr_id id,
 		const char* name, 
 		const char* file, 

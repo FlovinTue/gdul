@@ -162,9 +162,10 @@ void job_impl::detach_children()
 	}
 }
 #if defined(GDUL_JOB_DEBUG)
-void job_impl::register_tracking_node(constexpr_id id, const char* name, const char* file, std::uint32_t line)
+constexpr_id job_impl::register_tracking_node(constexpr_id id, const char* name, const char* file, std::uint32_t line)
 {
-	m_trackingNode = job_tracker::register_job_node(id, name, file, line);
+	m_trackingNode = job_tracker::register_node(id, name, file, line);
+	return m_trackingNode->id();
 }
 #endif
 }

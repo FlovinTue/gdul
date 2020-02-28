@@ -46,7 +46,7 @@ public:
 
 thread_local std::string t_bufferString;
 
-job_tracker_node* job_tracker::register_job_node(constexpr_id id, const char * name, const char* file, std::uint32_t line)
+job_tracker_node* job_tracker::register_node(constexpr_id id, const char * name, const char* file, std::uint32_t line)
 {
 	t_bufferString = name;
 
@@ -63,13 +63,15 @@ job_tracker_node* job_tracker::register_job_node(constexpr_id id, const char * n
 	auto itr = g_trackerData.m_nodeMap.insert({ localId.value(), job_tracker_node() });
 	if (itr.second){
 		itr.first->second.m_id = localId;
-		itr.first->second.m_parent = groupMatriarch;
+		itr.first->second.m_matriarch = groupMatriarch;
+		itr.first->second.m_groupParent = groupParent;
 		itr.first->second.m_name = std::move(t_bufferString);
 
 		auto matriarchItr = g_trackerData.m_nodeMap.insert({ groupMatriarch.value(), job_tracker_node() });
 		if (matriarchItr.second){
 			matriarchItr.first->second.m_id = groupMatriarch;
-			matriarchItr.first->second.m_parent = groupParent;
+			matriarchItr.first->second.m_matriarch = groupMatriarch;
+			matriarchItr.first->second.m_groupParent = groupParent;
 			matriarchItr.first->second.set_node_type(job_tracker_node_matriarch);
 			std::string matriarchName;
 			matriarchName.append(std::filesystem::path(file).filename().string());
@@ -89,41 +91,12 @@ job_tracker_node* job_tracker::register_job_node(constexpr_id id, const char * n
 			auto groupParentItr = g_trackerData.m_nodeMap.insert({ groupParent.value(), job_tracker_node() });
 			if (groupParentItr.second){
 				groupParentItr.first->second.m_id = groupParent;
+				groupParentItr.first->second.m_matriarch = groupParent;
+				groupParentItr.first->second.m_groupParent = groupParent;
 				groupParentItr.first->second.set_node_type(job_tracker_node_matriarch);
 				groupParentItr.first->second.m_name = "Unknown_Group_Parent";
 				
 			}
-		}
-	}
-	return &itr.first->second;
-}
-job_tracker_node * job_tracker::register_batch_node(constexpr_id id, const char * name)
-{
-	t_bufferString = name;
-
-	if (t_bufferString.empty())
-	{
-		t_bufferString = "Unnamed";
-	}
-
-	const constexpr_id groupParent(job_handler::this_job.m_debugId);
-	const constexpr_id batchId(id.merge(groupParent));
-
-	auto itr = g_trackerData.m_nodeMap.insert({ batchId.value(), job_tracker_node() });
-	if (itr.second)
-	{
-		itr.first->second.m_id = batchId;
-		itr.first->second.m_parent = groupParent;
-		itr.first->second.m_name = std::move(t_bufferString);
-		itr.first->second.set_node_type(job_tracker_node_batch);
-
-		auto groupParentItr = g_trackerData.m_nodeMap.insert({ groupParent.value(), job_tracker_node() });
-		if (groupParentItr.second)
-		{
-			groupParentItr.first->second.m_id = groupParent;
-			groupParentItr.first->second.set_node_type(job_tracker_node_matriarch);
-			groupParentItr.first->second.m_name = "Unknown_Group_Parent";
-
 		}
 	}
 	return &itr.first->second;
@@ -144,7 +117,7 @@ void job_tracker::dump_job_tree(const char* location)
 
 	for (auto node : nodes){
 		if (node.get_node_type() == job_tracker_node_default){
-			++childCounter[node.parent().value()];
+			++childCounter[node.group_parent().value()];
 		}
 	}
 	
@@ -207,7 +180,7 @@ void write_node(const job_tracker_node& node, const std::unordered_map<std::uint
 
 	if (node.id().value() != 0){
 		t_bufferString.append(" Source=\"");
-		t_bufferString.append(std::to_string(node.parent().value()));
+		t_bufferString.append(std::to_string(node.group_parent().value()));
 		t_bufferString.append("\" Target = \"");
 		t_bufferString.append(std::to_string(node.id().value()));
 		t_bufferString.append("\"");

@@ -42,7 +42,7 @@ public:
 	virtual std::size_t get_output_size() const noexcept = 0;
 	virtual job_queue get_target_queue() const noexcept = 0;
 #if defined(GDUL_JOB_DEBUG)
-	virtual void register_tracking_node(constexpr_id, const char* name, const char* file, std::uint32_t line)  = 0;
+	virtual constexpr_id register_tracking_node(constexpr_id, const char* name, const char* file, std::uint32_t line)  = 0;
 #endif
 };
 }

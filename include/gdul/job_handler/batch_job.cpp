@@ -64,9 +64,9 @@ std::size_t batch_job::get_output_size() const noexcept
 	return m_impl->get_output_size();
 }
 #if defined(GDUL_JOB_DEBUG)
-void batch_job::register_tracking_node(constexpr_id id, const char * name, const char* file, std::uint32_t line)
+constexpr_id batch_job::register_tracking_node(constexpr_id id, const char * name, const char* file, std::uint32_t line)
 {
-	m_impl->register_tracking_node(id, name, file, line);
+	return m_impl->register_tracking_node(id, name, file, line);
 }
 #endif
 job & batch_job::get_endjob() noexcept

@@ -48,8 +48,7 @@ class job_tracker
 {
 public:
 #if defined (GDUL_JOB_DEBUG)
-	static job_tracker_node* register_job_node(constexpr_id id, const char * name, const char* file, std::uint32_t line);
-	static job_tracker_node* register_batch_node(constexpr_id id, const char * name);
+	static job_tracker_node* register_node(constexpr_id id, const char * name, const char* file, std::uint32_t line);
 
 	static void dump_job_tree(const char* location);
 #else
