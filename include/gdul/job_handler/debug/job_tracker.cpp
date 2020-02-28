@@ -97,7 +97,7 @@ job_tracker_node* job_tracker::register_full_node(constexpr_id id, const char * 
 	}
 	return &itr.first->second;
 }
-void job_tracker::register_batch_sub_node(constexpr_id id, const char * name)
+job_tracker_node* job_tracker::register_batch_sub_node(constexpr_id id, const char * name)
 {
 	t_bufferString = name;
 
@@ -107,17 +107,16 @@ void job_tracker::register_batch_sub_node(constexpr_id id, const char * name)
 	}
 
 	const constexpr_id variation(std::hash<std::string>{}(t_bufferString));
-
-	const constexpr_id groupMatriarch(id.merge(job_handler::this_job.m_debugId));
-	const constexpr_id localId(variation.merge(groupMatriarch));
+	const constexpr_id localId(variation.merge(id));
 
 	auto itr = g_trackerData.m_nodeMap.insert({ localId.value(), job_tracker_node() });
 	if (itr.second)
 	{
 		itr.first->second.m_id = localId;
-		itr.first->second.m_parent = groupMatriarch;
+		itr.first->second.m_parent = id;
 		itr.first->second.m_name = std::move(t_bufferString);
 	}
+	return &itr.first->second;
 }
 job_tracker_node * job_tracker::fetch_node(constexpr_id id)
 {
@@ -142,7 +141,8 @@ void job_tracker::dump_job_tree(const char* location)
 	std::unordered_map<std::uint64_t, std::size_t> childCounter;
 
 	for (auto node : nodes){
-		if (node.get_node_type() == job_tracker_node_default){
+		if (node.get_node_type() == job_tracker_node_default || 
+			node.get_node_type() == job_tracker_node_batch){
 			++childCounter[node.parent().value()];
 		}
 	}
@@ -188,7 +188,7 @@ void write_node(const job_tracker_node& node, const std::unordered_map<std::uint
 	if (nodeType == job_tracker_node_matriarch ||
 		nodeType == job_tracker_node_batch){
 		auto itr = childCounter.find(node.id().value());
-		if (itr != childCounter.end() && itr->second < 60)
+		if (itr != childCounter.end() && itr->second < 30)
 			t_bufferString.append(" Group=\"Expanded\"");
 		else
 			t_bufferString.append(" Group=\"Collapsed\"");

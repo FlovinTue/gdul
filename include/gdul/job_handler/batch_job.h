@@ -62,7 +62,7 @@ private:
 
 #if defined(GDUL_JOB_DEBUG)
 	friend class jh_detail::job_tracker;
-	constexpr_id register_tracking_node(constexpr_id id, const char* name, const char* file, std::uint32_t line) override final;
+	constexpr_id register_tracking_node(constexpr_id id, const char* name, const char* file, std::uint32_t line, jh_detail::job_tracker_node_type) override final;
 #endif
 
 	job& get_endjob() noexcept;

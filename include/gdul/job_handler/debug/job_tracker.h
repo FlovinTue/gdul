@@ -49,7 +49,7 @@ class job_tracker
 public:
 #if defined (GDUL_JOB_DEBUG)
 	static job_tracker_node* register_full_node(constexpr_id id, const char * name, const char* file, std::uint32_t line);
-	static void register_batch_sub_node(constexpr_id id, const char* name);
+	static job_tracker_node* register_batch_sub_node(constexpr_id id, const char* name);
 
 	static job_tracker_node* fetch_node(constexpr_id id);
 

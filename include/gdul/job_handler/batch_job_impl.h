@@ -427,8 +427,7 @@ inline constexpr_id batch_job_impl<InputContainer, OutputContainer, Process>::re
 {
 	const constexpr_id batchJobNodeId(((job_tracker_interface*)(&m_root))->register_tracking_node(id, name, file, line));
 	m_trackingNode = job_tracker::fetch_node(batchJobNodeId);
-	//m_trackingNode->set_node_type(job_tracker_node_batch);
-	//m_trackingNode->set_name(name);
+	m_trackingNode->set_node_type(job_tracker_node_batch);
 	return batchJobNodeId;
 }
 template<class InputContainer, class OutputContainer, class Process>
@@ -436,7 +435,7 @@ inline void batch_job_impl<InputContainer, OutputContainer, Process>::track_sub_
 {
 #if defined(GDUL_JOB_DEBUG)
 	if (m_trackingNode)
-		job_tracker::register_batch_sub_node(m_trackingNode->id(), name);
+		((job_tracker_interface*)(&job))->register_tracking_node(m_trackingNode->id(), name, "", 0, job_tracker_node_batch_sub);
 #endif
 }
 #endif
