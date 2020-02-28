@@ -21,6 +21,7 @@
 #include "job_tracker.h"
 
 #if defined (GDUL_JOB_DEBUG)
+#include <Windows.h>
 #include <concurrent_unordered_map.h>
 #include <gdul/job_handler/job_handler.h>
 #include <unordered_map>
@@ -33,6 +34,16 @@
 #include <experimental/filesystem>
 #define GDUL_FS_PATH(arg) std::experimental::filesystem::path(arg)
 #endif
+
+std::string executable_name() {
+	char buffer[256];
+	if (GetModuleFileNameA(NULL, buffer, 256)) {
+		const char* cstr(buffer);
+
+		return GDUL_FS_PATH(cstr).replace_extension().string();
+	}
+	return std::string("Unnamed");
+}
 
 namespace gdul {
 namespace jh_detail {
@@ -135,7 +146,7 @@ job_tracker_node * job_tracker::fetch_node(constexpr_id id)
 void job_tracker::dump_job_tree(const char* location)
 {
 	const std::string folder(location);
-	const std::string programName("myprogram");
+	const std::string programName(executable_name());
 	const std::string outputFile(folder + programName + "_" + "job_graph.dgml");
 
 	std::vector<job_tracker_node> nodes;
