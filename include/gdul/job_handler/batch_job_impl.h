@@ -329,7 +329,6 @@ inline void batch_job_impl<InputContainer, OutputContainer, Process>::make_jobs(
 #if defined(GDUL_JOB_DEBUG)
 		track_sub_job(nextProcessJob, "batch_job_process");
 #endif
-
 		if (i < (m_batchCount - 1)) {
 			job nextPackJob(make_work_slice(&batch_job_impl::work_pack, i));
 #if defined(GDUL_JOB_DEBUG)
@@ -426,12 +425,19 @@ inline void batch_job_impl<InputContainer, OutputContainer, Process>::finalize()
 template<class InputContainer, class OutputContainer, class Process>
 inline constexpr_id batch_job_impl<InputContainer, OutputContainer, Process>::register_tracking_node(constexpr_id id, const char* name, const char* file, std::uint32_t line)
 {
-	return ((job_tracker_interface*)(&m_root))->register_tracking_node(id, name, file, line);
+	const constexpr_id batchJobNodeId(((job_tracker_interface*)(&m_root))->register_tracking_node(id, name, file, line));
+	m_trackingNode = job_tracker::fetch_node(batchJobNodeId);
+	//m_trackingNode->set_node_type(job_tracker_node_batch);
+	//m_trackingNode->set_name(name);
+	return batchJobNodeId;
 }
 template<class InputContainer, class OutputContainer, class Process>
 inline void batch_job_impl<InputContainer, OutputContainer, Process>::track_sub_job(job & job, const char * name)
 {
-	((job_tracker_interface*)(&job))->register_tracking_node(m_root.m_debugId, name, "", 0);
+#if defined(GDUL_JOB_DEBUG)
+	if (m_trackingNode)
+		job_tracker::register_batch_sub_node(m_trackingNode->id(), name);
+#endif
 }
 #endif
 struct dummy_container{using value_type = int;};

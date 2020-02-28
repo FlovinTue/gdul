@@ -22,8 +22,7 @@ struct job_tracker_node
 	job_tracker_node();
 
 	constexpr_id id() const;
-	constexpr_id group_parent() const;
-	constexpr_id group_matriarch() const;
+	constexpr_id parent() const;
 
 	void add_completion_time(float time);
 
@@ -45,8 +44,7 @@ private:
 	std::string m_name;
 
 	constexpr_id m_id;
-	constexpr_id m_groupParent;
-	constexpr_id m_matriarch;
+	constexpr_id m_parent;
 
 	std::size_t m_completedCount;
 

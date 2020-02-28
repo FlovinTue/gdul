@@ -76,8 +76,8 @@ worker_impl::worker_impl(std::thread&& thrd, allocator_type allocator)
 
 worker_impl::~worker_impl()
 {
-	if (m_thread.get_id() == std::thread().get_id()) {
-		CloseHandle(m_threadHandle);
+	if (m_thread.get_id() == std::thread().get_id() && m_threadHandle) {
+		jh_detail::close_thread_handle(m_threadHandle);
 		m_threadHandle = nullptr;
 	}
 

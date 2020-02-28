@@ -10,8 +10,7 @@ namespace jh_detail
 {
 job_tracker_node::job_tracker_node()
 	: m_id(constexpr_id::make<0>())
-	, m_groupParent(constexpr_id::make<0>())
-	, m_matriarch(constexpr_id::make<0>())
+	, m_parent(constexpr_id::make<0>())
 	, m_completedCount(0)
 	, m_minTime(0.f)
 	, m_avgTime(0.f)
@@ -23,13 +22,9 @@ constexpr_id job_tracker_node::id() const
 {
 	return m_id;
 }
-constexpr_id job_tracker_node::group_parent() const
+constexpr_id job_tracker_node::parent() const
 {
-	return m_groupParent;
-}
-constexpr_id job_tracker_node::group_matriarch() const
-{
-	return m_matriarch;
+	return m_parent;
 }
 void job_tracker_node::add_completion_time(float time)
 {

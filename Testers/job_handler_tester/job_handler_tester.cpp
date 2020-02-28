@@ -119,7 +119,7 @@ float job_handler_tester::run_consumption_strand_parallel_test(std::size_t jobs,
 		{
 			intermediate[j] = m_handler.make_job(gdul::delegate<void()>(&work_tracker::main_work, &m_work));
 			intermediate[j].set_target_queue((gdul::job_queue((j + i) % gdul::job_queue_count)));
-			intermediate[j].activate_debug_tracking(std::string("strand parallel intermediate# " + std::to_string(i)).c_str());
+			intermediate[j].activate_debug_tracking(std::string("strand parallel intermediate").c_str());
 			end.add_dependency(intermediate[j]);
 
 			for (std::uint8_t dependencies = 0; dependencies < nextNum; ++dependencies)

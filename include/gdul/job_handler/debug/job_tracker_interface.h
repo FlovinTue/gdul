@@ -37,6 +37,7 @@ public:
 	void activate_debug_tracking(const char* name) {
 		(void)name;
 	}
+
 #if defined(GDUL_JOB_DEBUG)
 	job_tracker_interface()
 		: m_debugId(constexpr_id::make<0>())

@@ -46,7 +46,7 @@ public:
 
 thread_local std::string t_bufferString;
 
-job_tracker_node* job_tracker::register_node(constexpr_id id, const char * name, const char* file, std::uint32_t line)
+job_tracker_node* job_tracker::register_full_node(constexpr_id id, const char * name, const char* file, std::uint32_t line)
 {
 	t_bufferString = name;
 
@@ -63,15 +63,13 @@ job_tracker_node* job_tracker::register_node(constexpr_id id, const char * name,
 	auto itr = g_trackerData.m_nodeMap.insert({ localId.value(), job_tracker_node() });
 	if (itr.second){
 		itr.first->second.m_id = localId;
-		itr.first->second.m_matriarch = groupMatriarch;
-		itr.first->second.m_groupParent = groupParent;
+		itr.first->second.m_parent = groupMatriarch;
 		itr.first->second.m_name = std::move(t_bufferString);
 
 		auto matriarchItr = g_trackerData.m_nodeMap.insert({ groupMatriarch.value(), job_tracker_node() });
 		if (matriarchItr.second){
 			matriarchItr.first->second.m_id = groupMatriarch;
-			matriarchItr.first->second.m_matriarch = groupMatriarch;
-			matriarchItr.first->second.m_groupParent = groupParent;
+			matriarchItr.first->second.m_parent = groupParent;
 			matriarchItr.first->second.set_node_type(job_tracker_node_matriarch);
 			std::string matriarchName;
 			matriarchName.append(std::filesystem::path(file).filename().string());
@@ -91,8 +89,6 @@ job_tracker_node* job_tracker::register_node(constexpr_id id, const char * name,
 			auto groupParentItr = g_trackerData.m_nodeMap.insert({ groupParent.value(), job_tracker_node() });
 			if (groupParentItr.second){
 				groupParentItr.first->second.m_id = groupParent;
-				groupParentItr.first->second.m_matriarch = groupParent;
-				groupParentItr.first->second.m_groupParent = groupParent;
 				groupParentItr.first->second.set_node_type(job_tracker_node_matriarch);
 				groupParentItr.first->second.m_name = "Unknown_Group_Parent";
 				
@@ -100,6 +96,36 @@ job_tracker_node* job_tracker::register_node(constexpr_id id, const char * name,
 		}
 	}
 	return &itr.first->second;
+}
+void job_tracker::register_batch_sub_node(constexpr_id id, const char * name)
+{
+	t_bufferString = name;
+
+	if (t_bufferString.empty())
+	{
+		t_bufferString = "Unnamed";
+	}
+
+	const constexpr_id variation(std::hash<std::string>{}(t_bufferString));
+
+	const constexpr_id groupMatriarch(id.merge(job_handler::this_job.m_debugId));
+	const constexpr_id localId(variation.merge(groupMatriarch));
+
+	auto itr = g_trackerData.m_nodeMap.insert({ localId.value(), job_tracker_node() });
+	if (itr.second)
+	{
+		itr.first->second.m_id = localId;
+		itr.first->second.m_parent = groupMatriarch;
+		itr.first->second.m_name = std::move(t_bufferString);
+	}
+}
+job_tracker_node * job_tracker::fetch_node(constexpr_id id)
+{
+	auto itr = g_trackerData.m_nodeMap.find(id.value());
+	if (itr != g_trackerData.m_nodeMap.end())
+		return &itr->second;
+
+	return nullptr;
 }
 void job_tracker::dump_job_tree(const char* location)
 {
@@ -117,7 +143,7 @@ void job_tracker::dump_job_tree(const char* location)
 
 	for (auto node : nodes){
 		if (node.get_node_type() == job_tracker_node_default){
-			++childCounter[node.group_parent().value()];
+			++childCounter[node.parent().value()];
 		}
 	}
 	
@@ -157,7 +183,10 @@ void write_node(const job_tracker_node& node, const std::unordered_map<std::uint
 	t_bufferString.append(node.name());
 	t_bufferString.append("\"");
 
-	if (node.get_node_type() == job_tracker_node_matriarch){
+	auto nodeType = node.get_node_type();
+
+	if (nodeType == job_tracker_node_matriarch ||
+		nodeType == job_tracker_node_batch){
 		auto itr = childCounter.find(node.id().value());
 		if (itr != childCounter.end() && itr->second < 60)
 			t_bufferString.append(" Group=\"Expanded\"");
@@ -173,14 +202,14 @@ void write_node(const job_tracker_node& node, const std::unordered_map<std::uint
 	t_bufferString.clear();
 	t_bufferString.append("<Link");
 
-	if (node.get_node_type() == job_tracker_node_default ||
-		node.get_node_type() == job_tracker_node_batch){
+	if (nodeType == job_tracker_node_default ||
+		nodeType == job_tracker_node_batch){
 		t_bufferString.append(" Category=\"Contains\"");
 	}
 
 	if (node.id().value() != 0){
 		t_bufferString.append(" Source=\"");
-		t_bufferString.append(std::to_string(node.group_parent().value()));
+		t_bufferString.append(std::to_string(node.parent().value()));
 		t_bufferString.append("\" Target = \"");
 		t_bufferString.append(std::to_string(node.id().value()));
 		t_bufferString.append("\"");

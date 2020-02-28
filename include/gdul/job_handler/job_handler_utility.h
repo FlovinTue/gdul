@@ -80,6 +80,7 @@ void set_thread_name(const char* name, thread_handle handle);
 void set_thread_priority(std::int32_t priority, thread_handle handle);
 void set_thread_core_affinity(std::uint8_t core, thread_handle handle);
 thread_handle create_thread_handle();
+void close_thread_handle(thread_handle handle);
 
 #if defined(GDUL_JOB_DEBUG)
 class timer
