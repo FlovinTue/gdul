@@ -54,15 +54,20 @@ void job_impl::operator()()
 	assert(!m_finished);
 
 #if defined (GDUL_JOB_DEBUG)
+	const constexpr_id swap(job_handler::this_job.m_physicalId);
 	if (m_trackingNode)
-		job_handler::this_job.m_debugId = m_physicalId;
+		job_handler::this_job.m_physicalId = m_physicalId;
 
 	timer time;
 #endif
+
 	m_workUnit();
+
 #if defined(GDUL_JOB_DEBUG)
 	if (m_trackingNode)
 		m_trackingNode->add_completion_time(time.get());
+
+	job_handler::this_job.m_physicalId = swap;
 #endif
 
 	m_finished.store(true, std::memory_order_seq_cst);

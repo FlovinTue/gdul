@@ -2,8 +2,6 @@
 
 #if defined(GDUL_JOB_DEBUG)
 
-#include <algorithm>
-
 namespace gdul
 {
 namespace jh_detail
@@ -29,8 +27,8 @@ constexpr_id job_tracker_node::parent() const
 void job_tracker_node::add_completion_time(float time)
 {
 	++m_completedCount;
-	m_minTime = std::min(m_minTime, time);
-	m_maxTime = std::max(m_maxTime, time);
+	m_minTime = time < m_minTime ? time : m_minTime;
+	m_maxTime = m_maxTime < time ? time : m_maxTime;
 	m_avgTime += time;
 }
 

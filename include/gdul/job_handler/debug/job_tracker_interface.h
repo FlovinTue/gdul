@@ -40,7 +40,7 @@ public:
 
 #if defined(GDUL_JOB_DEBUG)
 	job_tracker_interface()
-		: m_debugId(constexpr_id::make<0>())
+		: m_physicalId(constexpr_id::make<0>())
 	{}
 
 	virtual ~job_tracker_interface() {}
@@ -51,7 +51,7 @@ public:
 		const char* file,
 		uint32_t line) {
 
-		m_debugId = register_tracking_node(id, name, file, line);
+		m_physicalId = register_tracking_node(id, name, file, line);
 	}
 
 protected:
@@ -68,7 +68,7 @@ private:
 	template <class InputContainer, class OutputContainer, class Process>
 	friend class batch_job_impl;
 
-	constexpr_id m_debugId;
+	constexpr_id m_physicalId;
 #endif
 };
 }
