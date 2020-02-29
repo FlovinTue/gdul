@@ -435,7 +435,7 @@ inline void batch_job_impl<InputContainer, OutputContainer, Process>::track_sub_
 {
 #if defined(GDUL_JOB_DEBUG)
 	if (m_trackingNode)
-		((job_tracker_interface*)(&job))->register_tracking_node(m_trackingNode->id(), name, "", 0, job_tracker_node_batch_sub);
+		((job_tracker_interface*)(&job))->register_tracking_node(m_trackingNode->id(), name, "", 0, true);
 #endif
 }
 #endif

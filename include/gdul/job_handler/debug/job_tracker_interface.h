@@ -57,10 +57,9 @@ public:
 protected:
 	virtual constexpr_id register_tracking_node(
 		constexpr_id id,
-		const char* name, 
-		const char* file, 
-		std::uint32_t line, 
-		jh_detail::job_tracker_node_type type = jh_detail::job_tracker_node_default) = 0;
+		const char* name,
+		const char* file,
+		std::uint32_t line, bool batchSub = false) = 0;
 
 private:
 	friend class job_tracker;
