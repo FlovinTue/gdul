@@ -67,7 +67,6 @@
 #endif
 
 #define GDUL_CQ_PADDING(bytes) const std::uint8_t MAKE_UNIQUE_NAME(trash)[bytes] {}
-#define GDUL_CACHELINE_SIZE 64u
 
 // For anonymous struct and alignas
 #pragma warning(push, 2)
@@ -249,14 +248,14 @@ inline void concurrent_queue_fifo<T, Allocator>::push_internal(Arg&& ...in)
 template<class T, class Allocator>
 bool concurrent_queue_fifo<T, Allocator>::try_pop(T& out)
 {
-	while (!this_consumer_cached()->try_pop(out)){
-		if (this_consumer_cached()->is_valid()){
-			if (!refresh_consumer()){
+	while (!this_consumer_cached()->try_pop(out)) {
+		if (this_consumer_cached()->is_valid()) {
+			if (!refresh_consumer()) {
 				return false;
 			}
 		}
-		else{
-			if (!initialize_consumer()){
+		else {
+			if (!initialize_consumer()) {
 				return false;
 			}
 		}
@@ -302,13 +301,11 @@ inline void concurrent_queue_fifo<T, Allocator>::unsafe_clear()
 
 	buffer_type* const active(m_itemBuffer.unsafe_get());
 
-	if (active->is_valid())
-	{
+	if (active->is_valid()){
 		active->unsafe_clear();
 
 		shared_ptr_buffer_type front(active->find_front());
-		if (front)
-		{
+		if (front) {
 			m_itemBuffer.unsafe_store(std::move(front), std::memory_order_relaxed);
 		}
 	}
@@ -598,12 +595,11 @@ private:
 	template <class U = T, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) && !GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)> * = nullptr>
 	inline void write_out(size_type slot, U& out);
 
-	inline void try_publish_changes(size_type untilAt, std::atomic<size_t>& publishVar);
-
-
 	std::atomic<size_type> m_preReadSync;
 	GDUL_CQ_PADDING(64);
-	std::atomic<size_type> m_readAt;
+
+	GDUL_ATOMIC_WITH_VIEW(size_type, m_readAt);
+
 	GDUL_CQ_PADDING(64);
 
 	std::atomic<size_type> m_writeAt;
@@ -645,18 +641,18 @@ inline item_buffer<T, Allocator>::~item_buffer()
 template<class T, class Allocator>
 inline bool item_buffer<T, Allocator>::is_active() const
 {
-	if (!m_next){
+	if (!m_next) {
 		return true;
 	}
 
 	const size_type written(m_written.load(std::memory_order_acquire));
 
-	if (written != m_capacity){
+	if (written != m_capacity) {
 		return true;
 	}
 
 	const size_type read(m_readAt.load(std::memory_order_relaxed));
-	if (read != written){
+	if (read != written) {
 		return true;
 	}
 
@@ -699,8 +695,8 @@ inline typename item_buffer<T, Allocator>::shared_ptr_buffer_type item_buffer<T,
 	shared_ptr_buffer_type back(nullptr);
 	item_buffer<T, allocator_type>* inspect(this);
 
-	do{
-		if (inspect->is_active()){
+	do {
+		if (inspect->is_active()) {
 			break;
 		}
 		back = inspect->m_next.load(std::memory_order_seq_cst);
@@ -735,11 +731,11 @@ inline bool item_buffer<T, Allocator>::try_push_front(shared_ptr_buffer_type new
 {
 	item_buffer<T, allocator_type>* last(this);
 
-	while (last->m_next){
+	while (last->m_next) {
 		last = last->m_next.unsafe_get();
 	}
 
-	if (last->m_writeAt.load(std::memory_order_relaxed) < m_capacity){
+	if (last->m_writeAt.load(std::memory_order_relaxed) < m_capacity) {
 		return false;
 	}
 
@@ -772,12 +768,12 @@ inline void item_buffer<T, Allocator>::unsafe_clear()
 template<class T, class Allocator>
 inline void item_buffer<T, Allocator>::block_writers()
 {
-	m_writeAt.store(m_capacity, std::memory_order_release);
+	m_writeAt.store(m_capacity, std::memory_order_relaxed);
 }
 template<class T, class Allocator>
 inline void item_buffer<T, Allocator>::block_readers()
 {
-	m_readAt.store(m_capacity + std::numeric_limits<std::uint16_t>::max(), std::memory_order_release);
+	m_readAt.store(m_capacity + std::numeric_limits<std::uint16_t>::max(), std::memory_order_relaxed);
 }
 template<class T, class Allocator>
 template<class ...Arg>
@@ -785,60 +781,41 @@ inline bool item_buffer<T, Allocator>::try_push(Arg&& ...in)
 {
 	const size_type at(m_writeAt.fetch_add(1, std::memory_order_relaxed));
 
-	if (!(at < m_capacity)){
+	if (!(at < m_capacity)) {
 		return false;
 	}
 
-	const size_type atLocal(at % m_capacity);
+	write_in(at, std::forward<Arg>(in)...);
 
-	write_in(atLocal, std::forward<Arg>(in)...);
-
-	const size_type postSync(m_postWriteSync.fetch_add(1, std::memory_order_release));
+	const size_type postSync(m_postWriteSync.fetch_add(1, std::memory_order_acq_rel));
 	const size_type postAt(m_writeAt.load(std::memory_order_relaxed));
-	if ((postSync + 1) == postAt)
-		while (postAt < m_written.exchange(postAt, std::memory_order_relaxed));
-		
-
-	//const size_type postSync(m_postWriteSync.fetch_add(1, std::memory_order_release));
-	//const size_type postAt(m_writeAt.load(std::memory_order_relaxed));
-
-	//if ((postSync + 1) == postAt){
-	//	try_publish_changes(postAt, m_written);
-	//}
+	if ((postSync + 1) == postAt) {
+		size_type xchg(postAt);
+		size_type target(0);
+		do {
+			target = xchg;
+			xchg = m_written.exchange(target, std::memory_order_release);
+		} while (target < xchg);
+	}
 
 	return true;
 }
 template<class T, class Allocator>
 inline bool item_buffer<T, Allocator>::try_pop(T& out)
 {
-	const size_type written(m_written.load(std::memory_order_relaxed));
-	const size_type reserve(m_preReadSync.fetch_add(1, std::memory_order_relaxed));
-	const size_type avaliable(written - reserve);
+	const size_type written(m_written.load(std::memory_order_acquire));
+	const size_type preReadSync(m_preReadSync.fetch_add(1, std::memory_order_relaxed));
 
-	if (!((avaliable - 1) < m_capacity))
-	{
+	if (!(preReadSync < written)) {
 		m_preReadSync.fetch_sub(1, std::memory_order_relaxed);
 		return false;
 	}
 
 	const size_type at(m_readAt.fetch_add(1, std::memory_order_relaxed));
-	const size_type atLocal(at % m_capacity);
 
-	write_out(atLocal, out);
+	write_out(at, out);
 
 	return true;
-}
-template<class T, class Allocator>
-inline void item_buffer<T, Allocator>::try_publish_changes(size_type untilAt, std::atomic<size_t>& publishVar)
-{
-	size_type expected(publishVar.load(std::memory_order_relaxed));
-	const size_type desired(untilAt);
-	do{
-		if (!(expected < untilAt)){
-			break;
-		}
-
-	} while (!publishVar.compare_exchange_strong(expected, desired, std::memory_order_release, std::memory_order_relaxed));
 }
 template <class T, class Allocator>
 template <class U, std::enable_if_t<GDUL_CQ_BUFFER_NOTHROW_PUSH_MOVE(U)>*>
