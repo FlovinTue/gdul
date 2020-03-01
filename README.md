@@ -71,7 +71,7 @@ Job tracking instructions:
 - if making a msvc debug build, override /ZI (edit-and-continue) with /Zi to make sure __ LINE__ macro is seen as a compile time constant
 - dump job graph using job_tracker::dump_job_tree(location)
 
-A quick usage example:
+A quick usage example for job:
 ```
 #include <iostream>
 #include <thread>
