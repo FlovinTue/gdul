@@ -63,12 +63,13 @@ Main features would be:
 * Supports (multiple) job dependencies. (if job 'first' depends on job 'second' then 'first' will not be enqueued for consumption until 'second' has completed) 
 * Keeps multiple internal job queues (defined in gdul::jh_detail::Num_Job_Queues), with workers consuming from the further-back queues less frequently
 * Has three types of batch_job (splits an array of items combined with a processing delegate over multiple jobs). 
-* Job tree may be dumped into a dgml file
+* Job spawn graph may be dumped to file for viewing
 
-To enable job tracking: 
+Job tracking instructions: 
 - make sure GDUL_JOB_DEBUG is defined in globals.h
 - for each job taking part in the tracking, call activate_job_tracking(name)
 - if making a msvc debug build, override /ZI (edit-and-continue) with /Zi to make sure __ LINE__ macro is seen as a compile time constant
+- dump job graph using job_tracker::dump_job_tree(location)
 
 A quick usage example:
 ```
