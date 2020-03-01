@@ -55,7 +55,7 @@ public:
 
 	static void dump_job_tree(const char* location);
 #else
-	static void dump_job_tree(const char* /*dummy*/) {};
+	static void dump_job_tree(const char*) {};
 #endif
 };
 }
