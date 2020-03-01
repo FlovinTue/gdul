@@ -84,6 +84,7 @@ private:
 	void launch_worker(std::uint16_t index) noexcept;
 
 	void work();
+	void consume_job(job&& jb);
 
 	job_impl_shared_ptr fetch_job();
 
@@ -91,7 +92,7 @@ private:
 
 	concurrent_object_pool<job_impl_chunk_rep, allocator_type> m_jobImplChunkPool;
 	concurrent_object_pool<job_node_chunk_rep, allocator_type> m_jobNodeChunkPool;
-	concurrent_object_pool<batch_job_chunk_rep, allocator_type> m_scatterJobChunkPool;
+	concurrent_object_pool<batch_job_chunk_rep, allocator_type> m_batchJobChunkPool;
 
 	concurrent_queue<job_impl_shared_ptr, allocator_type> m_jobQueues[job_queue_count];
 

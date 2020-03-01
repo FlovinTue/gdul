@@ -22,11 +22,16 @@
 #pragma warning(push)
 #pragma warning(disable : 4324)
 
+
 #include <gdul/job_handler/job_handler_utility.h>
 #include <gdul/job_handler/chunk_allocator.h>
 #include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
 #include <gdul/job_handler/job_node.h>
 #include <gdul/delegate/delegate.h>
+
+#if defined(GDUL_JOB_DEBUG)
+#include <gdul/job_handler/debug/job_tracker.h>
+#endif
 
 namespace gdul{
 
@@ -52,9 +57,6 @@ public:
 
 	bool try_attach_child(job_impl_shared_ptr child);
 
-	void set_name(const char* name);
-	const char* get_name() const;
-
 	job_queue get_target_queue() const noexcept;
 	void set_target_queue(job_queue target) noexcept;
 
@@ -68,7 +70,9 @@ public:
 	bool is_finished() const;
 	bool is_enabled() const;
 
-	float get_time() const noexcept;
+#if defined(GDUL_JOB_DEBUG)
+	constexpr_id register_tracking_node(constexpr_id id, const char* name, const char* file, std::uint32_t line, bool batchSub);
+#endif
 
 	void work_until_finished(job_queue consumeFrom);
 	void wait_until_finished() noexcept;
@@ -76,9 +80,9 @@ private:
 
 	void detach_children();
 
-#if defined(GDUL_DEBUG)
-	std::string m_name;
-	float m_time;
+#if defined(GDUL_JOB_DEBUG)
+	job_tracker_node* m_trackingNode;
+	constexpr_id m_physicalId;
 #endif
 
 	delegate<void()> m_workUnit;

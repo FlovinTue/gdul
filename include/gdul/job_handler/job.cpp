@@ -51,14 +51,6 @@ job & job::operator=(const job & other) noexcept
 	m_impl = other.m_impl;
 	return *this;
 }
-void job::set_name(const char* name)
-{
-	m_impl->set_name(name);
-}
-const char* job::get_name() const
-{
-	return m_impl->get_name();
-}
 void job::add_dependency(job & dependency)
 {
 	assert(m_impl && "Job not set");
@@ -116,8 +108,10 @@ job::operator bool() const noexcept
 {
 	return m_impl;
 }
-float job::get_time() const noexcept
+#if defined(GDUL_JOB_DEBUG)
+constexpr_id job::register_tracking_node(constexpr_id id, const char* name, const char* file, std::uint32_t line, bool batchSub)
 {
-	return m_impl->get_time();
+	return m_impl->register_tracking_node(id, name, file, line, batchSub);
 }
+#endif
 }

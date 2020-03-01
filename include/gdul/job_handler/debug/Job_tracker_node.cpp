@@ -18,61 +18,75 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <gdul/job_handler/worker.h>
-#include <gdul/job_handler/worker_impl.h>
-#include <gdul/job_handler/chunk_allocator.h>
+#include "Job_tracker_node.h"
+
+#if defined(GDUL_JOB_DEBUG)
 
 namespace gdul
 {
-worker::worker(jh_detail::worker_impl * impl)
-	: m_impl(impl)
+namespace jh_detail
 {
+job_tracker_node::job_tracker_node()
+	: m_id(constexpr_id::make<0>())
+	, m_parent(constexpr_id::make<0>())
+	, m_completedCount(0)
+	, m_minTime(0.f)
+	, m_avgTime(0.f)
+	, m_maxTime(0.f)
+	, m_type(job_tracker_node_default)
+{
+}
+constexpr_id job_tracker_node::id() const
+{
+	return m_id;
+}
+constexpr_id job_tracker_node::parent() const
+{
+	return m_parent;
+}
+void job_tracker_node::add_completion_time(float time)
+{
+	++m_completedCount;
+	m_minTime = time < m_minTime ? time : m_minTime;
+	m_maxTime = m_maxTime < time ? time : m_maxTime;
+	m_avgTime += time;
 }
 
-worker::~worker()
+float job_tracker_node::min_time() const
 {
+	return m_minTime;
 }
 
-void worker::set_core_affinity(std::uint8_t core)
+float job_tracker_node::max_time() const
 {
-	m_impl->set_core_affinity(core);
+	return m_maxTime;
 }
 
-void worker::set_execution_priority(std::int32_t priority)
+float job_tracker_node::avg_time() const
 {
-	m_impl->set_execution_priority(priority);
+	return m_avgTime / m_completedCount;
 }
 
-void worker::set_name(const std::string& name)
+std::size_t job_tracker_node::completed_count() const
 {
-	m_impl->set_name(name);
+	return m_completedCount;
 }
-void worker::enable()
+
+void job_tracker_node::set_node_type(job_tracker_node_type type)
 {
-	m_impl->enable();
+	m_type = type;
 }
-bool worker::disable()
+
+job_tracker_node_type job_tracker_node::get_node_type() const
 {
-	return m_impl->disable();
+	return m_type;
 }
-void worker::set_run_on_enable(delegate<void()> toCall)
+
+const std::string & job_tracker_node::name() const
 {
-	m_impl->set_run_on_enable(std::move(toCall));
+	return m_name;
 }
-void worker::set_run_on_disable(delegate<void()> toCall)
-{
-	m_impl->set_run_on_disable(std::move(toCall));
-}
-void worker::set_queue_consume_first(job_queue firstQueue) noexcept
-{
-	m_impl->set_queue_consume_first(firstQueue);
-}
-void worker::set_queue_consume_last(job_queue lastQueue) noexcept
-{
-	m_impl->set_queue_consume_last(lastQueue);
-}
-bool worker::is_active() const
-{
-	return m_impl->is_active();
+
 }
 }
+#endif

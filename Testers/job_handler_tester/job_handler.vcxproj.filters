@@ -37,6 +37,12 @@
     <ClCompile Include="..\..\include\gdul\job_handler\job_handler_utility.cpp">
       <Filter>implementation</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\include\gdul\job_handler\debug\job_tracker.cpp">
+      <Filter>implementation\debug</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\gdul\job_handler\debug\Job_tracker_node.cpp">
+      <Filter>implementation\debug</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="job_handler_tester.h">
@@ -75,9 +81,6 @@
     <ClInclude Include="..\..\include\gdul\job_handler\job_impl.h">
       <Filter>implementation\job</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\gdul\job_handler\batch_job_interface.h">
-      <Filter>implementation\job</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\include\gdul\job_handler\job_handler_utility.h">
       <Filter>implementation</Filter>
     </ClInclude>
@@ -86,6 +89,21 @@
     </ClInclude>
     <ClInclude Include="..\..\include\gdul\job_handler\globals.h">
       <Filter>implementation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\gdul\job_handler\batch_job_impl_interface.h">
+      <Filter>implementation\job</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\gdul\job_handler\debug\job_tracker_interface.h">
+      <Filter>implementation\debug</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\gdul\job_handler\debug\Job_tracker_node.h">
+      <Filter>implementation\debug</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\gdul\job_handler\debug\constexp_id.h">
+      <Filter>implementation\debug</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\gdul\job_handler\debug\job_tracker.h">
+      <Filter>implementation\debug</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -97,6 +115,9 @@
     </Filter>
     <Filter Include="implementation\job">
       <UniqueIdentifier>{cf04a2ad-34fa-478a-bb28-32ccea96627f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="implementation\debug">
+      <UniqueIdentifier>{73a691c6-45d3-4c01-ab25-77747465520a}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

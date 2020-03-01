@@ -1,4 +1,4 @@
-// Copyright(c) 2019 Flovin Michaelsen
+// Copyright(c) 2020 Flovin Michaelsen
 // 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files(the "Software"), to deal
@@ -20,38 +20,43 @@
 
 #pragma once
 
-#include <cstdint>
-#include <cstddef>
-#include <type_traits>
+#include <gdul/job_handler/globals.h>
 
-// Define to enable some debug features
-#define GDUL_JOB_DEBUG
+#if defined (GDUL_JOB_DEBUG)
 
-namespace gdul
+#include <gdul/job_handler/debug/job_tracker_node.h>
+
+// https://stackoverflow.com/questions/48896142/is-it-possible-to-get-hash-values-as-compile-time-constants
+template <typename Str>
+constexpr std::size_t constexp_str_hash(const Str& toHash)
 {
+	std::size_t result = 0xcbf29ce484222325ull; 
 
-enum job_queue : std::uint8_t
+	for (char c : toHash) {
+		result ^= c;
+		result *= 1099511628211ull;
+	}
+
+	return result;
+}
+#endif
+
+namespace gdul {
+namespace jh_detail {
+
+class job_tracker
 {
-	job_queue_1,
-	job_queue_2,
-	job_queue_3,
+public:
+#if defined (GDUL_JOB_DEBUG)
+	static job_tracker_node* register_full_node(constexpr_id id, const char * name, const char* file, std::uint32_t line);
+	static job_tracker_node* register_batch_sub_node(constexpr_id id, const char* name);
 
-	// Leave in place
-	job_queue_count,
+	static job_tracker_node* fetch_node(constexpr_id id);
+
+	static void dump_job_tree(const char* location);
+#else
+	static void dump_job_tree(const char*) {};
+#endif
 };
-
-namespace jh_detail
-{
-constexpr job_queue Default_Job_Queue = job_queue(0);
-
-constexpr std::uint16_t Job_Handler_Max_Workers = 32;
-
-// Batch job will clamp batchSize so that this value is not exceeded
-constexpr std::uint16_t Batch_Job_Max_Batches = 128;
-
-// The number of chunks allocated per chunk block
-constexpr std::size_t Job_Impl_Allocator_Block_Size = 1024;
-// The number of chunks allocated per chunk block
-constexpr std::size_t Batch_Job_Allocator_Block_Size = 8;
 }
 }

@@ -1,4 +1,4 @@
-// Copyright(c) 2019 Flovin Michaelsen
+// Copyright(c) 2020 Flovin Michaelsen
 // 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files(the "Software"), to deal
@@ -20,38 +20,44 @@
 
 #pragma once
 
-#include <cstdint>
-#include <cstddef>
-#include <type_traits>
+#include <gdul/job_handler/globals.h>
 
-// Define to enable some debug features
-#define GDUL_JOB_DEBUG
-
+#if defined(GDUL_JOB_DEBUG)
 namespace gdul
 {
-
-enum job_queue : std::uint8_t
-{
-	job_queue_1,
-	job_queue_2,
-	job_queue_3,
-
-	// Leave in place
-	job_queue_count,
-};
-
 namespace jh_detail
 {
-constexpr job_queue Default_Job_Queue = job_queue(0);
-
-constexpr std::uint16_t Job_Handler_Max_Workers = 32;
-
-// Batch job will clamp batchSize so that this value is not exceeded
-constexpr std::uint16_t Batch_Job_Max_Batches = 128;
-
-// The number of chunks allocated per chunk block
-constexpr std::size_t Job_Impl_Allocator_Block_Size = 1024;
-// The number of chunks allocated per chunk block
-constexpr std::size_t Batch_Job_Allocator_Block_Size = 8;
+class job_tracker;
 }
+struct constexpr_id
+{
+	template <std::uint64_t Id>
+	static constexpr constexpr_id make()
+	{
+		return constexpr_id(Id);
+	}
+
+	constexpr_id merge(const constexpr_id& other) const
+	{
+		return constexpr_id(m_val + other.m_val);
+	}
+	std::uint64_t value() const noexcept { return m_val; }
+
+	constexpr_id(const constexpr_id&) = default;
+	constexpr_id(constexpr_id&&) = default;
+	constexpr_id& operator=(const constexpr_id&) = default;
+	constexpr_id& operator=(constexpr_id&&) = default;
+
+private:
+	friend class jh_detail::job_tracker;
+
+	std::uint64_t m_val;
+
+	constexpr constexpr_id(std::uint64_t id)
+		: m_val(id)
+	{}
+};
 }
+
+
+#endif
