@@ -25,14 +25,14 @@ utility wrapper class for 128 bit atomic operations.
 ## concurrent_queue
 Multi producer multi consumer unbounded lock-free queue. FIFO is respected within the context of single producers. Basic exception safety may be enabled at the price of a slight performance decrease.
 
-Depends on atomic_shared_ptr.h
+Depends on atomic_shared_ptr.h, thread_local_member.h
 
 -------------------------------------------------------------------------------------------------------------------------------------------
 
 ## concurrent_object_pool
 Allocates chunks of objects and makes them avaliable for usage via get_object. Return objects using recycle_object. Concurrency safe & lock-free.
 
-Depends on concurrent_queue.h, atomic_shared_ptr.h
+Depends on concurrent_queue.h, atomic_shared_ptr.h, thread_local_member.h
 
 -------------------------------------------------------------------------------------------------------------------------------------------
 
