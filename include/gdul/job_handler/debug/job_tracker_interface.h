@@ -86,7 +86,7 @@ GDUL_INLINE_PRAGMA(warning(push)) \
 GDUL_INLINE_PRAGMA(warning(disable : 4307)) \
 constexp_str_hash(__FILE__) \
 GDUL_INLINE_PRAGMA(warning(pop)) \
-+ std::size_t(__LINE__)>(), \
++ std::size_t(__COUNTER__)>(), \
 name, \
 __FILE__, \
 __LINE__)
