@@ -88,7 +88,7 @@ worker job_handler_impl::make_worker(gdul::delegate<void()> entryPoint)
 {
 	const std::uint16_t index(m_workerIndices.fetch_add(1, std::memory_order_relaxed));
 
-	const std::uint8_t autoCoreAffinity(static_cast<std::uint8_t>(index % std::thread::hardware_concurrency()));	
+	const std::uint8_t autoCoreAffinity(static_cast<std::uint8_t>(index % std::thread::hardware_concurrency()));
 
 	std::thread thread(&job_handler_impl::launch_worker, this, index);
 
@@ -153,17 +153,12 @@ bool job_handler_impl::try_consume_from_once(job_queue consumeFrom)
 	job_handler_impl::job_impl_shared_ptr jb;
 
 	if (m_jobQueues[consumeFrom].try_pop(jb)) {
-		job swap(std::move(job_handler::this_job));
-
-		job_handler::this_job = job(std::move(jb));
-
-		job_handler::this_job.m_impl->operator()();
-
-		job_handler::this_job = std::move(swap);
-
+		
+		consume_job(job(std::move(jb)));
+		
 		return true;
 	}
-	
+
 	return false;
 }
 void job_handler_impl::launch_worker(std::uint16_t index) noexcept
@@ -184,20 +179,27 @@ void job_handler_impl::launch_worker(std::uint16_t index) noexcept
 void job_handler_impl::work()
 {
 	while (t_items.this_worker_impl->is_active()) {
-		job_handler::this_job = job(fetch_job());
 
-		if (job_handler::this_job) {
-			(*job_handler::this_job.m_impl)();
-
-			job_handler::this_job = job();
+		if (job jb = fetch_job()) {
+			consume_job(std::move(jb));
 
 			t_items.this_worker_impl->refresh_sleep_timer();
 		}
-		else{
+		else {
 			t_items.this_worker_impl->idle();
 		}
-
 	}
+}
+
+void job_handler_impl::consume_job(job && jb)
+{
+	job swap(std::move(job_handler::this_job));
+
+	job_handler::this_job = job(std::move(jb));
+
+	job_handler::this_job.m_impl->operator()();
+
+	job_handler::this_job = std::move(swap);
 }
 
 job_handler_impl::job_impl_shared_ptr job_handler_impl::fetch_job()

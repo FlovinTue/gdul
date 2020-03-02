@@ -35,3 +35,4 @@
 *.app
 .vs/Tester/v15/.suo
 .vs/Tester/v15/Solution.VC.db
+*.dgml

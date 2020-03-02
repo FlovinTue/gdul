@@ -54,15 +54,20 @@ void job_impl::operator()()
 	assert(!m_finished);
 
 #if defined (GDUL_JOB_DEBUG)
+	const constexpr_id swap(job_handler::this_job.m_physicalId);
 	if (m_trackingNode)
-		job_handler::this_job.m_debugId = m_physicalId;
+		job_handler::this_job.m_physicalId = m_physicalId;
 
 	timer time;
 #endif
+
 	m_workUnit();
+
 #if defined(GDUL_JOB_DEBUG)
 	if (m_trackingNode)
 		m_trackingNode->add_completion_time(time.get());
+
+	job_handler::this_job.m_physicalId = swap;
 #endif
 
 	m_finished.store(true, std::memory_order_seq_cst);
@@ -163,10 +168,10 @@ void job_impl::detach_children()
 	}
 }
 #if defined(GDUL_JOB_DEBUG)
-constexpr_id job_impl::register_tracking_node(constexpr_id id, const char* name, const char* file, std::uint32_t line, jh_detail::job_tracker_node_type type)
+constexpr_id job_impl::register_tracking_node(constexpr_id id, const char* name, const char* file, std::uint32_t line, bool batchSub)
 {
 	m_physicalId = id;
-	m_trackingNode = type != job_tracker_node_batch_sub ? job_tracker::register_full_node(id, name, file, line) : job_tracker::register_batch_sub_node(id, name);
+	m_trackingNode = !batchSub ? job_tracker::register_full_node(id, name, file, line) : job_tracker::register_batch_sub_node(id, name);
 	return m_trackingNode->id();
 }
 #endif

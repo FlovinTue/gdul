@@ -84,6 +84,7 @@ private:
 	void launch_worker(std::uint16_t index) noexcept;
 
 	void work();
+	void consume_job(job&& jb);
 
 	job_impl_shared_ptr fetch_job();
 
