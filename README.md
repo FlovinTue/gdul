@@ -68,7 +68,6 @@ Main features would be:
 Job tracking instructions: 
 - make sure GDUL_JOB_DEBUG is defined in globals.h
 - for each job taking part in the tracking, call activate_job_tracking(name)
-- if making a msvc debug build, override /ZI (edit-and-continue) with /Zi to make sure __ LINE__ macro is seen as a compile time constant
 - dump job graph using job_tracker::dump_job_tree(location)
 
 A quick usage example for job:
