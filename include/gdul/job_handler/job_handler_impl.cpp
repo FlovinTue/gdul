@@ -182,8 +182,6 @@ void job_handler_impl::work()
 
 		if (job jb = fetch_job()) {
 			consume_job(std::move(jb));
-
-			t_items.this_worker_impl->refresh_sleep_timer();
 		}
 		else {
 			t_items.this_worker_impl->idle();
@@ -200,6 +198,8 @@ void job_handler_impl::consume_job(job && jb)
 	job_handler::this_job.m_impl->operator()();
 
 	job_handler::this_job = std::move(swap);
+
+	t_items.this_worker_impl->refresh_sleep_timer();
 }
 
 job_handler_impl::job_impl_shared_ptr job_handler_impl::fetch_job()

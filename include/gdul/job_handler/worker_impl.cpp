@@ -145,9 +145,8 @@ void worker_impl::refresh_sleep_timer()
 bool worker_impl::is_sleepy() const
 {
 	const std::chrono::high_resolution_clock::time_point current(m_sleepTimer.now());
-	const std::chrono::high_resolution_clock::time_point delta(current - m_lastJobTimepoint);
 
-	return !(std::chrono::duration_cast<std::chrono::milliseconds>(current - delta).count() < m_sleepThreshhold);
+	return !(std::chrono::duration_cast<std::chrono::milliseconds>(current - m_lastJobTimepoint).count() < m_sleepThreshhold);
 }
 bool worker_impl::is_active() const
 {
