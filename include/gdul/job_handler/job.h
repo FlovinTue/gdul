@@ -53,14 +53,20 @@ public:
 	job_queue get_target_queue() const noexcept;
 
 	// this object may be discarded once enable() has been invoked
-	void enable();
+	bool enable() noexcept;
+	bool enable_locally_if_ready() noexcept;
 
+	bool is_ready() const noexcept;
 	bool is_finished() const noexcept;
 
 	void wait_until_finished() noexcept;
+	void wait_until_ready() noexcept;
 
 	// Consume jobs until finished. Beware of recursive calls (stack overflow, stalls etc..)
 	void work_until_finished(job_queue consumeFrom);
+
+	// Consume jobs until ready. Beware of recursive calls (stack overflow, stalls etc..)
+	void work_until_ready(job_queue consumeFrom);
 
 	operator bool() const noexcept;
 

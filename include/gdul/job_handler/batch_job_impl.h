@@ -57,7 +57,7 @@ public:
 	void wait_until_finished() noexcept override final;
 	void work_until_finished(job_queue consumeFrom) override final;
 
-	void enable();
+	bool enable()  noexcept override final;
 	bool is_finished() const noexcept override final;
 
 	job& get_endjob() noexcept override final;
@@ -224,17 +224,15 @@ inline void batch_job_impl<InputContainer, OutputContainer, Process>::work_until
 	m_end.work_until_finished(consumeFrom);
 }
 template<class InputContainer, class OutputContainer, class Process>
-inline void batch_job_impl<InputContainer, OutputContainer, Process>::enable()
+inline bool batch_job_impl<InputContainer, OutputContainer, Process>::enable() noexcept
 {
-	m_root.enable();
+	return m_root.enable();
 }
-
 template<class InputContainer, class OutputContainer, class Process>
 inline bool batch_job_impl<InputContainer, OutputContainer, Process>::is_finished() const noexcept
 {
 	return m_end.is_finished();
 }
-
 template<class InputContainer, class OutputContainer, class Process>
 inline job & batch_job_impl<InputContainer, OutputContainer, Process>::get_endjob() noexcept
 {

@@ -29,31 +29,52 @@ batch_job::batch_job()
 {}
 void batch_job::add_dependency(job & dependency)
 {
-	m_impl->add_dependency(dependency);
+	assert(m_impl && "Job not set");
+
+	if (m_impl)
+		m_impl->add_dependency(dependency);
 }
 void batch_job::set_target_queue(job_queue target) noexcept
 {
-	m_impl->set_target_queue(target);
+	assert(m_impl && "Job not set");
+
+	if (m_impl)
+		m_impl->set_target_queue(target);
 }
 job_queue batch_job::get_target_queue() const noexcept 
 {
+	assert(m_impl && "Job not set");
+
+	if (!m_impl)
+		return jh_detail::Default_Job_Queue;
+
 	return m_impl->get_target_queue();
 }
-void batch_job::enable()
+bool batch_job::enable() noexcept
 {
-	m_impl->enable();
+	assert(m_impl && "Job not set");
+
+	return m_impl && m_impl->enable();
 }
 bool batch_job::is_finished() const noexcept
 {
-	return m_impl->is_finished();
+	assert(m_impl && "Job not set");
+
+	return m_impl && m_impl->is_finished();
 }
 void batch_job::wait_until_finished() noexcept
 {
-	m_impl->wait_until_finished();
+	assert(m_impl && "Job not set");
+
+	if (m_impl)
+		m_impl->wait_until_finished();
 }
 void batch_job::work_until_finished(job_queue consumeFrom)
 {
-	m_impl->work_until_finished(consumeFrom);
+	assert(m_impl && "Job not set");
+
+	if (m_impl)
+		m_impl->work_until_finished(consumeFrom);
 }
 batch_job::operator bool() const noexcept
 {
@@ -61,11 +82,21 @@ batch_job::operator bool() const noexcept
 }
 std::size_t batch_job::get_output_size() const noexcept
 {
+	assert(m_impl && "Job not set");
+
+	if (!m_impl)
+		return 0;
+
 	return m_impl->get_output_size();
 }
 #if defined(GDUL_JOB_DEBUG)
 constexpr_id batch_job::register_tracking_node(constexpr_id id, const char * name, const char* file, std::uint32_t line, bool)
 {
+	assert(m_impl && "Job not set");
+
+	if (!m_impl)
+		return constexpr_id::make<0>();
+
 	return m_impl->register_tracking_node(id, name, file, line);
 }
 #endif

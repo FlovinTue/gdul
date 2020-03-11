@@ -39,6 +39,8 @@ namespace jh_detail
 {
 
 constexpr std::uint32_t Job_Max_Dependencies = std::numeric_limits<std::uint32_t>::max() / 2;
+constexpr std::uint32_t Job_Enable_Dependencies = std::numeric_limits<std::uint32_t>::max() - Job_Max_Dependencies;
+
 
 using allocator_type = std::allocator<uint8_t>;
 

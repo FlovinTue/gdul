@@ -25,7 +25,9 @@
 #include <type_traits>
 
 // Define to enable some debug features
+#if !defined(GDUL_JOB_DEBUG)
 #define GDUL_JOB_DEBUG
+#endif
 
 namespace gdul
 {

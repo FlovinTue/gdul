@@ -34,7 +34,7 @@ class batch_job_impl_interface
 public:
 	virtual void add_dependency(job&) = 0;
 	virtual void set_target_queue(job_queue) noexcept = 0;
-	virtual void enable() = 0;
+	virtual bool enable() noexcept = 0;
 	virtual bool is_finished() const noexcept = 0;
 	virtual void wait_until_finished() noexcept = 0;
 	virtual void work_until_finished(job_queue) = 0;

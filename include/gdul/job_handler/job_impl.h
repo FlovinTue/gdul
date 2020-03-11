@@ -63,19 +63,24 @@ public:
 	bool try_add_dependencies(std::uint32_t n = 1);
 	std::uint32_t remove_dependencies(std::uint32_t n = 1);
 
-	bool enable();
+	bool enable() noexcept;
+	bool enable_if_ready() noexcept;
 
 	job_handler_impl* get_handler() const;
 
-	bool is_finished() const;
-	bool is_enabled() const;
+	bool is_finished() const noexcept;
+	bool is_enabled() const noexcept;
+	bool is_ready() const noexcept;
 
 #if defined(GDUL_JOB_DEBUG)
 	constexpr_id register_tracking_node(constexpr_id id, const char* name, const char* file, std::uint32_t line, bool batchSub);
 #endif
 
 	void work_until_finished(job_queue consumeFrom);
+	void work_until_ready(job_queue consumeFrom);
 	void wait_until_finished() noexcept;
+	void wait_until_ready() noexcept;
+
 private:
 
 	void detach_children();
@@ -94,7 +99,6 @@ private:
 	std::atomic<std::uint32_t> m_dependencies;
 
 	std::atomic_bool m_finished;
-	std::atomic_bool m_enabled;
 
 	job_queue m_targetQueue;
 };

@@ -23,6 +23,7 @@
 #include <gdul/job_handler/job_handler_impl.h>
 #include <gdul/job_handler/job_impl.h>
 #include <gdul/job_handler/batch_job.h>
+#include <gdul/job_handler/globals.h>
 
 namespace gdul
 {
@@ -55,6 +56,9 @@ void job::add_dependency(job & dependency)
 {
 	assert(m_impl && "Job not set");
 
+	if (!m_impl)
+		return;
+
 	if (m_impl->try_add_dependencies(1)) {
 		if (!dependency.m_impl->try_attach_child(m_impl)) {
 			if (!m_impl->remove_dependencies(1)) {
@@ -70,47 +74,107 @@ void job::add_dependency(batch_job & dependency)
 }
 void job::set_target_queue(job_queue target) noexcept
 {
+	if (!m_impl)
+		return;
+
 	m_impl->set_target_queue(target);
 }
 job_queue job::get_target_queue() const noexcept
 {
+	if (!m_impl)
+		return jh_detail::Default_Job_Queue;
+
 	return m_impl->get_target_queue();
 }
-void job::enable()
+bool job::enable() noexcept
 {
 	assert(m_impl && "Job not set");
 
-	if (m_impl->enable()) {
+	if (m_impl && m_impl->enable()) {
 		m_impl->get_handler()->enqueue_job(m_impl);
+
+		return true;
 	}
+	return false;
+}
+bool job::enable_locally_if_ready() noexcept
+{
+	assert(m_impl && "Job not set");
+
+	if (m_impl && m_impl->enable_if_ready()){
+		m_impl->get_handler()->enqueue_job(m_impl);
+
+		return true;
+	}
+	return false;
+}
+bool job::is_ready() const noexcept
+{
+	assert(m_impl && "Job not set");
+
+	if (m_impl)
+		return m_impl->is_ready();
+
+	return false;
 }
 bool job::is_finished() const noexcept
 {
 	assert(m_impl && "Job not set");
-
-	return m_impl->is_finished();
+	
+	return m_impl && m_impl->is_finished();
 }
 void job::wait_until_finished() noexcept
 {
 	assert(m_impl && "Job not set");
 
+	if (!m_impl)
+		return;
+
 	m_impl->wait_until_finished();
+}
+void job::wait_until_ready() noexcept
+{
+	assert(m_impl && "Job not set");
+
+	if (!m_impl)
+		return;
+
+	m_impl->wait_until_ready();
 }
 void job::work_until_finished(job_queue consumeFrom)
 {
+	assert(m_impl && "Job not set");
+
+	if (!m_impl)
+		return;
+
 	m_impl->work_until_finished(consumeFrom);
 }
 job::job(gdul::shared_ptr<jh_detail::job_impl> impl) noexcept
 	: m_impl(std::move(impl))
 {
 }
-job::operator bool() const noexcept 
+void job::work_until_ready(job_queue consumeFrom)
+{
+	assert(m_impl && "Job not set");
+
+	if (!m_impl)
+		return;
+
+	m_impl->work_until_ready(consumeFrom);
+}
+job::operator bool() const noexcept
 {
 	return m_impl;
 }
 #if defined(GDUL_JOB_DEBUG)
 constexpr_id job::register_tracking_node(constexpr_id id, const char* name, const char* file, std::uint32_t line, bool batchSub)
 {
+	assert(m_impl && "Job not set");
+
+	if (!m_impl)
+		return constexpr_id::make<0>();
+
 	return m_impl->register_tracking_node(id, name, file, line, batchSub);
 }
 #endif

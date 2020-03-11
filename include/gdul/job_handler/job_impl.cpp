@@ -34,11 +34,10 @@ job_impl::job_impl()
 job_impl::job_impl(delegate<void()>&& workUnit, job_handler_impl* handler)
 	: m_workUnit(std::forward<delegate<void()>>(workUnit))
 	, m_finished(false)
-	, m_enabled(false)
 	, m_firstDependee(nullptr)
 	, m_targetQueue(Default_Job_Queue)
 	, m_handler(handler)
-	, m_dependencies(Job_Max_Dependencies)
+	, m_dependencies(Job_Enable_Dependencies)
 #if defined (GDUL_JOB_DEBUG)
 	, m_trackingNode(nullptr)
 	, m_physicalId(constexpr_id::make<0>())
@@ -108,33 +107,58 @@ void job_impl::set_target_queue(job_queue target) noexcept
 bool job_impl::try_add_dependencies(std::uint32_t n)
 {
 	std::uint32_t exp(m_dependencies.load(std::memory_order_relaxed));
-	while (exp != 0 && !m_dependencies.compare_exchange_weak(exp, exp + n, std::memory_order_relaxed));
+	do{
+		assert(!(Job_Max_Dependencies < (exp + n)) && "Exceeding job max dependencies");
 
-	return exp != 0;
+		if (Job_Max_Dependencies < (exp + n))
+			return false;
+
+	}while(exp != 0 && !m_dependencies.compare_exchange_weak(exp, exp + n, std::memory_order_relaxed));
+
+	return exp;
 }
 std::uint32_t job_impl::remove_dependencies(std::uint32_t n)
 {
 	std::uint32_t result(m_dependencies.fetch_sub(n, std::memory_order_acq_rel));
 	return result - n;
 }
-bool job_impl::enable()
+bool job_impl::enable() noexcept
 {
-	if (!m_enabled.exchange(true, std::memory_order_relaxed)){
-		return !remove_dependencies(Job_Max_Dependencies);
+	std::uint32_t exp(m_dependencies.load(std::memory_order_relaxed));
+
+	while (!(exp < Job_Enable_Dependencies)){
+		if (m_dependencies.compare_exchange_weak(exp, exp - Job_Enable_Dependencies, std::memory_order_relaxed))
+			return true;
 	}
+
+	return false;
+}
+bool job_impl::enable_if_ready() noexcept
+{
+	std::uint32_t exp(m_dependencies.load(std::memory_order_relaxed));
+
+	if (Job_Enable_Dependencies == exp)
+		return m_dependencies.compare_exchange_strong(exp, 0, std::memory_order_relaxed);
+
 	return false;
 }
 job_handler_impl * job_impl::get_handler() const
 {
 	return m_handler;
 }
-bool job_impl::is_finished() const
+bool job_impl::is_finished() const noexcept
 {
 	return m_finished.load(std::memory_order_relaxed);
 }
-bool job_impl::is_enabled() const
+bool job_impl::is_enabled() const noexcept
 {
-	return m_enabled.load(std::memory_order_relaxed);
+	return m_dependencies.load(std::memory_order_relaxed) < Job_Enable_Dependencies;
+}
+bool job_impl::is_ready() const noexcept
+{
+	const std::uint32_t dependencies(m_dependencies.load(std::memory_order_relaxed));
+
+	return dependencies == Job_Enable_Dependencies;
 }
 void job_impl::work_until_finished(job_queue consumeFrom)
 {
@@ -145,9 +169,25 @@ void job_impl::work_until_finished(job_queue consumeFrom)
 		}
 	}
 }
+void job_impl::work_until_ready(job_queue consumeFrom)
+{
+	while (!is_ready()){
+		if (!m_handler->try_consume_from_once(consumeFrom)){
+			jh_detail::job_handler_impl::t_items.this_worker_impl->refresh_sleep_timer();
+			jh_detail::job_handler_impl::t_items.this_worker_impl->idle();
+		}
+	}
+}
 void job_impl::wait_until_finished() noexcept
 {
 	while (!is_finished()) {
+		jh_detail::job_handler_impl::t_items.this_worker_impl->refresh_sleep_timer();
+		jh_detail::job_handler_impl::t_items.this_worker_impl->idle();
+	}
+}
+void job_impl::wait_until_ready() noexcept
+{
+	while (!is_finished()){
 		jh_detail::job_handler_impl::t_items.this_worker_impl->refresh_sleep_timer();
 		jh_detail::job_handler_impl::t_items.this_worker_impl->idle();
 	}

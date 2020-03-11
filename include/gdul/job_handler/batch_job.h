@@ -44,7 +44,7 @@ public:
 	job_queue get_target_queue() const noexcept;
 
 	// this object may be discarded once enable() has been invoked
-	void enable();
+	bool enable() noexcept;
 
 	bool is_finished() const noexcept;
 	void wait_until_finished() noexcept;
