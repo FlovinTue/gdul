@@ -130,6 +130,8 @@ private:
 
 	job_handler* const m_handler;
 
+	void (job::* m_enableFunc)(void);
+
 	job m_root;
 	job m_end;
 
@@ -150,6 +152,7 @@ inline batch_job_impl<InputContainer, OutputContainer, Process>::batch_job_impl(
 	: m_batchTracker{}
 	, m_process(std::move(process))
 	, m_handler(handler)
+	, m_enableFunc(&job::enable)
 	, m_root(container_size(input) ? _redirect_make_job(handler, delegate<void()>(&batch_job_impl::initialize, this)) : _redirect_make_job(m_handler, delegate<void()>([]() {})))
 	, m_end(container_size(input) ? _redirect_make_job(handler, delegate<void()>(&batch_job_impl::finalize<>, this)) : m_root)
 	, m_input(input)
@@ -338,25 +341,25 @@ inline void batch_job_impl<InputContainer, OutputContainer, Process>::make_jobs(
 	job currentProcessJob = make_work_slice(&batch_job_impl::work_process<>, 0);
 	track_sub_job(currentProcessJob, "batch_job_process");
 
-	currentProcessJob.enable();
+	std::invoke(m_enableFunc, &currentProcessJob);
 
 	job currentPackJob(currentProcessJob);
 
 	for (std::size_t i = 1; i < m_batchCount; ++i) {
 		job nextProcessJob(make_work_slice(&batch_job_impl::work_process<>, i));
 		track_sub_job(nextProcessJob, "batch_job_process");
+		std::invoke(m_enableFunc, &nextProcessJob);
 
 		if (i < (m_batchCount - 1)) {
 			job nextPackJob(make_work_slice(&batch_job_impl::work_pack, i));
 			track_sub_job(nextPackJob, "batch_job_pack");
 			nextPackJob.add_dependency(currentPackJob);
 			nextPackJob.add_dependency(nextProcessJob);
-			nextPackJob.enable();
+			std::invoke(m_enableFunc, &nextPackJob);
 
 			currentPackJob = std::move(nextPackJob);
 		}
 
-		nextProcessJob.enable();
 		currentProcessJob = std::move(nextProcessJob);
 	}
 
@@ -367,7 +370,7 @@ inline void batch_job_impl<InputContainer, OutputContainer, Process>::make_jobs(
 	track_sub_job(m_end, "batch_job_finalize");
 
 	m_end.add_dependency(currentProcessJob);
-	m_end.enable();
+	std::invoke(m_enableFunc, &m_end);
 }
 template<class InputContainer, class OutputContainer, class Process>
 template <class U, std::enable_if_t<U::Specialize_Update>*>
@@ -376,13 +379,13 @@ inline void batch_job_impl<InputContainer, OutputContainer, Process>::make_jobs(
 	for (std::size_t i = 0; i < m_batchCount; ++i) {
 		job processJob(make_work_slice(&batch_job_impl::work_process<>, i));
 		track_sub_job(processJob, "batch_job_process");
+		std::invoke(m_enableFunc, &processJob);
 
 		m_end.add_dependency(processJob);
-		processJob.enable();
 	}
 
 	track_sub_job(m_end, "batch_job_finalize");
-	m_end.enable();
+	std::invoke(m_enableFunc, &m_end);
 }
 template<class InputContainer, class OutputContainer, class Process>
 inline void batch_job_impl<InputContainer, OutputContainer, Process>::initialize()
