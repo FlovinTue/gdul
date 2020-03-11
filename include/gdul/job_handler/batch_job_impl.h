@@ -130,7 +130,7 @@ private:
 
 	job_handler* const m_handler;
 
-	void (job::* m_enableFunc)(void);
+	bool (job::* m_enableFunc)(void);
 
 	job m_root;
 	job m_end;
