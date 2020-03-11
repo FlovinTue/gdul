@@ -1,4 +1,5 @@
 #include "work_tracker.h"
+#include <cmath>
 
 namespace gdul {
 thread_local double testSum = static_cast<double>(rand() % 100);
