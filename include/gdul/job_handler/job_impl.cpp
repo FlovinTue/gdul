@@ -108,9 +108,9 @@ bool job_impl::try_add_dependencies(std::uint32_t n)
 {
 	std::uint32_t exp(m_dependencies.load(std::memory_order_relaxed));
 	do{
-		assert(!(Job_Max_Dependencies < (exp + n)) && "Exceeding job max dependencies");
+		assert(!(std::numeric_limits<std::uint32_t>::max() < (std::size_t(exp) + std::size_t(n))) && "Exceeding job max dependencies");
 
-		if (Job_Max_Dependencies < (exp + n))
+		if ((std::numeric_limits<std::uint32_t>::max() < (std::size_t(exp) + std::size_t(n))))
 			return false;
 
 	}while(exp != 0 && !m_dependencies.compare_exchange_weak(exp, exp + n, std::memory_order_relaxed));
@@ -128,7 +128,7 @@ bool job_impl::enable() noexcept
 
 	while (!(exp < Job_Enable_Dependencies)){
 		if (m_dependencies.compare_exchange_weak(exp, exp - Job_Enable_Dependencies, std::memory_order_relaxed))
-			return true;
+			return !(exp - Job_Enable_Dependencies);
 	}
 
 	return false;
