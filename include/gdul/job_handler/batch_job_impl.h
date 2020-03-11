@@ -55,10 +55,13 @@ public:
 	job_queue get_target_queue() const noexcept override final;
 
 	void wait_until_finished() noexcept override final;
+	void wait_until_ready() noexcept override final;
 	void work_until_finished(job_queue consumeFrom) override final;
+	void work_until_ready(job_queue consumeFrom) override final;
 
 	bool enable()  noexcept override final;
 	bool is_finished() const noexcept override final;
+	bool is_ready() const noexcept override final;
 
 	job& get_endjob() noexcept override final;
 
@@ -219,9 +222,19 @@ inline void batch_job_impl<InputContainer, OutputContainer, Process>::wait_until
 	m_end.wait_until_finished();
 }
 template<class InputContainer, class OutputContainer, class Process>
+inline void batch_job_impl<InputContainer, OutputContainer, Process>::wait_until_ready() noexcept
+{
+	m_root.wait_until_ready();
+}
+template<class InputContainer, class OutputContainer, class Process>
 inline void batch_job_impl<InputContainer, OutputContainer, Process>::work_until_finished(job_queue consumeFrom)
 {
 	m_end.work_until_finished(consumeFrom);
+}
+template<class InputContainer, class OutputContainer, class Process>
+inline void batch_job_impl<InputContainer, OutputContainer, Process>::work_until_ready(job_queue consumeFrom)
+{
+	m_root.work_until_ready(consumeFrom);
 }
 template<class InputContainer, class OutputContainer, class Process>
 inline bool batch_job_impl<InputContainer, OutputContainer, Process>::enable() noexcept
@@ -232,6 +245,11 @@ template<class InputContainer, class OutputContainer, class Process>
 inline bool batch_job_impl<InputContainer, OutputContainer, Process>::is_finished() const noexcept
 {
 	return m_end.is_finished();
+}
+template<class InputContainer, class OutputContainer, class Process>
+inline bool batch_job_impl<InputContainer, OutputContainer, Process>::is_ready() const noexcept
+{
+	return m_root.is_ready();
 }
 template<class InputContainer, class OutputContainer, class Process>
 inline job & batch_job_impl<InputContainer, OutputContainer, Process>::get_endjob() noexcept

@@ -36,8 +36,12 @@ public:
 	virtual void set_target_queue(job_queue) noexcept = 0;
 	virtual bool enable() noexcept = 0;
 	virtual bool is_finished() const noexcept = 0;
+	virtual bool is_ready() const noexcept = 0;
 	virtual void wait_until_finished() noexcept = 0;
 	virtual void work_until_finished(job_queue) = 0;
+	virtual void wait_until_ready() noexcept = 0;
+	virtual void work_until_ready(job_queue) = 0;
+
 	virtual job& get_endjob() noexcept = 0;
 	virtual std::size_t get_output_size() const noexcept = 0;
 	virtual job_queue get_target_queue() const noexcept = 0;

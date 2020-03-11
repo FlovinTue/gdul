@@ -62,6 +62,12 @@ bool batch_job::is_finished() const noexcept
 
 	return m_impl && m_impl->is_finished();
 }
+bool batch_job::is_ready() const noexcept
+{
+	assert(m_impl && "Job not set");
+
+	return m_impl && m_impl->is_ready();
+}
 void batch_job::wait_until_finished() noexcept
 {
 	assert(m_impl && "Job not set");
@@ -69,12 +75,26 @@ void batch_job::wait_until_finished() noexcept
 	if (m_impl)
 		m_impl->wait_until_finished();
 }
+void batch_job::wait_until_ready() noexcept
+{
+	assert(m_impl && "Job not set");
+
+	if (m_impl)
+		m_impl->wait_until_ready();
+}
 void batch_job::work_until_finished(job_queue consumeFrom)
 {
 	assert(m_impl && "Job not set");
 
 	if (m_impl)
 		m_impl->work_until_finished(consumeFrom);
+}
+void batch_job::work_until_ready(job_queue consumeFrom)
+{
+	assert(m_impl && "Job not set");
+
+	if (m_impl)
+		m_impl->work_until_ready(consumeFrom);
 }
 batch_job::operator bool() const noexcept
 {

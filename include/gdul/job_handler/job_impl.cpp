@@ -171,7 +171,7 @@ void job_impl::work_until_finished(job_queue consumeFrom)
 }
 void job_impl::work_until_ready(job_queue consumeFrom)
 {
-	while (!is_ready()){
+	while (!is_ready() && !is_enabled()){
 		if (!m_handler->try_consume_from_once(consumeFrom)){
 			jh_detail::job_handler_impl::t_items.this_worker_impl->refresh_sleep_timer();
 			jh_detail::job_handler_impl::t_items.this_worker_impl->idle();
@@ -187,7 +187,7 @@ void job_impl::wait_until_finished() noexcept
 }
 void job_impl::wait_until_ready() noexcept
 {
-	while (!is_finished()){
+	while (!is_ready() && !is_enabled()){
 		jh_detail::job_handler_impl::t_items.this_worker_impl->refresh_sleep_timer();
 		jh_detail::job_handler_impl::t_items.this_worker_impl->idle();
 	}
