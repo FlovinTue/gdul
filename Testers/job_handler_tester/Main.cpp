@@ -20,7 +20,7 @@ int main()
 		
 		tester.init(info);
 
-		const uint32_t scatterRuns(10);
+		const uint32_t scatterRuns(100);
 		float scatterTimeAccum(0.f);
 		std::size_t scatterBatchAccum(0);
 

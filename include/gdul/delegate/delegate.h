@@ -61,7 +61,7 @@ using default_allocator = std::allocator<std::uint8_t>;
 template <class Ret, class ...Args>
 struct callable_wrapper_base
 {
-	inline virtual Ret operator()(Args&&... args) = 0;
+	inline virtual Ret operator()(Args&&... args) const = 0;
 
 	virtual ~callable_wrapper_base() = default;
 	virtual std::uint8_t* allocate() { assert(false); return nullptr; }
@@ -74,7 +74,7 @@ struct callable_wrapper_impl_call : public callable_wrapper_base<Ret, Args...>
 	callable_wrapper_impl_call(Callable callable)
 		: m_callable(callable) {}
 
-	inline Ret operator()(Args&&... args) override final{
+	inline Ret operator()(Args&&... args)  const override final{
 		return call_with_tuple(m_callable, std::forward_as_tuple(std::forward<Args>(args)...));
 	}
 
@@ -115,7 +115,7 @@ struct callable_wrapper_impl_call_bind : public callable_wrapper_base<Ret, Args.
 		: m_callable(callable)
 		, m_boundTuple(std::forward<BindTuple>(bind)) {}
 
-	inline Ret operator()(Args&&... args) override final{
+	inline Ret operator()(Args&&... args) const override final{
 		return call_with_tuple(m_callable, std::tuple_cat(m_boundTuple, std::forward_as_tuple(std::forward<Args>(args)...)));
 	}
 
@@ -161,7 +161,7 @@ public:
 	inline delegate_impl() noexcept;
 	inline ~delegate_impl() noexcept;
 
-	inline Ret operator()(Args && ...args);
+	inline Ret operator()(Args && ...args) const;
 
 protected:
 	template <class Callable, class Allocator, std::size_t Compare = sizeof(del_detail::callable_wrapper_impl_call<Ret, Callable, Args...>), std::enable_if_t<!(del_detail::Delegate_Storage < Compare)>* = nullptr>
@@ -215,7 +215,7 @@ inline delegate_impl<Ret, Args...>::~delegate_impl() noexcept
 	}
 }
 template<class Ret, class ...Args>
-inline Ret delegate_impl<Ret, Args...>::operator()(Args&& ... args)
+inline Ret delegate_impl<Ret, Args...>::operator()(Args&& ... args) const
 {
 	return m_callable->operator()(std::forward<Args>(args)...);
 }

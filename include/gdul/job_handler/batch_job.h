@@ -45,6 +45,7 @@ public:
 
 	// this object may be discarded once enable() has been invoked
 	bool enable() noexcept;
+	bool enable_locally_if_ready();
 
 	bool is_finished() const noexcept;
 	bool is_ready() const noexcept;

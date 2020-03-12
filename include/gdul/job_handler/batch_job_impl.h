@@ -35,7 +35,10 @@ class job_handler;
 namespace jh_detail {
 
 // Gets rid of circular dependency job_handler->batch_job_impl & batch_job_impl->job_handler
-job _redirect_make_job(job_handler* handler, gdul::delegate<void()>&& workUnit);
+gdul::job _redirect_make_job(job_handler* handler, gdul::delegate<void()>&& workUnit);
+
+bool _redirect_enable_if_ready(gdul::shared_ptr<job_impl>& jb);
+void _redirect_invoke_job(gdul::shared_ptr<job_impl>& jb);
 
 template <class InputContainer, class OutputContainer, class Process>
 class batch_job_impl : public batch_job_impl_interface
@@ -60,6 +63,8 @@ public:
 	void work_until_ready(job_queue consumeFrom) override final;
 
 	bool enable()  noexcept override final;
+	bool enable_locally_if_ready() override final;
+
 	bool is_finished() const noexcept override final;
 	bool is_ready() const noexcept override final;
 
@@ -243,6 +248,16 @@ template<class InputContainer, class OutputContainer, class Process>
 inline bool batch_job_impl<InputContainer, OutputContainer, Process>::enable() noexcept
 {
 	return m_root.enable();
+}
+template<class InputContainer, class OutputContainer, class Process>
+inline bool batch_job_impl<InputContainer, OutputContainer, Process>::enable_locally_if_ready()
+{
+	if (_redirect_enable_if_ready(m_root.m_impl)){
+		m_enableFunc = &job::enable_locally_if_ready;
+		_redirect_invoke_job(m_root.m_impl);
+		return true;
+	}
+	return false;
 }
 template<class InputContainer, class OutputContainer, class Process>
 inline bool batch_job_impl<InputContainer, OutputContainer, Process>::is_finished() const noexcept

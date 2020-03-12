@@ -247,7 +247,7 @@ void job_handler_tester::run_scatter_test_input_output(std::size_t arraySize, st
 	
 		scatter.activate_job_tracking("batch job test");
 
-		float result(time.get());
+		float result(0.f);
 		job endJob(m_handler.make_job([&time, &result, &scatter, this]() { result = time.get(); m_scatterOutput.resize(scatter.get_output_size()); }));
 		endJob.activate_job_tracking("batch post job");
 		endJob.add_dependency(scatter);

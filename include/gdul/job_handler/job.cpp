@@ -102,7 +102,7 @@ bool job::enable_locally_if_ready() noexcept
 	assert(m_impl && "Job not set");
 
 	if (m_impl && m_impl->enable_if_ready()){
-		m_impl->get_handler()->enqueue_job(m_impl);
+		m_impl->operator()();
 
 		return true;
 	}

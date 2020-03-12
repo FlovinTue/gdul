@@ -56,6 +56,12 @@ bool batch_job::enable() noexcept
 
 	return m_impl && m_impl->enable();
 }
+bool batch_job::enable_locally_if_ready()
+{
+	assert(m_impl && "Job not set");
+
+	return m_impl && m_impl->enable_locally_if_ready();
+}
 bool batch_job::is_finished() const noexcept
 {
 	assert(m_impl && "Job not set");

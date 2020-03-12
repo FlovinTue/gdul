@@ -21,14 +21,24 @@
 #include "batch_job_impl.h"
 #include <gdul/delegate/delegate.h>
 #include <gdul/job_handler/job_handler.h>
+#include <gdul/job_handler/job.h>
+#include <gdul/job_handler/job_impl.h>
 
 namespace gdul
 {
 namespace jh_detail
 {
-job gdul::jh_detail::_redirect_make_job(job_handler * handler, gdul::delegate<void()>&& workUnit)
+gdul::job _redirect_make_job(job_handler * handler, gdul::delegate<void()>&& workUnit)
 {
 	return handler->make_job(std::move(workUnit));
+}
+bool _redirect_enable_if_ready(gdul::shared_ptr<job_impl>& jb)
+{
+	return jb->enable_if_ready();
+}
+void _redirect_invoke_job(gdul::shared_ptr<job_impl>& jb)
+{
+	jb->operator()();
 }
 }
 }

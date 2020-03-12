@@ -33,6 +33,8 @@ namespace jh_detail {
 
 class job_handler_impl;
 class job_impl;
+template <class InputContainer, class OutputContainer, class Process>
+class batch_job_impl;
 }
 class job : public jh_detail::job_tracker_interface
 {
@@ -73,6 +75,8 @@ public:
 private:
 	friend class jh_detail::job_handler_impl;
 	friend class job_handler;
+	template <class InputContainer, class OutputContainer, class Process>
+	friend class jh_detail::batch_job_impl;
 
 #if defined(GDUL_JOB_DEBUG)
 	friend class jh_detail::job_tracker;

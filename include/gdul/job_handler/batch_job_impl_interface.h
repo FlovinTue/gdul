@@ -35,6 +35,7 @@ public:
 	virtual void add_dependency(job&) = 0;
 	virtual void set_target_queue(job_queue) noexcept = 0;
 	virtual bool enable() noexcept = 0;
+	virtual bool enable_locally_if_ready() = 0;
 	virtual bool is_finished() const noexcept = 0;
 	virtual bool is_ready() const noexcept = 0;
 	virtual void wait_until_finished() noexcept = 0;
