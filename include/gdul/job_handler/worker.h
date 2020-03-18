@@ -36,6 +36,7 @@ class worker_impl;
 class worker
 {
 public:
+	worker() = default;
 	worker(jh_detail::worker_impl* impl);
 	worker(const worker&) = default;
 	worker(worker&&) = default;
