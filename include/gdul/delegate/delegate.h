@@ -161,7 +161,7 @@ public:
 	inline delegate_impl() noexcept;
 	inline ~delegate_impl() noexcept;
 
-	inline Ret operator()(Args && ...args) const;
+	inline Ret operator()(Args  ...args) const;
 
 protected:
 	template <class Callable, class Allocator, std::size_t Compare = sizeof(del_detail::callable_wrapper_impl_call<Ret, Callable, Args...>), std::enable_if_t<!(del_detail::Delegate_Storage < Compare)>* = nullptr>
@@ -215,7 +215,7 @@ inline delegate_impl<Ret, Args...>::~delegate_impl() noexcept
 	}
 }
 template<class Ret, class ...Args>
-inline Ret delegate_impl<Ret, Args...>::operator()(Args&& ... args) const
+inline Ret delegate_impl<Ret, Args...>::operator()(Args ... args) const
 {
 	return m_callable->operator()(std::forward<Args>(args)...);
 }
