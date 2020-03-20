@@ -30,7 +30,6 @@
 // Exception handling may be enabled for basic exception safety at the cost of
 // a slight performance decrease
 
-
 /* #define GDUL_CQ_ENABLE_EXCEPTIONHANDLING */
 
 // In the event an exception is thrown during a pop operation, some entries may
@@ -284,21 +283,12 @@ inline void concurrent_queue<T, Allocator>::push_internal(Arg&& ...in)
 template<class T, class Allocator>
 bool concurrent_queue<T, Allocator>::try_pop(T& out)
 {
-	const std::uint16_t producers(m_producerCount.load(std::memory_order_relaxed));
+	while (!this_consumer_cached()->try_pop(out))
+		if (!relocate_consumer())
+			return false;
 
-	if (!this_consumer_cached()->try_pop(out)) {
-		std::uint16_t retry(0);
-		do {
-			if (!(retry++ < producers)) {
-				return false;
-			}
-			if (!relocate_consumer()) {
-				return false;
-			}
-		} while (!this_consumer_cached()->try_pop(out));
-	}
-
-	if ((1 < producers) & !(++t_cachedAccesses.m_lastConsumer.m_counter < cqdetail::Consumer_Force_Relocation_Pop_Count)) {
+	if ((1 < m_producerCount.load(std::memory_order_relaxed)) &
+		!(++t_cachedAccesses.m_lastConsumer.m_counter < cqdetail::Consumer_Force_Relocation_Pop_Count)) {
 		relocate_consumer();
 		t_cachedAccesses.m_lastConsumer.m_counter = 0;
 	}
@@ -396,9 +386,9 @@ template<class T, class Allocator>
 inline bool concurrent_queue<T, Allocator>::relocate_consumer()
 {
 	const std::uint16_t producers(m_producerCount.load(std::memory_order_acquire));
-	if (producers == 1) {
+	if (producers < 2) {
 		buffer_type* const cached(this_consumer_cached());
-		if (cached->is_valid() & cached->is_active()) {
+		if ((cached->is_valid() && cached->is_active()) || producers == 0) {
 			return false;
 		}
 	}
@@ -926,7 +916,7 @@ inline void producer_buffer<T, Allocator>::unsafe_clear()
 	m_failureCount.store(0, std::memory_order_relaxed);
 	m_failureIndex.store(0, std::memory_order_relaxed);
 
-	m_read.store(written, std::memory_order_relaxed);
+	m_read.store(m_written, std::memory_order_relaxed);
 #endif
 	if (m_next) {
 		m_next.unsafe_get()->unsafe_clear();
