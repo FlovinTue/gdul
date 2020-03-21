@@ -797,6 +797,7 @@ inline bool item_buffer<T, Allocator>::try_push(Arg&& ...in)
 			xchg = m_written.exchange(target, std::memory_order_release);
 		} while (target < xchg);
 	}
+	//m_written.fetch_add(1, std::memory_order_release);
 
 	return true;
 }
