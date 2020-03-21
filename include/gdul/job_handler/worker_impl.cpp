@@ -76,8 +76,8 @@ worker_impl::worker_impl(std::thread&& thrd, allocator_type allocator)
 
 worker_impl::~worker_impl()
 {
-	if (m_thread.get_id() == std::thread().get_id()) {
-		CloseHandle(m_threadHandle);
+	if (m_thread.get_id() == std::thread().get_id() && m_threadHandle) {
+		jh_detail::close_thread_handle(m_threadHandle);
 		m_threadHandle = nullptr;
 	}
 
@@ -145,9 +145,8 @@ void worker_impl::refresh_sleep_timer()
 bool worker_impl::is_sleepy() const
 {
 	const std::chrono::high_resolution_clock::time_point current(m_sleepTimer.now());
-	const std::chrono::high_resolution_clock::time_point delta(current - m_lastJobTimepoint);
 
-	return !(std::chrono::duration_cast<std::chrono::milliseconds>(current - delta).count() < m_sleepThreshhold);
+	return !(std::chrono::duration_cast<std::chrono::milliseconds>(current - m_lastJobTimepoint).count() < m_sleepThreshhold);
 }
 bool worker_impl::is_active() const
 {
@@ -224,7 +223,7 @@ allocator_type worker_impl::get_allocator() const
 void worker_impl::set_name(const std::string& name)
 {
 	assert(is_active() && "Cannot set name to inactive worker");
-#if defined(GDUL_DEBUG)
+#if defined(GDUL_JOB_DEBUG)
 	m_name = name;
 #else
 	(void)name;

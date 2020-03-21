@@ -18,27 +18,45 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include "batch_job_impl.h"
-#include <gdul/delegate/delegate.h>
-#include <gdul/job_handler/job_handler.h>
-#include <gdul/job_handler/job.h>
-#include <gdul/job_handler/job_impl.h>
+#pragma once
 
-namespace gdul
+#include <gdul/job_handler/globals.h>
+
+#if defined (GDUL_JOB_DEBUG)
+
+#include <gdul/job_handler/debug/job_tracker_node.h>
+
+// https://stackoverflow.com/questions/48896142/is-it-possible-to-get-hash-values-as-compile-time-constants
+template <typename Str>
+constexpr std::size_t constexp_str_hash(const Str& toHash)
 {
-namespace jh_detail
-{
-gdul::job _redirect_make_job(job_handler * handler, gdul::delegate<void()>&& workUnit)
-{
-	return handler->make_job(std::move(workUnit));
+	std::size_t result = 0xcbf29ce484222325ull; 
+
+	for (char c : toHash) {
+		result ^= c;
+		result *= 1099511628211ull;
+	}
+
+	return result;
 }
-bool _redirect_enable_if_ready(gdul::shared_ptr<job_impl>& jb)
+#endif
+
+namespace gdul {
+namespace jh_detail {
+
+class job_tracker
 {
-	return jb->enable_if_ready();
-}
-void _redirect_invoke_job(gdul::shared_ptr<job_impl>& jb)
-{
-	jb->operator()();
-}
+public:
+#if defined (GDUL_JOB_DEBUG)
+	static job_tracker_node* register_full_node(constexpr_id id, const char * name, const char* file, std::uint32_t line);
+	static job_tracker_node* register_batch_sub_node(constexpr_id id, const char* name);
+
+	static job_tracker_node* fetch_node(constexpr_id id);
+
+	static void dump_job_tree(const char* location);
+#else
+	static void dump_job_tree(const char*) {};
+#endif
+};
 }
 }

@@ -18,9 +18,9 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <gdul\job_handler\job_handler_impl.h>
 #include <string>
 #include <thread>
+#include <gdul/job_handler/job_handler_impl.h>
 #include <gdul/job_handler/job_handler.h>
 #include <gdul/job_handler/chunk_allocator.h>
 
@@ -41,7 +41,7 @@ thread_local job_handler_impl::tl_container job_handler_impl::t_items{ &job_hand
 job_handler_impl::job_handler_impl()
 	: m_jobImplChunkPool(jh_detail::Job_Impl_Allocator_Block_Size, m_mainAllocator)
 	, m_jobNodeChunkPool(jh_detail::Job_Impl_Allocator_Block_Size, m_mainAllocator)
-	, m_scatterJobChunkPool(Batch_Job_Allocator_Block_Size, m_mainAllocator)
+	, m_batchJobChunkPool(Batch_Job_Allocator_Block_Size, m_mainAllocator)
 	, m_workerIndices(0)
 	, m_workerCount(0)
 {
@@ -51,7 +51,7 @@ job_handler_impl::job_handler_impl(allocator_type & allocator)
 	: m_mainAllocator(allocator)
 	, m_jobImplChunkPool(jh_detail::Job_Impl_Allocator_Block_Size, m_mainAllocator)
 	, m_jobNodeChunkPool(jh_detail::Job_Impl_Allocator_Block_Size, m_mainAllocator)
-	, m_scatterJobChunkPool(Batch_Job_Allocator_Block_Size, m_mainAllocator)
+	, m_batchJobChunkPool(Batch_Job_Allocator_Block_Size, m_mainAllocator)
 	, m_workerIndices(0)
 	, m_workerCount(0)
 {
@@ -88,7 +88,7 @@ worker job_handler_impl::make_worker(gdul::delegate<void()> entryPoint)
 {
 	const std::uint16_t index(m_workerIndices.fetch_add(1, std::memory_order_relaxed));
 
-	const std::uint8_t autoCoreAffinity(static_cast<std::uint8_t>(index % std::thread::hardware_concurrency()));	
+	const std::uint8_t autoCoreAffinity(static_cast<std::uint8_t>(index % std::thread::hardware_concurrency()));
 
 	std::thread thread(&job_handler_impl::launch_worker, this, index);
 
@@ -139,7 +139,7 @@ concurrent_object_pool<job_node_chunk_rep, allocator_type>* job_handler_impl::ge
 
 concurrent_object_pool<batch_job_chunk_rep, allocator_type>* job_handler_impl::get_batch_job_chunk_pool() noexcept
 {
-	return &m_scatterJobChunkPool;
+	return &m_batchJobChunkPool;
 }
 
 void job_handler_impl::enqueue_job(job_impl_shared_ptr job)
@@ -153,17 +153,12 @@ bool job_handler_impl::try_consume_from_once(job_queue consumeFrom)
 	job_handler_impl::job_impl_shared_ptr jb;
 
 	if (m_jobQueues[consumeFrom].try_pop(jb)) {
-		job swap(std::move(job_handler::this_job));
-
-		job_handler::this_job = job(std::move(jb));
-
-		job_handler::this_job.m_impl->operator()();
-
-		job_handler::this_job = std::move(swap);
-
+		
+		consume_job(job(std::move(jb)));
+		
 		return true;
 	}
-	
+
 	return false;
 }
 void job_handler_impl::launch_worker(std::uint16_t index) noexcept
@@ -184,17 +179,27 @@ void job_handler_impl::launch_worker(std::uint16_t index) noexcept
 void job_handler_impl::work()
 {
 	while (t_items.this_worker_impl->is_active()) {
-		job_handler::this_job = job(fetch_job());
 
-		if (job_handler::this_job) {
-			(*job_handler::this_job.m_impl)();
-
-			t_items.this_worker_impl->refresh_sleep_timer();
+		if (job jb = fetch_job()) {
+			consume_job(std::move(jb));
 		}
-		else{
+		else {
 			t_items.this_worker_impl->idle();
 		}
 	}
+}
+
+void job_handler_impl::consume_job(job && jb)
+{
+	job swap(std::move(job_handler::this_job));
+
+	job_handler::this_job = job(std::move(jb));
+
+	job_handler::this_job.m_impl->operator()();
+
+	job_handler::this_job = std::move(swap);
+
+	t_items.this_worker_impl->refresh_sleep_timer();
 }
 
 job_handler_impl::job_impl_shared_ptr job_handler_impl::fetch_job()

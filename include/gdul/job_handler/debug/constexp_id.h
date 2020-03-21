@@ -18,27 +18,46 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include "batch_job_impl.h"
-#include <gdul/delegate/delegate.h>
-#include <gdul/job_handler/job_handler.h>
-#include <gdul/job_handler/job.h>
-#include <gdul/job_handler/job_impl.h>
+#pragma once
 
+#include <gdul/job_handler/globals.h>
+
+#if defined(GDUL_JOB_DEBUG)
 namespace gdul
 {
 namespace jh_detail
 {
-gdul::job _redirect_make_job(job_handler * handler, gdul::delegate<void()>&& workUnit)
+class job_tracker;
+}
+struct constexpr_id
 {
-	return handler->make_job(std::move(workUnit));
+	template <std::uint64_t Id>
+	static constexpr constexpr_id make()
+	{
+		return constexpr_id(Id);
+	}
+
+	constexpr_id merge(const constexpr_id& other) const
+	{
+		return constexpr_id(m_val + other.m_val);
+	}
+	std::uint64_t value() const noexcept { return m_val; }
+
+	constexpr_id(const constexpr_id&) = default;
+	constexpr_id(constexpr_id&&) = default;
+	constexpr_id& operator=(const constexpr_id&) = default;
+	constexpr_id& operator=(constexpr_id&&) = default;
+
+private:
+	friend class jh_detail::job_tracker;
+
+	std::uint64_t m_val;
+
+	constexpr constexpr_id(std::uint64_t id)
+		: m_val(id)
+	{}
+};
 }
-bool _redirect_enable_if_ready(gdul::shared_ptr<job_impl>& jb)
-{
-	return jb->enable_if_ready();
-}
-void _redirect_invoke_job(gdul::shared_ptr<job_impl>& jb)
-{
-	jb->operator()();
-}
-}
-}
+
+
+#endif

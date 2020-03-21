@@ -25,14 +25,14 @@ utility wrapper class for 128 bit atomic operations.
 ## concurrent_queue
 Multi producer multi consumer unbounded lock-free queue. FIFO is respected within the context of single producers. Basic exception safety may be enabled at the price of a slight performance decrease.
 
-Depends on atomic_shared_ptr.h
+Depends on atomic_shared_ptr.h, thread_local_member.h
 
 -------------------------------------------------------------------------------------------------------------------------------------------
 
 ## concurrent_object_pool
 Allocates chunks of objects and makes them avaliable for usage via get_object. Return objects using recycle_object. Concurrency safe & lock-free.
 
-Depends on concurrent_queue.h, atomic_shared_ptr.h
+Depends on concurrent_queue.h, atomic_shared_ptr.h, thread_local_member.h
 
 -------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -63,9 +63,14 @@ Main features would be:
 * Supports (multiple) job dependencies. (if job 'first' depends on job 'second' then 'first' will not be enqueued for consumption until 'second' has completed) 
 * Keeps multiple internal job queues (defined in gdul::jh_detail::Num_Job_Queues), with workers consuming from the further-back queues less frequently
 * Has three types of batch_job (splits an array of items combined with a processing delegate over multiple jobs). 
+* Job spawn graph may be dumped to file for viewing
 
+Job tracking instructions: 
+- make sure GDUL_JOB_DEBUG is defined in globals.h
+- for each job taking part in the tracking, call activate_job_tracking(name)
+- dump job graph using job_tracker::dump_job_tree(location)
 
-A quick usage example:
+A quick usage example for job:
 ```
 #include <iostream>
 #include <thread>

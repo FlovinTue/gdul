@@ -15,19 +15,19 @@
     <ProjectGuid>{38AC6E3A-729D-4527-83C6-3805A7274AA8}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>gdul</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0.18362.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
@@ -62,6 +62,7 @@
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <AdditionalIncludeDirectories>$(SolutionDir)External\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/Zi %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -93,13 +94,17 @@
     <ClInclude Include="..\..\include\gdul\job_handler\batch_job.h" />
     <ClInclude Include="..\..\include\gdul\job_handler\batch_job_impl.h" />
     <ClInclude Include="..\..\include\gdul\job_handler\chunk_allocator.h" />
+    <ClInclude Include="..\..\include\gdul\job_handler\debug\constexp_id.h" />
+    <ClInclude Include="..\..\include\gdul\job_handler\debug\job_tracker.h" />
+    <ClInclude Include="..\..\include\gdul\job_handler\debug\job_tracker_interface.h" />
+    <ClInclude Include="..\..\include\gdul\job_handler\debug\Job_tracker_node.h" />
     <ClInclude Include="..\..\include\gdul\job_handler\globals.h" />
     <ClInclude Include="..\..\include\gdul\job_handler\job.h" />
     <ClInclude Include="..\..\include\gdul\job_handler\job_handler.h" />
     <ClInclude Include="..\..\include\gdul\job_handler\job_handler_utility.h" />
     <ClInclude Include="..\..\include\gdul\job_handler\job_handler_impl.h" />
     <ClInclude Include="..\..\include\gdul\job_handler\job_impl.h" />
-    <ClInclude Include="..\..\include\gdul\job_handler\batch_job_interface.h" />
+    <ClInclude Include="..\..\include\gdul\job_handler\batch_job_impl_interface.h" />
     <ClInclude Include="..\..\include\gdul\job_handler\job_node.h" />
     <ClInclude Include="..\..\include\gdul\job_handler\worker.h" />
     <ClInclude Include="..\..\include\gdul\job_handler\worker_impl.h" />
@@ -110,6 +115,8 @@
   <ItemGroup>
     <ClCompile Include="..\..\include\gdul\job_handler\batch_job.cpp" />
     <ClCompile Include="..\..\include\gdul\job_handler\batch_job_impl.cpp" />
+    <ClCompile Include="..\..\include\gdul\job_handler\debug\job_tracker.cpp" />
+    <ClCompile Include="..\..\include\gdul\job_handler\debug\Job_tracker_node.cpp" />
     <ClCompile Include="..\..\include\gdul\job_handler\job.cpp" />
     <ClCompile Include="..\..\include\gdul\job_handler\job_handler.cpp" />
     <ClCompile Include="..\..\include\gdul\job_handler\job_handler_utility.cpp" />

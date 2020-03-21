@@ -21,8 +21,9 @@
 #pragma once
 
 #include <gdul/job_handler/job_handler_utility.h>
-#include <gdul/job_handler/batch_job_interface.h>
+#include <gdul/job_handler/batch_job_impl_interface.h>
 #include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
+#include <gdul/job_handler/debug/job_tracker_interface.h>
 
 namespace gdul {
 class job;
@@ -33,7 +34,7 @@ template <class InputContainer, class OutputContainer, class Process>
 class batch_job_impl;
 }
 
-class batch_job
+class batch_job : public jh_detail::job_tracker_interface
 {
 public:
 	batch_job();
@@ -43,26 +44,33 @@ public:
 	job_queue get_target_queue() const noexcept;
 
 	// this object may be discarded once enable() has been invoked
-	void enable();
+	bool enable() noexcept;
+	bool enable_locally_if_ready();
 
 	bool is_finished() const noexcept;
+	bool is_ready() const noexcept;
+
 	void wait_until_finished() noexcept;
+	void wait_until_ready() noexcept;
 
 	// Consume jobs until finished. Beware of recursive calls (stack overflow, stalls etc..)
 	void work_until_finished(job_queue consumeFrom);
 
+	// Consume jobs until ready. Beware of recursive calls (stack overflow, stalls etc..)
+	void work_until_ready(job_queue consumeFrom);
+
 	operator bool() const noexcept;
-
-	void set_name(const char* name);
-
-	// Get the duration of the job. Only valid if GDUL_DEBUG is defined & job has run
-	float get_time() const noexcept;
 
 	// Get the number of items written to the output container
 	std::size_t get_output_size() const noexcept;
 private:
 	friend class job_handler;
 	friend class job;
+
+#if defined(GDUL_JOB_DEBUG)
+	friend class jh_detail::job_tracker;
+	constexpr_id register_tracking_node(constexpr_id id, const char* name, const char* file, std::uint32_t line, bool /*batchSub*/) override final;
+#endif
 
 	job& get_endjob() noexcept;
 
@@ -71,6 +79,6 @@ private:
 	: m_impl(std::move(job))
 	{}
 
-	shared_ptr<jh_detail::batch_job_interface> m_impl;
+	shared_ptr<jh_detail::batch_job_impl_interface> m_impl;
 };
 }

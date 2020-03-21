@@ -8,14 +8,19 @@
 #include <gdul/WIP_concurrent_queue_fifo/concurrent_queue_fifo_v4.h>
 #include <queue>
 #include <mutex>
-#include "../Common/util.h"
-
+#include <random>
 
 // Test queue
 
 #ifdef MOODYCAMEL
 #include <concurrentqueue.h>
 #endif
+
+namespace gdul
+{
+extern std::random_device rd;
+extern std::mt19937 rng;
+}
 
 template <class T>
 class queue_mutex_wrapper
@@ -93,7 +98,7 @@ private:
 
 template<class T, class Allocator>
 inline tester<T, Allocator>::tester(Allocator&
-#ifdef GDUL	
+#ifdef GDUL
 	alloc
 #endif
 ) :
@@ -128,7 +133,7 @@ inline double tester<T, Allocator>::ExecuteConcurrent(std::uint32_t runs)
 	m_thrown = 0;
 	m_writtenSum = 0;
 	m_readSum = 0;
-	
+
 #if defined(GDUL_FIFO)
 	m_queue.reserve(Writes);
 #endif
@@ -370,7 +375,7 @@ inline double tester<T, Allocator>::ExecuteWrite(std::uint32_t runs)
 
 	return result;
 }
-		
+
 template<class T, class Allocator>
 inline bool tester<T, Allocator>::CheckResults() const
 {
@@ -441,7 +446,7 @@ inline void tester<T, Allocator>::Read(std::uint32_t reads)
 
 	while (!m_isRunning)
 		std::this_thread::yield();
-	
+
 	uint32_t sum(0);
 
 	T out{ 0 };
@@ -480,4 +485,3 @@ inline void tester<T, Allocator>::Read(std::uint32_t reads)
 #endif
 	m_readSum += sum;
 	}
-

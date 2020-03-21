@@ -20,10 +20,9 @@
 
 #include <thread>
 
-#include "job_handler_utility.h"
+#include <gdul/job_handler/job_handler_utility.h>
 
 #if defined(_WIN64) | defined(_WIN32)
-#define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #endif
@@ -85,20 +84,23 @@ thread_handle create_thread_handle()
 
 	return handle;
 }
+void close_thread_handle(thread_handle handle)
+{
+	CloseHandle(handle);
+}
 #else
-void set_thread_name(const char * /*name*/)
-{
-}
+void set_thread_name(const char*)
+{}
 void set_thread_priority(std::uint8_t, thread_handle)
-{
-}
+{}
 void set_thread_core_affinity(std::uint8_t, thread_handle)
-{
-}
+{}
 thread_handle create_thread_handle()
 {
 	return nullptr;
 }
+void close_thread_handle(thread_handle)
+{}
 #endif
 
 }

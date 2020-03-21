@@ -80,7 +80,7 @@ public:
 	allocator_type get_allocator() const;
 
 private:
-#ifdef GDUL_DEBUG
+#ifdef GDUL_JOB_DEBUG
 	std::string m_name;
 #endif
 	std::thread m_thread;
