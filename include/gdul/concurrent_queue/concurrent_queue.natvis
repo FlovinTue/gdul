@@ -42,7 +42,7 @@
 					</Exec>
 					<Loop>
 						<Exec>
-							sizeAccumulator += ((uint64_t)pBuffer->m_written - (uint64_t)pBuffer->_m_readSlot)
+							sizeAccumulator += ((uint64_t)pBuffer->_m_written - (uint64_t)pBuffer->_m_readSlot)
 						</Exec>
 						<Break Condition = "(pBuffer->m_next.m_debugView.m_u64 &amp; aspdetail::Cb_Mask) == 0"/>
 						<Exec>
@@ -86,7 +86,7 @@
 				<Variable Name="sizeAccumulator" InitialValue="0"/>
 
 				<Loop>
-					<Exec>sizeAccumulator += ((uint64_t)pBuffer->m_written - (uint64_t)pBuffer->_m_readSlot)</Exec>
+					<Exec>sizeAccumulator += ((uint64_t)pBuffer->_m_written - (uint64_t)pBuffer->_m_readSlot)</Exec>
 					<Break Condition="((pBuffer->m_next.m_debugView.m_u64 &amp; aspdetail::Cb_Mask) == 0)" />
 					<Exec>pBuffer = *(buffer_type**)(8 + (pBuffer->m_next.m_debugView.m_u64 &amp; aspdetail::Cb_Mask))</Exec>
 				</Loop>
@@ -96,16 +96,16 @@
 				<Exec>pBuffer = this</Exec>
 
 				<Loop>
-					<If Condition="itemCount == ((uint64_t)pBuffer->m_written - (uint64_t)pBuffer->_m_readSlot)">
+					<If Condition="itemCount == ((uint64_t)pBuffer->_m_written - (uint64_t)pBuffer->_m_readSlot)">
 						<Break Condition="((pBuffer->m_next.m_debugView.m_u64 &amp; aspdetail::Cb_Mask) == 0)" />
 						<Exec>pBuffer = *(buffer_type**)(8 + (pBuffer->m_next.m_debugView.m_u64 &amp; aspdetail::Cb_Mask))</Exec>
 						<Exec>pItem = pBuffer->m_dataBlock + ((uint64_t)pBuffer->_m_readSlot - (((uint64_t)pBuffer->_m_readSlot / pBuffer->m_capacity) * pBuffer->m_capacity))</Exec>
 						<Exec>itemCount = 0</Exec>
 					</If>
-					<If Condition="itemCount != ((uint64_t)pBuffer->m_written - (uint64_t)pBuffer->_m_readSlot)">
+					<If Condition="itemCount != ((uint64_t)pBuffer->_m_written - (uint64_t)pBuffer->_m_readSlot)">
 						<Item>pItem->m_data</Item>
 						<Exec>++pItem</Exec>
-						<If Condition="pItem == (pBuffer->m_dataBlock + (uint64_t)pBuffer->m_written - (uint64_t)pBuffer->_m_readSlot)">
+						<If Condition="pItem == (pBuffer->m_dataBlock + (uint64_t)pBuffer->_m_written - (uint64_t)pBuffer->_m_readSlot)">
 							<Exec>pItem= pBuffer->m_dataBlock</Exec>
 						</If>
 						<Exec>++itemCount</Exec>
