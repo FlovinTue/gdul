@@ -39,6 +39,7 @@ gdul::job _redirect_make_job(job_handler* handler, gdul::delegate<void()>&& work
 
 bool _redirect_enable_if_ready(gdul::shared_ptr<job_impl>& jb);
 void _redirect_invoke_job(gdul::shared_ptr<job_impl>& jb);
+bool _redirect_is_enabled(const gdul::shared_ptr<job_impl>& jb);
 
 template <class InputContainer, class OutputContainer, class Process>
 class batch_job_impl : public batch_job_impl_interface
@@ -65,6 +66,7 @@ public:
 	bool enable()  noexcept override final;
 	bool enable_locally_if_ready() override final;
 
+	bool is_enabled() const noexcept override final;
 	bool is_finished() const noexcept override final;
 	bool is_ready() const noexcept override final;
 
@@ -258,6 +260,11 @@ inline bool batch_job_impl<InputContainer, OutputContainer, Process>::enable_loc
 		return true;
 	}
 	return false;
+}
+template<class InputContainer, class OutputContainer, class Process>
+inline bool batch_job_impl<InputContainer, OutputContainer, Process>::is_enabled() const noexcept
+{
+	return _redirect_is_enabled(m_root.m_impl);
 }
 template<class InputContainer, class OutputContainer, class Process>
 inline bool batch_job_impl<InputContainer, OutputContainer, Process>::is_finished() const noexcept

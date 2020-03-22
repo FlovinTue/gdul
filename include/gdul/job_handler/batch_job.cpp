@@ -27,24 +27,22 @@ namespace gdul {
 batch_job::batch_job()
 	: m_impl(nullptr)
 {}
+batch_job::~batch_job()
+{
+	assert(!(*this) || m_impl->is_enabled() && "Job destructor ran before enable was called");
+}
 void batch_job::add_dependency(job & dependency)
 {
-	assert(m_impl && "Job not set");
-
 	if (m_impl)
 		m_impl->add_dependency(dependency);
 }
 void batch_job::set_target_queue(job_queue target) noexcept
 {
-	assert(m_impl && "Job not set");
-
 	if (m_impl)
 		m_impl->set_target_queue(target);
 }
 job_queue batch_job::get_target_queue() const noexcept 
 {
-	assert(m_impl && "Job not set");
-
 	if (!m_impl)
 		return jh_detail::Default_Job_Queue;
 
@@ -52,53 +50,37 @@ job_queue batch_job::get_target_queue() const noexcept
 }
 bool batch_job::enable() noexcept
 {
-	assert(m_impl && "Job not set");
-
 	return m_impl && m_impl->enable();
 }
 bool batch_job::enable_locally_if_ready()
 {
-	assert(m_impl && "Job not set");
-
 	return m_impl && m_impl->enable_locally_if_ready();
 }
 bool batch_job::is_finished() const noexcept
 {
-	assert(m_impl && "Job not set");
-
 	return m_impl && m_impl->is_finished();
 }
 bool batch_job::is_ready() const noexcept
 {
-	assert(m_impl && "Job not set");
-
 	return m_impl && m_impl->is_ready();
 }
 void batch_job::wait_until_finished() noexcept
 {
-	assert(m_impl && "Job not set");
-
 	if (m_impl)
 		m_impl->wait_until_finished();
 }
 void batch_job::wait_until_ready() noexcept
 {
-	assert(m_impl && "Job not set");
-
 	if (m_impl)
 		m_impl->wait_until_ready();
 }
 void batch_job::work_until_finished(job_queue consumeFrom)
 {
-	assert(m_impl && "Job not set");
-
 	if (m_impl)
 		m_impl->work_until_finished(consumeFrom);
 }
 void batch_job::work_until_ready(job_queue consumeFrom)
 {
-	assert(m_impl && "Job not set");
-
 	if (m_impl)
 		m_impl->work_until_ready(consumeFrom);
 }
@@ -108,8 +90,6 @@ batch_job::operator bool() const noexcept
 }
 std::size_t batch_job::get_output_size() const noexcept
 {
-	assert(m_impl && "Job not set");
-
 	if (!m_impl)
 		return 0;
 
@@ -118,8 +98,6 @@ std::size_t batch_job::get_output_size() const noexcept
 #if defined(GDUL_JOB_DEBUG)
 constexpr_id batch_job::register_tracking_node(constexpr_id id, const char * name, const char* file, std::uint32_t line, bool)
 {
-	assert(m_impl && "Job not set");
-
 	if (!m_impl)
 		return constexpr_id::make<0>();
 

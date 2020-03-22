@@ -40,5 +40,9 @@ void _redirect_invoke_job(gdul::shared_ptr<job_impl>& jb)
 {
 	jb->operator()();
 }
+bool _redirect_is_enabled(const gdul::shared_ptr<job_impl>& jb)
+{
+	return jb->is_enabled();
+}
 }
 }
