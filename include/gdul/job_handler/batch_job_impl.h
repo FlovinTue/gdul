@@ -27,6 +27,7 @@
 #include <gdul/job_handler/chunk_allocator.h>
 #include <array>
 #include <cassert>
+#include <algorithm>
 
 namespace gdul
 {
@@ -434,7 +435,7 @@ inline void batch_job_impl<InputContainer, OutputContainer, Process>::work_pack(
 	auto copyEndItr(copyBeginItr + batchSize);
 	auto copyTargetItr(m_output.begin() + lastBatchEnd);
 
-	std::copy(copyBeginItr, copyEndItr, copyTargetItr);
+	std::move(copyBeginItr, copyEndItr, copyTargetItr);
 
 	m_batchTracker[batchIndex] = (std::uint32_t)(lastBatchEnd + batchSize);
 }
