@@ -54,17 +54,19 @@ void job_impl::operator()()
 
 #if defined (GDUL_JOB_DEBUG)
 	const constexpr_id swap(job_handler::this_job.m_physicalId);
-	if (m_trackingNode)
+	if (m_trackingNode) {
+		m_trackingNode->m_enqueueTimeSet.log_time(m_enqueueTimer.get());
 		job_handler::this_job.m_physicalId = m_physicalId;
+	}
 
-	timer time;
+	timer completionTimer;
 #endif
 
 	m_workUnit();
 
 #if defined(GDUL_JOB_DEBUG)
 	if (m_trackingNode)
-		m_trackingNode->add_completion_time(time.get());
+		m_trackingNode->m_completionTimeSet.log_time(completionTimer.get());
 
 	job_handler::this_job.m_physicalId = swap;
 #endif
@@ -162,35 +164,43 @@ bool job_impl::is_ready() const noexcept
 }
 void job_impl::work_until_finished(job_queue consumeFrom)
 {
+	GDUL_JOB_DEBUG_CONDTIONAL(timer waitTimer)
 	while (!is_finished()) {
 		if (!m_handler->try_consume_from_once(consumeFrom)) {
 			jh_detail::job_handler_impl::t_items.this_worker_impl->refresh_sleep_timer();
 			jh_detail::job_handler_impl::t_items.this_worker_impl->idle();
 		}
 	}
+	GDUL_JOB_DEBUG_CONDTIONAL(if (m_trackingNode) m_trackingNode->m_waitTimeSet.log_time(waitTimer.get()))
 }
 void job_impl::work_until_ready(job_queue consumeFrom)
 {
+	GDUL_JOB_DEBUG_CONDTIONAL(timer waitTimer)
 	while (!is_ready() && !is_enabled()){
 		if (!m_handler->try_consume_from_once(consumeFrom)){
 			jh_detail::job_handler_impl::t_items.this_worker_impl->refresh_sleep_timer();
 			jh_detail::job_handler_impl::t_items.this_worker_impl->idle();
 		}
 	}
+	GDUL_JOB_DEBUG_CONDTIONAL(if (m_trackingNode) m_trackingNode->m_waitTimeSet.log_time(waitTimer.get()))
 }
 void job_impl::wait_until_finished() noexcept
 {
+	GDUL_JOB_DEBUG_CONDTIONAL(timer waitTimer)
 	while (!is_finished()) {
 		jh_detail::job_handler_impl::t_items.this_worker_impl->refresh_sleep_timer();
 		jh_detail::job_handler_impl::t_items.this_worker_impl->idle();
 	}
+	GDUL_JOB_DEBUG_CONDTIONAL(if (m_trackingNode) m_trackingNode->m_waitTimeSet.log_time(waitTimer.get()))
 }
 void job_impl::wait_until_ready() noexcept
 {
+	GDUL_JOB_DEBUG_CONDTIONAL(timer waitTimer)
 	while (!is_ready() && !is_enabled()){
 		jh_detail::job_handler_impl::t_items.this_worker_impl->refresh_sleep_timer();
 		jh_detail::job_handler_impl::t_items.this_worker_impl->idle();
 	}
+	GDUL_JOB_DEBUG_CONDTIONAL(if (m_trackingNode) m_trackingNode->m_waitTimeSet.log_time(waitTimer.get()))
 }
 void job_impl::detach_children()
 {
@@ -213,6 +223,10 @@ constexpr_id job_impl::register_tracking_node(constexpr_id id, const char* name,
 	m_physicalId = id;
 	m_trackingNode = !batchSub ? job_tracker::register_full_node(id, name, file, line) : job_tracker::register_batch_sub_node(id, name);
 	return m_trackingNode->id();
+}
+void job_impl::on_enqueue() noexcept 
+{
+	m_enqueueTimer.reset();
 }
 #endif
 }

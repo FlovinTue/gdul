@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../Common/Timer.h"
+#include <gdul/job_handler/debug/timer.h>
 #include <vector>
 
 namespace gdul {
@@ -21,7 +21,7 @@ public:
 private:
 	void evaluate_spin_count();
 
-	gdul::timer<float> m_workTime;
+	gdul::jh_detail::timer m_workTime;
 	std::size_t m_spinCount;
 	const float m_targetTime;
 

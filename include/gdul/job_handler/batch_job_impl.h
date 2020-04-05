@@ -29,6 +29,10 @@
 #include <cassert>
 #include <algorithm>
 
+#if defined(GDUL_JOB_DEBUG)
+#include <gdul/job_handler/debug/job_tracker.h>
+#endif
+
 namespace gdul
 {
 class job_handler;
@@ -127,10 +131,9 @@ private:
 
 	void work_pack(std::size_t batchIndex);
 
-#if defined(GDUL_JOB_DEBUG)
-	job_tracker_node* m_trackingNode;
-	timer m_timer;
-#endif
+	GDUL_JOB_DEBUG_CONDTIONAL(job_tracker_node* m_trackingNode)
+	GDUL_JOB_DEBUG_CONDTIONAL(timer m_completionTimer)
+	GDUL_JOB_DEBUG_CONDTIONAL(timer m_enqueueTimer)
 
 	std::array<std::uint32_t, Batch_Job_Max_Batches> m_batchTracker;
 
@@ -230,32 +233,44 @@ inline job_queue batch_job_impl<InputContainer, OutputContainer, Process>::get_t
 template<class InputContainer, class OutputContainer, class Process>
 inline void batch_job_impl<InputContainer, OutputContainer, Process>::wait_until_finished() noexcept
 {
+	GDUL_JOB_DEBUG_CONDTIONAL(timer waitTimer)
 	m_end.wait_until_finished();
+	GDUL_JOB_DEBUG_CONDTIONAL(if (m_trackingNode) m_trackingNode->m_waitTimeSet.log_time(waitTimer.get()))
 }
 template<class InputContainer, class OutputContainer, class Process>
 inline void batch_job_impl<InputContainer, OutputContainer, Process>::wait_until_ready() noexcept
 {
+	GDUL_JOB_DEBUG_CONDTIONAL(timer waitTimer)
 	m_root.wait_until_ready();
+	GDUL_JOB_DEBUG_CONDTIONAL(if (m_trackingNode) m_trackingNode->m_waitTimeSet.log_time(waitTimer.get()))
 }
 template<class InputContainer, class OutputContainer, class Process>
 inline void batch_job_impl<InputContainer, OutputContainer, Process>::work_until_finished(job_queue consumeFrom)
 {
+	GDUL_JOB_DEBUG_CONDTIONAL(timer waitTimer)
 	m_end.work_until_finished(consumeFrom);
+	GDUL_JOB_DEBUG_CONDTIONAL(if (m_trackingNode) m_trackingNode->m_waitTimeSet.log_time(waitTimer.get()))
 }
 template<class InputContainer, class OutputContainer, class Process>
 inline void batch_job_impl<InputContainer, OutputContainer, Process>::work_until_ready(job_queue consumeFrom)
 {
+	GDUL_JOB_DEBUG_CONDTIONAL(timer waitTimer)
 	m_root.work_until_ready(consumeFrom);
+	GDUL_JOB_DEBUG_CONDTIONAL(if (m_trackingNode) m_trackingNode->m_waitTimeSet.log_time(waitTimer.get()))
 }
 template<class InputContainer, class OutputContainer, class Process>
 inline bool batch_job_impl<InputContainer, OutputContainer, Process>::enable() noexcept
 {
+	GDUL_JOB_DEBUG_CONDTIONAL(m_enqueueTimer.reset())
 	return m_root.enable();
 }
 template<class InputContainer, class OutputContainer, class Process>
 inline bool batch_job_impl<InputContainer, OutputContainer, Process>::enable_locally_if_ready()
 {
 	if (_redirect_enable_if_ready(m_root.m_impl)){
+
+		GDUL_JOB_DEBUG_CONDTIONAL(m_enqueueTimer.reset())
+
 		m_enableFunc = &job::enable_locally_if_ready;
 		_redirect_invoke_job(m_root.m_impl);
 		return true;
@@ -413,9 +428,9 @@ inline void batch_job_impl<InputContainer, OutputContainer, Process>::make_jobs(
 template<class InputContainer, class OutputContainer, class Process>
 inline void batch_job_impl<InputContainer, OutputContainer, Process>::initialize()
 {
-#if defined(GDUL_JOB_DEBUG)
-	m_timer.reset();
-#endif
+	GDUL_JOB_DEBUG_CONDTIONAL(m_completionTimer.reset())
+	GDUL_JOB_DEBUG_CONDTIONAL(if (m_trackingNode)m_trackingNode->m_enqueueTimeSet.log_time(m_enqueueTimer.get()))
+
 	make_jobs<>();
 }
 template<class InputContainer, class OutputContainer, class Process>
@@ -447,19 +462,13 @@ inline void batch_job_impl<InputContainer, OutputContainer, Process>::finalize()
 		work_pack(m_batchCount - 1);
 	}
 
-#if defined(GDUL_JOB_DEBUG)
-	if (m_trackingNode)
-		m_trackingNode->add_completion_time(m_timer.get());
-#endif
+	GDUL_JOB_DEBUG_CONDTIONAL(if (m_trackingNode)m_trackingNode->m_completionTimeSet.log_time(m_completionTimer.get()))
 }
 template<class InputContainer, class OutputContainer, class Process>
 template <class U, std::enable_if_t<U::Specialize_Update>*>
 inline void batch_job_impl<InputContainer, OutputContainer, Process>::finalize()
 {
-#if defined(GDUL_JOB_DEBUG)
-	if (m_trackingNode)
-		m_trackingNode->add_completion_time(m_timer.get());
-#endif
+	GDUL_JOB_DEBUG_CONDTIONAL(if (m_trackingNode)m_trackingNode->m_completionTimeSet.log_time(m_completionTimer.get()))
 }
 #if defined(GDUL_JOB_DEBUG)
 template<class InputContainer, class OutputContainer, class Process>

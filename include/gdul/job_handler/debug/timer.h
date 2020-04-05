@@ -18,44 +18,30 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include "Job_tracker_node.h"
+#pragma once
+
+#include <gdul/job_handler/globals.h>
 
 #if defined(GDUL_JOB_DEBUG)
-
+#include <chrono>
 namespace gdul
 {
 namespace jh_detail
 {
-job_tracker_node::job_tracker_node()
-	: m_id(constexpr_id::make<0>())
-	, m_parent(constexpr_id::make<0>())
-	, m_type(job_tracker_node_default)
+class timer
 {
+public:
+	timer();
+
+	float get() const;
+	void reset();
+
+private:
+	std::chrono::high_resolution_clock m_clock;
+	std::chrono::high_resolution_clock::time_point m_fromTime;
+};
 }
-constexpr_id job_tracker_node::id() const
-{
-	return m_id;
-}
-constexpr_id job_tracker_node::parent() const
-{
-	return m_parent;
 }
 
-void job_tracker_node::set_node_type(job_tracker_node_type type)
-{
-	m_type = type;
-}
 
-job_tracker_node_type job_tracker_node::get_node_type() const
-{
-	return m_type;
-}
-
-const std::string & job_tracker_node::name() const
-{
-	return m_name;
-}
-
-}
-}
 #endif

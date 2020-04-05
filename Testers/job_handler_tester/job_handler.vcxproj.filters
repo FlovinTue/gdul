@@ -43,6 +43,12 @@
     <ClCompile Include="..\..\include\gdul\job_handler\debug\Job_tracker_node.cpp">
       <Filter>implementation\debug</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\include\gdul\job_handler\debug\log_time_set.cpp">
+      <Filter>implementation\debug</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\gdul\job_handler\debug\timer.cpp">
+      <Filter>implementation\debug</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="job_handler_tester.h">
@@ -103,6 +109,12 @@
       <Filter>implementation\debug</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\gdul\job_handler\debug\job_tracker.h">
+      <Filter>implementation\debug</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\gdul\job_handler\debug\log_time_set.h">
+      <Filter>implementation\debug</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\gdul\job_handler\debug\timer.h">
       <Filter>implementation\debug</Filter>
     </ClInclude>
   </ItemGroup>

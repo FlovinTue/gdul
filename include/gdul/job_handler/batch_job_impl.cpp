@@ -38,6 +38,7 @@ bool _redirect_enable_if_ready(gdul::shared_ptr<job_impl>& jb)
 }
 void _redirect_invoke_job(gdul::shared_ptr<job_impl>& jb)
 {
+	GDUL_JOB_DEBUG_CONDTIONAL(jb->on_enqueue())
 	jb->operator()();
 }
 bool _redirect_is_enabled(const gdul::shared_ptr<job_impl>& jb)

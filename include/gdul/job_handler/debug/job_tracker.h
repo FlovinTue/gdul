@@ -39,6 +39,9 @@ constexpr std::size_t constexp_str_hash(const Str& toHash)
 
 	return result;
 }
+#define GDUL_JOB_DEBUG_CONDTIONAL(conditional)conditional;
+#else
+#define GDUL_JOB_DEBUG_CONDTIONAL(conditional)
 #endif
 
 namespace gdul {

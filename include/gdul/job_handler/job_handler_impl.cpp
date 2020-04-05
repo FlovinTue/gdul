@@ -146,6 +146,8 @@ void job_handler_impl::enqueue_job(job_impl_shared_ptr job)
 {
 	const std::uint8_t target(job->get_target_queue());
 
+	GDUL_JOB_DEBUG_CONDTIONAL(job->on_enqueue())
+
 	m_jobQueues[target].push(std::move(job));
 }
 bool job_handler_impl::try_consume_from_once(job_queue consumeFrom)

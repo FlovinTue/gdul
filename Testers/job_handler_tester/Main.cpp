@@ -4,7 +4,6 @@
 #include "job_handler_tester.h"
 #include <iostream>
 #include <functional>
-#include "../Common/timer.h"
 #include <vld.h>
 #include "../Common/tracking_allocator.h"
 #include <gdul/job_handler/debug/job_tracker.h>

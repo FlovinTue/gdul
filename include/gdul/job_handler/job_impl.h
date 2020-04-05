@@ -31,6 +31,7 @@
 
 #if defined(GDUL_JOB_DEBUG)
 #include <gdul/job_handler/debug/job_tracker.h>
+#include <gdul/job_handler/debug/timer.h>
 #endif
 
 namespace gdul{
@@ -72,9 +73,8 @@ public:
 	bool is_enabled() const noexcept;
 	bool is_ready() const noexcept;
 
-#if defined(GDUL_JOB_DEBUG)
-	constexpr_id register_tracking_node(constexpr_id id, const char* name, const char* file, std::uint32_t line, bool batchSub);
-#endif
+	GDUL_JOB_DEBUG_CONDTIONAL(constexpr_id register_tracking_node(constexpr_id id, const char* name, const char* file, std::uint32_t line, bool batchSub))
+	GDUL_JOB_DEBUG_CONDTIONAL(void on_enqueue() noexcept)
 
 	void work_until_finished(job_queue consumeFrom);
 	void work_until_ready(job_queue consumeFrom);
@@ -82,13 +82,11 @@ public:
 	void wait_until_ready() noexcept;
 
 private:
-
 	void detach_children();
 
-#if defined(GDUL_JOB_DEBUG)
-	job_tracker_node* m_trackingNode;
-	constexpr_id m_physicalId;
-#endif
+	GDUL_JOB_DEBUG_CONDTIONAL(job_tracker_node* m_trackingNode)
+	GDUL_JOB_DEBUG_CONDTIONAL(constexpr_id m_physicalId)
+	GDUL_JOB_DEBUG_CONDTIONAL(timer m_enqueueTimer)
 
 	delegate<void()> m_workUnit;
 

@@ -54,7 +54,7 @@ class job_tracker_data
 public:
 	job_tracker_data()
 	{
-		auto itr = m_nodeMap.insert({ 0, job_tracker_node() });
+		auto itr = m_nodeMap.insert(std::make_pair( 0, job_tracker_node() ));
 		itr.first->second.m_name = "Undeclared_Root_Node";
 		itr.first->second.m_type = job_tracker_node_default;
 	}
@@ -77,13 +77,13 @@ job_tracker_node* job_tracker::register_full_node(constexpr_id id, const char * 
 	const constexpr_id groupMatriarch(id.merge(groupParent));
 	const constexpr_id localId(variation.merge(groupMatriarch));
 
-	auto itr = g_trackerData.m_nodeMap.insert({ localId.value(), job_tracker_node() });
+	auto itr = g_trackerData.m_nodeMap.insert(std::make_pair(localId.value(), job_tracker_node()));
 	if (itr.second){
 		itr.first->second.m_id = localId;
 		itr.first->second.m_parent = groupMatriarch;
 		itr.first->second.m_name = std::move(t_bufferString);
 
-		auto matriarchItr = g_trackerData.m_nodeMap.insert({ groupMatriarch.value(), job_tracker_node() });
+		auto matriarchItr = g_trackerData.m_nodeMap.insert(std::make_pair(groupMatriarch.value(), job_tracker_node()));
 		if (matriarchItr.second){
 			matriarchItr.first->second.m_id = groupMatriarch;
 			matriarchItr.first->second.m_parent = groupParent;
@@ -103,7 +103,7 @@ job_tracker_node* job_tracker::register_full_node(constexpr_id id, const char * 
 
 			matriarchItr.first->second.m_name = std::move(matriarchName);
 
-			auto groupParentItr = g_trackerData.m_nodeMap.insert({ groupParent.value(), job_tracker_node() });
+			auto groupParentItr = g_trackerData.m_nodeMap.insert(std::make_pair(groupParent.value(), job_tracker_node()));
 			if (groupParentItr.second){
 				groupParentItr.first->second.m_id = groupParent;
 				groupParentItr.first->second.set_node_type(job_tracker_node_matriarch);
@@ -126,7 +126,7 @@ job_tracker_node* job_tracker::register_batch_sub_node(constexpr_id id, const ch
 	const constexpr_id variation(std::hash<std::string>{}(t_bufferString));
 	const constexpr_id localId(variation.merge(id));
 
-	auto itr = g_trackerData.m_nodeMap.insert({ localId.value(), job_tracker_node() });
+	auto itr = g_trackerData.m_nodeMap.insert(std::make_pair(localId.value(), job_tracker_node()));
 	if (itr.second)
 	{
 		itr.first->second.m_id = localId;
@@ -151,13 +151,13 @@ void job_tracker::dump_job_tree(const char* location)
 
 	std::vector<job_tracker_node> nodes;
 
-	for (auto node : g_trackerData.m_nodeMap){
+	for (auto& node : g_trackerData.m_nodeMap){
 		nodes.push_back(node.second);
 	}
 
 	std::unordered_map<std::uint64_t, std::size_t> childCounter;
 
-	for (auto node : nodes){
+	for (auto& node : nodes){
 		if (node.get_node_type() == job_tracker_node_default || 
 			node.get_node_type() == job_tracker_node_batch){
 			++childCounter[node.parent().value()];
@@ -167,7 +167,7 @@ void job_tracker::dump_job_tree(const char* location)
 	std::string nodesOutput;
 	std::string linksOutput;
 
-	for (auto node : nodes){
+	for (auto& node : nodes){
 		write_node(node, childCounter, nodesOutput, linksOutput);
 	}
 

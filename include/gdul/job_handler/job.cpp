@@ -96,6 +96,9 @@ bool job::enable() noexcept
 bool job::enable_locally_if_ready() noexcept
 {
 	if (m_impl && m_impl->enable_if_ready()) {
+
+		GDUL_JOB_DEBUG_CONDTIONAL(m_impl->on_enqueue())
+
 		m_impl->operator()();
 
 		return true;

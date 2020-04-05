@@ -2,7 +2,6 @@
 
 #include <gdul\job_handler_master.h>
 #include "work_tracker.h"
-#include "Timer.h"
 
 namespace gdul
 {

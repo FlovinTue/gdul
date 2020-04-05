@@ -18,44 +18,50 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include "Job_tracker_node.h"
+#pragma once
+
+#include <gdul/job_handler/globals.h>
 
 #if defined(GDUL_JOB_DEBUG)
+#include <gdul/job_handler/debug/timer.h>
+#include <atomic>
 
-namespace gdul
-{
-namespace jh_detail
-{
-job_tracker_node::job_tracker_node()
-	: m_id(constexpr_id::make<0>())
-	, m_parent(constexpr_id::make<0>())
-	, m_type(job_tracker_node_default)
-{
-}
-constexpr_id job_tracker_node::id() const
-{
-	return m_id;
-}
-constexpr_id job_tracker_node::parent() const
-{
-	return m_parent;
-}
+namespace gdul {
+namespace jh_detail {
 
-void job_tracker_node::set_node_type(job_tracker_node_type type)
+class log_time_set
 {
-	m_type = type;
-}
+public:
+	log_time_set();
+	log_time_set(const log_time_set& other);
+	log_time_set(log_time_set&& other);
+	log_time_set& operator=(log_time_set&& other);
+	log_time_set& operator=(const log_time_set& other);
 
-job_tracker_node_type job_tracker_node::get_node_type() const
-{
-	return m_type;
-}
+	void log_time(float completionTime);
 
-const std::string & job_tracker_node::name() const
-{
-	return m_name;
-}
+	float get_avg() const;
+	float get_max() const;
+	float get_min() const;
+	float get_minTimepoint() const;
+	float get_maxTimepoint() const;
 
+
+
+private:
+	static timer s_globalTimer;
+
+	std::atomic_flag m_lock;
+
+	std::size_t m_completionCount;
+
+	float m_beginTime;
+	float m_totalTime;
+	float m_minTime;
+	float m_maxTime;
+	float m_minTimepoint;
+	float m_maxTimepoint;
+};
 }
 }
 #endif
