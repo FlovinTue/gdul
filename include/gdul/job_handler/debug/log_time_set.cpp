@@ -37,6 +37,7 @@ log_time_set::log_time_set()
 	, m_minTimepoint(0.f)
 	, m_maxTimepoint(0.f)
 	, m_completionCount(0)
+	, m_lock{ATOMIC_FLAG_INIT}
 {}
 log_time_set::log_time_set(const log_time_set & other)
 {
@@ -59,7 +60,7 @@ void log_time_set::log_time(float completionTime)
 {
 	const float completedAt(s_globalTimer.get());
 
-	while (!m_lock.test_and_set())
+	while (m_lock.test_and_set())
 		std::this_thread::yield();
 
 	if (completionTime < m_minTime) {

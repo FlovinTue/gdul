@@ -3,7 +3,7 @@
 #include <iostream>
 #include <algorithm>
 #include <thread>
-#include <gdul/job_handler/debug/timer.h>
+#include "../Common/Timer.h"
 #include <gdul/delegate/delegate.h>
 #include <array>
 #include "../Common/util.h"
@@ -82,7 +82,7 @@ float job_handler_tester::run_consumption_parallel_test(std::size_t jobs, float 
 	}
 	end.enable();
 
-	gdul::jh_detail::timer time;
+	timer<float> time;
 	root.enable();
 	end.wait_until_finished();
 
@@ -136,7 +136,7 @@ float job_handler_tester::run_consumption_strand_parallel_test(std::size_t jobs,
 		nextNum = children;
 	}
 
-	gdul::jh_detail::timer time;
+	timer<float> time;
 
 	root.enable();
 	end.wait_until_finished();
@@ -206,7 +206,7 @@ float job_handler_tester::run_consumption_strand_test(std::size_t jobs, float /*
 	end.add_dependency(previous);
 	end.enable();
 
-	gdul::jh_detail::timer time;
+	timer<float> time;
 
 	root.enable();
 	end.wait_until_finished();
@@ -226,7 +226,7 @@ void job_handler_tester::run_scatter_test_input_output(std::size_t arraySize, st
 	
 	std::size_t batchSize(stepSize);
 	
-	gdul::jh_detail::timer time;
+	timer<float> time;
 	for (std::size_t i = 0; i < passes; ++i) {
 	
 		m_scatterInput.resize(arraySize);

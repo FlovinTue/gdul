@@ -25,6 +25,12 @@
 #include <limits>
 #include <memory>
 
+#if defined(GDUL_JOB_DEBUG)
+#define GDUL_JOB_DEBUG_CONDTIONAL(conditional)conditional;
+#else
+#define GDUL_JOB_DEBUG_CONDTIONAL(conditional)
+#endif
+
 namespace gdul
 {
 
