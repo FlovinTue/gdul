@@ -25,7 +25,7 @@
 #if defined(GDUL_JOB_DEBUG)
 
 #include <gdul/job_handler/debug/constexp_id.h>
-#include <gdul/job_handler/debug/log_time_set.h>
+#include <gdul/job_handler/debug/time_set.h>
 #include <string>
 
 namespace gdul
@@ -50,9 +50,9 @@ struct job_tracker_node
 
 	const std::string& name() const;
 
-	log_time_set m_completionTimeSet;
-	log_time_set m_waitTimeSet;
-	log_time_set m_enqueueTimeSet;
+	time_set m_completionTimeSet;
+	time_set m_waitTimeSet;
+	time_set m_enqueueTimeSet;
 
 private:
 	friend class job_tracker;

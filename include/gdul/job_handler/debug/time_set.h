@@ -29,14 +29,14 @@
 namespace gdul {
 namespace jh_detail {
 
-class log_time_set
+class time_set
 {
 public:
-	log_time_set();
-	log_time_set(const log_time_set& other);
-	log_time_set(log_time_set&& other);
-	log_time_set& operator=(log_time_set&& other);
-	log_time_set& operator=(const log_time_set& other);
+	time_set();
+	time_set(const time_set& other);
+	time_set(time_set&& other);
+	time_set& operator=(time_set&& other);
+	time_set& operator=(const time_set& other);
 
 	void log_time(float completionTime);
 
@@ -46,7 +46,7 @@ public:
 	float get_minTimepoint() const;
 	float get_maxTimepoint() const;
 
-
+	std::size_t get_completion_count() const;
 
 private:
 	static timer s_globalTimer;

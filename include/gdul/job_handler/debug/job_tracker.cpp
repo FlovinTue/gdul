@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include "job_tracker.h"
+#include <gdul/job_handler/debug/job_tracker.h>
 
 #if defined (GDUL_JOB_DEBUG)
 #include <Windows.h>
@@ -47,7 +47,7 @@ std::string executable_name() {
 
 namespace gdul {
 namespace jh_detail {
-void write_node(const job_tracker_node& node, const std::unordered_map<std::uint64_t, std::size_t>& childCounter, std::string& outNodes, std::string& outLinks);
+void write_dgml_node(const job_tracker_node& node, const std::unordered_map<std::uint64_t, std::size_t>& childCounter, std::string& outNodes, std::string& outLinks);
 
 class job_tracker_data
 {
@@ -168,7 +168,7 @@ void job_tracker::dump_job_tree(const char* location)
 	std::string linksOutput;
 
 	for (auto& node : nodes){
-		write_node(node, childCounter, nodesOutput, linksOutput);
+		write_dgml_node(node, childCounter, nodesOutput, linksOutput);
 	}
 
 	std::ofstream outStream;
@@ -189,7 +189,7 @@ void job_tracker::dump_job_tree(const char* location)
 	outStream.close();
 }
 
-void write_node(const job_tracker_node& node, const std::unordered_map<std::uint64_t, std::size_t>& childCounter, std::string& outNodes, std::string& outLinks)
+void write_dgml_node(const job_tracker_node& node, const std::unordered_map<std::uint64_t, std::size_t>& childCounter, std::string& outNodes, std::string& outLinks)
 {
 	t_bufferString.clear();
 
@@ -236,6 +236,47 @@ void write_node(const job_tracker_node& node, const std::unordered_map<std::uint
 
 		outLinks.append(t_bufferString);
 	}
+}
+void write_job_time_set(const time_set& timeSet, std::ofstream& toStream, const char* withName)
+{
+	toStream << "<time_set name=\"" << withName << "\">\n";
+	toStream << "<avg_time>" << timeSet.get_avg() << "</avgtime>\n";
+	toStream << "<min_time>" << timeSet.get_min() << "</mintime>\n";
+	toStream << "<max_time>" << timeSet.get_max() << "</maxtime>\n";
+	toStream << "<min_timepoint>" << timeSet.get_minTimepoint() << "</min_timepoint>\n";
+	toStream << "<max_timepoint>" << timeSet.get_maxTimepoint() << "</max_timepoint>\n";
+	toStream << "<completion_count>" << timeSet.get_completion_count() << "</completion_count>\n";
+	toStream << "</time_set>\n";
+}
+void job_tracker::dump_job_time_sets(const char* location)
+{
+	const std::string folder(location);
+	const std::string programName(executable_name());
+	const std::string outputFile(folder + programName + "_" + "job_time_sets.xml");
+
+	std::ofstream outStream;
+	outStream.open(outputFile, std::ofstream::out);
+
+	outStream << "<?xml version=\"1.0\" encoding=\"utf - 8\"?>\n";
+	outStream << "<jobs>\n";
+	
+	for (auto& itr : g_trackerData.m_nodeMap) {
+		outStream << "<job name=\"";
+		outStream << itr.second.id().value();
+		outStream << "_";
+		outStream << itr.second.name();
+		outStream << "\">\n\"";
+		
+		write_job_time_set(itr.second.m_completionTimeSet, outStream, "completion_time");
+		write_job_time_set(itr.second.m_enqueueTimeSet, outStream, "enqueue_time");
+		write_job_time_set(itr.second.m_waitTimeSet, outStream, "wait_time");
+
+		outStream << "</job>\n";
+	}
+
+	outStream << "</jobs>\n";
+
+	outStream.close();
 }
 }
 }

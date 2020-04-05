@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include "Job_tracker_node.h"
+#include <gdul/job_handler/debug/job_tracker_node.h>
 
 #if defined(GDUL_JOB_DEBUG)
 

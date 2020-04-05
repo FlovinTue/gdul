@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include "log_time_set.h"
+#include <gdul/job_handler/debug/time_set.h>
 
 #if defined(GDUL_JOB_DEBUG)
 #include <memory>
@@ -27,9 +27,9 @@
 namespace gdul {
 namespace jh_detail {
 
-timer log_time_set::s_globalTimer;
+timer time_set::s_globalTimer;
 
-log_time_set::log_time_set()
+time_set::time_set()
 	: m_beginTime(0.f)
 	, m_totalTime(0.f)
 	, m_minTime(std::numeric_limits<float>::max())
@@ -39,24 +39,24 @@ log_time_set::log_time_set()
 	, m_completionCount(0)
 	, m_lock{ATOMIC_FLAG_INIT}
 {}
-log_time_set::log_time_set(const log_time_set & other)
+time_set::time_set(const time_set & other)
 {
 	operator=(other);
 }
-log_time_set::log_time_set(log_time_set&& other)
+time_set::time_set(time_set&& other)
 {
 	operator=(other);
 }
-log_time_set& log_time_set::operator=(log_time_set&& other)
+time_set& time_set::operator=(time_set&& other)
 {
 	return operator=(other);
 }
-log_time_set& log_time_set::operator=(const log_time_set& other)
+time_set& time_set::operator=(const time_set& other)
 {
-	std::memcpy(this, &other, sizeof(log_time_set));
+	std::memcpy(this, &other, sizeof(time_set));
 	return *this;
 }
-void log_time_set::log_time(float completionTime)
+void time_set::log_time(float completionTime)
 {
 	const float completedAt(s_globalTimer.get());
 
@@ -78,29 +78,33 @@ void log_time_set::log_time(float completionTime)
 
 	m_lock.clear();
 }
-float log_time_set::get_avg() const
+float time_set::get_avg() const
 {
 	return m_totalTime / (m_completionCount != 0 ? m_completionCount : 1);
 }
 
-float log_time_set::get_max() const
+float time_set::get_max() const
 {
 	return m_maxTime;
 }
 
-float log_time_set::get_min() const
+float time_set::get_min() const
 {
 	return m_minTime;
 }
 
-float log_time_set::get_minTimepoint() const
+float time_set::get_minTimepoint() const
 {
 	return m_minTimepoint;
 }
 
-float log_time_set::get_maxTimepoint() const
+float time_set::get_maxTimepoint() const
 {
 	return m_maxTimepoint;
+}
+std::size_t time_set::get_completion_count() const
+{
+	return m_completionCount;
 }
 }
 }

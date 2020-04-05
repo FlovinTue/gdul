@@ -40,13 +40,13 @@
     <ClCompile Include="..\..\include\gdul\job_handler\debug\job_tracker.cpp">
       <Filter>implementation\debug</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\include\gdul\job_handler\debug\Job_tracker_node.cpp">
-      <Filter>implementation\debug</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\include\gdul\job_handler\debug\log_time_set.cpp">
-      <Filter>implementation\debug</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\include\gdul\job_handler\debug\timer.cpp">
+      <Filter>implementation\debug</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\gdul\job_handler\debug\time_set.cpp">
+      <Filter>implementation\debug</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\gdul\job_handler\debug\job_tracker_node.cpp">
       <Filter>implementation\debug</Filter>
     </ClCompile>
   </ItemGroup>
@@ -102,19 +102,19 @@
     <ClInclude Include="..\..\include\gdul\job_handler\debug\job_tracker_interface.h">
       <Filter>implementation\debug</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\gdul\job_handler\debug\Job_tracker_node.h">
-      <Filter>implementation\debug</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\include\gdul\job_handler\debug\constexp_id.h">
       <Filter>implementation\debug</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\gdul\job_handler\debug\job_tracker.h">
       <Filter>implementation\debug</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\gdul\job_handler\debug\log_time_set.h">
+    <ClInclude Include="..\..\include\gdul\job_handler\debug\timer.h">
       <Filter>implementation\debug</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\gdul\job_handler\debug\timer.h">
+    <ClInclude Include="..\..\include\gdul\job_handler\debug\time_set.h">
+      <Filter>implementation\debug</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\gdul\job_handler\debug\job_tracker_node.h">
       <Filter>implementation\debug</Filter>
     </ClInclude>
   </ItemGroup>
