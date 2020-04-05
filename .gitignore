@@ -36,3 +36,7 @@
 .vs/Tester/v15/.suo
 .vs/Tester/v15/Solution.VC.db
 *.dgml
+*.cache
+*.pdb
+job_handler_plot_view/job_handler_plot_view/obj/Debug/job_handler_plot_view.csproj.FileListAbsolute.txt
+*.resources
