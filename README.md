@@ -61,7 +61,7 @@ A job system
 
 Main features would be:
 * Supports (multiple) job dependencies. (if job 'first' depends on job 'second' then 'first' will not be enqueued for consumption until 'second' has completed) 
-* Keeps multiple internal job queues (defined in gdul::jh_detail::Num_Job_Queues), with workers consuming from the further-back queues less frequently
+* Keeps multiple internal job queues (number defined by gdul::job_queue_count enum value), with workers consuming from the further-back queues less frequently (range of consumption is definable).
 * Has three types of batch_job (splits an array of items combined with a processing delegate over multiple jobs). 
 * Job spawn graph may be dumped to file for viewing
 
