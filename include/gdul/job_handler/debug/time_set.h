@@ -55,7 +55,6 @@ private:
 
 	std::size_t m_completionCount;
 
-	float m_beginTime;
 	float m_totalTime;
 	float m_minTime;
 	float m_maxTime;

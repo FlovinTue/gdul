@@ -30,6 +30,7 @@ job_tracker_node::job_tracker_node()
 	: m_id(constexpr_id::make<0>())
 	, m_parent(constexpr_id::make<0>())
 	, m_type(job_tracker_node_default)
+	, m_line(0)
 {
 }
 constexpr_id job_tracker_node::id() const
@@ -54,6 +55,16 @@ job_tracker_node_type job_tracker_node::get_node_type() const
 const std::string & job_tracker_node::name() const
 {
 	return m_name;
+}
+
+const std::string& job_tracker_node::physical_location() const
+{
+	return m_physicalLocation;
+}
+
+std::uint32_t job_tracker_node::line() const
+{
+	return m_line;
 }
 
 }

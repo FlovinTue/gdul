@@ -19,6 +19,8 @@ int main()
 		
 		tester.init(info);
 
+		tester.basic_tests();
+
 		const uint32_t scatterRuns(100);
 		float scatterTimeAccum(0.f);
 		std::size_t scatterBatchAccum(0);
@@ -42,6 +44,7 @@ int main()
 	}
 
 	gdul::jh_detail::job_tracker::dump_job_tree("");
+	gdul::jh_detail::job_tracker::dump_job_time_sets("");
 
 	std::cout << "Final allocated: " << gdul::s_allocated << std::endl;
 	

@@ -82,14 +82,18 @@ job_tracker_node* job_tracker::register_full_node(constexpr_id id, const char * 
 		itr.first->second.m_id = localId;
 		itr.first->second.m_parent = groupMatriarch;
 		itr.first->second.m_name = std::move(t_bufferString);
+		itr.first->second.m_physicalLocation = GDUL_FS_PATH(file).filename().string();
+		itr.first->second.m_line = line;
 
 		auto matriarchItr = g_trackerData.m_nodeMap.insert(std::make_pair(groupMatriarch.value(), job_tracker_node()));
 		if (matriarchItr.second){
 			matriarchItr.first->second.m_id = groupMatriarch;
 			matriarchItr.first->second.m_parent = groupParent;
 			matriarchItr.first->second.set_node_type(job_tracker_node_matriarch);
+			matriarchItr.first->second.m_physicalLocation = GDUL_FS_PATH(file).filename().string();
+			matriarchItr.first->second.m_line = line;
 			std::string matriarchName;
-			matriarchName.append(GDUL_FS_PATH(file).filename().string());
+			matriarchName.append(matriarchItr.first->second.m_physicalLocation);
 			matriarchName.append("__L:_");
 			matriarchName.append(std::to_string(line));
 			matriarchName.append("__");
@@ -108,7 +112,6 @@ job_tracker_node* job_tracker::register_full_node(constexpr_id id, const char * 
 				groupParentItr.first->second.m_id = groupParent;
 				groupParentItr.first->second.set_node_type(job_tracker_node_matriarch);
 				groupParentItr.first->second.m_name = "Unknown_Group_Parent";
-				
 			}
 		}
 	}
@@ -129,9 +132,13 @@ job_tracker_node* job_tracker::register_batch_sub_node(constexpr_id id, const ch
 	auto itr = g_trackerData.m_nodeMap.insert(std::make_pair(localId.value(), job_tracker_node()));
 	if (itr.second)
 	{
+		auto parent = g_trackerData.m_nodeMap.find(id.value());
+
 		itr.first->second.m_id = localId;
 		itr.first->second.m_parent = id;
 		itr.first->second.m_name = std::move(t_bufferString);
+		itr.first->second.m_physicalLocation = parent->second.physical_location();
+		itr.first->second.m_line = parent->second.line();
 	}
 	return &itr.first->second;
 }
@@ -267,9 +274,12 @@ void job_tracker::dump_job_time_sets(const char* location)
 		outStream << itr.second.name();
 		outStream << "\">\n\"";
 		
-		write_job_time_set(itr.second.m_completionTimeSet, outStream, "completion_time");
-		write_job_time_set(itr.second.m_enqueueTimeSet, outStream, "enqueue_time");
-		write_job_time_set(itr.second.m_waitTimeSet, outStream, "wait_time");
+		if (itr.second.m_completionTimeSet.get_completion_count())
+			write_job_time_set(itr.second.m_completionTimeSet, outStream, "completion_time");
+		if (itr.second.m_enqueueTimeSet.get_completion_count())
+			write_job_time_set(itr.second.m_enqueueTimeSet, outStream, "enqueue_time");
+		if (itr.second.m_waitTimeSet.get_completion_count())
+			write_job_time_set(itr.second.m_waitTimeSet, outStream, "wait_time");
 
 		outStream << "</job>\n";
 	}

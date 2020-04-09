@@ -30,8 +30,7 @@ namespace jh_detail {
 timer time_set::s_globalTimer;
 
 time_set::time_set()
-	: m_beginTime(0.f)
-	, m_totalTime(0.f)
+	: m_totalTime(0.f)
 	, m_minTime(std::numeric_limits<float>::max())
 	, m_maxTime(-std::numeric_limits<float>::max())
 	, m_minTimepoint(0.f)
@@ -58,18 +57,16 @@ time_set& time_set::operator=(const time_set& other)
 }
 void time_set::log_time(float completionTime)
 {
-	const float completedAt(s_globalTimer.get());
-
 	while (m_lock.test_and_set())
 		std::this_thread::yield();
 
 	if (completionTime < m_minTime) {
 		m_minTime = completionTime;
-		m_minTimepoint = completedAt;
+		m_minTimepoint = s_globalTimer.get();
 	}
 	if (m_maxTime < completionTime) {
 		m_maxTime = completionTime;
-		m_maxTimepoint = completedAt;
+		m_maxTimepoint = s_globalTimer.get();
 	}
 
 	m_totalTime += completionTime;

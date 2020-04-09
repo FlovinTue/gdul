@@ -49,6 +49,9 @@ struct job_tracker_node
 	job_tracker_node_type get_node_type() const;
 
 	const std::string& name() const;
+	const std::string& physical_location() const;
+
+	std::uint32_t line() const;
 
 	time_set m_completionTimeSet;
 	time_set m_waitTimeSet;
@@ -59,6 +62,9 @@ private:
 	friend class job_tracker_data;
 
 	std::string m_name;
+	std::string m_physicalLocation;
+
+	std::uint32_t m_line;
 
 	constexpr_id m_id;
 	constexpr_id m_parent;

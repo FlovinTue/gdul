@@ -30,7 +30,7 @@ class job;
 
 namespace jh_detail
 {
-template <class InputContainer, class OutputContainer, class Process>
+template <class InContainer, class OutContainer, class Process>
 class batch_job_impl;
 }
 
@@ -75,8 +75,8 @@ private:
 
 	job& get_endjob() noexcept;
 
-	template <class InputContainer, class OutputContainer, class Process>
-	batch_job(shared_ptr<jh_detail::batch_job_impl<InputContainer, OutputContainer, Process>>&& job)
+	template <class InContainer, class OutContainer, class Process>
+	batch_job(shared_ptr<jh_detail::batch_job_impl<InContainer, OutContainer, Process>>&& job)
 	: m_impl(std::move(job))
 	{}
 

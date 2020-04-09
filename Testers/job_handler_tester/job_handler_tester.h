@@ -24,6 +24,8 @@ public:
 
 	void init(const job_handler_tester_info& info);
 
+	void basic_tests();
+
 	void setup_workers();
 
 	float run_consumption_parallel_test(std::size_t jobs, float overDuration);
