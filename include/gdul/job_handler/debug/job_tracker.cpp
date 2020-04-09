@@ -181,7 +181,7 @@ void job_tracker::dump_job_tree(const char* location)
 	std::ofstream outStream;
 	outStream.open(outputFile,std::ofstream::out);
 	
-	outStream << "<?xml version=\"1.0\" encoding=\"utf - 8\"?>\n";
+	outStream << "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n";
 	outStream << "<DirectedGraph Title=\"DrivingTest\" Background=\"Grey\" xmlns=\"http://schemas.microsoft.com/vs/2009/dgml\">\n";
 
 	outStream << "<Nodes>\n";
@@ -247,9 +247,9 @@ void write_dgml_node(const job_tracker_node& node, const std::unordered_map<std:
 void write_job_time_set(const time_set& timeSet, std::ofstream& toStream, const char* withName)
 {
 	toStream << "<time_set name=\"" << withName << "\">\n";
-	toStream << "<avg_time>" << timeSet.get_avg() << "</avgtime>\n";
-	toStream << "<min_time>" << timeSet.get_min() << "</mintime>\n";
-	toStream << "<max_time>" << timeSet.get_max() << "</maxtime>\n";
+	toStream << "<avg_time>" << timeSet.get_avg() << "</avg_time>\n";
+	toStream << "<min_time>" << timeSet.get_min() << "</min_time>\n";
+	toStream << "<max_time>" << timeSet.get_max() << "</max_time>\n";
 	toStream << "<min_timepoint>" << timeSet.get_minTimepoint() << "</min_timepoint>\n";
 	toStream << "<max_timepoint>" << timeSet.get_maxTimepoint() << "</max_timepoint>\n";
 	toStream << "<completion_count>" << timeSet.get_completion_count() << "</completion_count>\n";
@@ -264,15 +264,21 @@ void job_tracker::dump_job_time_sets(const char* location)
 	std::ofstream outStream;
 	outStream.open(outputFile, std::ofstream::out);
 
-	outStream << "<?xml version=\"1.0\" encoding=\"utf - 8\"?>\n";
+	outStream << "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n";
 	outStream << "<jobs>\n";
 	
 	for (auto& itr : g_trackerData.m_nodeMap) {
-		outStream << "<job name=\"";
+		if (!itr.second.m_completionTimeSet.get_completion_count() &&
+			!itr.second.m_enqueueTimeSet.get_completion_count() &&
+			!itr.second.m_waitTimeSet.get_completion_count())
+			continue;
+
+		outStream << "<job id=\"";
 		outStream << itr.second.id().value();
-		outStream << "_";
-		outStream << itr.second.name();
-		outStream << "\">\n\"";
+		outStream << "\">\n";
+
+		outStream << "<job_name>" << itr.second.name() << "</job_name>\n";
+		outStream << "<physical_job>" << itr.second.physical_location() + "__L:_" + std::to_string(itr.second.line()) << "</physical_job>\n";
 		
 		if (itr.second.m_completionTimeSet.get_completion_count())
 			write_job_time_set(itr.second.m_completionTimeSet, outStream, "completion_time");
