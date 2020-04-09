@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.29926.136
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "job_time_set_view", "job_handler_plot_view\job_time_set_view.csproj", "{B86D3E42-0946-4675-880E-84EA1CAA74B7}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "job_time_set_view", "job_time_set_view\job_time_set_view.csproj", "{B86D3E42-0946-4675-880E-84EA1CAA74B7}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
