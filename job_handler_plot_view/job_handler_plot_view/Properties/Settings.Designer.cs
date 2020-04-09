@@ -8,7 +8,7 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-namespace job_handler_plot_view.Properties
+namespace job_time_set_view.Properties
 {
 
 

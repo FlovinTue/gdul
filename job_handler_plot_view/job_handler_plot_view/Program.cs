@@ -4,7 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
-namespace job_handler_plot_view
+namespace job_time_set_view
 {
     static class Program
     {
@@ -16,7 +16,7 @@ namespace job_handler_plot_view
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new job_handler_plot_view());
+            Application.Run(new job_time_set_view());
         }
     }
 }
