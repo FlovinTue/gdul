@@ -52,8 +52,10 @@ namespace job_time_set_view
                 return;
             }
 
+            StreamReader streamReader = new StreamReader(first, Encoding.ASCII);
+
             XmlDocument newDoc = new XmlDocument();
-            newDoc.Load(first);
+            newDoc.Load(streamReader);
 
             parse_xml(newDoc);
 
@@ -138,7 +140,7 @@ namespace job_time_set_view
                 page.Text = variationSource.Key;
 
                 Chart chart = new Chart();
-
+                
                 ((System.ComponentModel.ISupportInitialize)(chart)).BeginInit();
 
                 chart.Location = new System.Drawing.Point(4, 22);
@@ -147,15 +149,21 @@ namespace job_time_set_view
                 
                 ChartArea chartArea = new ChartArea();
                 chartArea.Name = "ChartArea1";
+                chartArea.AxisX.ScaleView.Zoomable = true;
+                chartArea.AxisY.ScaleView.Zoomable = true;
+                
                 chart.ChartAreas.Add(chartArea);
                 chart.Click += chart_clicked;
+                chart.MouseWheel += chart_zoom;
+
+                chart.Anchor = AnchorStyles.Top | AnchorStyles.Right | AnchorStyles.Left;
 
                 Legend legend = new Legend();
                 legend.Name = "Legend1";
                 chart.Legends.Add(legend);
                 
                 Series series = new Series();
-                series.Name = "Series1";
+                series.Name = variationSource.Key;
                 series.Legend = "Legend1";
                 series.ChartArea = "ChartArea1";
                 series.YValueType = ChartValueType.Double;
@@ -199,7 +207,10 @@ namespace job_time_set_view
             foreach(TabPage tab in this.tabControl1.TabPages)
             {
                 foreach (Chart chart in tab.Controls)
+                {
                     chart.Click -= chart_clicked;
+                    chart.MouseWheel -= chart_zoom;
+                }
             }
 
             this.tabControl1.TabPages.Clear();  
@@ -219,10 +230,10 @@ namespace job_time_set_view
             Chart chart = sender as Chart;
             MouseEventArgs args = e as MouseEventArgs;
 
-            if (chart == null)
+            if (chart == null || args == null)
                 return;
 
-           HitTestResult hitTestResult = chart.HitTest(args.X, args.Y);
+            HitTestResult hitTestResult = chart.HitTest(args.X, args.Y);
 
             DataPoint hitPoint = hitTestResult.Object as DataPoint;
 
@@ -237,6 +248,39 @@ namespace job_time_set_view
             {
                 this.ItemProperties.Items.Add(infoPair.Item1 + infoPair.Item2);
             }
+        }
+
+        private void chart_zoom(object sender, EventArgs e)
+        {
+            Chart chart = sender as Chart;
+            MouseEventArgs args = e as MouseEventArgs;
+
+            if (chart == null || args == null)
+                return;
+
+            var xAxis = chart.ChartAreas[0].AxisX;
+            var yAxis = chart.ChartAreas[0].AxisY;
+
+            if (args.Delta < 0)
+            {
+                xAxis.ScaleView.ZoomReset();
+                yAxis.ScaleView.ZoomReset();
+                return;
+            }
+            
+            var xMin = xAxis.ScaleView.ViewMinimum;
+            var xMax = xAxis.ScaleView.ViewMaximum;
+            var yMin = yAxis.ScaleView.ViewMinimum;
+            var yMax = yAxis.ScaleView.ViewMaximum;
+
+            var posXStart = xAxis.PixelPositionToValue(args.Location.X) - (xMax - xMin) * 0.9f;
+            var posXFinish = xAxis.PixelPositionToValue(args.Location.X) + (xMax - xMin) * 0.9f;
+            var posYStart = yAxis.PixelPositionToValue(args.Location.Y) - (yMax - yMin) * 0.9f;
+            var posYFinish = yAxis.PixelPositionToValue(args.Location.Y) + (yMax - yMin) * 0.9f;
+
+            xAxis.ScaleView.Zoom(posXStart, posXFinish);
+            yAxis.ScaleView.Zoom(posYStart, posYFinish);
+            
         }
 
     }
