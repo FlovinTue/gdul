@@ -13,14 +13,14 @@ using System.Windows.Forms.DataVisualization.Charting;
 
 namespace job_time_set_view
 {
-    using job_info = List<string>;
+    using job_info = List<Tuple<string, string>>;
 
     public partial class job_time_set_view : Form
     {
         private Dictionary<string, job_info> m_jobInfos;
 
         // dataSource -> dataVariation -> value list with links to corresponding job_info
-        private Dictionary<string, Dictionary<string, List<Tuple<float, job_info>>>> m_dataSources;
+        private Dictionary<string, Dictionary<string, List<Tuple<float, string>>>> m_dataSources;
 
         // for string parse conversion
         private System.Globalization.CultureInfo m_enCultureInfo;
@@ -30,7 +30,7 @@ namespace job_time_set_view
             InitializeComponent();
 
             m_jobInfos = new Dictionary<string, job_info>();
-            m_dataSources = new Dictionary<string, Dictionary<string, List<Tuple<float, job_info>>>>();
+            m_dataSources = new Dictionary<string, Dictionary<string, List<Tuple<float, string>>>>();
 
             m_enCultureInfo = new System.Globalization.CultureInfo("en-US");
         }
@@ -87,7 +87,7 @@ namespace job_time_set_view
 
                 m_jobInfos.Add(jobIdStr, info);
 
-                info.Add(jobIdentifier.Name + ": " + jobIdentifier.Value.ToString());
+                info.Add(new Tuple<string, string>(jobIdentifier.Name + ": ",  jobIdentifier.Value.ToString()));
 
                 for(var mem = 0; mem < job.ChildNodes.Count; ++mem)
                 {
@@ -97,7 +97,7 @@ namespace job_time_set_view
                     {
                         string setName = member.Attributes.Item(0).Value.ToString();
                         if (!m_dataSources.ContainsKey(setName))
-                            m_dataSources.Add(setName, new Dictionary<string, List<Tuple<float, job_info>>>());
+                            m_dataSources.Add(setName, new Dictionary<string, List<Tuple<float, string>>>());
 
                         var dataSource = m_dataSources[setName];
                         for (var tsIndex = 0; tsIndex < member.ChildNodes.Count; ++tsIndex)
@@ -107,18 +107,18 @@ namespace job_time_set_view
                             string tsMemberName = tsMember.Name;
 
                             if (!dataSource.ContainsKey(tsMemberName))
-                                dataSource.Add(tsMemberName, new List<Tuple<float, job_info>>());
+                                dataSource.Add(tsMemberName, new List<Tuple<float, string>>());
 
                             string valueStr = tsMember.FirstChild.Value;
                             float value = float.Parse(valueStr, m_enCultureInfo);
 
-                            dataSource[tsMemberName].Add(new Tuple<float, job_info>(value, info));
-                            info.Add(setName + "_" + tsMemberName + ": " + valueStr);
+                            dataSource[tsMemberName].Add(new Tuple<float, string>(value, jobIdStr));
+                            info.Add(new Tuple<string, string>(setName + "_",  tsMemberName + ": " + valueStr));
                         }
                         continue;
                     }
 
-                    info.Add(member.Name + ": " + member.FirstChild.Value.ToString());
+                    info.Add(new Tuple<string, string>(member.Name + ": ", member.FirstChild.Value.ToString()));
                 }
             }
         }
@@ -144,24 +144,45 @@ namespace job_time_set_view
                 chart.Location = new System.Drawing.Point(4, 22);
                 chart.Size = new System.Drawing.Size(846, 669);
                 chart.TabIndex = 5;
-
+                
                 ChartArea chartArea = new ChartArea();
                 chartArea.Name = "ChartArea1";
                 chart.ChartAreas.Add(chartArea);
+                chart.Click += chart_clicked;
 
                 Legend legend = new Legend();
                 legend.Name = "Legend1";
                 chart.Legends.Add(legend);
-
+                
                 Series series = new Series();
                 series.Name = "Series1";
                 series.Legend = "Legend1";
                 series.ChartArea = "ChartArea1";
+                series.YValueType = ChartValueType.Double;
+                series.YAxisType = AxisType.Primary;
 
                 foreach(var data in variationSource.Value)
                 {
-                    series.Points.Add(data.Item1);
+                    job_info info = m_jobInfos[data.Item2];
+
+                    DataPoint point = new DataPoint();
+                    point.SetValueY(data.Item1);
+                    point.Label = info[1].Item2;
+
+                    StringBuilder toolTip = new StringBuilder();
+                    
+                    foreach(var infoPair in info)
+                    {
+                        toolTip.Append(infoPair.Item1);
+                        toolTip.Append(infoPair.Item2);
+                        toolTip.Append("\n");
+                    }
+                    point.ToolTip = toolTip.ToString();
+                    point.SetCustomProperty("job", data.Item2);
+
+                    series.Points.Add(point);
                 }
+                series.Sort(PointSortOrder.Descending);
 
                 chart.Series.Add(series);
 
@@ -171,25 +192,16 @@ namespace job_time_set_view
 
                 this.tabControl1.TabPages.Add(page);
             }
-
-
-            //chartArea1.Name = "ChartArea1";
-            //this.chart1.ChartAreas.Add(chartArea1);
-            //legend1.Name = "Legend1";
-            //this.chart1.Legends.Add(legend1);
-            //this.chart1.Location = new System.Drawing.Point(3, 3);
-            //this.chart1.Name = "chart1";
-            //series1.ChartArea = "ChartArea1";
-            //series1.Legend = "Legend1";
-            //series1.Name = "Series1";
-            //this.chart1.Series.Add(series1);
-            //this.chart1.Size = this.tabControl1.Size;
-            //this.chart1.TabIndex = 0;
-            //this.chart1.Text = "chart1";
         }
 
         private void listBox1_SelectedIndexChanged(object sender, EventArgs e)
         {
+            foreach(TabPage tab in this.tabControl1.TabPages)
+            {
+                foreach (Chart chart in tab.Controls)
+                    chart.Click -= chart_clicked;
+            }
+
             this.tabControl1.TabPages.Clear();  
 
             var selectedItem = this.DataSource.SelectedItem;
@@ -200,24 +212,31 @@ namespace job_time_set_view
             generate_tabs(selectedItem as string);
         }
 
-        private void job_time_set_view_Load(object sender, EventArgs e)
+        private void chart_clicked(object sender, EventArgs e)
         {
+            this.ItemProperties.Items.Clear();
 
-        }
+            Chart chart = sender as Chart;
+            MouseEventArgs args = e as MouseEventArgs;
 
-        private void label1_Click(object sender, EventArgs e)
-        {
+            if (chart == null)
+                return;
 
-        }
+           HitTestResult hitTestResult = chart.HitTest(args.X, args.Y);
 
-        private void listBox1_SelectedIndexChanged_1(object sender, EventArgs e)
-        {
+            DataPoint hitPoint = hitTestResult.Object as DataPoint;
 
-        }
+            if (hitPoint == null)
+                return;
 
-        private void label2_Click(object sender, EventArgs e)
-        {
+            string job = hitPoint.GetCustomProperty("job");
 
+            job_info info = m_jobInfos[job];
+            
+            foreach(var infoPair in info)
+            {
+                this.ItemProperties.Items.Add(infoPair.Item1 + infoPair.Item2);
+            }
         }
 
     }

@@ -53,7 +53,6 @@
             this.label1.Size = new System.Drawing.Size(67, 13);
             this.label1.TabIndex = 2;
             this.label1.Text = "Data Source";
-            this.label1.Click += new System.EventHandler(this.label1_Click);
             // 
             // ItemProperties
             // 
@@ -65,7 +64,6 @@
             this.ItemProperties.Name = "ItemProperties";
             this.ItemProperties.Size = new System.Drawing.Size(239, 420);
             this.ItemProperties.TabIndex = 3;
-            this.ItemProperties.SelectedIndexChanged += new System.EventHandler(this.listBox1_SelectedIndexChanged_1);
             // 
             // label2
             // 
@@ -78,7 +76,6 @@
             this.label2.Size = new System.Drawing.Size(77, 13);
             this.label2.TabIndex = 4;
             this.label2.Text = "Item Properties";
-            this.label2.Click += new System.EventHandler(this.label2_Click);
             // 
             // tabControl1
             // 
@@ -104,7 +101,6 @@
             this.Controls.Add(this.tabControl1);
             this.Name = "job_time_set_view";
             this.Text = "job_time_set_view";
-            this.Load += new System.EventHandler(this.job_time_set_view_Load);
             this.DragDrop += new System.Windows.Forms.DragEventHandler(this.job_time_set_view_on_drag_drop);
             this.DragEnter += new System.Windows.Forms.DragEventHandler(this.job_time_set_view_drag_enter);
             this.ResumeLayout(false);
