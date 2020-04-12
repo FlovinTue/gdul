@@ -22,7 +22,6 @@
 #include <thread>
 #include <gdul/job_handler/job_handler_impl.h>
 #include <gdul/job_handler/job_handler.h>
-#include <gdul/job_handler/chunk_allocator.h>
 
 #if defined(_WIN64) | defined(_WIN32)
 #define NOMINMAX
@@ -39,22 +38,25 @@ namespace jh_detail
 thread_local job_handler_impl::tl_container job_handler_impl::t_items{ &job_handler_impl::t_items.m_implicitWorker };
 
 job_handler_impl::job_handler_impl()
-	: m_jobImplChunkPool(jh_detail::Job_Allocator_Block_Size, m_mainAllocator)
-	, m_jobNodeChunkPool(jh_detail::Job_Allocator_Block_Size, m_mainAllocator)
-	, m_batchJobChunkPool(Batch_Job_Allocator_Block_Size, m_mainAllocator)
-	, m_workerIndices(0)
-	, m_workerCount(0)
+	: job_handler_impl(allocator_type())
 {
+
 }
 
-job_handler_impl::job_handler_impl(allocator_type & allocator)
+job_handler_impl::job_handler_impl(allocator_type allocator)
 	: m_mainAllocator(allocator)
-	, m_jobImplChunkPool(jh_detail::Job_Allocator_Block_Size, m_mainAllocator)
-	, m_jobNodeChunkPool(jh_detail::Job_Allocator_Block_Size, m_mainAllocator)
-	, m_batchJobChunkPool(Batch_Job_Allocator_Block_Size, m_mainAllocator)
 	, m_workerIndices(0)
 	, m_workerCount(0)
 {
+	constexpr std::size_t jobImplAllocSize(allocate_shared_size<job_impl, chunk_allocator<job_impl>>());
+	constexpr std::size_t jobNodeAllocSize(allocate_shared_size<job_node, chunk_allocator<job_node>>());
+
+
+	constexpr std::size_t batchJobAllocSize(allocate_shared_size<dummy_batch_type, chunk_allocator<dummy_batch_type>>());
+
+	m_jobImplChunkPool.init<jobImplAllocSize, alignof(job_impl)>(Job_Allocator_Block_Size, m_mainAllocator);
+	m_jobNodeChunkPool.init<jobNodeAllocSize, alignof(job_node)>(Job_Allocator_Block_Size, m_mainAllocator);
+	m_batchJobChunkPool.init<batchJobAllocSize, alignof(dummy_batch_type)>(Batch_Job_Allocator_Block_Size, m_mainAllocator);
 }
 
 
@@ -103,7 +105,7 @@ worker job_handler_impl::make_worker(gdul::delegate<void()> entryPoint)
 }
 job job_handler_impl::make_job(delegate<void()>&& workUnit)
 {
-	job_impl_allocator alloc(&m_jobImplChunkPool);
+	chunk_allocator<job_impl> alloc(m_jobImplChunkPool.create_allocator<job_impl>());
 	const job_impl_shared_ptr jobImpl(gdul::allocate_shared<job_impl>
 		(
 			alloc,
@@ -132,16 +134,14 @@ std::size_t job_handler_impl::active_job_count() const noexcept
 
 	return accum;
 }
-concurrent_object_pool<job_node_chunk_rep, allocator_type>* job_handler_impl::get_job_node_chunk_pool() noexcept
+chunk_allocator<job_node> job_handler_impl::get_job_node_allocator() const noexcept
 {
-	return &m_jobNodeChunkPool;
+	return m_jobNodeChunkPool.create_allocator<job_node>();
 }
-
-concurrent_object_pool<batch_job_chunk_rep, allocator_type>* job_handler_impl::get_batch_job_chunk_pool() noexcept
+chunk_allocator<typename dummy_batch_type> job_handler_impl::get_batch_job_allocator() const noexcept
 {
-	return &m_batchJobChunkPool;
+	return m_batchJobChunkPool.create_allocator<dummy_batch_type>();
 }
-
 void job_handler_impl::enqueue_job(job_impl_shared_ptr job)
 {
 	const std::uint8_t target(job->get_target_queue());

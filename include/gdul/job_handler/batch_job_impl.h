@@ -24,7 +24,6 @@
 #include <gdul/job_handler/job.h>
 #include <gdul/delegate/delegate.h>
 #include <gdul/job_handler/batch_job_impl_interface.h>
-#include <gdul/job_handler/chunk_allocator.h>
 #include <array>
 #include <cassert>
 #include <algorithm>
@@ -38,6 +37,9 @@ namespace gdul
 class job_handler;
 
 namespace jh_detail {
+
+struct dummy_batch_container { using value_type = int; };
+using dummy_batch_type = batch_job_impl<dummy_batch_container, dummy_batch_container, delegate<bool(int&, int&)>>;
 
 // Gets rid of circular dependency job_handler->batch_job_impl & batch_job_impl->job_handler
 gdul::job _redirect_make_job(job_handler* handler, gdul::delegate<void()>&& workUnit);
@@ -489,15 +491,5 @@ inline void batch_job_impl<InContainer, OutContainer, Process>::track_sub_job(jo
 		((job_tracker_interface*)(&job))->register_tracking_node(m_trackingNode->id(), name, "", 0, true);
 }
 #endif
-struct dummy_container{using value_type = int;};
-
-// Memory chunk representation of batch_job_impl
-#pragma warning(push)
-#pragma warning(disable:4324)
-struct alignas(alignof(std::max_align_t)) batch_job_chunk_rep
-{
-	std::uint8_t dummy[allocate_shared_size<batch_job_impl<dummy_container, dummy_container, gdul::delegate<bool(int&, int&)>>, chunk_allocator<batch_job_impl<dummy_container, dummy_container, gdul::delegate<bool(int&, int&)>>, batch_job_chunk_rep>>()]{};
-};
-#pragma warning(pop)
 }
 }

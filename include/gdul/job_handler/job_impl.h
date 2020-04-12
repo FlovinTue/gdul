@@ -24,7 +24,6 @@
 
 
 #include <gdul/job_handler/job_handler_utility.h>
-#include <gdul/job_handler/chunk_allocator.h>
 #include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
 #include <gdul/job_handler/job_node.h>
 #include <gdul/delegate/delegate.h>
@@ -99,11 +98,6 @@ private:
 	std::atomic_bool m_finished;
 
 	job_queue m_targetQueue;
-};
-// Memory chunk representation of job_impl
-struct alignas(alignof(job_impl)) job_impl_chunk_rep
-{
-	std::uint8_t dummy[allocate_shared_size<job_impl, chunk_allocator<jh_detail::job_impl, job_impl_chunk_rep>>()]{};
 };
 }
 }
