@@ -26,7 +26,7 @@
 #include <gdul/job_handler/batch_job.h>
 #include <gdul/concurrent_object_pool/concurrent_object_pool.h>
 #include <gdul/delegate/delegate.h>
-#include <gdul/WIP_chunk_allocator/chunk_allocator.h>
+#include <gdul/WIP_pool_allocator/pool_allocator.h>
 
 #pragma once
 
@@ -108,7 +108,7 @@ public:
 		std::size_t batchSize,
 		delegate<void(std::size_t)> outputResizeFunc);
 private:
-	chunk_allocator<jh_detail::dummy_batch_type> get_batch_job_allocator() const noexcept;
+	pool_allocator<jh_detail::dummy_batch_type> get_batch_job_allocator() const noexcept;
 
 	gdul::shared_ptr<jh_detail::job_handler_impl> m_impl;
 
@@ -158,7 +158,7 @@ inline batch_job job_handler::make_batch_job(
 {
 	using batch_type = jh_detail::batch_job_impl<InContainer, InContainer, delegate<void(typename InContainer::value_type&)>>;
 
-	chunk_allocator<batch_type> alloc(get_batch_job_allocator());
+	pool_allocator<batch_type> alloc(get_batch_job_allocator());
 
 	shared_ptr<batch_type> sp = gdul::allocate_shared<batch_type>(alloc, input, input, std::move(process), batchSize, delegate<void(std::size_t)>([](std::size_t) {}), this);
 
@@ -175,7 +175,7 @@ inline batch_job job_handler::make_batch_job(
 {
 	using batch_type = jh_detail::batch_job_impl<InOutContainer, InOutContainer, delegate<bool(typename InOutContainer::value_type&)>>;
 
-	chunk_allocator<batch_type> alloc(get_batch_job_allocator());
+	pool_allocator<batch_type> alloc(get_batch_job_allocator());
 
 	shared_ptr<batch_type> sp = gdul::allocate_shared<batch_type>(alloc, inputOutput, inputOutput, std::move(process), batchSize, std::move(outputResizeFunc), this);
 
@@ -193,7 +193,7 @@ inline batch_job job_handler::make_batch_job(
 {
 	using batch_type = jh_detail::batch_job_impl<InContainer, OutContainer, delegate<bool(typename InContainer::value_type&, typename OutContainer::value_type&)>>;
 
-	chunk_allocator<batch_type> alloc(get_batch_job_allocator());
+	pool_allocator<batch_type> alloc(get_batch_job_allocator());
 
 	shared_ptr<batch_type> sp = gdul::allocate_shared<batch_type>(alloc, input, output, std::move(process), batchSize, std::move(outputResizeFunc), this);
 

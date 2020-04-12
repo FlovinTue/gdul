@@ -31,7 +31,7 @@
 #include <gdul/job_handler/job.h>
 #include <gdul/job_handler/job_handler_utility.h>
 #include <gdul/job_handler/job_impl.h>
-#include <gdul/WIP_chunk_allocator/chunk_allocator.h>
+#include <gdul/WIP_pool_allocator/pool_allocator.h>
 #include <gdul/job_handler/worker_impl.h>
 #include <gdul/job_handler/worker.h>
 #include <gdul/delegate/delegate.h>
@@ -69,8 +69,8 @@ public:
 	std::size_t external_worker_count() const noexcept;
 	std::size_t active_job_count() const noexcept;
 
-	chunk_allocator<job_node> get_job_node_allocator() const noexcept;
-	chunk_allocator<dummy_batch_type> get_batch_job_allocator() const noexcept;
+	pool_allocator<job_node> get_job_node_allocator() const noexcept;
+	pool_allocator<dummy_batch_type> get_batch_job_allocator() const noexcept;
 
 	void enqueue_job(job_impl_shared_ptr job);
 
@@ -87,9 +87,9 @@ private:
 
 	allocator_type m_mainAllocator;
 
-	memory_chunk_pool m_jobImplChunkPool;
-	memory_chunk_pool m_jobNodeChunkPool;
-	memory_chunk_pool m_batchJobChunkPool;
+	memory_pool m_jobImplChunkPool;
+	memory_pool m_jobNodeChunkPool;
+	memory_pool m_batchJobChunkPool;
 
 	concurrent_queue<job_impl_shared_ptr, allocator_type> m_jobQueues[job_queue_count];
 

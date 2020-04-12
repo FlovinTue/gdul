@@ -72,7 +72,7 @@ job job_handler::make_job(gdul::delegate<void()> workUnit)
 {
 	return m_impl->make_job(std::move(workUnit));
 }
-chunk_allocator<jh_detail::dummy_batch_type> job_handler::get_batch_job_allocator() const noexcept
+pool_allocator<jh_detail::dummy_batch_type> job_handler::get_batch_job_allocator() const noexcept
 {
 	return m_impl->get_batch_job_allocator();
 }
