@@ -1,4 +1,4 @@
-// Copyright(c) 2019 Flovin Michaelsen
+// Copyright(c) 2020 Flovin Michaelsen
 // 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files(the "Software"), to deal
@@ -65,8 +65,9 @@ public:
 
 	job make_job(delegate<void()>&& workUnit);
 
-	std::size_t num_workers() const noexcept;
-	std::size_t num_enqueued() const noexcept;
+	std::size_t internal_worker_count() const noexcept;
+	std::size_t external_worker_count() const noexcept;
+	std::size_t active_job_count() const noexcept;
 
 	concurrent_object_pool<job_node_chunk_rep, allocator_type>* get_job_node_chunk_pool() noexcept;
 	concurrent_object_pool<batch_job_chunk_rep, allocator_type>* get_batch_job_chunk_pool() noexcept;
@@ -83,6 +84,7 @@ private:
 	void launch_worker(std::uint16_t index) noexcept;
 
 	void work();
+	void consume_job(job&& jb);
 
 	job_impl_shared_ptr fetch_job();
 
@@ -90,13 +92,14 @@ private:
 
 	concurrent_object_pool<job_impl_chunk_rep, allocator_type> m_jobImplChunkPool;
 	concurrent_object_pool<job_node_chunk_rep, allocator_type> m_jobNodeChunkPool;
-	concurrent_object_pool<batch_job_chunk_rep, allocator_type> m_scatterJobChunkPool;
+	concurrent_object_pool<batch_job_chunk_rep, allocator_type> m_batchJobChunkPool;
 
 	concurrent_queue<job_impl_shared_ptr, allocator_type> m_jobQueues[job_queue_count];
 
 	std::array<worker_impl, Job_Handler_Max_Workers> m_workers;
 
 	std::atomic<std::uint16_t> m_workerCount;
+	std::atomic<std::uint16_t> m_workerIndices;
 };
 }
 }

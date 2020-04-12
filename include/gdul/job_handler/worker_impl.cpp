@@ -1,4 +1,4 @@
-// Copyright(c) 2019 Flovin Michaelsen
+// Copyright(c) 2020 Flovin Michaelsen
 // 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files(the "Software"), to deal
@@ -45,11 +45,12 @@ worker_impl::worker_impl()
 	, m_sleepThreshhold(std::numeric_limits<std::uint16_t>::max())
 	, m_isActive(false)
 	, m_firstQueue(job_queue(0))
-	, m_lastQueue(job_queue(job_queue_count - 1))
+	, m_lastQueue(job_queue(0))
 	, m_coreAffinity(0)
 	, m_executionPriority(0)
 {
-	m_distributionChunks = jh_detail::pow2summation(m_firstQueue + 1, m_lastQueue + 1);
+	set_queue_consume_first(job_queue(0));
+	set_queue_consume_last(job_queue(job_queue_count - 1));
 }
 worker_impl::worker_impl(std::thread&& thrd, allocator_type allocator)
 	: m_thread(std::move(thrd))
@@ -63,19 +64,20 @@ worker_impl::worker_impl(std::thread&& thrd, allocator_type allocator)
 	, m_sleepThreshhold(250)
 	, m_isActive(false)
 	, m_firstQueue(job_queue(0))
-	, m_lastQueue(job_queue(job_queue_count - 1))
+	, m_lastQueue(job_queue(0))
 	, m_coreAffinity(0)
 	, m_executionPriority(0)
 {
-	m_distributionChunks = jh_detail::pow2summation(m_firstQueue + 1, m_lastQueue + 1);
+	set_queue_consume_first(job_queue(0));
+	set_queue_consume_last(job_queue(job_queue_count - 1));
 
 	m_isActive.store(true, std::memory_order_release);
 }
 
 worker_impl::~worker_impl()
 {
-	if (m_thread.get_id() == std::thread().get_id()) {
-		CloseHandle(m_threadHandle);
+	if (m_thread.get_id() == std::thread().get_id() && m_threadHandle) {
+		jh_detail::close_thread_handle(m_threadHandle);
 		m_threadHandle = nullptr;
 	}
 
@@ -143,9 +145,8 @@ void worker_impl::refresh_sleep_timer()
 bool worker_impl::is_sleepy() const
 {
 	const std::chrono::high_resolution_clock::time_point current(m_sleepTimer.now());
-	const std::chrono::high_resolution_clock::time_point delta(current - m_lastJobTimepoint);
 
-	return !(std::chrono::duration_cast<std::chrono::milliseconds>(current - delta).count() < m_sleepThreshhold);
+	return !(std::chrono::duration_cast<std::chrono::milliseconds>(current - m_lastJobTimepoint).count() < m_sleepThreshhold);
 }
 bool worker_impl::is_active() const
 {
@@ -222,7 +223,7 @@ allocator_type worker_impl::get_allocator() const
 void worker_impl::set_name(const std::string& name)
 {
 	assert(is_active() && "Cannot set name to inactive worker");
-#if defined(GDUL_DEBUG)
+#if defined(GDUL_JOB_DEBUG)
 	m_name = name;
 #else
 	(void)name;
@@ -236,7 +237,7 @@ void worker_impl::set_queue_consume_first(job_queue firstQueue) noexcept
 	}
 	m_firstQueue = firstQueue;
 
-	m_distributionChunks = jh_detail::pow2summation(m_firstQueue + 1, m_lastQueue + 1);
+	m_distributionChunks = jh_detail::pow2summation(0, (1 + m_lastQueue) - m_firstQueue);
 }
 void worker_impl::set_queue_consume_last(job_queue lastQueue) noexcept
 {
@@ -245,7 +246,7 @@ void worker_impl::set_queue_consume_last(job_queue lastQueue) noexcept
 	}
 	m_lastQueue = lastQueue;
 
-	m_distributionChunks = jh_detail::pow2summation(m_firstQueue + 1, m_lastQueue + 1);
+	m_distributionChunks = jh_detail::pow2summation(0, (1 + m_lastQueue) - m_firstQueue);
 }
 }
 }

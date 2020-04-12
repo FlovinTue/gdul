@@ -1,4 +1,4 @@
-// Copyright(c) 2019 Flovin Michaelsen
+// Copyright(c) 2020 Flovin Michaelsen
 // 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files(the "Software"), to deal
@@ -20,7 +20,7 @@
 
 #pragma once
 
-#include <gdul\job_handler\job_handler_utility.h>
+#include <gdul/job_handler/job_handler_utility.h>
 
 namespace gdul
 {

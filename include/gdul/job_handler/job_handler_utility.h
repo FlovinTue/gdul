@@ -1,4 +1,4 @@
-// Copyright(c) 2019 Flovin Michaelsen
+// Copyright(c) 2020 Flovin Michaelsen
 // 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files(the "Software"), to deal
@@ -25,7 +25,7 @@
 #include <limits>
 #include <memory>
 
-#if defined (GDUL_DEBUG)
+#if defined (GDUL_JOB_DEBUG)
 #include <chrono>
 #endif
 
@@ -39,6 +39,8 @@ namespace jh_detail
 {
 
 constexpr std::uint32_t Job_Max_Dependencies = std::numeric_limits<std::uint32_t>::max() / 2;
+constexpr std::uint32_t Job_Enable_Dependencies = std::numeric_limits<std::uint32_t>::max() - Job_Max_Dependencies;
+
 
 using allocator_type = std::allocator<uint8_t>;
 
@@ -80,8 +82,9 @@ void set_thread_name(const char* name, thread_handle handle);
 void set_thread_priority(std::int32_t priority, thread_handle handle);
 void set_thread_core_affinity(std::uint8_t core, thread_handle handle);
 thread_handle create_thread_handle();
+void close_thread_handle(thread_handle handle);
 
-#if defined(GDUL_DEBUG)
+#if defined(GDUL_JOB_DEBUG)
 class timer
 {
 public:

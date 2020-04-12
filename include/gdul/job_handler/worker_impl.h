@@ -1,4 +1,4 @@
-// Copyright(c) 2019 Flovin Michaelsen
+// Copyright(c) 2020 Flovin Michaelsen
 // 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files(the "Software"), to deal
@@ -80,7 +80,7 @@ public:
 	allocator_type get_allocator() const;
 
 private:
-#ifdef GDUL_DEBUG
+#ifdef GDUL_JOB_DEBUG
 	std::string m_name;
 #endif
 	std::thread m_thread;

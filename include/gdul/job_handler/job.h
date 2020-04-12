@@ -1,4 +1,4 @@
-// Copyright(c) 2019 Flovin Michaelsen
+// Copyright(c) 2020 Flovin Michaelsen
 // 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files(the "Software"), to deal
@@ -22,6 +22,7 @@
 
 #include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
 #include <gdul/job_handler/job_handler_utility.h>
+#include <gdul/job_handler/debug/job_tracker_interface.h>
 
 namespace gdul {
 
@@ -32,8 +33,10 @@ namespace jh_detail {
 
 class job_handler_impl;
 class job_impl;
+template <class InputContainer, class OutputContainer, class Process>
+class batch_job_impl;
 }
-class job
+class job : public jh_detail::job_tracker_interface
 {
 public:
 	job() noexcept;
@@ -45,9 +48,6 @@ public:
 	job& operator=(job&& other) noexcept;
 	job& operator=(const job& other) noexcept;
 
-	void set_name(const std::string& name);
-	const std::string& get_name() const;
-
 	void add_dependency(job& dependency);
 	void add_dependency(batch_job& dependency);
 
@@ -55,23 +55,34 @@ public:
 	job_queue get_target_queue() const noexcept;
 
 	// this object may be discarded once enable() has been invoked
-	void enable();
+	bool enable() noexcept;
+	bool enable_locally_if_ready() noexcept;
 
+	bool is_ready() const noexcept;
 	bool is_finished() const noexcept;
 
 	void wait_until_finished() noexcept;
+	void wait_until_ready() noexcept;
 
 	// Consume jobs until finished. Beware of recursive calls (stack overflow, stalls etc..)
 	void work_until_finished(job_queue consumeFrom);
 
-	operator bool() const noexcept;
+	// Consume jobs until ready. Beware of recursive calls (stack overflow, stalls etc..)
+	void work_until_ready(job_queue consumeFrom);
 
-	// Get the duration of the job. Only valid if GDUL_DEBUG is defined & job has run
-	float get_time() const noexcept;
+	operator bool() const noexcept;
 
 private:
 	friend class jh_detail::job_handler_impl;
 	friend class job_handler;
+	template <class InputContainer, class OutputContainer, class Process>
+	friend class jh_detail::batch_job_impl;
+
+#if defined(GDUL_JOB_DEBUG)
+	friend class jh_detail::job_tracker;
+
+	constexpr_id register_tracking_node(constexpr_id id, const char* name, const char* file, std::uint32_t line, bool batchSub) override final;
+#endif
 
 	job(gdul::shared_ptr<jh_detail::job_impl> impl) noexcept;
 

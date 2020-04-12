@@ -7,13 +7,19 @@
 #include <concurrent_queue.h>
 #include <queue>
 #include <mutex>
-
+#include <random>
 
 // Test queue
 
 #ifdef MOODYCAMEL
 #include <concurrentqueue.h>
 #endif
+
+namespace gdul
+{
+extern std::random_device rd;
+extern std::mt19937 rng;
+}
 
 template <class T>
 class queue_mutex_wrapper

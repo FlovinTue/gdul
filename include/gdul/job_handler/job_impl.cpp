@@ -1,4 +1,4 @@
-// Copyright(c) 2019 Flovin Michaelsen
+// Copyright(c) 2020 Flovin Michaelsen
 // 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files(the "Software"), to deal
@@ -18,9 +18,10 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <gdul\job_handler\job_impl.h>
-#include <gdul\job_handler\job_handler_impl.h>
-#include <gdul\concurrent_object_pool\concurrent_object_pool.h>
+#include <gdul/job_handler/job_impl.h>
+#include <gdul/job_handler/job_handler_impl.h>
+#include <gdul/concurrent_object_pool/concurrent_object_pool.h>
+#include <gdul/job_handler/job_handler.h>
 
 namespace gdul
 {
@@ -33,13 +34,13 @@ job_impl::job_impl()
 job_impl::job_impl(delegate<void()>&& workUnit, job_handler_impl* handler)
 	: m_workUnit(std::forward<delegate<void()>>(workUnit))
 	, m_finished(false)
-	, m_enabled(false)
 	, m_firstDependee(nullptr)
 	, m_targetQueue(Default_Job_Queue)
 	, m_handler(handler)
-	, m_dependencies(Job_Max_Dependencies)
-#if defined (GDUL_DEBUG)
-	, m_time(0.f)
+	, m_dependencies(Job_Enable_Dependencies)
+#if defined (GDUL_JOB_DEBUG)
+	, m_trackingNode(nullptr)
+	, m_physicalId(constexpr_id::make<0>())
 #endif
 {
 }
@@ -51,12 +52,21 @@ void job_impl::operator()()
 {
 	assert(!m_finished);
 
-#if defined (GDUL_DEBUG)
+#if defined (GDUL_JOB_DEBUG)
+	const constexpr_id swap(job_handler::this_job.m_physicalId);
+	if (m_trackingNode)
+		job_handler::this_job.m_physicalId = m_physicalId;
+
 	timer time;
 #endif
+
 	m_workUnit();
-#if defined (GDUL_DEBUG)
-	m_time = time.get();
+
+#if defined(GDUL_JOB_DEBUG)
+	if (m_trackingNode)
+		m_trackingNode->add_completion_time(time.get());
+
+	job_handler::this_job.m_physicalId = swap;
 #endif
 
 	m_finished.store(true, std::memory_order_seq_cst);
@@ -86,21 +96,6 @@ bool job_impl::try_attach_child(job_impl_shared_ptr child)
 
 	return true;
 }
-void job_impl::set_name(const std::string & name)
-{
-	(void)name;
-#if defined GDUL_DEBUG
-	m_name = name;
-#endif
-}
-const std::string & job_impl::get_name() const
-{
-#if defined(GDUL_DEBUG)
-	return m_name;
-#else
-	return "";
-#endif
-}
 job_queue job_impl::get_target_queue() const noexcept
 {
 	return m_targetQueue;
@@ -112,41 +107,58 @@ void job_impl::set_target_queue(job_queue target) noexcept
 bool job_impl::try_add_dependencies(std::uint32_t n)
 {
 	std::uint32_t exp(m_dependencies.load(std::memory_order_relaxed));
-	while (exp != 0 && !m_dependencies.compare_exchange_weak(exp, exp + n, std::memory_order_relaxed));
+	do{
+		assert(!(std::numeric_limits<std::uint32_t>::max() < (std::size_t(exp) + std::size_t(n))) && "Exceeding job max dependencies");
 
-	return exp != 0;
+		if ((std::numeric_limits<std::uint32_t>::max() < (std::size_t(exp) + std::size_t(n))))
+			return false;
+
+	}while(exp != 0 && !m_dependencies.compare_exchange_weak(exp, exp + n, std::memory_order_relaxed));
+
+	return exp;
 }
 std::uint32_t job_impl::remove_dependencies(std::uint32_t n)
 {
 	std::uint32_t result(m_dependencies.fetch_sub(n, std::memory_order_acq_rel));
 	return result - n;
 }
-bool job_impl::enable()
+bool job_impl::enable() noexcept
 {
-	if (!m_enabled.exchange(true, std::memory_order_relaxed)){
-		return !remove_dependencies(Job_Max_Dependencies);
+	std::uint32_t exp(m_dependencies.load(std::memory_order_relaxed));
+
+	while (!(exp < Job_Enable_Dependencies)){
+		if (m_dependencies.compare_exchange_weak(exp, exp - Job_Enable_Dependencies, std::memory_order_relaxed))
+			return !(exp - Job_Enable_Dependencies);
 	}
+
+	return false;
+}
+bool job_impl::enable_if_ready() noexcept
+{
+	std::uint32_t exp(m_dependencies.load(std::memory_order_relaxed));
+
+	if (Job_Enable_Dependencies == exp)
+		return m_dependencies.compare_exchange_strong(exp, 0, std::memory_order_relaxed);
+
 	return false;
 }
 job_handler_impl * job_impl::get_handler() const
 {
 	return m_handler;
 }
-bool job_impl::is_finished() const
+bool job_impl::is_finished() const noexcept
 {
 	return m_finished.load(std::memory_order_relaxed);
 }
-bool job_impl::is_enabled() const
+bool job_impl::is_enabled() const noexcept
 {
-	return m_enabled.load(std::memory_order_relaxed);
+	return m_dependencies.load(std::memory_order_relaxed) < Job_Enable_Dependencies;
 }
-float job_impl::get_time() const noexcept
+bool job_impl::is_ready() const noexcept
 {
-#if defined (GDUL_DEBUG)
-	return m_time;
-#else
-	return 0.0f;
-#endif
+	const std::uint32_t dependencies(m_dependencies.load(std::memory_order_relaxed));
+
+	return dependencies == Job_Enable_Dependencies;
 }
 void job_impl::work_until_finished(job_queue consumeFrom)
 {
@@ -157,9 +169,25 @@ void job_impl::work_until_finished(job_queue consumeFrom)
 		}
 	}
 }
+void job_impl::work_until_ready(job_queue consumeFrom)
+{
+	while (!is_ready() && !is_enabled()){
+		if (!m_handler->try_consume_from_once(consumeFrom)){
+			jh_detail::job_handler_impl::t_items.this_worker_impl->refresh_sleep_timer();
+			jh_detail::job_handler_impl::t_items.this_worker_impl->idle();
+		}
+	}
+}
 void job_impl::wait_until_finished() noexcept
 {
 	while (!is_finished()) {
+		jh_detail::job_handler_impl::t_items.this_worker_impl->refresh_sleep_timer();
+		jh_detail::job_handler_impl::t_items.this_worker_impl->idle();
+	}
+}
+void job_impl::wait_until_ready() noexcept
+{
+	while (!is_ready() && !is_enabled()){
 		jh_detail::job_handler_impl::t_items.this_worker_impl->refresh_sleep_timer();
 		jh_detail::job_handler_impl::t_items.this_worker_impl->idle();
 	}
@@ -179,5 +207,13 @@ void job_impl::detach_children()
 		dependee = std::move(next);
 	}
 }
+#if defined(GDUL_JOB_DEBUG)
+constexpr_id job_impl::register_tracking_node(constexpr_id id, const char* name, const char* file, std::uint32_t line, bool batchSub)
+{
+	m_physicalId = id;
+	m_trackingNode = !batchSub ? job_tracker::register_full_node(id, name, file, line) : job_tracker::register_batch_sub_node(id, name);
+	return m_trackingNode->id();
+}
+#endif
 }
 }

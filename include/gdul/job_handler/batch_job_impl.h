@@ -1,4 +1,4 @@
-// Copyright(c) 2019 Flovin Michaelsen
+// Copyright(c) 2020 Flovin Michaelsen
 // 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files(the "Software"), to deal
@@ -23,10 +23,11 @@
 #include <gdul/job_handler/job_handler_utility.h>
 #include <gdul/job_handler/job.h>
 #include <gdul/delegate/delegate.h>
-#include <gdul/job_handler/batch_job_interface.h>
+#include <gdul/job_handler/batch_job_impl_interface.h>
 #include <gdul/job_handler/chunk_allocator.h>
 #include <array>
 #include <cassert>
+#include <algorithm>
 
 namespace gdul
 {
@@ -35,10 +36,14 @@ class job_handler;
 namespace jh_detail {
 
 // Gets rid of circular dependency job_handler->batch_job_impl & batch_job_impl->job_handler
-job _redirect_make_job(job_handler* handler, gdul::delegate<void()>&& workUnit);
+gdul::job _redirect_make_job(job_handler* handler, gdul::delegate<void()>&& workUnit);
+
+bool _redirect_enable_if_ready(gdul::shared_ptr<job_impl>& jb);
+void _redirect_invoke_job(gdul::shared_ptr<job_impl>& jb);
+bool _redirect_is_enabled(const gdul::shared_ptr<job_impl>& jb);
 
 template <class InputContainer, class OutputContainer, class Process>
-class batch_job_impl : public batch_job_interface
+class batch_job_impl : public batch_job_impl_interface
 {
 public:
 	batch_job_impl() = default;
@@ -54,19 +59,28 @@ public:
 	void set_target_queue(job_queue target) noexcept override final;
 	job_queue get_target_queue() const noexcept override final;
 
-	void set_name(const std::string& name) override final;
-
 	void wait_until_finished() noexcept override final;
+	void wait_until_ready() noexcept override final;
 	void work_until_finished(job_queue consumeFrom) override final;
+	void work_until_ready(job_queue consumeFrom) override final;
 
-	void enable();
+	bool enable()  noexcept override final;
+	bool enable_locally_if_ready() override final;
+
+	bool is_enabled() const noexcept override final;
 	bool is_finished() const noexcept override final;
+	bool is_ready() const noexcept override final;
 
 	job& get_endjob() noexcept override final;
 
-	float get_time() const noexcept override final;
-
 	std::size_t get_output_size() const noexcept override final;
+
+#if defined(GDUL_JOB_DEBUG)
+	constexpr_id register_tracking_node(constexpr_id id, const char* name, const char* file, std::uint32_t line) override final;
+	void track_sub_job(job& job, const char* name);
+#else
+	void track_sub_job(job&, const char*) {};
+#endif
 
 	batch_job_impl(intput_container_type& input, output_container_type& output, process_type&& process, std::size_t batchSize, job_handler* handler);
 	batch_job_impl(intput_container_type& inputOutput, process_type&& process, std::size_t batchSize, job_handler* handler);
@@ -87,8 +101,6 @@ private:
 
 	std::uint32_t clamp_batch_size(std::size_t desired) const;
 
-	void set_name_to(job& jb, const std::string& postfix);
-
 	bool is_input_output() const;
 
 	template <class Fun>
@@ -106,9 +118,6 @@ private:
 	template <class U = batch_job_impl, std::enable_if_t<U::Specialize_Update>* = nullptr>
 	void make_jobs();
 
-	template <class U = batch_job_impl, std::enable_if_t<U::Specialize_Update>* = nullptr>
-	void initialize();
-	template <class U = batch_job_impl, std::enable_if_t<!U::Specialize_Update>* = nullptr>
 	void initialize();
 
 	template <class U = batch_job_impl, std::enable_if_t<!U::Specialize_Update>* = nullptr>
@@ -118,10 +127,9 @@ private:
 
 	void work_pack(std::size_t batchIndex);
 
-#if defined(GDUL_DEBUG)
-	std::string m_name;
+#if defined(GDUL_JOB_DEBUG)
+	job_tracker_node* m_trackingNode;
 	timer m_timer;
-	float m_time;
 #endif
 
 	std::array<std::uint32_t, Batch_Job_Max_Batches> m_batchTracker;
@@ -129,6 +137,8 @@ private:
 	process_type m_process;
 
 	job_handler* const m_handler;
+
+	bool (job::* m_enableFunc)(void);
 
 	job m_root;
 	job m_end;
@@ -150,20 +160,19 @@ inline batch_job_impl<InputContainer, OutputContainer, Process>::batch_job_impl(
 	: m_batchTracker{}
 	, m_process(std::move(process))
 	, m_handler(handler)
-	, m_root(container_size(input) ? _redirect_make_job(handler, delegate<void()>(&batch_job_impl::initialize<>, this)) : _redirect_make_job(m_handler, delegate<void()>([]() {})))
+	, m_enableFunc(&job::enable)
+	, m_root(container_size(input) ? _redirect_make_job(handler, delegate<void()>(&batch_job_impl::initialize, this)) : _redirect_make_job(m_handler, delegate<void()>([]() {})))
 	, m_end(container_size(input) ? _redirect_make_job(handler, delegate<void()>(&batch_job_impl::finalize<>, this)) : m_root)
 	, m_input(input)
 	, m_output(output)
 	, m_batchSize(clamp_batch_size(batchSize + !(bool)batchSize))
 	, m_batchCount((std::uint16_t)(container_size(m_input) / m_batchSize + ((bool)(container_size(m_input) % m_batchSize))) + !(bool)(container_size(m_input)))
 	, m_targetQueue(jh_detail::Default_Job_Queue)
-#if defined(GDUL_DEBUG)
-	, m_time(0.f)
+#if defined(GDUL_JOB_DEBUG)
+	, m_trackingNode(nullptr)
 #endif
 {
 	assert(!(container_size(m_input) < container_size(m_output)) && "Input container size must not exceed output container size");
-
-	m_root.set_name(" initialize");
 }
 template<class InputContainer, class OutputContainer, class Process>
 inline std::size_t batch_job_impl<InputContainer, OutputContainer, Process>::to_batch_begin(std::size_t batchIndex) const
@@ -199,15 +208,6 @@ inline std::uint32_t batch_job_impl<InputContainer, OutputContainer, Process>::c
 	return returnValue;
 }
 template<class InputContainer, class OutputContainer, class Process>
-inline void batch_job_impl<InputContainer, OutputContainer, Process>::set_name_to(job & jb, const std::string & postfix)
-{
-#if defined(GDUL_DEFINED)
-	jb.set_name(m_name + postfix);
-#else
-	(void)jb; (void)postfix;
-#endif
-}
-template<class InputContainer, class OutputContainer, class Process>
 inline bool batch_job_impl<InputContainer, OutputContainer, Process>::is_input_output() const
 {
 	return (void*)&m_input == (void*)&m_output;
@@ -228,19 +228,14 @@ inline job_queue batch_job_impl<InputContainer, OutputContainer, Process>::get_t
 	return m_targetQueue;
 }
 template<class InputContainer, class OutputContainer, class Process>
-inline void batch_job_impl<InputContainer, OutputContainer, Process>::set_name(const std::string & name)
-{
-#if defined(GDUL_DEBUG)
-	m_name = name;
-	m_root.set_name(m_name + " initialize");
-#else
-	(void)name;
-#endif
-}
-template<class InputContainer, class OutputContainer, class Process>
 inline void batch_job_impl<InputContainer, OutputContainer, Process>::wait_until_finished() noexcept
 {
 	m_end.wait_until_finished();
+}
+template<class InputContainer, class OutputContainer, class Process>
+inline void batch_job_impl<InputContainer, OutputContainer, Process>::wait_until_ready() noexcept
+{
+	m_root.wait_until_ready();
 }
 template<class InputContainer, class OutputContainer, class Process>
 inline void batch_job_impl<InputContainer, OutputContainer, Process>::work_until_finished(job_queue consumeFrom)
@@ -248,33 +243,44 @@ inline void batch_job_impl<InputContainer, OutputContainer, Process>::work_until
 	m_end.work_until_finished(consumeFrom);
 }
 template<class InputContainer, class OutputContainer, class Process>
-inline void batch_job_impl<InputContainer, OutputContainer, Process>::enable()
+inline void batch_job_impl<InputContainer, OutputContainer, Process>::work_until_ready(job_queue consumeFrom)
 {
-#if defined(GDUL_DEBUG)
-	m_timer.reset();
-#endif
-	m_root.enable();
+	m_root.work_until_ready(consumeFrom);
 }
-
+template<class InputContainer, class OutputContainer, class Process>
+inline bool batch_job_impl<InputContainer, OutputContainer, Process>::enable() noexcept
+{
+	return m_root.enable();
+}
+template<class InputContainer, class OutputContainer, class Process>
+inline bool batch_job_impl<InputContainer, OutputContainer, Process>::enable_locally_if_ready()
+{
+	if (_redirect_enable_if_ready(m_root.m_impl)){
+		m_enableFunc = &job::enable_locally_if_ready;
+		_redirect_invoke_job(m_root.m_impl);
+		return true;
+	}
+	return false;
+}
+template<class InputContainer, class OutputContainer, class Process>
+inline bool batch_job_impl<InputContainer, OutputContainer, Process>::is_enabled() const noexcept
+{
+	return _redirect_is_enabled(m_root.m_impl);
+}
 template<class InputContainer, class OutputContainer, class Process>
 inline bool batch_job_impl<InputContainer, OutputContainer, Process>::is_finished() const noexcept
 {
 	return m_end.is_finished();
 }
-
+template<class InputContainer, class OutputContainer, class Process>
+inline bool batch_job_impl<InputContainer, OutputContainer, Process>::is_ready() const noexcept
+{
+	return m_root.is_ready();
+}
 template<class InputContainer, class OutputContainer, class Process>
 inline job & batch_job_impl<InputContainer, OutputContainer, Process>::get_endjob() noexcept
 {
 	return m_end;
-}
-template<class InputContainer, class OutputContainer, class Process>
-inline float batch_job_impl<InputContainer, OutputContainer, Process>::get_time() const noexcept
-{
-#if defined(GDUL_DEBUG)
-	return m_time;
-#else
-	return 0.f;
-#endif
 }
 template<class InputContainer, class OutputContainer, class Process>
 inline std::size_t batch_job_impl<InputContainer, OutputContainer, Process>::get_output_size() const noexcept
@@ -356,26 +362,27 @@ template <class U, std::enable_if_t<!U::Specialize_Update>*>
 inline void batch_job_impl<InputContainer, OutputContainer, Process>::make_jobs()
 {
 	job currentProcessJob = make_work_slice(&batch_job_impl::work_process<>, 0);
-	set_name_to(currentProcessJob, " process batch 1");
-	currentProcessJob.enable();
+	track_sub_job(currentProcessJob, "batch_job_process");
+
+	std::invoke(m_enableFunc, &currentProcessJob);
 
 	job currentPackJob(currentProcessJob);
 
 	for (std::size_t i = 1; i < m_batchCount; ++i) {
 		job nextProcessJob(make_work_slice(&batch_job_impl::work_process<>, i));
-		set_name_to(nextProcessJob, " process batch " + std::to_string(i + 1));
+		track_sub_job(nextProcessJob, "batch_job_process");
+		std::invoke(m_enableFunc, &nextProcessJob);
 
 		if (i < (m_batchCount - 1)) {
 			job nextPackJob(make_work_slice(&batch_job_impl::work_pack, i));
-			set_name_to(nextPackJob, " pack batch " + std::to_string(i));
+			track_sub_job(nextPackJob, "batch_job_pack");
 			nextPackJob.add_dependency(currentPackJob);
 			nextPackJob.add_dependency(nextProcessJob);
-			nextPackJob.enable();
+			std::invoke(m_enableFunc, &nextPackJob);
 
 			currentPackJob = std::move(nextPackJob);
 		}
 
-		nextProcessJob.enable();
 		currentProcessJob = std::move(nextProcessJob);
 	}
 
@@ -383,9 +390,10 @@ inline void batch_job_impl<InputContainer, OutputContainer, Process>::make_jobs(
 		m_end.add_dependency(currentPackJob);
 	}
 
+	track_sub_job(m_end, "batch_job_finalize");
+
 	m_end.add_dependency(currentProcessJob);
-	set_name_to(m_end, " finalize");
-	m_end.enable();
+	std::invoke(m_enableFunc, &m_end);
 }
 template<class InputContainer, class OutputContainer, class Process>
 template <class U, std::enable_if_t<U::Specialize_Update>*>
@@ -393,24 +401,21 @@ inline void batch_job_impl<InputContainer, OutputContainer, Process>::make_jobs(
 {
 	for (std::size_t i = 0; i < m_batchCount; ++i) {
 		job processJob(make_work_slice(&batch_job_impl::work_process<>, i));
-		set_name_to(processJob, " process batch " + std::to_string(i + 1));
+		track_sub_job(processJob, "batch_job_process");
+		std::invoke(m_enableFunc, &processJob);
+
 		m_end.add_dependency(processJob);
-		processJob.enable();
 	}
 
-	set_name_to(m_end, " finalize");
-	m_end.enable();
+	track_sub_job(m_end, "batch_job_finalize");
+	std::invoke(m_enableFunc, &m_end);
 }
 template<class InputContainer, class OutputContainer, class Process>
-template <class U, std::enable_if_t<U::Specialize_Update>*>
 inline void batch_job_impl<InputContainer, OutputContainer, Process>::initialize()
 {
-	make_jobs<>();
-}
-template<class InputContainer, class OutputContainer, class Process>
-template <class U, std::enable_if_t<!U::Specialize_Update>*>
-inline void batch_job_impl<InputContainer, OutputContainer, Process>::initialize()
-{
+#if defined(GDUL_JOB_DEBUG)
+	m_timer.reset();
+#endif
 	make_jobs<>();
 }
 template<class InputContainer, class OutputContainer, class Process>
@@ -430,7 +435,7 @@ inline void batch_job_impl<InputContainer, OutputContainer, Process>::work_pack(
 	auto copyEndItr(copyBeginItr + batchSize);
 	auto copyTargetItr(m_output.begin() + lastBatchEnd);
 
-	std::copy(copyBeginItr, copyEndItr, copyTargetItr);
+	std::move(copyBeginItr, copyEndItr, copyTargetItr);
 
 	m_batchTracker[batchIndex] = (std::uint32_t)(lastBatchEnd + batchSize);
 }
@@ -442,24 +447,45 @@ inline void batch_job_impl<InputContainer, OutputContainer, Process>::finalize()
 		work_pack(m_batchCount - 1);
 	}
 
-#if defined(GDUL_DEBUG)
-	m_time = m_timer.get();
+#if defined(GDUL_JOB_DEBUG)
+	if (m_trackingNode)
+		m_trackingNode->add_completion_time(m_timer.get());
 #endif
 }
 template<class InputContainer, class OutputContainer, class Process>
 template <class U, std::enable_if_t<U::Specialize_Update>*>
 inline void batch_job_impl<InputContainer, OutputContainer, Process>::finalize()
 {
-#if defined(GDUL_DEBUG)
-	m_time = m_timer.get();
+#if defined(GDUL_JOB_DEBUG)
+	if (m_trackingNode)
+		m_trackingNode->add_completion_time(m_timer.get());
 #endif
 }
+#if defined(GDUL_JOB_DEBUG)
+template<class InputContainer, class OutputContainer, class Process>
+inline constexpr_id batch_job_impl<InputContainer, OutputContainer, Process>::register_tracking_node(constexpr_id id, const char* name, const char* file, std::uint32_t line)
+{
+	const constexpr_id batchJobNodeId(((job_tracker_interface*)(&m_root))->register_tracking_node(id, name, file, line));
+	m_trackingNode = job_tracker::fetch_node(batchJobNodeId);
+	m_trackingNode->set_node_type(job_tracker_node_batch);
+	return batchJobNodeId;
+}
+template<class InputContainer, class OutputContainer, class Process>
+inline void batch_job_impl<InputContainer, OutputContainer, Process>::track_sub_job(job & job, const char * name)
+{
+	if (m_trackingNode)
+		((job_tracker_interface*)(&job))->register_tracking_node(m_trackingNode->id(), name, "", 0, true);
+}
+#endif
 struct dummy_container{using value_type = int;};
 
 // Memory chunk representation of batch_job_impl
+#pragma warning(push)
+#pragma warning(disable:4324)
 struct alignas(alignof(std::max_align_t)) batch_job_chunk_rep
 {
 	std::uint8_t dummy[allocate_shared_size<batch_job_impl<dummy_container, dummy_container, gdul::delegate<bool(int&, int&)>>, chunk_allocator<batch_job_impl<dummy_container, dummy_container, gdul::delegate<bool(int&, int&)>>, batch_job_chunk_rep>>()]{};
 };
+#pragma warning(pop)
 }
 }

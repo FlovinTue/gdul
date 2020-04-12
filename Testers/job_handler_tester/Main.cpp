@@ -7,7 +7,7 @@
 #include "../Common/timer.h"
 #include <vld.h>
 #include "../Common/tracking_allocator.h"
-
+#include <gdul/job_handler/debug/job_tracker.h>
 
 int main()
 {	
@@ -20,7 +20,7 @@ int main()
 		
 		tester.init(info);
 
-		const uint32_t scatterRuns(40);
+		const uint32_t scatterRuns(100);
 		float scatterTimeAccum(0.f);
 		std::size_t scatterBatchAccum(0);
 
@@ -36,14 +36,17 @@ int main()
 		
 		std::cout << "Best time / batchsize average: " << scatterTimeAccum / scatterRuns << ", " << scatterBatchAccum / scatterRuns << std::endl;
 	
-		for (uint32_t i = 0; i < 5000; ++i)
+		for (uint32_t i = 0; i < 5; ++i)
 		{
 			tester.run_consumption_strand_parallel_test(1500, 1.0f);
 		}
 	}
 
+	gdul::jh_detail::job_tracker::dump_job_tree("");
+
 	std::cout << "Final allocated: " << gdul::s_allocated << std::endl;
 	
 	std::cout << "Hello World!\n";
+
 
 }

@@ -292,7 +292,7 @@ inline void tester<T, ArraySize, NumThreads>::work_cas(std::uint32_t passes)
 			raw_ptr<T> check_(expected_);
 			const bool resultb = m_testArray[i].compare_exchange_strong(rawExpected, std::move(desired_), std::memory_order_relaxed);
 
-			if (!(resultb == (rawExpected == check_))) {
+			if (!(resultb == (rawExpected == check_ && rawExpected.get_version() == check_.get_version()))) {
 				throw std::runtime_error("output from expected do not correspond to CAS results");
 			}
 

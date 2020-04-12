@@ -1,4 +1,4 @@
-// Copyright(c) 2019 Flovin Michaelsen
+// Copyright(c) 2020 Flovin Michaelsen
 // 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files(the "Software"), to deal
@@ -20,26 +20,61 @@
 
 #pragma once
 
-#include <gdul/job_handler/job_handler_utility.h>
+#include <gdul/job_handler/globals.h>
+
+#if defined(GDUL_JOB_DEBUG)
+
+#include <gdul/job_handler/debug/constexp_id.h>
 #include <string>
 
-namespace gdul {
-class job;
-namespace jh_detail {
-class batch_job_interface
+namespace gdul
 {
-public:
-	virtual void add_dependency(job& dependency) = 0;
-	virtual void set_target_queue(job_queue target) noexcept = 0;
-	virtual void enable() = 0;
-	virtual bool is_finished() const noexcept = 0;
-	virtual void wait_until_finished() noexcept = 0;
-	virtual void work_until_finished(job_queue) = 0;
-	virtual job& get_endjob() noexcept = 0;
-	virtual void set_name(const std::string&) = 0;
-	virtual float get_time() const noexcept = 0;
-	virtual std::size_t get_output_size() const noexcept = 0;
-	virtual job_queue get_target_queue() const noexcept = 0;
+namespace jh_detail
+{
+enum job_tracker_node_type : std::uint8_t
+{
+	job_tracker_node_default,
+	job_tracker_node_batch,
+	job_tracker_node_matriarch,
+};
+struct job_tracker_node
+{
+	job_tracker_node();
+
+	constexpr_id id() const;
+	constexpr_id parent() const;
+
+	void add_completion_time(float time);
+
+	float min_time() const;
+	float max_time() const;
+	float avg_time() const;
+
+	std::size_t completed_count() const;
+
+	void set_node_type(job_tracker_node_type type);
+	job_tracker_node_type get_node_type() const;
+
+	const std::string& name() const;
+
+private:
+	friend class job_tracker;
+	friend class job_tracker_data;
+
+	std::string m_name;
+
+	constexpr_id m_id;
+	constexpr_id m_parent;
+
+	std::size_t m_completedCount;
+
+	float m_minTime;
+	float m_avgTime; 
+	float m_maxTime;
+
+	job_tracker_node_type m_type;
 };
 }
 }
+
+#endif

@@ -1,4 +1,4 @@
-// Copyright(c) 2019 Flovin Michaelsen
+// Copyright(c) 2020 Flovin Michaelsen
 // 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files(the "Software"), to deal
@@ -81,8 +81,9 @@ public:
 
 	void retire_workers();
 
-	std::size_t num_workers() const;
-	std::size_t num_enqueued() const;
+	std::size_t internal_worker_count() const noexcept;
+	std::size_t external_worker_count() const noexcept;
+	std::size_t active_job_count() const noexcept;
 private:
 	concurrent_object_pool<jh_detail::batch_job_chunk_rep, jh_detail::allocator_type>* get_batch_job_chunk_pool();
 

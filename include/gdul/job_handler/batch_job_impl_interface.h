@@ -20,9 +20,36 @@
 
 #pragma once
 
-#include <gdul/job_handler/job.h>
-#include <gdul/job_handler/job_handler.h>
-#include <gdul/job_handler/worker.h>
-#include <gdul/job_handler/batch_job.h>
-#include <gdul/job_handler/batch_job_impl.h>
-#include <gdul/job_handler/globals.h>
+#include <gdul/job_handler/job_handler_utility.h>
+
+#if defined(GDUL_JOB_DEBUG)
+#include <gdul/job_handler/debug/job_tracker.h>
+#endif
+
+namespace gdul {
+class job;
+namespace jh_detail {
+class batch_job_impl_interface
+{
+public:
+	virtual void add_dependency(job&) = 0;
+	virtual void set_target_queue(job_queue) noexcept = 0;
+	virtual bool enable() noexcept = 0;
+	virtual bool enable_locally_if_ready() = 0;
+	virtual bool is_finished() const noexcept = 0;
+	virtual bool is_ready() const noexcept = 0;
+	virtual bool is_enabled() const noexcept = 0;
+	virtual void wait_until_finished() noexcept = 0;
+	virtual void work_until_finished(job_queue) = 0;
+	virtual void wait_until_ready() noexcept = 0;
+	virtual void work_until_ready(job_queue) = 0;
+
+	virtual job& get_endjob() noexcept = 0;
+	virtual std::size_t get_output_size() const noexcept = 0;
+	virtual job_queue get_target_queue() const noexcept = 0;
+#if defined(GDUL_JOB_DEBUG)
+	virtual constexpr_id register_tracking_node(constexpr_id, const char* name, const char* file, std::uint32_t line)  = 0;
+#endif
+};
+}
+}

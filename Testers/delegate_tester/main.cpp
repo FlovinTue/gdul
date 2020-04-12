@@ -7,6 +7,8 @@
 #include <vld.h>
 #include "../Common/Timer.h"
 #include <functional>
+#include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
+#include "../Common/util.h"
 
 uint64_t global = 0;
 
@@ -91,6 +93,35 @@ int main()
 	delegate<void()> allocDel(alloc_delegate<void()>(largeCallArg, customAlloc, 1.f, 1));
 	allocDel();
 
+	struct destructible
+	{
+		~destructible()
+		{
+			std::cout << "destructible destructor ran" << std::endl;
+			check = UINT32_MAX;
+		}
+		uint32_t check = 0;
+	};
+
+	shared_ptr<destructible> toCapture1(make_shared<destructible>());
+	shared_ptr<destructible> toCapture2(make_shared<destructible>());
+
+	delegate<void()> captureDel1([toCapture1]()
+	{
+		assert(toCapture1->check == 0);
+	});
+
+	delegate<void()> captureDel2([](shared_ptr<destructible> destr)
+	{
+		assert(destr->check == 0);
+	}, toCapture2);
+
+	toCapture1 = shared_ptr<destructible>(nullptr);
+	toCapture2 = shared_ptr<destructible>(nullptr);
+
+	captureDel1();
+	captureDel2();
+
 	auto awkwardLam = [cap1, cap2, cap3, cap4, cap5]()
 	{
 		global += cap1;
@@ -99,7 +130,6 @@ int main()
 		global += cap4;
 		global += cap5;
 	};
-	const size_t blah = sizeof(awkwardLam);
 
 	gdul::timer<float> time;
 

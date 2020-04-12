@@ -1,4 +1,4 @@
-// Copyright(c) 2019 Flovin Michaelsen
+// Copyright(c) 2020 Flovin Michaelsen
 // 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files(the "Software"), to deal
@@ -36,6 +36,7 @@ class worker_impl;
 class worker
 {
 public:
+	worker() = default;
 	worker(jh_detail::worker_impl* impl);
 	worker(const worker&) = default;
 	worker(worker&&) = default;
