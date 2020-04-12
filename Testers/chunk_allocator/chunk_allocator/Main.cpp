@@ -6,6 +6,9 @@
 #include <atomic>
 #include <gdul/WIP_chunk_allocator/chunk_allocator.h>
 
+
+
+
 struct alignas(32) test_object
 {
 	int m_mem;
@@ -13,11 +16,14 @@ struct alignas(32) test_object
 
 int main()
 {
-	gdul::allocate_shared_chunk_pool<test_object> chunkPool(16);
+	gdul::memory_chunk_pool pool;
 
-	gdul::chunk_allocator<int*, decltype(chunkPool)> allocator(chunkPool);
+	constexpr std::size_t allocSharedSize(gdul::allocate_shared_size<test_object, gdul::chunk_allocator<test_object>>());
+	pool.init<allocSharedSize, alignof(test_object)>(8);
 
-	gdul::shared_ptr<test_object> sp = gdul::allocate_shared<test_object>(allocator);
+	gdul::chunk_allocator<test_object> alloc(pool.create_allocator<test_object>());
+
+	gdul::shared_ptr<test_object> sp(gdul::allocate_shared<test_object>(alloc));
 
 	return 0;
 }

@@ -40,3 +40,5 @@
 *.pdb
 job_handler_plot_view/job_handler_plot_view/obj/Debug/job_handler_plot_view.csproj.FileListAbsolute.txt
 *.resources
+Bin/job_handler_Debug_job_time_sets.xml
+Bin/job_handler_Release_job_time_sets.xml
