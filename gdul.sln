@@ -23,7 +23,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "delegate", "Testers\delegat
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "concurrent_queue_fifo", "Testers\concurrent_queue_fifo_tester\concurrent_queue_fifo\concurrent_queue_fifo.vcxproj", "{1FFC44D2-F701-4925-8987-768C3F623870}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "chunk_allocator", "Testers\chunk_allocator\chunk_allocator\chunk_allocator.vcxproj", "{A2E8798B-61E2-4AF0-95A2-8D9FAC6A57BA}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "pool_allocator", "Testers\pool_allocator\pool_allocator\pool_allocator.vcxproj", "{A2E8798B-61E2-4AF0-95A2-8D9FAC6A57BA}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

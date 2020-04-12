@@ -23,14 +23,12 @@
 #pragma once
 
 #include <stdint.h>
-
 #include <gdul/concurrent_object_pool/concurrent_object_pool.h>
-#include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
 
 namespace gdul
 {
 namespace call_detail {
-class memory_chunk_pool_base
+class memory_pool_base
 {
 public:
 	virtual bool verify_compatibility(std::size_t chunkSize, std::size_t chunkAlign) const = 0;
@@ -40,101 +38,103 @@ public:
 };
 
 template <std::size_t ChunkSize, std::size_t ChunkAlign, class ParentAllocator>
-class memory_chunk_pool_impl;
+class memory_pool_impl;
 }
 
+// Allocator associated with a pool instance. Is only able to request memory chunks of the 
+// size that the pool is initialized with (but may do so quickly)
 template <class T>
-class chunk_allocator
+class pool_allocator
 {
 public:
 	using value_type = T;
 
 	// raw_ptr and shared_ptr may be used here, based on if an allocator
 	// is allowed to outlive its pool or not
-	using pool_ptr_type = raw_ptr<call_detail::memory_chunk_pool_base>;
+	using pool_ptr_type = raw_ptr<call_detail::memory_pool_base>;
 
 	template <typename U>
 	struct rebind
 	{
-		using other = chunk_allocator<U>;
+		using other = pool_allocator<U>;
 	};
 
 	template <class U>
-	chunk_allocator(const chunk_allocator<U>& other);
+	pool_allocator(const pool_allocator<U>& other);
 	template <class U>
-	chunk_allocator(chunk_allocator<U>&& other);
+	pool_allocator(pool_allocator<U>&& other);
 
 	template <class U>
-	chunk_allocator& operator=(const chunk_allocator<U>& other);
+	pool_allocator& operator=(const pool_allocator<U>& other);
 	template <class U>
-	chunk_allocator& operator=(chunk_allocator<U>&& other);
+	pool_allocator& operator=(pool_allocator<U>&& other);
 
 	value_type* allocate(std::size_t);
 	void deallocate(value_type* chunk, std::size_t);
 
 	template <class U>
-	chunk_allocator<U> convert() const;
+	pool_allocator<U> convert() const;
 
-	chunk_allocator(const pool_ptr_type& chunkPool);
+	pool_allocator(const pool_ptr_type& memoryPool);
 private:
 
-	friend class memory_chunk_pool;
+	friend class memory_pool;
 
 	pool_ptr_type m_pool;
 };
 
 template<class T>
-inline chunk_allocator<T>::chunk_allocator(const pool_ptr_type& chunkPool)
-	: m_pool(chunkPool)
+inline pool_allocator<T>::pool_allocator(const pool_ptr_type& memoryPool)
+	: m_pool(memoryPool)
 {}
 template<class T>
 template<class U>
-inline chunk_allocator<T>::chunk_allocator(const chunk_allocator<U>& other)
+inline pool_allocator<T>::pool_allocator(const pool_allocator<U>& other)
 {
 	operator=(other);
 }
 template<class T>
 template<class U>
-inline chunk_allocator<T>::chunk_allocator(chunk_allocator<U>&& other)
+inline pool_allocator<T>::pool_allocator(pool_allocator<U>&& other)
 {
 	operator=(std::move(other));
 }
 template<class T>
 template <class U>
-inline chunk_allocator<T>& chunk_allocator<T>::operator=(const chunk_allocator<U>& other)
+inline pool_allocator<T>& pool_allocator<T>::operator=(const pool_allocator<U>& other)
 {
 	m_pool = std::move(other.convert<T>().m_pool);
 	return *this;
 }
 template<class T>
 template <class U>
-inline chunk_allocator<T>& chunk_allocator<T>::operator=(chunk_allocator<U>&& other)
+inline pool_allocator<T>& pool_allocator<T>::operator=(pool_allocator<U>&& other)
 {
 	operator=(other);
 	return *this;
 }
 template<class T>
 template<class U>
-inline chunk_allocator<U> chunk_allocator<T>::convert() const
+inline pool_allocator<U> pool_allocator<T>::convert() const
 {
 	assert(m_pool->verify_compatibility(sizeof(U), alignof(U)) && "Memory pool stats incompatible with type");
-	return chunk_allocator<U>(m_pool);
+	return pool_allocator<U>(m_pool);
 }
 template<class T>
-inline typename chunk_allocator<T>::value_type* chunk_allocator<T>::allocate(std::size_t)
+inline typename pool_allocator<T>::value_type* pool_allocator<T>::allocate(std::size_t)
 {
 	return (value_type*)m_pool->get_chunk();
 }
 template<class T>
-inline void chunk_allocator<T>::deallocate(value_type* chunk, std::size_t)
+inline void pool_allocator<T>::deallocate(value_type* chunk, std::size_t)
 {
 	m_pool->recycle_chunk((void*)chunk);
 }
 
-class memory_chunk_pool
+class memory_pool
 {
 public:
-	memory_chunk_pool() = default;
+	memory_pool() = default;
 
 	template <std::size_t ChunkSize, std::size_t ChunkAlign>
 	void init(std::size_t chunksPerBlock);
@@ -145,44 +145,44 @@ public:
 	void reset();
 
 	template <class T>
-	chunk_allocator<T> create_allocator() const;
+	pool_allocator<T> create_allocator() const;
 
 private:
-	shared_ptr<call_detail::memory_chunk_pool_base> m_impl;
+	shared_ptr<call_detail::memory_pool_base> m_impl;
 };
 template<std::size_t ChunkSize, std::size_t ChunkAlign>
-inline void memory_chunk_pool::init(std::size_t chunksPerBlock)
+inline void memory_pool::init(std::size_t chunksPerBlock)
 {
 	init<ChunkSize, ChunkAlign>(chunksPerBlock, std::allocator<std::uint8_t>());
 }
 template<std::size_t ChunkSize, std::size_t ChunkAlign, class ParentAllocator>
-inline void memory_chunk_pool::init(std::size_t chunksPerBlock, ParentAllocator allocator)
+inline void memory_pool::init(std::size_t chunksPerBlock, ParentAllocator allocator)
 {
 	if (m_impl)
 		return;
 
-	m_impl = gdul::allocate_shared<call_detail::memory_chunk_pool_impl<ChunkSize, ChunkAlign, ParentAllocator>>(allocator, chunksPerBlock, allocator);
+	m_impl = gdul::allocate_shared<call_detail::memory_pool_impl<ChunkSize, ChunkAlign, ParentAllocator>>(allocator, chunksPerBlock, allocator);
 }
-inline void memory_chunk_pool::reset() 
+inline void memory_pool::reset() 
 {
-	m_impl = shared_ptr<call_detail::memory_chunk_pool_base>();
+	m_impl = shared_ptr<call_detail::memory_pool_base>();
 }
 template<class T>
-inline chunk_allocator<T> memory_chunk_pool::create_allocator() const
+inline pool_allocator<T> memory_pool::create_allocator() const
 {
 	assert(m_impl->verify_compatibility(sizeof(T), alignof(T)) && "Memory pool stats incompatible with type");
-	return chunk_allocator<T>((typename chunk_allocator<T>::pool_ptr_type)m_impl);
+	return pool_allocator<T>((typename pool_allocator<T>::pool_ptr_type)m_impl);
 }
 namespace call_detail {
 template <std::size_t ChunkSize, std::size_t ChunkAlign, class ParentAllocator>
-class memory_chunk_pool_impl : public memory_chunk_pool_base
+class memory_pool_impl : public memory_pool_base
 {
 	struct alignas(ChunkAlign) chunk_rep
 	{
 		std::uint8_t m_block[ChunkSize];
 	};
 public:
-	memory_chunk_pool_impl(std::size_t chunksPerBlock, ParentAllocator allocator)
+	memory_pool_impl(std::size_t chunksPerBlock, ParentAllocator allocator)
 		: m_pool(chunksPerBlock, allocator)
 	{}
 	void* get_chunk() override final {
