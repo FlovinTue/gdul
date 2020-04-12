@@ -105,8 +105,6 @@ private:
 
 	std::uint32_t clamp_batch_size(std::size_t desired) const;
 
-	bool is_input_output() const;
-
 	template <class Fun>
 	job make_work_slice(Fun fun, std::size_t batchIndex);
 
@@ -180,9 +178,7 @@ inline batch_job_impl<InContainer, OutContainer, Process>::batch_job_impl(
 #if defined(GDUL_JOB_DEBUG)
 	, m_trackingNode(nullptr)
 #endif
-{
-	assert(!(container_size(m_input) < container_size(m_output)) && "Input container size must not exceed output container size");
-}
+{}
 template<class InContainer, class OutContainer, class Process>
 inline std::size_t batch_job_impl<InContainer, OutContainer, Process>::to_batch_begin(std::size_t batchIndex) const
 {
@@ -215,11 +211,6 @@ inline std::uint32_t batch_job_impl<InContainer, OutContainer, Process>::clamp_b
 	}
 
 	return returnValue;
-}
-template<class InContainer, class OutContainer, class Process>
-inline bool batch_job_impl<InContainer, OutContainer, Process>::is_input_output() const
-{
-	return (void*)&m_input == (void*)&m_output;
 }
 template<class InContainer, class OutContainer, class Process>
 inline void batch_job_impl<InContainer, OutContainer, Process>::add_dependency(job& dependency)
@@ -438,6 +429,8 @@ inline void batch_job_impl<InContainer, OutContainer, Process>::initialize()
 	GDUL_JOB_DEBUG_CONDTIONAL(if (m_trackingNode)m_trackingNode->m_enqueueTimeSet.log_time(m_enqueueTimer.get()))
 
 	m_outputResizeFunc(container_size(m_input));
+
+	assert(!(container_size(m_output) < container_size(m_input)) && "Input container size must not exceed output container size");
 
 	make_jobs<>();
 }
