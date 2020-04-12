@@ -5,7 +5,7 @@
 #include <iostream>
 #include <atomic>
 #include <gdul/WIP_chunk_allocator/chunk_allocator.h>
-
+#include <vld.h>
 
 
 

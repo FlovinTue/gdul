@@ -48,6 +48,9 @@ class chunk_allocator
 {
 public:
 	using value_type = T;
+
+	// raw_ptr and shared_ptr may be used here, based on if an allocator
+	// is allowed to outlive its pool or not
 	using pool_ptr_type = raw_ptr<call_detail::memory_chunk_pool_base>;
 
 	template <typename U>
@@ -168,7 +171,7 @@ template<class T>
 inline chunk_allocator<T> memory_chunk_pool::create_allocator() const
 {
 	assert(m_impl->verify_compatibility(sizeof(T), alignof(T)) && "Memory pool stats incompatible with type");
-	return chunk_allocator<T>(m_impl.get_raw_ptr());
+	return chunk_allocator<T>((typename chunk_allocator<T>::pool_ptr_type)m_impl);
 }
 namespace call_detail {
 template <std::size_t ChunkSize, std::size_t ChunkAlign, class ParentAllocator>
@@ -190,8 +193,8 @@ public:
 	}
 
 	bool verify_compatibility(std::size_t chunkSize, std::size_t chunkAlign) const override final {
-		const std::size_t maxChunkSize(ChunkSize);
-		const std::size_t maxChunkAlign(ChunkAlign);
+		constexpr std::size_t maxChunkSize(ChunkSize);
+		constexpr std::size_t maxChunkAlign(ChunkAlign);
 		const bool size(!(maxChunkSize < chunkSize));
 		const bool align(!(maxChunkAlign < chunkAlign));
 		return size & align;
@@ -199,7 +202,6 @@ public:
 
 private:
 	concurrent_object_pool<chunk_rep, ParentAllocator> m_pool;
-
 };
 }
 
