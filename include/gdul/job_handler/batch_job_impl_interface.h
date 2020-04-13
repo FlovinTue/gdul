@@ -38,6 +38,7 @@ public:
 	virtual bool enable_locally_if_ready() = 0;
 	virtual bool is_finished() const noexcept = 0;
 	virtual bool is_ready() const noexcept = 0;
+	virtual bool is_enabled() const noexcept = 0;
 	virtual void wait_until_finished() noexcept = 0;
 	virtual void work_until_finished(job_queue) = 0;
 	virtual void wait_until_ready() noexcept = 0;

@@ -72,13 +72,12 @@ constexpr void assert_alignment(std::uint8_t* block);
 
 constexpr std::uint16_t to_version(compressed_storage);
 constexpr compressed_storage set_version(compressed_storage, std::uint16_t);
-constexpr compressed_storage inc_version(compressed_storage);
 
 template <class T>
 struct disable_deduction;
 
 template <std::uint8_t Align, std::size_t Size>
-struct aligned_storage;
+struct max_align_storage;
 
 template <class T>
 constexpr bool is_unbounded_array_v = std::is_array_v<T> & (std::extent_v<T> == 0);
@@ -967,7 +966,7 @@ inline void control_block_make_shared<T, Allocator>::destroy() noexcept
 	constexpr std::size_t blockSize(gdul::allocate_shared_size<T, Allocator>());
 	constexpr std::size_t blockAlign(alignof(T));
 
-	using block_type = aspdetail::aligned_storage<blockAlign, blockSize>;
+	using block_type = aspdetail::max_align_storage<blockAlign, blockSize>;
 	using rebound_alloc = typename std::allocator_traits<Allocator>::template rebind_alloc<block_type>;
 
 	rebound_alloc rebound(alloc);
@@ -1091,16 +1090,15 @@ struct disable_deduction
 	using type = T;
 };
 template <std::uint8_t Align, std::size_t Size>
-struct alignas(Align) aligned_storage
+struct 
+#if 201700 < __cplusplus || _HAS_CXX17
+	alignas(Align) 
+#else
+	alignas(std::max_align_t)
+#endif
+	max_align_storage
 {
 	std::uint8_t dummy[Size]{};
-};
-template <class T>
-struct type_diff_copy_helper
-{
-	shared_ptr<T> construct_from(compressed_storage storage) {
-		return shared_ptr<T>(storage);
-	};
 };
 constexpr std::uint16_t to_version(compressed_storage from)
 {
@@ -1126,18 +1124,13 @@ constexpr compressed_storage set_version(compressed_storage storage, std::uint16
 
 	return updated;
 }
-constexpr compressed_storage inc_version(compressed_storage storage)
-{
-	return set_version(storage, to_version(storage) + 1);
-}
 template<class T>
 constexpr void assert_alignment(std::uint8_t* block)
 {
-
 #if 201700 < __cplusplus || _HAS_CXX17
 	if ((std::uintptr_t)block % alignof(T) != 0)
 	{
-		throw std::runtime_error("conforming with C++17 alloc_shared expects alignof(T) allocates. Minimally alignof(std::max_align_t)");
+		throw std::runtime_error("conforming with C++17 alloc_shared expects alignof(T) allocates");
 	}
 #else
 	static_assert(!(std::numeric_limits<std::uint8_t>::max() < alignof(T)), "alloc_shared supports only supports up to std::numeric_limits<std::uint8_t>::max() byte aligned types");
@@ -1406,7 +1399,6 @@ private:
 
 	friend class raw_ptr<T>;
 	friend class atomic_shared_ptr<T>;
-	friend struct aspdetail::type_diff_copy_helper<T>;
 
 	template
 		<
@@ -1982,7 +1974,7 @@ inline shared_ptr<T> allocate_shared(Allocator allocator, Args&& ...args)
 	constexpr std::size_t blockSize(allocate_shared_size<T, Allocator>());
 	constexpr std::size_t blockAlign(alignof(T));
 
-	using block_type = aspdetail::aligned_storage<blockAlign, blockSize>;
+	using block_type = aspdetail::max_align_storage<blockAlign, blockSize>;
 	using rebound_alloc = typename std::allocator_traits<Allocator>::template rebind_alloc<block_type>;
 
 	rebound_alloc rebound(allocator);

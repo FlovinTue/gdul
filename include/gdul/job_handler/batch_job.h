@@ -38,6 +38,7 @@ class batch_job : public jh_detail::job_tracker_interface
 {
 public:
 	batch_job();
+	~batch_job();
 
 	void add_dependency(job& dependency);
 	void set_target_queue(job_queue target) noexcept;

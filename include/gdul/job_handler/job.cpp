@@ -34,28 +34,26 @@ job::~job()
 {
 	assert(!(*this) || m_impl->is_enabled() && "Job destructor ran before enable was called");
 }
-job::job(job && other) noexcept
+job::job(job&& other) noexcept
 {
 	operator=(std::move(other));
 }
-job::job(const job & other) noexcept
+job::job(const job& other) noexcept
 {
 	operator=(other);
 }
-job & job::operator=(job && other) noexcept
+job& job::operator=(job&& other) noexcept
 {
 	m_impl = std::move(other.m_impl);
 	return *this;
 }
-job & job::operator=(const job & other) noexcept
+job& job::operator=(const job& other) noexcept
 {
 	m_impl = other.m_impl;
 	return *this;
 }
-void job::add_dependency(job & dependency)
+void job::add_dependency(job& dependency)
 {
-	assert(m_impl && "Job not set");
-
 	if (!m_impl)
 		return;
 
@@ -68,7 +66,7 @@ void job::add_dependency(job & dependency)
 	}
 
 }
-void job::add_dependency(batch_job & dependency)
+void job::add_dependency(batch_job& dependency)
 {
 	add_dependency(dependency.get_endjob());
 }
@@ -88,8 +86,6 @@ job_queue job::get_target_queue() const noexcept
 }
 bool job::enable() noexcept
 {
-	assert(m_impl && "Job not set");
-
 	if (m_impl && m_impl->enable()) {
 		m_impl->get_handler()->enqueue_job(m_impl);
 
@@ -99,9 +95,7 @@ bool job::enable() noexcept
 }
 bool job::enable_locally_if_ready() noexcept
 {
-	assert(m_impl && "Job not set");
-
-	if (m_impl && m_impl->enable_if_ready()){
+	if (m_impl && m_impl->enable_if_ready()) {
 		m_impl->operator()();
 
 		return true;
@@ -110,8 +104,6 @@ bool job::enable_locally_if_ready() noexcept
 }
 bool job::is_ready() const noexcept
 {
-	assert(m_impl && "Job not set");
-
 	if (m_impl)
 		return m_impl->is_ready();
 
@@ -119,14 +111,10 @@ bool job::is_ready() const noexcept
 }
 bool job::is_finished() const noexcept
 {
-	assert(m_impl && "Job not set");
-	
 	return m_impl && m_impl->is_finished();
 }
 void job::wait_until_finished() noexcept
 {
-	assert(m_impl && "Job not set");
-
 	if (!m_impl)
 		return;
 
@@ -134,8 +122,6 @@ void job::wait_until_finished() noexcept
 }
 void job::wait_until_ready() noexcept
 {
-	assert(m_impl && "Job not set");
-
 	if (!m_impl)
 		return;
 
@@ -143,8 +129,6 @@ void job::wait_until_ready() noexcept
 }
 void job::work_until_finished(job_queue consumeFrom)
 {
-	assert(m_impl && "Job not set");
-
 	if (!m_impl)
 		return;
 
@@ -156,8 +140,6 @@ job::job(gdul::shared_ptr<jh_detail::job_impl> impl) noexcept
 }
 void job::work_until_ready(job_queue consumeFrom)
 {
-	assert(m_impl && "Job not set");
-
 	if (!m_impl)
 		return;
 
@@ -170,8 +152,6 @@ job::operator bool() const noexcept
 #if defined(GDUL_JOB_DEBUG)
 constexpr_id job::register_tracking_node(constexpr_id id, const char* name, const char* file, std::uint32_t line, bool batchSub)
 {
-	assert(m_impl && "Job not set");
-
 	if (!m_impl)
 		return constexpr_id::make<0>();
 
