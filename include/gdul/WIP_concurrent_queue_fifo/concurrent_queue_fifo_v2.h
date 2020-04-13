@@ -106,7 +106,7 @@ template <class Dummy = void>
 constexpr std::size_t aligned_size(std::size_t byteSize, std::size_t align);
 
 template <class T, class Allocator>
-class shared_ptr_allocator_adaptor;
+class shared_ptr_allocator_adapter;
 
 // Not quite size_type max because we need some leaway in case we
 // need to throw consumers out of a buffer whilst repairing it
@@ -157,7 +157,7 @@ private:
 	friend class cq_fifo_detail::dummy_container<T, allocator_type>;
 
 	using buffer_type = cq_fifo_detail::item_buffer<T, allocator_type>;
-	using allocator_adapter_type = cq_fifo_detail::shared_ptr_allocator_adaptor<std::uint8_t, allocator_type>;
+	using allocator_adapter_type = cq_fifo_detail::shared_ptr_allocator_adapter<std::uint8_t, allocator_type>;
 
 	using raw_ptr_buffer_type = raw_ptr<buffer_type>;
 	using shared_ptr_buffer_type = shared_ptr<buffer_type>;
@@ -1119,28 +1119,28 @@ constexpr std::size_t aligned_size(std::size_t byteSize, std::size_t align)
 	return align * total;
 }
 template <class T, class Allocator>
-class shared_ptr_allocator_adaptor : public Allocator
+class shared_ptr_allocator_adapter : public Allocator
 {
 public:
 	template <typename U>
 	struct rebind
 	{
-		using other = shared_ptr_allocator_adaptor<U, Allocator>;
+		using other = shared_ptr_allocator_adapter<U, Allocator>;
 	};
 
 	template <class U>
-	shared_ptr_allocator_adaptor(const shared_ptr_allocator_adaptor<U, Allocator>& other)
+	shared_ptr_allocator_adapter(const shared_ptr_allocator_adapter<U, Allocator>& other)
 		: m_address(other.m_address)
 		, m_size(other.m_size)
 	{
 	}
 
-	shared_ptr_allocator_adaptor()
+	shared_ptr_allocator_adapter()
 		: m_address(nullptr)
 		, m_size(0)
 	{
 	}
-	shared_ptr_allocator_adaptor(T* retAddr, std::size_t size)
+	shared_ptr_allocator_adapter(T* retAddr, std::size_t size)
 		: m_address(retAddr)
 		, m_size(size)
 	{

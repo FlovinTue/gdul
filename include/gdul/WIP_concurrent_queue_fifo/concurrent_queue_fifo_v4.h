@@ -84,9 +84,6 @@ namespace cq_fifo_detail
 typedef std::size_t size_type;
 
 template <class T, class Allocator>
-struct accessor_cache;
-
-template <class T, class Allocator>
 class item_buffer;
 
 template <class T>
@@ -113,7 +110,7 @@ template <class Dummy = void>
 constexpr std::size_t aligned_size(std::size_t byteSize, std::size_t align);
 
 template <class T, class Allocator>
-class shared_ptr_allocator_adaptor;
+class shared_ptr_allocator_adapter;
 
 // Not quite size_type max because we need some leaway in case we
 // need to throw consumers out of a buffer whilst repairing it
@@ -164,20 +161,15 @@ private:
 	friend class cq_fifo_detail::dummy_container<T, allocator_type>;
 
 	using buffer_type = cq_fifo_detail::item_buffer<T, allocator_type>;
-	using allocator_adapter_type = cq_fifo_detail::shared_ptr_allocator_adaptor<std::uint8_t, allocator_type>;
+	using allocator_adapter_type = cq_fifo_detail::shared_ptr_allocator_adapter<std::uint8_t, allocator_type>;
 
-	using raw_ptr_buffer_type = raw_ptr<buffer_type>;
 	using shared_ptr_buffer_type = shared_ptr<buffer_type>;
 	using atomic_shared_ptr_buffer_type = atomic_shared_ptr<buffer_type>;
 
 	template <class ...Arg>
 	void push_internal(Arg&&... in);
 
-
 	inline shared_ptr_buffer_type create_item_buffer(std::size_t withSize);
-
-	inline buffer_type* this_producer_cached();
-	inline buffer_type* this_consumer_cached();
 
 	inline bool initialize_consumer();
 	inline void initialize_producer();
@@ -185,15 +177,10 @@ private:
 	inline bool refresh_consumer();
 	inline void refresh_producer();
 
-	inline void refresh_cached_consumer();
-	inline void refresh_cached_producer();
+	static cq_fifo_detail::dummy_container<T, allocator_type> s_dummyContainer;
 
 	tlm<shared_ptr_buffer_type, allocator_type> t_producer;
 	tlm<shared_ptr_buffer_type, allocator_type> t_consumer;
-
-	static thread_local struct cache_container { cq_fifo_detail::accessor_cache<T, allocator_type> m_lastConsumer, m_lastProducer; } t_cachedAccesses;
-
-	static cq_fifo_detail::dummy_container<T, allocator_type> s_dummyContainer;
 
 	atomic_shared_ptr_buffer_type m_itemBuffer;
 
@@ -232,24 +219,20 @@ template<class T, class Allocator>
 template<class ...Arg>
 inline void concurrent_queue_fifo<T, Allocator>::push_internal(Arg&& ...in)
 {
-	while (!this_producer_cached()->try_push(std::forward<Arg>(in)...))
-	{
-		if (this_producer_cached()->is_valid())
-		{
+	while (!t_producer.get()->try_push(std::forward<Arg>(in)...)){
+		if (t_producer.get()->is_valid()){
 			refresh_producer();
 		}
-		else
-		{
+		else{
 			initialize_producer();
 		}
-		refresh_cached_producer();
 	}
 }
 template<class T, class Allocator>
 bool concurrent_queue_fifo<T, Allocator>::try_pop(T& out)
 {
-	while (!this_consumer_cached()->try_pop(out)) {
-		if (this_consumer_cached()->is_valid()) {
+	while (!t_consumer.get()->try_pop(out)) {
+		if (t_consumer.get()->is_valid()) {
 			if (!refresh_consumer()) {
 				return false;
 			}
@@ -259,7 +242,6 @@ bool concurrent_queue_fifo<T, Allocator>::try_pop(T& out)
 				return false;
 			}
 		}
-		refresh_cached_consumer();
 	}
 	return true;
 }
@@ -436,27 +418,6 @@ inline typename concurrent_queue_fifo<T, Allocator>::shared_ptr_buffer_type conc
 
 	return returnValue;
 }
-
-template<class T, class Allocator>
-inline typename concurrent_queue_fifo<T, Allocator>::buffer_type* concurrent_queue_fifo<T, Allocator>::this_producer_cached()
-{
-	if ((t_cachedAccesses.m_lastProducer.m_addrBlock & cq_fifo_detail::Ptr_Mask) ^ reinterpret_cast<std::uintptr_t>(this))
-	{
-		refresh_cached_producer();
-	}
-	return t_cachedAccesses.m_lastProducer.m_buffer;
-}
-
-template<class T, class Allocator>
-inline typename concurrent_queue_fifo<T, Allocator>::buffer_type* concurrent_queue_fifo<T, Allocator>::this_consumer_cached()
-{
-	if ((t_cachedAccesses.m_lastConsumer.m_addrBlock & cq_fifo_detail::Ptr_Mask) ^ reinterpret_cast<std::uintptr_t>(this))
-	{
-		refresh_cached_consumer();
-	}
-	return t_cachedAccesses.m_lastConsumer.m_buffer;
-}
-
 template<class T, class Allocator>
 inline bool concurrent_queue_fifo<T, Allocator>::initialize_consumer()
 {
@@ -512,20 +473,6 @@ inline void concurrent_queue_fifo<T, Allocator>::refresh_producer()
 	//} while (t_producer.get().get() == initial);
 
 	t_producer = m_itemBuffer.load(std::memory_order_relaxed);
-}
-
-template<class T, class Allocator>
-inline void concurrent_queue_fifo<T, Allocator>::refresh_cached_consumer()
-{
-	t_cachedAccesses.m_lastConsumer.m_buffer = t_consumer.get().get();
-	t_cachedAccesses.m_lastConsumer.m_addr = this;
-}
-
-template<class T, class Allocator>
-inline void concurrent_queue_fifo<T, Allocator>::refresh_cached_producer()
-{
-	t_cachedAccesses.m_lastProducer.m_buffer = t_producer.get().get();
-	t_cachedAccesses.m_lastProducer.m_addr = this;
 }
 
 namespace cq_fifo_detail
@@ -787,24 +734,28 @@ inline bool item_buffer<T, Allocator>::try_push(Arg&& ...in)
 
 	write_in(at, std::forward<Arg>(in)...);
 
-	const size_type postSync(m_postWriteSync.fetch_add(1, std::memory_order_acq_rel));
+	std::atomic_thread_fence(std::memory_order_release);
+
+	const size_type postSync(m_postWriteSync.fetch_add(1, std::memory_order_relaxed));
 	const size_type postAt(m_writeAt.load(std::memory_order_relaxed));
 	if ((postSync + 1) == postAt) {
 		size_type xchg(postAt);
 		size_type target(0);
 		do {
 			target = xchg;
-			xchg = m_written.exchange(target, std::memory_order_release);
+			xchg = m_written.exchange(target, std::memory_order_relaxed);
 		} while (target < xchg);
 	}
-	//m_written.fetch_add(1, std::memory_order_release);
 
 	return true;
 }
 template<class T, class Allocator>
 inline bool item_buffer<T, Allocator>::try_pop(T& out)
 {
-	const size_type written(m_written.load(std::memory_order_acquire));
+	const size_type written(m_written.load(std::memory_order_relaxed));
+
+	std::atomic_thread_fence(std::memory_order_acquire);
+
 	const size_type preReadSync(m_preReadSync.fetch_add(1, std::memory_order_relaxed));
 
 	if (!(preReadSync < written)) {
@@ -981,28 +932,28 @@ constexpr std::size_t aligned_size(std::size_t byteSize, std::size_t align)
 	return align * total;
 }
 template <class T, class Allocator>
-class shared_ptr_allocator_adaptor : public Allocator
+class shared_ptr_allocator_adapter : public Allocator
 {
 public:
 	template <typename U>
 	struct rebind
 	{
-		using other = shared_ptr_allocator_adaptor<U, Allocator>;
+		using other = shared_ptr_allocator_adapter<U, Allocator>;
 	};
 
 	template <class U>
-	shared_ptr_allocator_adaptor(const shared_ptr_allocator_adaptor<U, Allocator>& other)
+	shared_ptr_allocator_adapter(const shared_ptr_allocator_adapter<U, Allocator>& other)
 		: m_address(other.m_address)
 		, m_size(other.m_size)
 	{
 	}
 
-	shared_ptr_allocator_adaptor()
+	shared_ptr_allocator_adapter()
 		: m_address(nullptr)
 		, m_size(0)
 	{
 	}
-	shared_ptr_allocator_adaptor(T* retAddr, std::size_t size)
+	shared_ptr_allocator_adapter(T* retAddr, std::size_t size)
 		: m_address(retAddr)
 		, m_size(size)
 	{
@@ -1034,34 +985,16 @@ private:
 	std::size_t m_size;
 };
 template <class T, class Allocator>
-struct accessor_cache
-{
-	item_buffer<T, Allocator>* m_buffer;
-
-	union
-	{
-		void* m_addr;
-		std::uint64_t m_addrBlock;
-		struct
-		{
-			std::uint16_t padding[3];
-			std::uint16_t m_counter;
-		};
-	};
-};
-template <class T, class Allocator>
 class dummy_container
 {
 public:
 	dummy_container();
+	~dummy_container() = default;
+
 	using shared_ptr_buffer_type = typename concurrent_queue_fifo<T, Allocator>::shared_ptr_buffer_type;
 	using allocator_adapter_type = typename concurrent_queue_fifo<T, Allocator>::allocator_adapter_type;
 	using buffer_type = typename concurrent_queue_fifo<T, Allocator>::buffer_type;
 	using allocator_type = typename concurrent_queue_fifo<T, Allocator>::allocator_type;
-	~dummy_container()
-	{
-
-	}
 
 	shared_ptr_buffer_type m_dummyBuffer;
 	item_slot<T> m_dummyItem;
@@ -1091,7 +1024,5 @@ inline void buffer_deleter<T, Allocator>::operator()(T* obj, Allocator&)
 }
 template <class T, class Allocator>
 cq_fifo_detail::dummy_container<T, typename concurrent_queue_fifo<T, Allocator>::allocator_type> concurrent_queue_fifo<T, Allocator>::s_dummyContainer;
-template <class T, class Allocator>
-thread_local typename concurrent_queue_fifo<T, Allocator>::cache_container concurrent_queue_fifo<T, Allocator>::t_cachedAccesses{ {&concurrent_queue_fifo<T, Allocator>::s_dummyContainer.m_dummyRawBuffer, nullptr}, {&concurrent_queue_fifo<T, Allocator>::s_dummyContainer.m_dummyRawBuffer, nullptr} };
 }
 #pragma warning(pop)
