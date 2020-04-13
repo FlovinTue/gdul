@@ -734,6 +734,8 @@ inline union aspdetail::compressed_storage atomic_shared_ptr<T>::copy_internal(s
 
 	initial.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] = 1;
 
+	std::atomic_thread_fence(order);
+
 	return initial;
 }
 template <class T>
