@@ -163,6 +163,7 @@ private:
 	using buffer_type = cq_fifo_detail::item_buffer<T, allocator_type>;
 	using allocator_adapter_type = cq_fifo_detail::shared_ptr_allocator_adapter<std::uint8_t, allocator_type>;
 
+	using raw_ptr_buffer_type = raw_ptr<buffer_type>;
 	using shared_ptr_buffer_type = shared_ptr<buffer_type>;
 	using atomic_shared_ptr_buffer_type = atomic_shared_ptr<buffer_type>;
 
@@ -592,7 +593,7 @@ inline bool item_buffer<T, Allocator>::is_active() const
 		return true;
 	}
 
-	const size_type written(m_written.load(std::memory_order_acquire));
+	const size_type written(m_written.load(std::memory_order_relaxed));
 
 	if (written != m_capacity) {
 		return true;
