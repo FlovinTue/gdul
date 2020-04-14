@@ -53,6 +53,7 @@ class batch_job_impl : public batch_job_impl_interface
 {
 public:
 	batch_job_impl() = default;
+	~batch_job_impl();
 
 	using intput_container_type = InContainer;
 	using output_container_type = OutContainer;
@@ -213,6 +214,11 @@ inline std::uint32_t batch_job_impl<InContainer, OutContainer, Process>::clamp_b
 	}
 
 	return returnValue;
+}
+template<class InContainer, class OutContainer, class Process>
+inline batch_job_impl<InContainer, OutContainer, Process>::~batch_job_impl()
+{
+	assert(_redirect_is_enabled(m_root.m_impl) && "Job destructor ran before enable was called");
 }
 template<class InContainer, class OutContainer, class Process>
 inline void batch_job_impl<InContainer, OutContainer, Process>::add_dependency(job& dependency)

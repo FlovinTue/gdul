@@ -41,8 +41,6 @@ class job : public jh_detail::job_tracker_interface
 public:
 	job() noexcept;
 
-	~job();
-
 	job(job&& other) noexcept;
 	job(const job& other) noexcept;
 	job& operator=(job&& other) noexcept;

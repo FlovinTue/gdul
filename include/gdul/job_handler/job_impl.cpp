@@ -46,6 +46,7 @@ job_impl::job_impl(delegate<void()>&& workUnit, job_handler_impl* handler)
 }
 job_impl::~job_impl()
 {
+	assert(is_enabled() && "Job destructor ran before enable was called");
 }
 
 void job_impl::operator()()

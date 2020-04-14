@@ -27,10 +27,6 @@ namespace gdul {
 batch_job::batch_job()
 	: m_impl(nullptr)
 {}
-batch_job::~batch_job()
-{
-	assert(!(*this) || m_impl->is_enabled() && "Job destructor ran before enable was called");
-}
 void batch_job::add_dependency(job & dependency)
 {
 	if (m_impl)

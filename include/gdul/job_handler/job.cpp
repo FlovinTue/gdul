@@ -30,10 +30,6 @@ namespace gdul
 job::job() noexcept
 {
 }
-job::~job()
-{
-	assert(!(*this) || m_impl->is_enabled() && "Job destructor ran before enable was called");
-}
 job::job(job&& other) noexcept
 {
 	operator=(std::move(other));
