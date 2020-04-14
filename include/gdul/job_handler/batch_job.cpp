@@ -46,7 +46,7 @@ job_queue batch_job::get_target_queue() const noexcept
 }
 bool batch_job::enable() noexcept
 {
-	return m_impl && m_impl->enable();
+	return m_impl && m_impl->enable(m_impl);
 }
 bool batch_job::enable_locally_if_ready()
 {

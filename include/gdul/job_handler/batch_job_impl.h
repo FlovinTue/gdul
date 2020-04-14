@@ -73,7 +73,7 @@ public:
 	void work_until_finished(job_queue consumeFrom) override final;
 	void work_until_ready(job_queue consumeFrom) override final;
 
-	bool enable()  noexcept override final;
+	bool enable(shared_ptr<batch_job_impl_interface> selfRef)  noexcept override final;
 	bool enable_locally_if_ready() override final;
 
 	bool is_enabled() const noexcept override final;
@@ -145,6 +145,8 @@ private:
 
 	bool (job::* m_enableFunc)(void);
 
+	shared_ptr<batch_job_impl_interface> m_selfRef;
+
 	job m_root;
 	job m_end;
 
@@ -183,6 +185,11 @@ inline batch_job_impl<InContainer, OutContainer, Process>::batch_job_impl(
 #endif
 {}
 template<class InContainer, class OutContainer, class Process>
+inline batch_job_impl<InContainer, OutContainer, Process>::~batch_job_impl()
+{
+	assert(_redirect_is_enabled(m_root.m_impl) && "Job destructor ran before enable was called");
+}
+template<class InContainer, class OutContainer, class Process>
 inline std::size_t batch_job_impl<InContainer, OutContainer, Process>::to_batch_begin(std::size_t batchIndex) const
 {
 	return batchIndex * m_batchSize;
@@ -214,11 +221,6 @@ inline std::uint32_t batch_job_impl<InContainer, OutContainer, Process>::clamp_b
 	}
 
 	return returnValue;
-}
-template<class InContainer, class OutContainer, class Process>
-inline batch_job_impl<InContainer, OutContainer, Process>::~batch_job_impl()
-{
-	assert(_redirect_is_enabled(m_root.m_impl) && "Job destructor ran before enable was called");
 }
 template<class InContainer, class OutContainer, class Process>
 inline void batch_job_impl<InContainer, OutContainer, Process>::add_dependency(job& dependency)
@@ -264,10 +266,15 @@ inline void batch_job_impl<InContainer, OutContainer, Process>::work_until_ready
 	GDUL_JOB_DEBUG_CONDTIONAL(if (m_trackingNode) m_trackingNode->m_waitTimeSet.log_time(waitTimer.get()))
 }
 template<class InContainer, class OutContainer, class Process>
-inline bool batch_job_impl<InContainer, OutContainer, Process>::enable() noexcept
+inline bool batch_job_impl<InContainer, OutContainer, Process>::enable(shared_ptr<batch_job_impl_interface> selfRef) noexcept
 {
 	GDUL_JOB_DEBUG_CONDTIONAL(m_enqueueTimer.reset())
-	return m_root.enable();
+
+	const bool result(m_root.enable());
+	if (result)
+		m_selfRef = std::move(selfRef);
+
+	return result;
 }
 template<class InContainer, class OutContainer, class Process>
 inline bool batch_job_impl<InContainer, OutContainer, Process>::enable_locally_if_ready()
@@ -474,12 +481,16 @@ inline void batch_job_impl<InContainer, OutContainer, Process>::finalize()
 	m_outputResizeFunc(get_output_size());
 
 	GDUL_JOB_DEBUG_CONDTIONAL(if (m_trackingNode)m_trackingNode->m_completionTimeSet.log_time(m_completionTimer.get()))
+
+	m_selfRef = shared_ptr<batch_job_impl_interface>();
 }
 template<class InContainer, class OutContainer, class Process>
 template <class U, std::enable_if_t<U::Specialize_Update>*>
 inline void batch_job_impl<InContainer, OutContainer, Process>::finalize()
 {
 	GDUL_JOB_DEBUG_CONDTIONAL(if (m_trackingNode)m_trackingNode->m_completionTimeSet.log_time(m_completionTimer.get()))
+
+	m_selfRef = shared_ptr<batch_job_impl_interface>();
 }
 #if defined(GDUL_JOB_DEBUG)
 template<class InContainer, class OutContainer, class Process>
