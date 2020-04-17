@@ -185,6 +185,18 @@ public:
 
 	~thread_local_member() noexcept;
 
+	inline void unsafe_reset();
+	// Initialize with default T value (move)
+	inline void unsafe_reset(T&& init);
+	// Initialize with default T value
+	inline void unsafe_reset(const T& init);
+	// Initialize with allocator
+	inline void unsafe_reset(Allocator allocator);
+	// Initialize with allocator and default T value (move)
+	inline void unsafe_reset(T&& init, Allocator allocator);
+	// Initialize with allocator and default T value
+	inline void unsafe_reset(const T& init, Allocator allocator);
+
 	inline operator T& ();
 	inline operator const T& () const;
 
@@ -295,6 +307,40 @@ inline thread_local_member<T, Allocator>::~thread_local_member() noexcept
 		store_instance_tracker(instance_tracker_entry(nullptr));
 		s_st_container.m_indexPool.add(m_index);	
 	}
+}
+template<class T, class Allocator>
+inline void thread_local_member<T, Allocator>::unsafe_reset()
+{
+	unsafe_reset(T());
+}
+template<class T, class Allocator>
+inline void thread_local_member<T, Allocator>::unsafe_reset(T&& init)
+{
+	unsafe_reset(std::move(init), Allocator());
+}
+template<class T, class Allocator>
+inline void thread_local_member<T, Allocator>::unsafe_reset(const T& init)
+{
+	unsafe_reset(init, Allocator());
+}
+template<class T, class Allocator>
+inline void thread_local_member<T, Allocator>::unsafe_reset(Allocator allocator)
+{
+	unsafe_reset(T(), Allocator());
+}
+template<class T, class Allocator>
+inline void thread_local_member<T, Allocator>::unsafe_reset(T&& init, Allocator allocator)
+{
+	thread_local_member* const addr(this);
+	this->~thread_local_member();
+	new (addr) thread_local_member(std::move(init), allocator);
+}
+template<class T, class Allocator>
+inline void thread_local_member<T, Allocator>::unsafe_reset(const T& init, Allocator allocator)
+{
+	thread_local_member* const addr(this);
+	this->~thread_local_member();
+	new (addr) thread_local_member(init, allocator);
 }
 template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::operator T& ()
@@ -511,7 +557,6 @@ public:
 
 	inline size_type capacity() const noexcept;
 private:
-
 
 	T* get_array_ref() noexcept;
 
