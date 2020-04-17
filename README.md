@@ -5,7 +5,6 @@ A collection of (mainly concurrency related) data structures, created with game 
 -------------------------------------------------------------------------------------------------------------------------------------------
 
 ## atomic_shared_ptr
-My take on an atomic shared pointer.
 
 * Lock-Free (if used with a lock-free allocator)
 * Uses an interface resembling that of an std::atomic type
@@ -63,7 +62,7 @@ Main features would be:
 * Supports (multiple) job dependencies. (if job 'first' depends on job 'second' then 'first' will not be enqueued for consumption until 'second' has completed) 
 * Keeps multiple internal job queues (number defined by gdul::job_queue_count enum value), with workers consuming from the further-back queues less frequently (range of consumption is definable).
 * Has three types of batch_job (splits an array of items combined with a processing delegate over multiple jobs). 
-* Job spawn graph may be dumped to file for viewing
+* Job relationship graph may be dumped to file for viewing
 
 Job tracking instructions: 
 - make sure GDUL_JOB_DEBUG is defined in globals.h
