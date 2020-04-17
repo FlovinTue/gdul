@@ -3,17 +3,19 @@
 
 #include "pch.h"
 #include <iostream>
-#include <gdul\concurrent_object_pool\concurrent_object_pool.h>
+#include <gdul\concurrent_object_pool\concurrent_object_pool_v2.h>
 #include <vld.h>
 
 int main()
 {
 	std::allocator<std::uint8_t> alloc;
-	gdul::concurrent_object_pool<int, decltype(alloc)> pool(1, alloc);
-	int* second = pool.get_object();
-	int* first = pool.get_object();
-	pool.recycle_object(first);
-	pool.unsafe_destroy();
+	gdul::concurrent_object_pool<int, decltype(alloc)> pool(alloc);
+	pool.try_alloc_block();
+
+	int* second = pool.get();
+	int* first = pool.get();
+	pool.recycle(first);
+	pool.unsafe_reset();
 	std::size_t numAvaliable = pool.avaliable();
 
     std::cout << "Hello World!\n"; 
