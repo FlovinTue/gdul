@@ -3,27 +3,38 @@
 
 #include "pch.h"
 #include <iostream>
-#include <atomic>
-#include <gdul/WIP_pool_allocator/pool_allocator.h>
+#include <tester.h>
 #include <vld.h>
 
 
 
-struct alignas(32) test_object
-{
-	int m_mem;
-};
-
 int main()
 {
-	gdul::memory_pool pool;
+	//gdul::memory_pool pool;
+	//pool.init<sizeof(gdul::test_struct), alignof(gdul::test_struct)>(2);
+	//gdul::pool_allocator<gdul::test_struct> alloc(pool.create_allocator<gdul::test_struct>());
+	//auto a = alloc.allocate();
+	//auto b = alloc.allocate();
+	//auto c = alloc.allocate();
 
-	constexpr std::size_t allocSharedSize(gdul::allocate_shared_size<test_object, gdul::pool_allocator<test_object>>());
-	pool.init<allocSharedSize, alignof(test_object)>(8);
+	//alloc.deallocate(a);
+	//alloc.deallocate(b);
+	//alloc.deallocate(c);
 
-	gdul::pool_allocator<test_object> alloc(pool.create_allocator<test_object>());
+	//for (auto i = 0; i < 128; ++i) {
+	//	alloc.allocate();
+	//}
 
-	gdul::shared_ptr<test_object> sp(gdul::allocate_shared<test_object>(alloc));
+	gdul::tester tester;
+	tester.init();
+	
+	for (auto i = 0; i < 1000; ++i) {
+		const float allocation = tester.test_allocation(2048);
+
+
+		std::cout << "Result allocation: " << allocation << std::endl;
+	}
+	
 
 	return 0;
 }

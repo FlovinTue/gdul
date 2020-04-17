@@ -23,7 +23,7 @@
 #pragma once
 
 #include <stdint.h>
-#include <gdul/concurrent_object_pool/concurrent_object_pool_v2.h>
+#include <gdul/concurrent_object_pool/concurrent_object_pool.h>
 
 namespace gdul
 {
@@ -163,7 +163,7 @@ inline void memory_pool::init(std::size_t chunksPerBlock, ParentAllocator alloca
 
 	m_impl = gdul::allocate_shared<call_detail::memory_pool_impl<ChunkSize, ChunkAlign, ParentAllocator>>(allocator, chunksPerBlock, allocator);
 }
-inline void memory_pool::reset() 
+inline void memory_pool::reset()
 {
 	m_impl = shared_ptr<call_detail::memory_pool_base>();
 }
@@ -174,22 +174,34 @@ inline pool_allocator<T> memory_pool::create_allocator() const
 	return pool_allocator<T>((typename pool_allocator<T>::pool_ptr_type)m_impl);
 }
 namespace call_detail {
+
+
+static constexpr std::size_t Memory_Pool_Max_Growth = 16;
+static constexpr std::size_t Memory_Pool_Min_Size = 4;
+
 template <std::size_t ChunkSize, std::size_t ChunkAlign, class ParentAllocator>
 class memory_pool_impl : public memory_pool_base
 {
 	struct alignas(ChunkAlign) chunk_rep
 	{
-		std::uint8_t m_block[ChunkSize];
+		std::uint8_t m_block[ChunkSize]{};
+		std::atomic_flag m_claim{ ATOMIC_FLAG_INIT };
 	};
+
+	struct block_rep
+	{
+		atomic_shared_ptr<chunk_rep[]> m_ownedBlock;
+		const chunk_rep* m_begin = nullptr;
+		const chunk_rep* m_end = nullptr;
+		std::atomic_uint m_accessIndex = 0;
+	};
+
 public:
-	memory_pool_impl(std::size_t chunksPerBlock, ParentAllocator allocator)
-		: m_pool(chunksPerBlock, allocator)
+	memory_pool_impl(std::size_t initChunkCount, ParentAllocator allocator)
 	{}
 	void* get_chunk() override final {
-		return (void*)m_pool.get();
 	}
 	void recycle_chunk(void* chunk) override final {
-		m_pool.recycle((chunk_rep*)chunk);
 	}
 
 	bool verify_compatibility(std::size_t chunkSize, std::size_t chunkAlign) const override final {
@@ -200,9 +212,32 @@ public:
 		return size & align;
 	}
 
+	static constexpr std::size_t to_index(std::size_t chunkCount);
+	static constexpr std::size_t to_chunk_count(std::size_t index);
+
+	void try_allocate_block(std::size_t index);
+
 private:
-	concurrent_object_pool<chunk_rep, ParentAllocator> m_pool;
+	std::array<block_rep, Memory_Pool_Max_Growth> m_blocks;
+
+
+
+	ParentAllocator m_allocator;
+
 };
+template<std::size_t ChunkSize, std::size_t ChunkAlign, class ParentAllocator>
+inline void memory_pool_impl<ChunkSize, ChunkAlign, ParentAllocator>::try_allocate_block(std::size_t index)
+{
+	if (m_blocks[index].m_ownedBlock.get_version() != 0) {
+		return;
+	}
+
+	raw_ptr<chunk_rep[]> expected(nullptr, 0);
+
+	shared_ptr<chunk_rep[]> desired(make_shared<chunk_rep[]>(to_chunk_count(index, m_allocator));
+
+	m_blocks[index].m_ownedBlock.compare_exchange_strong(expected, desired);
+}
 }
 
 }
