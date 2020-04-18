@@ -74,6 +74,9 @@ int main()
 	atomic_shared_ptr<int> afirst;
 	atomic_shared_ptr<int> asecond(nullptr);
 	atomic_shared_ptr<int> athird(make_shared<int>(3));
+	const std::size_t useCount(athird.unsafe_use_count());
+	const std::size_t itemCount(athird.unsafe_item_count());
+	const std::uint8_t localCount(athird.use_count_local());
 
 	shared_ptr<int> afourthsrc(make_shared<int>(4));
 	atomic_shared_ptr<int> afourth(afourthsrc);
