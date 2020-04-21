@@ -170,7 +170,7 @@ private:
 	template <class ...Arg>
 	void push_internal(Arg&&... in);
 
-	inline shared_ptr_buffer_type create_item_buffer(std::size_t withCapacity);
+	inline shared_ptr_buffer_type create_item_buffer(std::size_t withSize);
 
 	inline bool initialize_consumer();
 	inline void initialize_producer();
@@ -182,11 +182,8 @@ private:
 
 	tlm<shared_ptr_buffer_type, allocator_type> t_producer;
 	tlm<shared_ptr_buffer_type, allocator_type> t_consumer;
-	tlm<shared_ptr_buffer_type, allocator_type> t_spareBuffer;
 
 	atomic_shared_ptr_buffer_type m_itemBuffer;
-
-	size_type m_capacity;
 
 	allocator_type m_allocator;
 };
@@ -200,9 +197,7 @@ template<class T, class Allocator>
 inline concurrent_queue_fifo<T, Allocator>::concurrent_queue_fifo(Allocator allocator)
 	: t_producer(s_dummyContainer.m_dummyBuffer, allocator)
 	, t_consumer(s_dummyContainer.m_dummyBuffer, allocator)
-	, t_spareBuffer(s_dummyContainer.m_dummyBuffer, allocator)
 	, m_itemBuffer(s_dummyContainer.m_dummyBuffer)
-	, m_capacity(32)
 	, m_allocator(allocator)
 {
 }
@@ -265,19 +260,22 @@ inline void concurrent_queue_fifo<T, Allocator>::reserve(typename concurrent_que
 	shared_ptr_buffer_type active(nullptr);
 	shared_ptr_buffer_type  front(nullptr);
 
-	do{
+	do
+	{
 		active = m_itemBuffer.load(std::memory_order_relaxed);
 		front = active->find_front();
 
-		if (!front){
+		if (!front)
+		{
 			front = active;
 		}
 
-		if (!(front->get_capacity() < capacity)){
+		if (!(front->get_capacity() < capacity))
+		{
 			break;
 		}
 
-	} while (!active->try_exchange_front(create_item_buffer(alignedCapacity)));
+	} while (!active->try_push_front(create_item_buffer(alignedCapacity)));
 }
 template<class T, class Allocator>
 inline void concurrent_queue_fifo<T, Allocator>::unsafe_clear()
@@ -352,9 +350,9 @@ inline bool concurrent_queue_fifo<T, Allocator>::refresh_consumer()
 	return false;
 }
 template<class T, class Allocator>
-inline typename concurrent_queue_fifo<T, Allocator>::shared_ptr_buffer_type concurrent_queue_fifo<T, Allocator>::create_item_buffer(std::size_t withCapacity)
+inline typename concurrent_queue_fifo<T, Allocator>::shared_ptr_buffer_type concurrent_queue_fifo<T, Allocator>::create_item_buffer(std::size_t withSize)
 {
-	const std::size_t log2size(cq_fifo_detail::log2_align<>(withCapacity));
+	const std::size_t log2size(cq_fifo_detail::log2_align<>(withSize));
 
 	const std::size_t alignOfData(alignof(T));
 
@@ -450,24 +448,30 @@ inline void concurrent_queue_fifo<T, Allocator>::refresh_producer()
 {
 	assert(t_producer.get()->is_valid() && "producer needs to be initialized");
 
-	shared_ptr_buffer_type& currentBuffer(t_producer.get());
-	shared_ptr_buffer_type frontBuffer(currentBuffer.find_front());
-
-	if (frontBuffer) {
-		currentBuffer = std::move(frontBuffer);
-		return;
-	}
-
-	shared_ptr_buffer_type& spareBuffer(t_spareBuffer.get());
-
-	if (spareBuffer->capacity() < m_capacity ||
-		spareBuffer.use_count() != spareBuffer.use_count_local()) {
-		spareBuffer = create_item_buffer(m_capacity);
-	}
-
-	currentBuffer->try_exchange_front(spareBuffer);
-
-	std::swap(std::move(spareBuffer), std::move(currentBuffer));
+	//const buffer_type* const initial(t_producer.get().get());
+	//
+	//do
+	//{
+	//	shared_ptr_buffer_type front(t_producer.get()->find_front());
+	//
+	//	if (!front)
+	//	{
+	//		front = t_producer.get();
+	//	}
+	//
+	//	if (front.get() == t_producer.get().get())
+	//	{
+	//		const size_type capacity(front->get_capacity());
+	//		const size_type newCapacity(capacity * 2);
+	//
+	//		reserve(newCapacity);
+	//	}
+	//	else
+	//	{
+	//		t_producer = std::move(front);
+	//	}
+	//
+	//} while (t_producer.get().get() == initial);
 
 	t_producer = m_itemBuffer.load(std::memory_order_relaxed);
 }
@@ -513,7 +517,7 @@ public:
 
 	// Pushes a newly allocated buffer buffer to the front of the
 	// buffer list
-	inline bool try_exchange_front(shared_ptr_buffer_type& inOutBuffer);
+	inline bool try_push_front(shared_ptr_buffer_type newBuffer);
 
 	// Used to signal that this buffer list is to be discarded
 	inline void unsafe_invalidate();
@@ -671,7 +675,7 @@ inline typename item_buffer<T, Allocator>::size_type item_buffer<T, Allocator>::
 	return m_capacity;
 }
 template<class T, class Allocator>
-inline bool item_buffer<T, Allocator>::try_exchange_front(shared_ptr_buffer_type& inOutBuffer)
+inline bool item_buffer<T, Allocator>::try_push_front(shared_ptr_buffer_type newBuffer)
 {
 	item_buffer<T, allocator_type>* last(this);
 
@@ -685,7 +689,7 @@ inline bool item_buffer<T, Allocator>::try_exchange_front(shared_ptr_buffer_type
 
 	last->block_writers();
 
-	shared_ptr_buffer_type exp(nullptr, last->m_next.get_version());
+	raw_ptr_buffer_type exp(nullptr);
 	return last->m_next.compare_exchange_strong(exp, std::move(newBuffer), std::memory_order_release, std::memory_order_relaxed);
 }
 template<class T, class Allocator>
