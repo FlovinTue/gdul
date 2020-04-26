@@ -29,8 +29,8 @@ namespace job_time_set_view
         {
             InitializeComponent();
 
-            this.numericUpDown1.ValueChanged += new System.EventHandler(this.refresh_series_min);
-            this.numericUpDown2.ValueChanged += new System.EventHandler(this.refresh_series_max);
+            this.FromItemField.ValueChanged += new System.EventHandler(this.refresh_series_min);
+            this.ToItemField.ValueChanged += new System.EventHandler(this.refresh_series_max);
 
             m_jobInfos = new Dictionary<string, job_info>();
             m_dataSources = new Dictionary<string, Dictionary<string, List<Tuple<float, string>>>>();
@@ -166,6 +166,10 @@ namespace job_time_set_view
                 chartArea.Name = "ChartArea1";
                 chartArea.AxisX.ScaleView.Zoomable = true;
                 chartArea.BackColor = Color.FromArgb(245, 245, 255);
+                chartArea.Position.X = 0;
+                chartArea.Position.Y = 0;
+                chartArea.Position.Width = 98;
+                chartArea.Position.Height = 98;
 
                 chart.ChartAreas.Add(chartArea);
                 chart.Click += chart_clicked;
@@ -324,24 +328,26 @@ namespace job_time_set_view
             charts[0].ChartAreas[0].AxisX.ScaleView.Zoom(0, 25.0f);
 
             charts[0].Refresh();
-
-            this.numericUpDown1.Maximum = charts[0].Series[1].Points.Count;
-            this.numericUpDown2.Maximum = charts[0].Series[1].Points.Count;
-            this.numericUpDown1.Minimum = 0;
-            this.numericUpDown2.Minimum = 0;
-            this.numericUpDown1.Value = 0;
-            this.numericUpDown2.Value = this.numericUpDown2.Maximum;
-
+            this.FromItemField.ValueChanged -= refresh_series_min;
+            this.ToItemField.ValueChanged -= refresh_series_max;
+            this.FromItemField.Maximum = charts[0].Series[1].Points.Count;
+            this.ToItemField.Maximum = charts[0].Series[1].Points.Count;
+            this.FromItemField.Minimum = 0;
+            this.ToItemField.Minimum = 0;
+            this.FromItemField.Value = 0;
+            this.ToItemField.Value = this.ToItemField.Maximum;
+            this.FromItemField.ValueChanged += new System.EventHandler(this.refresh_series_min);
+            this.ToItemField.ValueChanged += new System.EventHandler(this.refresh_series_max);
         }
         private void refresh_series_max(object sender, EventArgs e)
         {
-            this.numericUpDown1.Maximum = this.numericUpDown2.Value;
+            this.FromItemField.Maximum = this.ToItemField.Value;
 
             refresh_series_range(sender, e);
         }
         private void refresh_series_min(object sender, EventArgs e)
         {
-            this.numericUpDown2.Minimum = this.numericUpDown1.Value;
+            this.ToItemField.Minimum = this.FromItemField.Value;
 
             refresh_series_range(sender, e);
         }
@@ -353,8 +359,8 @@ namespace job_time_set_view
                 sender == null)
                 return;
 
-            int min = (int)numericUpDown1.Value;
-            int max = (int)numericUpDown2.Value;
+            int min = (int)FromItemField.Value;
+            int max = (int)ToItemField.Value;
 
             Chart chart = currentTab.Controls.OfType<Chart>().ToList()[0];
 
