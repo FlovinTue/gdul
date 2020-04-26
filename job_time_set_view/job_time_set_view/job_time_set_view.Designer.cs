@@ -33,6 +33,13 @@
             this.ItemProperties = new System.Windows.Forms.ListBox();
             this.label2 = new System.Windows.Forms.Label();
             this.tabControl1 = new System.Windows.Forms.TabControl();
+            this.splitter1 = new System.Windows.Forms.Splitter();
+            this.StartIndexLabel = new System.Windows.Forms.Label();
+            this.numericUpDown1 = new System.Windows.Forms.NumericUpDown();
+            this.EndIndexLabel = new System.Windows.Forms.Label();
+            this.numericUpDown2 = new System.Windows.Forms.NumericUpDown();
+            ((System.ComponentModel.ISupportInitialize)(this.numericUpDown1)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.numericUpDown2)).BeginInit();
             this.SuspendLayout();
             // 
             // DataSource
@@ -82,11 +89,51 @@
             this.tabControl1.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.tabControl1.Location = new System.Drawing.Point(260, 12);
+            this.tabControl1.Location = new System.Drawing.Point(260, 18);
             this.tabControl1.Name = "tabControl1";
             this.tabControl1.SelectedIndex = 0;
-            this.tabControl1.Size = new System.Drawing.Size(1008, 781);
+            this.tabControl1.Size = new System.Drawing.Size(1008, 728);
             this.tabControl1.TabIndex = 0;
+            // 
+            // splitter1
+            // 
+            this.splitter1.Location = new System.Drawing.Point(0, 0);
+            this.splitter1.Name = "splitter1";
+            this.splitter1.Size = new System.Drawing.Size(3, 802);
+            this.splitter1.TabIndex = 5;
+            this.splitter1.TabStop = false;
+            // 
+            // StartIndexLabel
+            // 
+            this.StartIndexLabel.AutoSize = true;
+            this.StartIndexLabel.Location = new System.Drawing.Point(257, 752);
+            this.StartIndexLabel.Name = "StartIndexLabel";
+            this.StartIndexLabel.Size = new System.Drawing.Size(55, 13);
+            this.StartIndexLabel.TabIndex = 7;
+            this.StartIndexLabel.Text = "StartIndex";
+            // 
+            // numericUpDown1
+            // 
+            this.numericUpDown1.Location = new System.Drawing.Point(318, 748);
+            this.numericUpDown1.Name = "numericUpDown1";
+            this.numericUpDown1.Size = new System.Drawing.Size(77, 20);
+            this.numericUpDown1.TabIndex = 8;
+            // 
+            // EndIndexLabel
+            // 
+            this.EndIndexLabel.AutoSize = true;
+            this.EndIndexLabel.Location = new System.Drawing.Point(414, 752);
+            this.EndIndexLabel.Name = "EndIndexLabel";
+            this.EndIndexLabel.Size = new System.Drawing.Size(52, 13);
+            this.EndIndexLabel.TabIndex = 9;
+            this.EndIndexLabel.Text = "EndIndex";
+            // 
+            // numericUpDown2
+            // 
+            this.numericUpDown2.Location = new System.Drawing.Point(472, 748);
+            this.numericUpDown2.Name = "numericUpDown2";
+            this.numericUpDown2.Size = new System.Drawing.Size(77, 20);
+            this.numericUpDown2.TabIndex = 10;
             // 
             // job_time_set_view
             // 
@@ -94,6 +141,11 @@
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(1280, 802);
+            this.Controls.Add(this.numericUpDown2);
+            this.Controls.Add(this.EndIndexLabel);
+            this.Controls.Add(this.numericUpDown1);
+            this.Controls.Add(this.StartIndexLabel);
+            this.Controls.Add(this.splitter1);
             this.Controls.Add(this.label2);
             this.Controls.Add(this.ItemProperties);
             this.Controls.Add(this.label1);
@@ -103,6 +155,8 @@
             this.Text = "job_time_set_view";
             this.DragDrop += new System.Windows.Forms.DragEventHandler(this.job_time_set_view_on_drag_drop);
             this.DragEnter += new System.Windows.Forms.DragEventHandler(this.job_time_set_view_drag_enter);
+            ((System.ComponentModel.ISupportInitialize)(this.numericUpDown1)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.numericUpDown2)).EndInit();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -114,6 +168,11 @@
         private System.Windows.Forms.ListBox ItemProperties;
         private System.Windows.Forms.Label label2;
         private System.Windows.Forms.TabControl tabControl1;
+        private System.Windows.Forms.Splitter splitter1;
+        private System.Windows.Forms.Label StartIndexLabel;
+        private System.Windows.Forms.NumericUpDown numericUpDown1;
+        private System.Windows.Forms.Label EndIndexLabel;
+        private System.Windows.Forms.NumericUpDown numericUpDown2;
     }
 }
 

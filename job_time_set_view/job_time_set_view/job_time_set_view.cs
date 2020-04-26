@@ -29,6 +29,9 @@ namespace job_time_set_view
         {
             InitializeComponent();
 
+            this.numericUpDown1.ValueChanged += new System.EventHandler(this.refresh_series_min);
+            this.numericUpDown2.ValueChanged += new System.EventHandler(this.refresh_series_max);
+
             m_jobInfos = new Dictionary<string, job_info>();
             m_dataSources = new Dictionary<string, Dictionary<string, List<Tuple<float, string>>>>();
 
@@ -180,6 +183,8 @@ namespace job_time_set_view
                 series.ChartArea = "ChartArea1";
                 series.YValueType = ChartValueType.Double;
                 series.YAxisType = AxisType.Primary;
+                series.IsVisibleInLegend = false;
+                series.Color = Color.CadetBlue;
                 
                 Font f = new Font(series.Font.FontFamily, 8.0f);
                 series.Font = f;
@@ -197,6 +202,7 @@ namespace job_time_set_view
                     DataPoint point = new DataPoint();
                     point.SetValueY(data.Item1);
                     point.Label = info[1].Item2;
+                    point.LabelForeColor = someColors[colorCycle++ % someColors.Count];
 
                     StringBuilder toolTip = new StringBuilder();
                     
@@ -213,13 +219,17 @@ namespace job_time_set_view
                 }
                 series.Sort(PointSortOrder.Descending);
 
+                Series original = new Series();
+                original.Color = series.Color;
+                original.Enabled = false;
+
                 foreach(var point in series.Points)
                 {
-                    point.LabelForeColor = someColors[colorCycle++ % someColors.Count];
-                    point.MarkerColor = point.LabelForeColor;
+                    original.Points.Add(point);
                 }
 
                 chart.Series.Add(series);
+                chart.Series.Add(original);
 
                 ((System.ComponentModel.ISupportInitialize)(chart)).EndInit();
 
@@ -310,14 +320,53 @@ namespace job_time_set_view
             if (charts.Count == 0)
                 return;
 
-            Series series = charts[0].Series[0];
-
-            float zoom = 25.0f / (float)series.Points.Count;
-
             charts[0].ChartAreas[0].AxisX.ScaleView.ZoomReset();
             charts[0].ChartAreas[0].AxisX.ScaleView.Zoom(0, 25.0f);
 
             charts[0].Refresh();
+
+            this.numericUpDown1.Maximum = charts[0].Series[1].Points.Count;
+            this.numericUpDown2.Maximum = charts[0].Series[1].Points.Count;
+            this.numericUpDown1.Minimum = 0;
+            this.numericUpDown2.Minimum = 0;
+            this.numericUpDown1.Value = 0;
+            this.numericUpDown2.Value = this.numericUpDown2.Maximum;
+
+        }
+        private void refresh_series_max(object sender, EventArgs e)
+        {
+            this.numericUpDown1.Maximum = this.numericUpDown2.Value;
+
+            refresh_series_range(sender, e);
+        }
+        private void refresh_series_min(object sender, EventArgs e)
+        {
+            this.numericUpDown2.Minimum = this.numericUpDown1.Value;
+
+            refresh_series_range(sender, e);
+        }
+        private void refresh_series_range(object sender, EventArgs e)
+        {
+            TabPage currentTab = this.tabControl1.SelectedTab;
+
+            if (currentTab == null ||
+                sender == null)
+                return;
+
+            int min = (int)numericUpDown1.Value;
+            int max = (int)numericUpDown2.Value;
+
+            Chart chart = currentTab.Controls.OfType<Chart>().ToList()[0];
+
+            Series a = chart.Series[0];
+            Series b = chart.Series[1];
+
+            a.Points.Clear();
+
+            for(var i = min; i < max; ++i)
+            {
+                a.Points.Add(b.Points[i]);
+            }
         }
         private void chart_zoom(Chart chart, float zoomMulti)
         {
@@ -330,14 +379,6 @@ namespace job_time_set_view
             var posXFinish = 0 + (xMax - xMin) * zoomMulti;
 
             xAxis.ScaleView.Zoom(posXStart, posXFinish);
-        }
-        private void mouse_enter_data_point(object sender, MouseEventArgs e)
-        {
-
-        }
-        private void mouse_leave_data_point(object sender, MouseEventArgs e)
-        {
-
         }
     }
 }
