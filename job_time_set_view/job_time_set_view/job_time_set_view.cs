@@ -37,6 +37,11 @@ namespace job_time_set_view
 
         private void job_time_set_view_on_drag_drop(object sender, System.Windows.Forms.DragEventArgs e)
         {
+            this.DataSource.Items.Clear();
+            this.tabControl1.TabPages.Clear();
+            m_jobInfos.Clear();
+            m_dataSources.Clear();
+
             var dropped = e.Data.GetData(DataFormats.FileDrop);
             if (dropped.GetType() != typeof(System.String[]))
             {
@@ -131,6 +136,13 @@ namespace job_time_set_view
 
             var ds = m_dataSources[dataSource];
 
+            List<Color> someColors = new List<Color>();
+            someColors.Add(Color.DarkBlue);
+            someColors.Add(Color.DarkOrange);
+            someColors.Add(Color.DarkViolet);
+            someColors.Add(Color.DarkGreen);
+            someColors.Add(Color.DarkRed);
+
             foreach (var variationSource in ds)
             {
                 TabPage page = new TabPage();
@@ -150,13 +162,13 @@ namespace job_time_set_view
                 ChartArea chartArea = new ChartArea();
                 chartArea.Name = "ChartArea1";
                 chartArea.AxisX.ScaleView.Zoomable = true;
-                chartArea.AxisY.ScaleView.Zoomable = true;
-                
+                chartArea.BackColor = Color.FromArgb(245, 245, 255);
+
                 chart.ChartAreas.Add(chartArea);
                 chart.Click += chart_clicked;
-                chart.MouseWheel += chart_zoom;
+                chart.MouseWheel += on_mouse_wheel;
 
-                chart.Anchor = AnchorStyles.Top | AnchorStyles.Right | AnchorStyles.Left;
+                chart.Anchor = AnchorStyles.Top | AnchorStyles.Right | AnchorStyles.Left | AnchorStyles.Bottom;
 
                 Legend legend = new Legend();
                 legend.Name = "Legend1";
@@ -168,8 +180,17 @@ namespace job_time_set_view
                 series.ChartArea = "ChartArea1";
                 series.YValueType = ChartValueType.Double;
                 series.YAxisType = AxisType.Primary;
+                
+                Font f = new Font(series.Font.FontFamily, 8.0f);
+                series.Font = f;
+                series.SmartLabelStyle.MaxMovingDistance = 1000.0f;
+                series.SmartLabelStyle.MinMovingDistance = 100.0f;
+                series.SmartLabelStyle.MovingDirection = LabelAlignmentStyles.Top | LabelAlignmentStyles.TopRight;
+                series.SmartLabelStyle.CalloutLineWidth = 2;
 
-                foreach(var data in variationSource.Value)
+                int colorCycle = 0;
+
+                foreach (var data in variationSource.Value)
                 {
                     job_info info = m_jobInfos[data.Item2];
 
@@ -192,6 +213,12 @@ namespace job_time_set_view
                 }
                 series.Sort(PointSortOrder.Descending);
 
+                foreach(var point in series.Points)
+                {
+                    point.LabelForeColor = someColors[colorCycle++ % someColors.Count];
+                    point.MarkerColor = point.LabelForeColor;
+                }
+
                 chart.Series.Add(series);
 
                 ((System.ComponentModel.ISupportInitialize)(chart)).EndInit();
@@ -199,7 +226,10 @@ namespace job_time_set_view
                 page.Controls.Add(chart);
 
                 this.tabControl1.TabPages.Add(page);
+                page.Enter += new System.EventHandler(this.on_tab_enter);
             }
+            this.tabControl1.Update();
+            on_tab_enter(this.tabControl1.TabPages[0], null);
         }
 
         private void listBox1_SelectedIndexChanged(object sender, EventArgs e)
@@ -209,11 +239,11 @@ namespace job_time_set_view
                 foreach (Chart chart in tab.Controls)
                 {
                     chart.Click -= chart_clicked;
-                    chart.MouseWheel -= chart_zoom;
+                    chart.MouseWheel -= on_mouse_wheel;
                 }
             }
 
-            this.tabControl1.TabPages.Clear();  
+            this.tabControl1.TabPages.Clear();
 
             var selectedItem = this.DataSource.SelectedItem;
 
@@ -250,7 +280,7 @@ namespace job_time_set_view
             }
         }
 
-        private void chart_zoom(object sender, EventArgs e)
+        private void on_mouse_wheel(object sender, EventArgs e)
         {
             Chart chart = sender as Chart;
             MouseEventArgs args = e as MouseEventArgs;
@@ -259,29 +289,55 @@ namespace job_time_set_view
                 return;
 
             var xAxis = chart.ChartAreas[0].AxisX;
-            var yAxis = chart.ChartAreas[0].AxisY;
 
             if (args.Delta < 0)
             {
-                xAxis.ScaleView.ZoomReset();
-                yAxis.ScaleView.ZoomReset();
+                chart_zoom(chart, 1 / 0.8f);
                 return;
             }
-            
+
+            chart_zoom(chart, 0.8f);
+        }
+        private void on_tab_enter(object sender, EventArgs e)
+        {
+            if (sender == null)
+                return;
+
+            TabPage page = sender as TabPage;
+
+            List<Chart> charts = page.Controls.OfType<Chart>().ToList();
+
+            if (charts.Count == 0)
+                return;
+
+            Series series = charts[0].Series[0];
+
+            float zoom = 25.0f / (float)series.Points.Count;
+
+            charts[0].ChartAreas[0].AxisX.ScaleView.ZoomReset();
+            charts[0].ChartAreas[0].AxisX.ScaleView.Zoom(0, 25.0f);
+
+            charts[0].Refresh();
+        }
+        private void chart_zoom(Chart chart, float zoomMulti)
+        {
+            var xAxis = chart.ChartAreas[0].AxisX;
+
             var xMin = xAxis.ScaleView.ViewMinimum;
             var xMax = xAxis.ScaleView.ViewMaximum;
-            var yMin = yAxis.ScaleView.ViewMinimum;
-            var yMax = yAxis.ScaleView.ViewMaximum;
 
-            var posXStart = xAxis.PixelPositionToValue(args.Location.X) - (xMax - xMin) * 0.9f;
-            var posXFinish = xAxis.PixelPositionToValue(args.Location.X) + (xMax - xMin) * 0.9f;
-            var posYStart = yAxis.PixelPositionToValue(args.Location.Y) - (yMax - yMin) * 0.9f;
-            var posYFinish = yAxis.PixelPositionToValue(args.Location.Y) + (yMax - yMin) * 0.9f;
+            var posXStart = 0;
+            var posXFinish = 0 + (xMax - xMin) * zoomMulti;
 
             xAxis.ScaleView.Zoom(posXStart, posXFinish);
-            yAxis.ScaleView.Zoom(posYStart, posYFinish);
-            
         }
+        private void mouse_enter_data_point(object sender, MouseEventArgs e)
+        {
 
+        }
+        private void mouse_leave_data_point(object sender, MouseEventArgs e)
+        {
+
+        }
     }
 }

@@ -62,7 +62,7 @@
             this.ItemProperties.FormattingEnabled = true;
             this.ItemProperties.Location = new System.Drawing.Point(12, 270);
             this.ItemProperties.Name = "ItemProperties";
-            this.ItemProperties.Size = new System.Drawing.Size(239, 420);
+            this.ItemProperties.Size = new System.Drawing.Size(239, 498);
             this.ItemProperties.TabIndex = 3;
             // 
             // label2
@@ -85,7 +85,7 @@
             this.tabControl1.Location = new System.Drawing.Point(260, 12);
             this.tabControl1.Name = "tabControl1";
             this.tabControl1.SelectedIndex = 0;
-            this.tabControl1.Size = new System.Drawing.Size(739, 695);
+            this.tabControl1.Size = new System.Drawing.Size(1008, 781);
             this.tabControl1.TabIndex = 0;
             // 
             // job_time_set_view
@@ -93,7 +93,7 @@
             this.AllowDrop = true;
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(1011, 716);
+            this.ClientSize = new System.Drawing.Size(1280, 802);
             this.Controls.Add(this.label2);
             this.Controls.Add(this.ItemProperties);
             this.Controls.Add(this.label1);
