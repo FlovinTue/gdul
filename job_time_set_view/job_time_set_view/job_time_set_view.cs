@@ -338,6 +338,8 @@ namespace job_time_set_view
             this.ToItemField.Value = this.ToItemField.Maximum;
             this.FromItemField.ValueChanged += new System.EventHandler(this.refresh_series_min);
             this.ToItemField.ValueChanged += new System.EventHandler(this.refresh_series_max);
+
+            refresh_series_range(null, null);
         }
         private void refresh_series_max(object sender, EventArgs e)
         {
@@ -355,8 +357,7 @@ namespace job_time_set_view
         {
             TabPage currentTab = this.tabControl1.SelectedTab;
 
-            if (currentTab == null ||
-                sender == null)
+            if (currentTab == null)
                 return;
 
             int min = (int)FromItemField.Value;
