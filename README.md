@@ -67,7 +67,13 @@ Main features would be:
 Job tracking instructions: 
 - make sure GDUL_JOB_DEBUG is defined in globals.h
 - for each job taking part in the tracking, call activate_job_tracking(name)
+
 - dump job graph using job_tracker::dump_job_tree(location)
+- dump job time sets using job_tracker::dump_job_time_sets(location) 
+
+- graph may be viewed using the Visual Studio dgml extension. 
+- job time sets may be viewed in the small C# app job_time_set_view located in root folder
+
 
 A quick usage example for job:
 ```
