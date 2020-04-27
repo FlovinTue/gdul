@@ -1,6 +1,6 @@
 #pragma once
 
-#include <gdul/WIP_pool_allocator/pool_allocator.h>
+#include <gdul/pool_allocator/pool_allocator.h>
 
 namespace gdul {
 
