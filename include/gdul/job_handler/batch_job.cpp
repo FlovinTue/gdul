@@ -20,7 +20,6 @@
 
 #include "batch_job.h"
 #include <gdul/job_handler/batch_job_impl.h>
-#include <gdul/concurrent_object_pool/concurrent_object_pool.h>
 
 namespace gdul {
 

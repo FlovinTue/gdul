@@ -24,9 +24,8 @@
 #include <gdul/job_handler/job.h>
 #include <gdul/job_handler/batch_job_impl.h>
 #include <gdul/job_handler/batch_job.h>
-#include <gdul/concurrent_object_pool/concurrent_object_pool.h>
 #include <gdul/delegate/delegate.h>
-#include <gdul/WIP_pool_allocator/pool_allocator.h>
+#include <gdul/pool_allocator/pool_allocator.h>
 
 #pragma once
 
