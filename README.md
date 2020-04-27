@@ -128,25 +128,21 @@ int main()
 		inputs.push_back(i);
 	}
 
-	outputs.resize(inputs.size());
-
 	gdul::delegate<bool(std::size_t&, std::size_t&)> process([](std::size_t& inputItem, std::size_t& outputItem)
-	{
-		// Output only the items that mod 5 == 0
-		if (inputItem % 5 == 0)
 		{
-			outputItem = inputItem;
-			return true;
-		}
-		return false;
-	});
+			// Output only the items that mod 5 == 0
+			if (inputItem % 5 == 0)
+			{
+				outputItem = inputItem;
+				return true;
+			}
+			return false;
+		});
 
-	gdul::batch_job bjb(jh.make_batch_job(inputs, outputs, process, 30/*batch size*/));
+	gdul::batch_job bjb(jh.make_batch_job(inputs, outputs, process));
 
 	bjb.enable();
 	bjb.wait_until_finished();
-
-	outputs.resize(bjb.get_output_size());
 
 	// Here outputs should contain 0, 5, 10, 15...
 
