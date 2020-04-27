@@ -54,6 +54,7 @@ public:
 	static job_tracker_node* fetch_node(constexpr_id id);
 
 	static void dump_job_tree(const char* location);
+	static void dump_job_time_sets(const char* location);
 #else
 	static void dump_job_tree(const char*) {};
 #endif

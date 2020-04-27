@@ -20,17 +20,12 @@
 
 #include "batch_job.h"
 #include <gdul/job_handler/batch_job_impl.h>
-#include <gdul/concurrent_object_pool/concurrent_object_pool.h>
 
 namespace gdul {
 
 batch_job::batch_job()
 	: m_impl(nullptr)
 {}
-batch_job::~batch_job()
-{
-	assert(!(*this) || m_impl->is_enabled() && "Job destructor ran before enable was called");
-}
 void batch_job::add_dependency(job & dependency)
 {
 	if (m_impl)
@@ -50,7 +45,7 @@ job_queue batch_job::get_target_queue() const noexcept
 }
 bool batch_job::enable() noexcept
 {
-	return m_impl && m_impl->enable();
+	return m_impl && m_impl->enable(m_impl);
 }
 bool batch_job::enable_locally_if_ready()
 {

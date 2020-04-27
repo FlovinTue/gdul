@@ -23,55 +23,44 @@
 #include <gdul/job_handler/globals.h>
 
 #if defined(GDUL_JOB_DEBUG)
+#include <gdul/job_handler/debug/timer.h>
+#include <atomic>
 
-#include <gdul/job_handler/debug/constexp_id.h>
-#include <gdul/job_handler/debug/time_set.h>
-#include <string>
+namespace gdul {
+namespace jh_detail {
 
-namespace gdul
+class time_set
 {
-namespace jh_detail
-{
-enum job_tracker_node_type : std::uint8_t
-{
-	job_tracker_node_default,
-	job_tracker_node_batch,
-	job_tracker_node_matriarch,
-};
-struct job_tracker_node
-{
-	job_tracker_node();
+public:
+	time_set();
+	time_set(const time_set& other);
+	time_set(time_set&& other);
+	time_set& operator=(time_set&& other);
+	time_set& operator=(const time_set& other);
 
-	constexpr_id id() const;
-	constexpr_id parent() const;
+	void log_time(float completionTime);
 
-	void set_node_type(job_tracker_node_type type);
-	job_tracker_node_type get_node_type() const;
+	float get_avg() const;
+	float get_max() const;
+	float get_min() const;
+	float get_minTimepoint() const;
+	float get_maxTimepoint() const;
 
-	const std::string& name() const;
-	const std::string& physical_location() const;
-
-	std::uint32_t line() const;
-
-	time_set m_completionTimeSet;
-	time_set m_waitTimeSet;
-	time_set m_enqueueTimeSet;
+	std::size_t get_completion_count() const;
 
 private:
-	friend class job_tracker;
-	friend class job_tracker_data;
+	static timer s_globalTimer;
 
-	std::string m_name;
-	std::string m_physicalLocation;
+	std::atomic_flag m_lock;
 
-	std::uint32_t m_line;
+	std::size_t m_completionCount;
 
-	constexpr_id m_id;
-	constexpr_id m_parent;
-
-	job_tracker_node_type m_type;
+	float m_totalTime;
+	float m_minTime;
+	float m_maxTime;
+	float m_minTimepoint;
+	float m_maxTimepoint;
 };
 }
 }
-
 #endif

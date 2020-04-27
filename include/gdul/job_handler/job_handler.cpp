@@ -68,12 +68,12 @@ std::size_t job_handler::active_job_count() const noexcept
 {
 	return m_impl->active_job_count();
 }
-concurrent_object_pool<jh_detail::batch_job_chunk_rep, jh_detail::allocator_type>* job_handler::get_batch_job_chunk_pool()
-{
-	return m_impl->get_batch_job_chunk_pool();
-}
 job job_handler::make_job(gdul::delegate<void()> workUnit)
 {
 	return m_impl->make_job(std::move(workUnit));
+}
+pool_allocator<jh_detail::dummy_batch_type> job_handler::get_batch_job_allocator() const noexcept
+{
+	return m_impl->get_batch_job_allocator();
 }
 }

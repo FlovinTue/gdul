@@ -4,7 +4,6 @@
 #include "job_handler_tester.h"
 #include <iostream>
 #include <functional>
-#include "../Common/timer.h"
 #include <vld.h>
 #include "../Common/tracking_allocator.h"
 #include <gdul/job_handler/debug/job_tracker.h>
@@ -19,6 +18,8 @@ int main()
 		info.affinity = gdul::JOB_HANDLER_TESTER_WORKER_AFFINITY_DYNAMIC;
 		
 		tester.init(info);
+
+		tester.basic_tests();
 
 		const uint32_t scatterRuns(100);
 		float scatterTimeAccum(0.f);
@@ -43,6 +44,7 @@ int main()
 	}
 
 	gdul::jh_detail::job_tracker::dump_job_tree("");
+	gdul::jh_detail::job_tracker::dump_job_time_sets("");
 
 	std::cout << "Final allocated: " << gdul::s_allocated << std::endl;
 	

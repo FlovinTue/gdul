@@ -26,8 +26,6 @@ namespace gdul
 {
 namespace jh_detail
 {
-template <class T, class ChunkRep>
-class chunk_allocator;
 
 class job_impl;
 
@@ -37,11 +35,6 @@ struct job_node
 	gdul::shared_ptr<job_impl> m_job;
 };
 
-// Memory chunk representation of job_node
-struct alignas(alignof(job_node)) job_node_chunk_rep
-{
-	std::uint8_t dummy[allocate_shared_size<job_node, chunk_allocator<jh_detail::job_node, job_node_chunk_rep>>()]{};
-};
 using job_node_shared_ptr = gdul::shared_ptr<job_node>;
 using job_node_atomic_shared_ptr = gdul::atomic_shared_ptr<job_node>;
 using job_node_raw_ptr = gdul::raw_ptr<job_node>;

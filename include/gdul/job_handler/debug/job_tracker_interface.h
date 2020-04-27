@@ -63,7 +63,7 @@ protected:
 private:
 	friend class job_tracker;
 	friend class job_impl;
-	template <class InputContainer, class OutputContainer, class Process>
+	template <class InContainer, class OutContainer, class Process>
 	friend class batch_job_impl;
 
 	constexpr_id m_physicalId;
