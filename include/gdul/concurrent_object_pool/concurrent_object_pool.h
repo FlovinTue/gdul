@@ -28,21 +28,28 @@
 
 namespace gdul {
 
-template <class Object, class Allocator = std::allocator<std::uint8_t>>
+namespace cop_detail {
+static constexpr std::size_t Defaul_Block_Size = 8;
+using defaul_allocator = std::allocator<std::uint8_t>;
+}
+
+template <class Object, class Allocator = cop_detail::defaul_allocator>
 class concurrent_object_pool
 {
 public:
+	concurrent_object_pool();
+	concurrent_object_pool(Allocator allocator);
 	concurrent_object_pool(std::size_t blockSize);
-	concurrent_object_pool(std::size_t blockSize, Allocator& allocator);
+	concurrent_object_pool(std::size_t blockSize, Allocator allocator);
 	~concurrent_object_pool();
 
-	inline Object* get_object();
-	inline void recycle_object(Object* object);
+	inline Object* get();
+	inline void recycle(Object* object);
 
 	inline std::size_t avaliable() const;
 	inline std::size_t block_size() const;
 
-	inline void unsafe_destroy();
+	inline void unsafe_reset();
 
 
 private:
@@ -62,17 +69,20 @@ private:
 
 	Allocator m_allocator;
 };
-
+template<class Object, class Allocator>
+inline concurrent_object_pool<Object, Allocator>::concurrent_object_pool()
+	: concurrent_object_pool(cop_detail::Defaul_Block_Size, cop_detail::defaul_allocator())
+{}
+template<class Object, class Allocator>
+inline concurrent_object_pool<Object, Allocator>::concurrent_object_pool(Allocator allocator)
+	: concurrent_object_pool(cop_detail::Defaul_Block_Size, allocator)
+{}
 template<class Object, class Allocator>
 inline concurrent_object_pool<Object, Allocator>::concurrent_object_pool(std::size_t blockSize)
-	: m_blockSize(blockSize)
-	, m_unusedObjects(m_allocator)
-	, m_lastBlock(nullptr)
-{
-	try_alloc_block();
-}
+	: concurrent_object_pool(blockSize, cop_detail::defaul_allocator())
+{}
 template<class Object, class Allocator>
-inline concurrent_object_pool<Object, Allocator>::concurrent_object_pool(std::size_t blockSize, Allocator & allocator)
+inline concurrent_object_pool<Object, Allocator>::concurrent_object_pool(std::size_t blockSize, Allocator allocator)
 	: m_allocator(allocator)
 	, m_blockSize(blockSize)
 	, m_unusedObjects(allocator)
@@ -83,10 +93,10 @@ inline concurrent_object_pool<Object, Allocator>::concurrent_object_pool(std::si
 template<class Object, class Allocator>
 inline concurrent_object_pool<Object, Allocator>::~concurrent_object_pool()
 {
-	unsafe_destroy();
+	unsafe_reset();
 }
 template<class Object, class Allocator>
-inline Object * concurrent_object_pool<Object, Allocator>::get_object()
+inline Object * concurrent_object_pool<Object, Allocator>::get()
 {
 	Object* out;
 
@@ -96,7 +106,7 @@ inline Object * concurrent_object_pool<Object, Allocator>::get_object()
 	return out;
 }
 template<class Object, class Allocator>
-inline void concurrent_object_pool<Object, Allocator>::recycle_object(Object * object)
+inline void concurrent_object_pool<Object, Allocator>::recycle(Object * object)
 {
 	m_unusedObjects.push(object);
 }
@@ -111,7 +121,7 @@ inline std::size_t concurrent_object_pool<Object, Allocator>::block_size() const
 	return m_blockSize;
 }
 template<class Object, class Allocator>
-inline void concurrent_object_pool<Object, Allocator>::unsafe_destroy()
+inline void concurrent_object_pool<Object, Allocator>::unsafe_reset()
 {
 	shared_ptr<block_node> next(m_lastBlock.unsafe_exchange(shared_ptr<block_node>(nullptr), std::memory_order_relaxed));
 
