@@ -63,6 +63,7 @@ Main features would be:
 * Keeps multiple internal job queues (number defined by gdul::job_queue_count enum value), with workers consuming from the further-back queues less frequently (range of consumption is definable).
 * Has three types of batch_job (splits an array of items combined with a processing delegate over multiple jobs). 
 * Job relationship graph may be dumped to file for viewing
+* Job profiling info may be dumped for viewing
 
 Job tracking instructions: 
 - make sure GDUL_JOB_DEBUG is defined in globals.h
