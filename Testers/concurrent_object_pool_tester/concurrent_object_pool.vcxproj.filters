@@ -7,6 +7,5 @@
   <ItemGroup>
     <ClInclude Include="pch.h" />
     <ClInclude Include="..\..\include\gdul\concurrent_object_pool\concurrent_object_pool.h" />
-    <ClInclude Include="..\..\include\gdul\concurrent_object_pool\concurrent_object_pool_v2.h" />
   </ItemGroup>
 </Project>
