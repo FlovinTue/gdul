@@ -53,7 +53,6 @@ static constexpr std::uint8_t Cb_Ptr_Bottom_Bits = get_num_bottom_bits();
 static constexpr std::uint64_t Owned_Mask = (std::numeric_limits<std::uint64_t>::max() >> 16);
 static constexpr std::uint64_t Cb_Mask = (std::numeric_limits<std::uint64_t>::max() >> 16) & ~std::uint64_t((std::uint16_t(1) << Cb_Ptr_Bottom_Bits) - 1);
 static constexpr std::uint64_t Versioned_Cb_Mask = (std::numeric_limits<std::uint64_t>::max() >> 8);
-static constexpr std::uint64_t Local_Ref_Mask = ~Versioned_Cb_Mask;
 static constexpr std::uint16_t Max_Version = (std::uint16_t(std::numeric_limits<std::uint8_t>::max()) << Cb_Ptr_Bottom_Bits | ((std::uint16_t(1) << Cb_Ptr_Bottom_Bits) - 1));
 
 union compressed_storage
@@ -229,15 +228,15 @@ public:
 	inline shared_ptr<T> exchange(const shared_ptr<T>& with, std::memory_order order = std::memory_order_seq_cst) noexcept;
 	inline shared_ptr<T> exchange(shared_ptr<T>&& with, std::memory_order order = std::memory_order_seq_cst) noexcept;
 
+	inline shared_ptr<T> unsafe_load(std::memory_order order = std::memory_order_seq_cst) const noexcept;
+
+	inline shared_ptr<T> unsafe_exchange(const shared_ptr<T>& with, std::memory_order order = std::memory_order_seq_cst) noexcept;
+	inline shared_ptr<T> unsafe_exchange(shared_ptr<T>&& with, std::memory_order order = std::memory_order_seq_cst) noexcept;
+
+	inline void unsafe_store(const shared_ptr<T>& from, std::memory_order order = std::memory_order_seq_cst) noexcept;
+	inline void unsafe_store(shared_ptr<T>&& from, std::memory_order order = std::memory_order_seq_cst) noexcept;
+
 	inline std::uint16_t get_version() const noexcept;
-
-	inline shared_ptr<T> unsafe_load(std::memory_order order = std::memory_order_seq_cst) const;
-
-	inline shared_ptr<T> unsafe_exchange(const shared_ptr<T>& with, std::memory_order order = std::memory_order_seq_cst);
-	inline shared_ptr<T> unsafe_exchange(shared_ptr<T>&& with, std::memory_order order = std::memory_order_seq_cst);
-
-	inline void unsafe_store(const shared_ptr<T>& from, std::memory_order order = std::memory_order_seq_cst);
-	inline void unsafe_store(shared_ptr<T>&& from, std::memory_order order = std::memory_order_seq_cst);
 
 	// Cheap hint to see if this object holds a value
 	operator bool() const noexcept;
@@ -250,10 +249,12 @@ public:
 
 	raw_ptr<T> get_raw_ptr() const noexcept;
 
-	decayed_type* unsafe_get();
-	const decayed_type* unsafe_get() const;
+	decayed_type* unsafe_get() noexcept;
+	const decayed_type* unsafe_get() const noexcept;
 
-	const std::size_t unsafe_item_count() const;
+	std::uint8_t use_count_local() const noexcept;
+	std::size_t unsafe_item_count() const noexcept;
+	size_type unsafe_use_count() const noexcept;
 
 private:
 	template <class PtrType>
@@ -414,7 +415,7 @@ template<class T>
 template<class PtrType>
 inline bool atomic_shared_ptr<T>::compare_exchange_strong(typename aspdetail::disable_deduction<PtrType>::type& expected, shared_ptr<T>&& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept
 {
-	if (desired.get_local_refs() < aspdetail::Local_Ref_Fill_Boundary)
+	if (desired.use_count_local() < aspdetail::Local_Ref_Fill_Boundary)
 		desired.set_local_refs(std::numeric_limits<std::uint8_t>::max());
 
 	const compressed_storage desired_(desired.m_controlBlockStorage.m_u64);
@@ -451,7 +452,7 @@ template<class T>
 template<class PtrType>
 inline bool atomic_shared_ptr<T>::compare_exchange_weak(typename aspdetail::disable_deduction<PtrType>::type& expected, shared_ptr<T>&& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept
 {
-	if (desired.get_local_refs() < aspdetail::Local_Ref_Fill_Boundary)
+	if (desired.use_count_local() < aspdetail::Local_Ref_Fill_Boundary)
 		desired.set_local_refs(std::numeric_limits<std::uint8_t>::max());
 
 	const compressed_storage desired_(desired.m_controlBlockStorage.m_u64);
@@ -508,7 +509,7 @@ inline void atomic_shared_ptr<T>::store(const shared_ptr<T>& from, std::memory_o
 template<class T>
 inline void atomic_shared_ptr<T>::store(shared_ptr<T>&& from, std::memory_order order) noexcept
 {
-	if (from.get_local_refs() < aspdetail::Local_Ref_Fill_Boundary)
+	if (from.use_count_local() < aspdetail::Local_Ref_Fill_Boundary)
 		from.set_local_refs(std::numeric_limits<std::uint8_t>::max());
 
 	store_internal(from.m_controlBlockStorage.m_u64, order);
@@ -522,7 +523,7 @@ inline shared_ptr<T> atomic_shared_ptr<T>::exchange(const shared_ptr<T>& with, s
 template<class T>
 inline shared_ptr<T> atomic_shared_ptr<T>::exchange(shared_ptr<T>&& with, std::memory_order order) noexcept
 {
-	if (with.get_local_refs() < aspdetail::Local_Ref_Fill_Boundary)
+	if (with.use_count_local() < aspdetail::Local_Ref_Fill_Boundary)
 		with.set_local_refs(std::numeric_limits<std::uint8_t>::max());
 
 	compressed_storage previous(exchange_internal(with.m_controlBlockStorage, aspdetail::CAS_FLAG_STEAL_PREVIOUS, order));
@@ -536,29 +537,29 @@ inline std::uint16_t atomic_shared_ptr<T>::get_version() const noexcept
 	return aspdetail::to_version(storage);
 }
 template<class T>
-inline shared_ptr<T> atomic_shared_ptr<T>::unsafe_load(std::memory_order order) const
+inline shared_ptr<T> atomic_shared_ptr<T>::unsafe_load(std::memory_order order) const noexcept
 {
 	return shared_ptr<T>(unsafe_copy_internal(order));
 }
 template<class T>
-inline shared_ptr<T> atomic_shared_ptr<T>::unsafe_exchange(const shared_ptr<T>& with, std::memory_order order)
+inline shared_ptr<T> atomic_shared_ptr<T>::unsafe_exchange(const shared_ptr<T>& with, std::memory_order order) noexcept
 {
 	return unsafe_exchange(shared_ptr<T>(with), order);
 }
 template<class T>
-inline shared_ptr<T> atomic_shared_ptr<T>::unsafe_exchange(shared_ptr<T>&& with, std::memory_order order)
+inline shared_ptr<T> atomic_shared_ptr<T>::unsafe_exchange(shared_ptr<T>&& with, std::memory_order order) noexcept
 {
 	const compressed_storage previous(unsafe_exchange_internal(with.m_controlBlockStorage, order));
 	with.clear();
 	return shared_ptr<T>(previous);
 }
 template<class T>
-inline void atomic_shared_ptr<T>::unsafe_store(const shared_ptr<T>& from, std::memory_order order)
+inline void atomic_shared_ptr<T>::unsafe_store(const shared_ptr<T>& from, std::memory_order order) noexcept
 {
 	unsafe_store(shared_ptr<T>(from), order);
 }
 template<class T>
-inline void atomic_shared_ptr<T>::unsafe_store(shared_ptr<T>&& from, std::memory_order order)
+inline void atomic_shared_ptr<T>::unsafe_store(shared_ptr<T>&& from, std::memory_order order) noexcept
 {
 	unsafe_store_internal(from.m_controlBlockStorage, order);
 	from.clear();
@@ -570,7 +571,7 @@ inline raw_ptr<T> atomic_shared_ptr<T>::get_raw_ptr() const noexcept
 	return raw_ptr<T>(storage);
 }
 template<class T>
-inline typename atomic_shared_ptr<T>::decayed_type* atomic_shared_ptr<T>::unsafe_get()
+inline typename atomic_shared_ptr<T>::decayed_type* atomic_shared_ptr<T>::unsafe_get() noexcept
 {
 	aspdetail::control_block_free_type_base<T>* const cb(get_control_block());
 	if (cb) {
@@ -579,7 +580,7 @@ inline typename atomic_shared_ptr<T>::decayed_type* atomic_shared_ptr<T>::unsafe
 	return nullptr;
 }
 template<class T>
-inline const typename atomic_shared_ptr<T>::decayed_type* atomic_shared_ptr<T>::unsafe_get() const
+inline const typename atomic_shared_ptr<T>::decayed_type* atomic_shared_ptr<T>::unsafe_get() const noexcept
 {
 	const aspdetail::control_block_free_type_base<T>* const cb(get_control_block());
 	if (cb) {
@@ -588,9 +589,19 @@ inline const typename atomic_shared_ptr<T>::decayed_type* atomic_shared_ptr<T>::
 	return nullptr;
 }
 template<class T>
-inline const std::size_t atomic_shared_ptr<T>::unsafe_item_count() const
+inline std::uint8_t atomic_shared_ptr<T>::use_count_local() const noexcept
 {
-	return raw_ptr<T>(*this)->item_count();
+	return compressed_storage(m_storage.load(std::memory_order_relaxed)).m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF];
+}
+template<class T>
+inline std::size_t atomic_shared_ptr<T>::unsafe_item_count() const noexcept
+{
+	return raw_ptr<T>(*this).item_count();
+}
+template<class T>
+inline aspdetail::size_type atomic_shared_ptr<T>::unsafe_use_count() const noexcept
+{
+	return raw_ptr<T>(*this).use_count();
 }
 template<class T>
 inline constexpr const aspdetail::control_block_free_type_base<T>* atomic_shared_ptr<T>::get_control_block() const noexcept
@@ -733,6 +744,8 @@ inline union aspdetail::compressed_storage atomic_shared_ptr<T>::copy_internal(s
 	try_fill_local_refs(expected);
 
 	initial.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] = 1;
+
+	std::atomic_thread_fence(order);
 
 	return initial;
 }
@@ -1382,9 +1395,9 @@ public:
 
 	inline constexpr raw_ptr<T> get_raw_ptr() const noexcept;
 	inline void swap(shared_ptr<T>& other) noexcept;
+	inline constexpr std::uint8_t use_count_local() const noexcept;
 
 private:
-	inline constexpr std::uint8_t get_local_refs() const noexcept;
 	inline void set_local_refs(std::uint8_t target) noexcept;
 
 	constexpr void clear() noexcept;
@@ -1559,7 +1572,7 @@ inline void shared_ptr<T>::set_local_refs(std::uint8_t target) noexcept
 	this->m_controlBlockStorage.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] = target;
 }
 template <class T>
-inline constexpr std::uint8_t shared_ptr<T>::get_local_refs() const noexcept
+inline constexpr std::uint8_t shared_ptr<T>::use_count_local() const noexcept
 {
 	return this->m_controlBlockStorage.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF];
 }

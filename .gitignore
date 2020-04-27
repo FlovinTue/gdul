@@ -41,10 +41,5 @@
 job_handler_plot_view/job_handler_plot_view/obj/Debug/job_handler_plot_view.csproj.FileListAbsolute.txt
 *.resources
 Bin/job_handler_Release_job_time_sets.xml
-Bin/job_handler_Debug_job_time_sets.xml
-job_handler_plot_view/job_handler_plot_view/obj/Debug/job_time_set_view.csproj.FileListAbsolute.txt
 job_time_set_view/job_time_set_view/obj/Debug/job_time_set_view.csproj.FileListAbsolute.txt
-*.txt
 job_time_set_view/job_time_set_view/bin/Debug/job_time_set_view.exe.config
-job_time_set_view/job_time_set_view/bin/Release/job_time_set_view.exe.config
-job_time_set_view/job_time_set_view/obj/Debug/job_time_set_view.csproj.FileListAbsolute.txt

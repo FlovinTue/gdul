@@ -766,7 +766,6 @@ inline void producer_buffer<T, Allocator>::invalidate()
 template<class T, class Allocator>
 inline typename producer_buffer<T, Allocator>::shared_ptr_slot_type producer_buffer<T, Allocator>::find_back()
 {
-	shared_ptr_slot_type back(nullptr);
 	producer_buffer<T, allocator_type>* inspect(this);
 
 	while (inspect) {
@@ -783,10 +782,10 @@ inline typename producer_buffer<T, Allocator>::shared_ptr_slot_type producer_buf
 			break;
 		}
 
-		back = inspect->m_next.load(std::memory_order_relaxed);
-		inspect = back.get();
+		inspect = inspect->m_next.unsafe_get();
 	}
-	return back;
+
+	return inspect->m_next.load(std::memory_order_relaxed);
 }
 
 template<class T, class Allocator>
