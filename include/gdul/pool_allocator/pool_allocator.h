@@ -28,16 +28,19 @@
 namespace gdul
 {
 namespace call_detail {
+
+using size_type = std::size_t;
+
 class memory_pool_base
 {
 public:
-	virtual bool verify_compatibility(std::size_t chunkSize, std::size_t chunkAlign) const = 0;
+	virtual bool verify_compatibility(size_type chunkSize, size_type chunkAlign) const = 0;
 
 	virtual void* get_chunk() = 0;
 	virtual void recycle_chunk(void* chunk) = 0;
 };
 
-template <std::size_t ChunkSize, std::size_t ChunkAlign, class ParentAllocator>
+template <size_type ChunkSize, size_type ChunkAlign, class ParentAllocator>
 class memory_pool_impl;
 }
 
@@ -48,6 +51,9 @@ class pool_allocator
 {
 public:
 	using value_type = T;
+	using pointer = value_type*;
+	using const_pointer = const pointer;
+	using size_type = call_detail::size_type;
 
 	// raw_ptr and shared_ptr may be used here, based on if an allocator
 	// is allowed to outlive its pool or not
@@ -69,8 +75,8 @@ public:
 	template <class U>
 	pool_allocator& operator=(pool_allocator<U>&& other);
 
-	value_type* allocate(std::size_t);
-	void deallocate(value_type* chunk, std::size_t);
+	value_type* allocate(size_type);
+	void deallocate(value_type* chunk, size_type);
 
 	template <class U>
 	pool_allocator<U> convert() const;
@@ -121,12 +127,12 @@ inline pool_allocator<U> pool_allocator<T>::convert() const
 	return pool_allocator<U>(m_pool);
 }
 template<class T>
-inline typename pool_allocator<T>::value_type* pool_allocator<T>::allocate(std::size_t)
+inline typename pool_allocator<T>::value_type* pool_allocator<T>::allocate(size_type)
 {
 	return (value_type*)m_pool->get_chunk();
 }
 template<class T>
-inline void pool_allocator<T>::deallocate(value_type* chunk, std::size_t)
+inline void pool_allocator<T>::deallocate(value_type* chunk, size_type)
 {
 	m_pool->recycle_chunk((void*)chunk);
 }
@@ -136,11 +142,13 @@ class memory_pool
 public:
 	memory_pool() = default;
 
-	template <std::size_t ChunkSize, std::size_t ChunkAlign>
-	void init(std::size_t chunksPerBlock);
+	using size_type = call_detail::size_type;
 
-	template <std::size_t ChunkSize, std::size_t ChunkAlign, class ParentAllocator>
-	void init(std::size_t chunksPerBlock, ParentAllocator allocator);
+	template <size_type ChunkSize, size_type ChunkAlign>
+	void init(size_type chunksPerBlock);
+
+	template <size_type ChunkSize, size_type ChunkAlign, class ParentAllocator>
+	void init(size_type chunksPerBlock, ParentAllocator allocator);
 
 	void reset();
 
@@ -150,13 +158,13 @@ public:
 private:
 	shared_ptr<call_detail::memory_pool_base> m_impl;
 };
-template<std::size_t ChunkSize, std::size_t ChunkAlign>
-inline void memory_pool::init(std::size_t chunksPerBlock)
+template<memory_pool::size_type ChunkSize, memory_pool::size_type ChunkAlign>
+inline void memory_pool::init(size_type chunksPerBlock)
 {
 	init<ChunkSize, ChunkAlign>(chunksPerBlock, std::allocator<std::uint8_t>());
 }
-template<std::size_t ChunkSize, std::size_t ChunkAlign, class ParentAllocator>
-inline void memory_pool::init(std::size_t chunksPerBlock, ParentAllocator allocator)
+template<memory_pool::size_type ChunkSize, memory_pool::size_type ChunkAlign, class ParentAllocator>
+inline void memory_pool::init(size_type chunksPerBlock, ParentAllocator allocator)
 {
 	if (m_impl)
 		return;
@@ -174,7 +182,7 @@ inline pool_allocator<T> memory_pool::create_allocator() const
 	return pool_allocator<T>((typename pool_allocator<T>::pool_ptr_type)m_impl);
 }
 namespace call_detail {
-template <std::size_t ChunkSize, std::size_t ChunkAlign, class ParentAllocator>
+template <size_type ChunkSize, size_type ChunkAlign, class ParentAllocator>
 class memory_pool_impl : public memory_pool_base
 {
 	struct alignas(ChunkAlign) chunk_rep
@@ -182,19 +190,19 @@ class memory_pool_impl : public memory_pool_base
 		std::uint8_t m_block[ChunkSize];
 	};
 public:
-	memory_pool_impl(std::size_t chunksPerBlock, ParentAllocator allocator)
+	memory_pool_impl(size_type chunksPerBlock, ParentAllocator allocator)
 		: m_pool(chunksPerBlock, allocator)
 	{}
 	void* get_chunk() override final {
-		return (void*)m_pool.get_object();
+		return (void*)m_pool.get();
 	}
 	void recycle_chunk(void* chunk) override final {
-		m_pool.recycle_object((chunk_rep*)chunk);
+		m_pool.recycle((chunk_rep*)chunk);
 	}
 
-	bool verify_compatibility(std::size_t chunkSize, std::size_t chunkAlign) const override final {
-		constexpr std::size_t maxChunkSize(ChunkSize);
-		constexpr std::size_t maxChunkAlign(ChunkAlign);
+	bool verify_compatibility(size_type chunkSize, size_type chunkAlign) const override final {
+		constexpr size_type maxChunkSize(ChunkSize);
+		constexpr size_type maxChunkAlign(ChunkAlign);
 		const bool size(!(maxChunkSize < chunkSize));
 		const bool align(!(maxChunkAlign < chunkAlign));
 		return size & align;
