@@ -32,6 +32,42 @@ void job_handler_tester::init(const job_handler_tester_info& info)
 
 	setup_workers();
 }
+void job_handler_tester::basic_tests()
+{
+	std::vector<int> firstCollection;
+	firstCollection.resize(10);
+	gdul::batch_job first(m_handler.make_batch_job(firstCollection, gdul::delegate<void(int&)>([](int& elem) {elem = 10; })));
+	first.enable();
+	first.wait_until_finished();
+
+	for ([[maybe_unused]] auto itr : firstCollection)
+		assert(itr == 10);
+
+	std::vector<int> secondCollection;
+	secondCollection.resize(100);
+	gdul::batch_job second(m_handler.make_batch_job(secondCollection, gdul::delegate<bool(int&)>([](int& elem) {elem = 10; return rand() % 2; })));
+	second.enable();
+	second.wait_until_finished();
+
+	assert(secondCollection.size() != 0 && secondCollection.size() != 100 && "Size should *probably* be somewhere inbetween");
+
+	std::vector<int> thirdCollection;
+	std::vector<int> thirdOutCollection;
+	thirdCollection.resize(10);
+
+	for (auto i = 0; i < thirdCollection.size(); ++i)
+		thirdCollection[i] = i;
+
+	gdul::batch_job third(m_handler.make_batch_job(thirdCollection, thirdOutCollection, gdul::delegate<bool(int&, int&)>([](int& in, int& out) { out = in; return true; })));
+	third.enable();
+	third.wait_until_finished();
+
+	for (auto i = 0; i < thirdOutCollection.size(); ++i)
+		assert(thirdOutCollection[i] == i);
+
+	assert(thirdOutCollection.size() == thirdCollection.size());
+
+}
 void job_handler_tester::setup_workers()
 {
 	const std::size_t maxWorkers(std::thread::hardware_concurrency());
@@ -64,8 +100,10 @@ float job_handler_tester::run_consumption_parallel_test(std::size_t jobs, float 
 {
 	auto wrap = []() {}; overDuration;
 	job root(m_handler.make_job(gdul::delegate<void()>(wrap)));
+	root.activate_job_tracking("consumption_parallel_root");
 	root.set_target_queue(gdul::job_queue_1);
 	job end(m_handler.make_job(gdul::delegate<void()>([this]() { std::cout << "Finished run_consumption_parallel_test. Number of enqueued jobs: " << m_handler.active_job_count() << std::endl; })));
+	end.activate_job_tracking("consumption_parallel_end");
 
 	for (std::size_t i = 0; i < jobs; ++i)
 	{
@@ -73,7 +111,7 @@ float job_handler_tester::run_consumption_parallel_test(std::size_t jobs, float 
 		{
 			job jb(m_handler.make_job(gdul::delegate<void()>(wrap)));
 			jb.set_target_queue((gdul::job_queue((j + i) % gdul::job_queue_count)));
-
+			jb.activate_job_tracking("consumption_parallel_intermediate");
 			end.add_dependency(jb);
 
 			jb.add_dependency(root);
@@ -82,7 +120,7 @@ float job_handler_tester::run_consumption_parallel_test(std::size_t jobs, float 
 	}
 	end.enable();
 
-	gdul::timer<float> time;
+	timer<float> time;
 	root.enable();
 	end.wait_until_finished();
 
@@ -96,10 +134,10 @@ float job_handler_tester::run_consumption_strand_parallel_test(std::size_t jobs,
 	auto last = [this, jobs]() {m_work.end_work(); std::cout << "Finished run_consumption_strand_parallel_test. Number of enqueued jobs: " << m_handler.active_job_count() << " out of " << jobs << " initial" << std::endl; };
 
 	job root(m_handler.make_job(gdul::delegate<void()>(&work_tracker::begin_work, &m_work)));
-	root.activate_job_tracking("strand parallel root");
+	root.activate_job_tracking("strand_parallel_root");
 	job end(m_handler.make_job(gdul::delegate<void()>(last)));
 	end.add_dependency(root);
-	end.activate_job_tracking("strand parallel end");
+	end.activate_job_tracking("strand_parallel_end");
 	end.enable();
 
 	job next[8]{};
@@ -119,7 +157,7 @@ float job_handler_tester::run_consumption_strand_parallel_test(std::size_t jobs,
 		{
 			intermediate[j] = m_handler.make_job(gdul::delegate<void()>(&work_tracker::main_work, &m_work));
 			intermediate[j].set_target_queue((gdul::job_queue((j + i) % gdul::job_queue_count)));
-			intermediate[j].activate_job_tracking(std::string("strand parallel intermediate").c_str());
+			intermediate[j].activate_job_tracking(std::string("strand_parallel_intermediate").c_str());
 			end.add_dependency(intermediate[j]);
 
 			for (std::uint8_t dependencies = 0; dependencies < nextNum; ++dependencies)
@@ -136,7 +174,7 @@ float job_handler_tester::run_consumption_strand_parallel_test(std::size_t jobs,
 		nextNum = children;
 	}
 
-	gdul::timer<float> time;
+	timer<float> time;
 
 	root.enable();
 	end.wait_until_finished();
@@ -206,7 +244,7 @@ float job_handler_tester::run_consumption_strand_test(std::size_t jobs, float /*
 	end.add_dependency(previous);
 	end.enable();
 
-	gdul::timer<float> time;
+	timer<float> time;
 
 	root.enable();
 	end.wait_until_finished();
@@ -234,21 +272,19 @@ void job_handler_tester::run_scatter_test_input_output(std::size_t arraySize, st
 		for (std::size_t j = 0; j < arraySize; ++j) {
 			m_scatterInput[j] = (int*)(std::uintptr_t(j));
 		}
-
-		m_scatterOutput.resize(arraySize);
 	
 		delegate<bool(int*&, int*&)> process(&work_tracker::scatter_process, &m_work);
 		//delegate<bool(int*&)> process(&work_tracker::scatter_process_input, &m_work);
 		//delegate<void(int*&)> process(&work_tracker::scatter_process_update, &m_work);
 	
-		gdul::batch_job scatter(m_handler.make_batch_job(m_scatterInput, m_scatterOutput, std::move(process) , /*batchSize*/30));
-		//gdul::batch_job scatter(m_handler.make_batch_job(m_scatterInput, std::move(process) , /*batchSize*/30));
-		//gdul::batch_job scatter(m_handler.make_batch_job(m_scatterInput, std::move(process) , /*batchSize*/30));
+		gdul::batch_job scatter(m_handler.make_batch_job(m_scatterInput, m_scatterOutput, std::move(process)));
+		//gdul::batch_job scatter(m_handler.make_batch_job(m_scatterInput, std::move(process)));
+		//gdul::batch_job scatter(m_handler.make_batch_job(m_scatterInput, std::move(process)));
 	
 		scatter.activate_job_tracking("batch job test");
 
 		float result(0.f);
-		job endJob(m_handler.make_job([&time, &result, &scatter, this]() { result = time.get(); m_scatterOutput.resize(scatter.get_output_size()); }));
+		job endJob(m_handler.make_job([&time, &result, this]() { result = time.get(); }));
 		endJob.activate_job_tracking("batch post job");
 		endJob.add_dependency(scatter);
 		endJob.enable();

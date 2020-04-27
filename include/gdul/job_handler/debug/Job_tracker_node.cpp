@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include "Job_tracker_node.h"
+#include <gdul/job_handler/debug/job_tracker_node.h>
 
 #if defined(GDUL_JOB_DEBUG)
 
@@ -29,11 +29,8 @@ namespace jh_detail
 job_tracker_node::job_tracker_node()
 	: m_id(constexpr_id::make<0>())
 	, m_parent(constexpr_id::make<0>())
-	, m_completedCount(0)
-	, m_minTime(0.f)
-	, m_avgTime(0.f)
-	, m_maxTime(0.f)
 	, m_type(job_tracker_node_default)
+	, m_line(0)
 {
 }
 constexpr_id job_tracker_node::id() const
@@ -43,33 +40,6 @@ constexpr_id job_tracker_node::id() const
 constexpr_id job_tracker_node::parent() const
 {
 	return m_parent;
-}
-void job_tracker_node::add_completion_time(float time)
-{
-	++m_completedCount;
-	m_minTime = time < m_minTime ? time : m_minTime;
-	m_maxTime = m_maxTime < time ? time : m_maxTime;
-	m_avgTime += time;
-}
-
-float job_tracker_node::min_time() const
-{
-	return m_minTime;
-}
-
-float job_tracker_node::max_time() const
-{
-	return m_maxTime;
-}
-
-float job_tracker_node::avg_time() const
-{
-	return m_avgTime / m_completedCount;
-}
-
-std::size_t job_tracker_node::completed_count() const
-{
-	return m_completedCount;
 }
 
 void job_tracker_node::set_node_type(job_tracker_node_type type)
@@ -85,6 +55,16 @@ job_tracker_node_type job_tracker_node::get_node_type() const
 const std::string & job_tracker_node::name() const
 {
 	return m_name;
+}
+
+const std::string& job_tracker_node::physical_location() const
+{
+	return m_physicalLocation;
+}
+
+std::uint32_t job_tracker_node::line() const
+{
+	return m_line;
 }
 
 }

@@ -20,7 +20,6 @@
 
 #include <gdul/job_handler/worker.h>
 #include <gdul/job_handler/worker_impl.h>
-#include <gdul/job_handler/chunk_allocator.h>
 
 namespace gdul
 {

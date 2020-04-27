@@ -25,13 +25,12 @@
 
 #include <array>
 
-#include <gdul/concurrent_object_pool/concurrent_object_pool.h>
 #include <gdul/concurrent_queue/concurrent_queue.h>
 
 #include <gdul/job_handler/job.h>
 #include <gdul/job_handler/job_handler_utility.h>
 #include <gdul/job_handler/job_impl.h>
-#include <gdul/job_handler/chunk_allocator.h>
+#include <gdul/pool_allocator/pool_allocator.h>
 #include <gdul/job_handler/worker_impl.h>
 #include <gdul/job_handler/worker.h>
 #include <gdul/delegate/delegate.h>
@@ -55,7 +54,7 @@ public:
 	}static thread_local t_items;
 
 	job_handler_impl();
-	job_handler_impl(allocator_type& allocator);
+	job_handler_impl(allocator_type allocator);
 	~job_handler_impl();
 
  	void retire_workers();
@@ -69,15 +68,12 @@ public:
 	std::size_t external_worker_count() const noexcept;
 	std::size_t active_job_count() const noexcept;
 
-	concurrent_object_pool<job_node_chunk_rep, allocator_type>* get_job_node_chunk_pool() noexcept;
-	concurrent_object_pool<batch_job_chunk_rep, allocator_type>* get_batch_job_chunk_pool() noexcept;
+	pool_allocator<job_node> get_job_node_allocator() const noexcept;
+	pool_allocator<dummy_batch_type> get_batch_job_allocator() const noexcept;
 
 	void enqueue_job(job_impl_shared_ptr job);
 
 	bool try_consume_from_once(job_queue consumeFrom);
-
-	using job_impl_allocator = chunk_allocator<job_impl, job_impl_chunk_rep>;
-	using job_node_allocator = chunk_allocator<job_node, job_node_chunk_rep>;
 
 private:
 
@@ -90,9 +86,9 @@ private:
 
 	allocator_type m_mainAllocator;
 
-	concurrent_object_pool<job_impl_chunk_rep, allocator_type> m_jobImplChunkPool;
-	concurrent_object_pool<job_node_chunk_rep, allocator_type> m_jobNodeChunkPool;
-	concurrent_object_pool<batch_job_chunk_rep, allocator_type> m_batchJobChunkPool;
+	memory_pool m_jobImplChunkPool;
+	memory_pool m_jobNodeChunkPool;
+	memory_pool m_batchJobChunkPool;
 
 	concurrent_queue<job_impl_shared_ptr, allocator_type> m_jobQueues[job_queue_count];
 
