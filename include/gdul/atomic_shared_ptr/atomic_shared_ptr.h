@@ -974,6 +974,7 @@ inline void control_block_make_shared<T, Allocator>::destroy() noexcept
 {
 	Allocator alloc(this->m_allocator);
 
+	std::uint8_t* const block((std::uint8_t*)this - this->block_offset());
 	(*this).~control_block_make_shared<T, Allocator>();
 
 	constexpr std::size_t blockSize(gdul::allocate_shared_size<T, Allocator>());
@@ -984,8 +985,7 @@ inline void control_block_make_shared<T, Allocator>::destroy() noexcept
 
 	rebound_alloc rebound(alloc);
 
-	uint8_t* beginPtr((std::uint8_t*)this - this->block_offset());
-	block_type* const typedBlock((block_type*)beginPtr);
+	block_type* const typedBlock((block_type*)block);
 
 	rebound.deallocate(typedBlock, 1);
 }
@@ -1024,13 +1024,13 @@ inline void control_block_make_unbounded_array<T, Allocator>::destroy() noexcept
 		ptrBase[i].~decayed_type();
 	}
 
+	std::uint8_t* const block((std::uint8_t*)this);
+
 	(*this).~control_block_make_unbounded_array<T, Allocator>();
 
 	using rebound_alloc = typename std::allocator_traits<Allocator>::template rebind_alloc<std::uint8_t>;
 
 	rebound_alloc rebound(alloc);
-
-	uint8_t* const block((uint8_t*)this);
 
 	rebound.deallocate(block, allocate_shared_size<T, Allocator>(nItems));
 }
@@ -1055,13 +1055,14 @@ inline void control_block_claim<T, Allocator>::destroy() noexcept
 	Allocator alloc(this->m_allocator);
 
 	delete this->get();
+	std::uint8_t* const block((std::uint8_t*)this);
 	(*this).~control_block_claim<T, Allocator>();
 
 	using rebound_alloc = typename std::allocator_traits<Allocator>::template rebind_alloc<std::uint8_t>;
 
 	rebound_alloc rebound(alloc);
 
-	rebound.deallocate(reinterpret_cast<std::uint8_t*>(this), gdul::sp_claim_size<T, Allocator>());
+	rebound.deallocate(block, gdul::sp_claim_size<T, Allocator>());
 }
 template <class T, class Allocator, class Deleter>
 class control_block_claim_custom_delete : public control_block_base<T>
@@ -1086,15 +1087,17 @@ inline void control_block_claim_custom_delete<T, Allocator, Deleter>::destroy() 
 {
 	Allocator alloc(this->m_allocator);
 
-	T* ptrAddr(this->get());
+	T* const ptrAddr(this->get());
 	m_deleter(ptrAddr, alloc);
+
+	std::uint8_t* const block((std::uint8_t*)this);
 	(*this).~control_block_claim_custom_delete<T, Allocator, Deleter>();
 
 	using rebound_alloc = typename std::allocator_traits<Allocator>::template rebind_alloc<std::uint8_t>;
 
 	rebound_alloc rebound(alloc);
 
-	rebound.deallocate((std::uint8_t*)this, gdul::sp_claim_size_custom_delete<T, Allocator, Deleter>());
+	rebound.deallocate(block, gdul::sp_claim_size_custom_delete<T, Allocator, Deleter>());
 }
 
 template <class T>
