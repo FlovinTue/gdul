@@ -6,7 +6,7 @@ A collection of (mainly concurrency related) data structures, created with game 
 
 ## atomic_shared_ptr
 
-* Lock-Free (if used with a lock-free allocator)
+* Lock-free
 * Uses an interface resembling that of an std::atomic type
 * Uses internal versioning to make it resistant to ABA problems
 * Uses a shared_ptr similar to that of std::shared_ptr
