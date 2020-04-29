@@ -124,16 +124,19 @@ std::uint32_t job_impl::remove_dependencies(std::uint32_t n)
 	std::uint32_t result(m_dependencies.fetch_sub(n, std::memory_order_acq_rel));
 	return result - n;
 }
-bool job_impl::enable() noexcept
+enable_result job_impl::enable() noexcept
 {
 	std::uint32_t exp(m_dependencies.load(std::memory_order_relaxed));
 
 	while (!(exp < Job_Enable_Dependencies)){
-		if (m_dependencies.compare_exchange_weak(exp, exp - Job_Enable_Dependencies, std::memory_order_relaxed))
-			return !(exp - Job_Enable_Dependencies);
+		if (m_dependencies.compare_exchange_weak(exp, exp - Job_Enable_Dependencies, std::memory_order_relaxed)) {
+			std::uint8_t result(enable_result_enabled);
+			result |= enable_result_enqueue * !(exp - Job_Enable_Dependencies);
+			return (enable_result)result;
+		}
 	}
 
-	return false;
+	return enable_result_null;
 }
 bool job_impl::enable_if_ready() noexcept
 {
