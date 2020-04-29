@@ -73,7 +73,7 @@ public:
 	void work_until_finished(job_queue consumeFrom) override final;
 	void work_until_ready(job_queue consumeFrom) override final;
 
-	bool enable(shared_ptr<batch_job_impl_interface> selfRef)  noexcept override final;
+	bool enable(const shared_ptr<batch_job_impl_interface>& selfRef)  noexcept override final;
 	bool enable_locally_if_ready() override final;
 
 	bool is_enabled() const noexcept override final;
@@ -269,13 +269,13 @@ inline void batch_job_impl<InContainer, OutContainer, Process>::work_until_ready
 	GDUL_JOB_DEBUG_CONDTIONAL(if (m_trackingNode) m_trackingNode->m_waitTimeSet.log_time(waitTimer.get()))
 }
 template<class InContainer, class OutContainer, class Process>
-inline bool batch_job_impl<InContainer, OutContainer, Process>::enable(shared_ptr<batch_job_impl_interface> selfRef) noexcept
+inline bool batch_job_impl<InContainer, OutContainer, Process>::enable(const shared_ptr<batch_job_impl_interface>& selfRef) noexcept
 {
 	GDUL_JOB_DEBUG_CONDTIONAL(m_enqueueTimer.reset())
 
 	const bool result(m_root.enable());
 	if (result)
-		m_selfRef = std::move(selfRef);
+		m_selfRef = selfRef;
 
 	return result;
 }
