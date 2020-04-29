@@ -61,6 +61,7 @@ public:
 
 	// Invokes process for all elements
 	// Requirements on Container is ::begin(), ::end(), ::value_type
+	// Will not modify container
 	template <class InContainer>
 	batch_job make_batch_job(
 		InContainer& input,
@@ -68,6 +69,7 @@ public:
 
 	// Invokes process for all elements. Boolean returnvalue signals inclusion in the processed collection
 	// Requirements on Container is ::begin(), ::end(), ::value_type, ::resize(std::size_t)
+	// Will modify container
 	template <class InOutContainer>
 	batch_job make_batch_job(
 		InOutContainer& inputOutput,
@@ -75,6 +77,7 @@ public:
 
 	// Invokes process for all elements. Boolean returnvalue signals inclusion in the output collection
 	// Requirements on Container is ::begin(), ::end(), ::value_type, ::resize(std::size_t) (only output)
+	// Will modify output container
 	template <class InContainer, class OutContainer>
 	batch_job make_batch_job(
 		InContainer& input,
@@ -83,6 +86,7 @@ public:
 
 	// Invokes process for all elements
 	// Requirements on Container is ::begin(), ::end(), ::value_type
+	// Will not modify container
 	template <class InContainer>
 	batch_job make_batch_job(
 		InContainer& input,
@@ -91,6 +95,7 @@ public:
 
 	// Invokes process for all elements. Boolean returnvalue signals inclusion in the processed collection
 	// Requirements on Container is ::begin(), ::end(), ::value_type
+	// Will modify container
 	template <class InOutContainer>
 	batch_job make_batch_job(
 		InOutContainer& inputOutput,
@@ -100,6 +105,7 @@ public:
 
 	// Invokes process for all elements. Boolean returnvalue signals inclusion in the output collection
 	// Requirements on Container is ::begin(), ::end(), ::value_type. Input container size must not exceed that of output.
+	// Will modify output container
 	template <class InContainer, class OutContainer>
 	batch_job make_batch_job(InContainer& input,
 		OutContainer& output,
@@ -115,6 +121,7 @@ private:
 };
 // Invokes process for all elements
 // Requirements on Container is ::begin(), ::end(), ::value_type
+// Will not modify container
 template<class InContainer>
 inline batch_job job_handler::make_batch_job(
 	InContainer& input, 
@@ -126,6 +133,7 @@ inline batch_job job_handler::make_batch_job(
 }
 // Invokes process for all elements. Boolean returnvalue signals inclusion in the processed collection
 // Requirements on Container is ::begin(), ::end(), ::value_type, ::resize(std::size_t)
+// Will modify container
 template<class InOutContainer>
 inline batch_job job_handler::make_batch_job(
 	InOutContainer& inputOutput, 
@@ -137,6 +145,7 @@ inline batch_job job_handler::make_batch_job(
 }
 // Invokes process for all elements. Boolean returnvalue signals inclusion in the output collection
 // Requirements on Container is ::begin(), ::end(), ::value_type, ::resize(std::size_t) (only output)
+// Will modify output container
 template<class InContainer, class OutContainer>
 inline batch_job job_handler::make_batch_job(
 	InContainer& input, 
@@ -149,6 +158,7 @@ inline batch_job job_handler::make_batch_job(
 }
 // Invokes process for all elements
 // Requirements on Container is ::begin(), ::end(), ::value_type
+// Will not modify container
 template<class InContainer>
 inline batch_job job_handler::make_batch_job(
 	InContainer& input, 
@@ -165,6 +175,7 @@ inline batch_job job_handler::make_batch_job(
 }
 // Invokes process for all elements. Boolean returnvalue signals inclusion in the processed collection
 // Requirements on Container is ::begin(), ::end(), ::value_type
+// Will modify container
 template<class InOutContainer>
 inline batch_job job_handler::make_batch_job(
 	InOutContainer& inputOutput, 
@@ -182,6 +193,7 @@ inline batch_job job_handler::make_batch_job(
 }
 // Invokes process for all elements. Boolean returnvalue signals inclusion in the output collection
 // Requirements on Container is ::begin(), ::end(), ::value_type. Input container size must not exceed that of output.
+// Will modify output container
 template<class InContainer, class OutContainer>
 inline batch_job job_handler::make_batch_job(
 	InContainer& input, 
