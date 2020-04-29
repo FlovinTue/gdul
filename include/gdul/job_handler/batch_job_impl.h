@@ -145,11 +145,6 @@ private:
 
 	bool (job::* m_enableFunc)(void);
 
-	atomic_shared_ptr<batch_job_impl_interface> m_selfRef;
-
-	job m_root;
-	job m_end;
-
 	intput_container_type& m_input;
 	output_container_type& m_output;
 
@@ -157,15 +152,20 @@ private:
 	const std::uint16_t m_batchCount;
 
 	job_queue m_targetQueue;
+
+	atomic_shared_ptr<batch_job_impl_interface> m_selfRef;
+
+	job m_root;
+	job m_end;
 };
 template<class InContainer, class OutContainer, class Process>
 inline batch_job_impl<InContainer, OutContainer, Process>::batch_job_impl(
-	InContainer& input, 
-	OutContainer& output, 
-	typename batch_job_impl<InContainer, 
-	OutContainer, 
-	Process>::process_type&& process, 
-	std::size_t batchSize, 
+	InContainer& input,
+	OutContainer& output,
+	typename batch_job_impl<InContainer,
+	OutContainer,
+	Process>::process_type&& process,
+	std::size_t batchSize,
 	gdul::delegate<void(std::size_t)> outputResizeFunc,
 	job_handler* handler)
 	: m_batchTracker{}
@@ -173,13 +173,14 @@ inline batch_job_impl<InContainer, OutContainer, Process>::batch_job_impl(
 	, m_outputResizeFunc(std::move(outputResizeFunc))
 	, m_handler(handler)
 	, m_enableFunc(&job::enable)
-	, m_root(container_size(input) ? _redirect_make_job(handler, delegate<void()>(&batch_job_impl::initialize, this)) : _redirect_make_job(m_handler, delegate<void()>([]() {})))
-	, m_end(container_size(input) ? _redirect_make_job(handler, delegate<void()>(&batch_job_impl::finalize<>, this)) : m_root)
 	, m_input(input)
 	, m_output(output)
 	, m_batchSize(clamp_batch_size(batchSize + !(bool)batchSize))
-	, m_batchCount((std::uint16_t)(container_size(m_input) / m_batchSize + ((bool)(container_size(m_input) % m_batchSize))) + !(bool)(container_size(m_input)))
+	, m_batchCount((std::uint16_t)(container_size(m_input) / m_batchSize + ((bool)(container_size(m_input) % m_batchSize))))
 	, m_targetQueue(jh_detail::Default_Job_Queue)
+	, m_selfRef()
+	, m_root(m_batchCount ? _redirect_make_job(handler, delegate<void()>(&batch_job_impl::initialize, this)) : _redirect_make_job(m_handler, delegate<void()>([]() {})))
+	, m_end(m_batchCount ? _redirect_make_job(handler, delegate<void()>(&batch_job_impl::finalize<>, this)) : m_root)
 #if defined(GDUL_JOB_DEBUG)
 	, m_trackingNode(nullptr)
 #endif
