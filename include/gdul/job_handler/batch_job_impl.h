@@ -145,7 +145,7 @@ private:
 
 	bool (job::* m_enableFunc)(void);
 
-	shared_ptr<batch_job_impl_interface> m_selfRef;
+	atomic_shared_ptr<batch_job_impl_interface> m_selfRef;
 
 	job m_root;
 	job m_end;
@@ -274,8 +274,10 @@ inline bool batch_job_impl<InContainer, OutContainer, Process>::enable(const sha
 	GDUL_JOB_DEBUG_CONDTIONAL(m_enqueueTimer.reset())
 
 	const bool result(m_root.enable());
-	if (result)
-		m_selfRef = selfRef;
+	if (result) {
+		raw_ptr<batch_job_impl_interface> expected(nullptr);
+		m_selfRef.compare_exchange_strong(expected, selfRef, std::memory_order_relaxed);
+	}
 
 	return result;
 }
@@ -485,7 +487,7 @@ inline void batch_job_impl<InContainer, OutContainer, Process>::finalize()
 
 	GDUL_JOB_DEBUG_CONDTIONAL(if (m_trackingNode)m_trackingNode->m_completionTimeSet.log_time(m_completionTimer.get()))
 
-	m_selfRef = shared_ptr<batch_job_impl_interface>();
+	m_selfRef.store(shared_ptr<batch_job_impl_interface>(), std::memory_order_relaxed);
 }
 template<class InContainer, class OutContainer, class Process>
 template <class U, std::enable_if_t<U::Specialize_Update>*>
@@ -493,7 +495,7 @@ inline void batch_job_impl<InContainer, OutContainer, Process>::finalize()
 {
 	GDUL_JOB_DEBUG_CONDTIONAL(if (m_trackingNode)m_trackingNode->m_completionTimeSet.log_time(m_completionTimer.get()))
 
-	m_selfRef = shared_ptr<batch_job_impl_interface>();
+	m_selfRef.store(shared_ptr<batch_job_impl_interface>(), std::memory_order_relaxed);
 }
 #if defined(GDUL_JOB_DEBUG)
 template<class InContainer, class OutContainer, class Process>
