@@ -119,7 +119,6 @@
     <ClCompile Include="..\..\include\gdul\job_handler\debug\job_tracker.cpp" />
     <ClCompile Include="..\..\include\gdul\job_handler\debug\job_tracker_node.cpp" />
     <ClCompile Include="..\..\include\gdul\job_handler\debug\time_set.cpp" />
-    <ClCompile Include="..\..\include\gdul\job_handler\debug\timer.cpp" />
     <ClCompile Include="..\..\include\gdul\job_handler\job.cpp" />
     <ClCompile Include="..\..\include\gdul\job_handler\job_handler.cpp" />
     <ClCompile Include="..\..\include\gdul\job_handler\job_handler_utility.cpp" />

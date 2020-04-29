@@ -73,7 +73,7 @@ public:
 	void work_until_finished(job_queue consumeFrom) override final;
 	void work_until_ready(job_queue consumeFrom) override final;
 
-	bool enable(shared_ptr<batch_job_impl_interface> selfRef)  noexcept override final;
+	bool enable(const shared_ptr<batch_job_impl_interface>& selfRef)  noexcept override final;
 	bool enable_locally_if_ready() override final;
 
 	bool is_enabled() const noexcept override final;
@@ -145,11 +145,6 @@ private:
 
 	bool (job::* m_enableFunc)(void);
 
-	shared_ptr<batch_job_impl_interface> m_selfRef;
-
-	job m_root;
-	job m_end;
-
 	intput_container_type& m_input;
 	output_container_type& m_output;
 
@@ -157,15 +152,20 @@ private:
 	const std::uint16_t m_batchCount;
 
 	job_queue m_targetQueue;
+
+	atomic_shared_ptr<batch_job_impl_interface> m_selfRef;
+
+	job m_root;
+	job m_end;
 };
 template<class InContainer, class OutContainer, class Process>
 inline batch_job_impl<InContainer, OutContainer, Process>::batch_job_impl(
-	InContainer& input, 
-	OutContainer& output, 
-	typename batch_job_impl<InContainer, 
-	OutContainer, 
-	Process>::process_type&& process, 
-	std::size_t batchSize, 
+	InContainer& input,
+	OutContainer& output,
+	typename batch_job_impl<InContainer,
+	OutContainer,
+	Process>::process_type&& process,
+	std::size_t batchSize,
 	gdul::delegate<void(std::size_t)> outputResizeFunc,
 	job_handler* handler)
 	: m_batchTracker{}
@@ -173,13 +173,14 @@ inline batch_job_impl<InContainer, OutContainer, Process>::batch_job_impl(
 	, m_outputResizeFunc(std::move(outputResizeFunc))
 	, m_handler(handler)
 	, m_enableFunc(&job::enable)
-	, m_root(container_size(input) ? _redirect_make_job(handler, delegate<void()>(&batch_job_impl::initialize, this)) : _redirect_make_job(m_handler, delegate<void()>([]() {})))
-	, m_end(container_size(input) ? _redirect_make_job(handler, delegate<void()>(&batch_job_impl::finalize<>, this)) : m_root)
 	, m_input(input)
 	, m_output(output)
 	, m_batchSize(clamp_batch_size(batchSize + !(bool)batchSize))
-	, m_batchCount((std::uint16_t)(container_size(m_input) / m_batchSize + ((bool)(container_size(m_input) % m_batchSize))) + !(bool)(container_size(m_input)))
+	, m_batchCount((std::uint16_t)(container_size(m_input) / m_batchSize + ((bool)(container_size(m_input) % m_batchSize))))
 	, m_targetQueue(jh_detail::Default_Job_Queue)
+	, m_selfRef()
+	, m_root(m_batchCount ? _redirect_make_job(handler, delegate<void()>(&batch_job_impl::initialize, this)) : _redirect_make_job(m_handler, delegate<void()>([]() {})))
+	, m_end(m_batchCount ? _redirect_make_job(handler, delegate<void()>(&batch_job_impl::finalize<>, this)) : m_root)
 #if defined(GDUL_JOB_DEBUG)
 	, m_trackingNode(nullptr)
 #endif
@@ -231,6 +232,9 @@ template<class InContainer, class OutContainer, class Process>
 inline void batch_job_impl<InContainer, OutContainer, Process>::set_target_queue(job_queue target) noexcept
 {
 	m_targetQueue = target;
+
+	m_root.set_target_queue(m_targetQueue);
+	m_end.set_target_queue(m_targetQueue);
 }
 template<class InContainer, class OutContainer, class Process>
 inline job_queue batch_job_impl<InContainer, OutContainer, Process>::get_target_queue() const noexcept
@@ -266,13 +270,15 @@ inline void batch_job_impl<InContainer, OutContainer, Process>::work_until_ready
 	GDUL_JOB_DEBUG_CONDTIONAL(if (m_trackingNode) m_trackingNode->m_waitTimeSet.log_time(waitTimer.get()))
 }
 template<class InContainer, class OutContainer, class Process>
-inline bool batch_job_impl<InContainer, OutContainer, Process>::enable(shared_ptr<batch_job_impl_interface> selfRef) noexcept
+inline bool batch_job_impl<InContainer, OutContainer, Process>::enable(const shared_ptr<batch_job_impl_interface>& selfRef) noexcept
 {
 	GDUL_JOB_DEBUG_CONDTIONAL(m_enqueueTimer.reset())
 
 	const bool result(m_root.enable());
-	if (result)
-		m_selfRef = std::move(selfRef);
+	if (result) {
+		raw_ptr<batch_job_impl_interface> expected(nullptr);
+		m_selfRef.compare_exchange_strong(expected, selfRef, std::memory_order_relaxed);
+	}
 
 	return result;
 }
@@ -482,7 +488,7 @@ inline void batch_job_impl<InContainer, OutContainer, Process>::finalize()
 
 	GDUL_JOB_DEBUG_CONDTIONAL(if (m_trackingNode)m_trackingNode->m_completionTimeSet.log_time(m_completionTimer.get()))
 
-	m_selfRef = shared_ptr<batch_job_impl_interface>();
+	m_selfRef.store(shared_ptr<batch_job_impl_interface>(), std::memory_order_relaxed);
 }
 template<class InContainer, class OutContainer, class Process>
 template <class U, std::enable_if_t<U::Specialize_Update>*>
@@ -490,7 +496,7 @@ inline void batch_job_impl<InContainer, OutContainer, Process>::finalize()
 {
 	GDUL_JOB_DEBUG_CONDTIONAL(if (m_trackingNode)m_trackingNode->m_completionTimeSet.log_time(m_completionTimer.get()))
 
-	m_selfRef = shared_ptr<batch_job_impl_interface>();
+	m_selfRef.store(shared_ptr<batch_job_impl_interface>(), std::memory_order_relaxed);
 }
 #if defined(GDUL_JOB_DEBUG)
 template<class InContainer, class OutContainer, class Process>
