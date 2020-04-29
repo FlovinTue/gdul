@@ -231,6 +231,9 @@ template<class InContainer, class OutContainer, class Process>
 inline void batch_job_impl<InContainer, OutContainer, Process>::set_target_queue(job_queue target) noexcept
 {
 	m_targetQueue = target;
+
+	m_root.set_target_queue(m_targetQueue);
+	m_end.set_target_queue(m_targetQueue);
 }
 template<class InContainer, class OutContainer, class Process>
 inline job_queue batch_job_impl<InContainer, OutContainer, Process>::get_target_queue() const noexcept
