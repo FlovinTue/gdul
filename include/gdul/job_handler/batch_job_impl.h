@@ -96,7 +96,7 @@ private:
 
 	template <class Cont>
 	std::size_t container_size(const Cont& arr) const {
-		return arr.end() - arr.begin();
+		return arr.size();
 	}
 
 	static constexpr bool Specialize_Input_Output = std::is_same_v<bool, typename process_type::return_type> && process_type::Num_Args == 2;
