@@ -2,7 +2,6 @@
 
 #include <gdul\job_handler_master.h>
 #include "work_tracker.h"
-#include "Timer.h"
 
 namespace gdul
 {
@@ -24,6 +23,8 @@ public:
 	~job_handler_tester();
 
 	void init(const job_handler_tester_info& info);
+
+	void basic_tests();
 
 	void setup_workers();
 

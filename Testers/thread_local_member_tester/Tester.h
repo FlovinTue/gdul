@@ -147,6 +147,12 @@ inline void tester<T>::test_assignment(uint32_t tasks)
 template<class T>
 inline void tester<T>::assert_base_functionality()
 {
+	tlm<int> resetTest(5);
+	const int five(resetTest.get());
+	resetTest.unsafe_reset(6);
+	const int six(resetTest.get());
+	GDUL_ASSERT(six == 6);
+
 	tlm<char> boolOpFalse(0);
 	tlm<char> boolOpTrue(1);
 

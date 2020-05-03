@@ -5,9 +5,8 @@ A collection of (mainly concurrency related) data structures, created with game 
 -------------------------------------------------------------------------------------------------------------------------------------------
 
 ## atomic_shared_ptr
-My take on an atomic shared pointer.
 
-* Lock-Free (if used with a lock-free allocator)
+* Lock-free
 * Uses an interface resembling that of an std::atomic type
 * Uses internal versioning to make it resistant to ABA problems
 * Uses a shared_ptr similar to that of std::shared_ptr
@@ -63,18 +62,25 @@ Main features would be:
 * Supports (multiple) job dependencies. (if job 'first' depends on job 'second' then 'first' will not be enqueued for consumption until 'second' has completed) 
 * Keeps multiple internal job queues (number defined by gdul::job_queue_count enum value), with workers consuming from the further-back queues less frequently (range of consumption is definable).
 * Has three types of batch_job (splits an array of items combined with a processing delegate over multiple jobs). 
-* Job spawn graph may be dumped to file for viewing
+* Job relationship graph may be dumped to file for viewing
+* Job profiling info may be dumped for viewing
 
 Job tracking instructions: 
 - make sure GDUL_JOB_DEBUG is defined in globals.h
 - for each job taking part in the tracking, call activate_job_tracking(name)
+
 - dump job graph using job_tracker::dump_job_tree(location)
+- dump job time sets using job_tracker::dump_job_time_sets(location) 
+
+- graph may be viewed using the Visual Studio dgml extension. 
+- job time sets may be viewed in the small C# app job_time_set_view located in root folder
+
 
 A quick usage example for job:
 ```
 #include <iostream>
 #include <thread>
-#include <gdul/job_handler/job_handler.h>
+#include <gdul/job_handler_master.h>
 
 int main()
 {	
@@ -100,7 +106,7 @@ int main()
 And with batch_job:
 ```
 #include <thread>
-#include <gdul/job_handler/job_handler.h>
+#include <gdul/job_handler_master.h>
 #include <vector>
 
 int main()
@@ -122,25 +128,21 @@ int main()
 		inputs.push_back(i);
 	}
 
-	outputs.resize(inputs.size());
-
 	gdul::delegate<bool(std::size_t&, std::size_t&)> process([](std::size_t& inputItem, std::size_t& outputItem)
-	{
-		// Output only the items that mod 5 == 0
-		if (inputItem % 5 == 0)
 		{
-			outputItem = inputItem;
-			return true;
-		}
-		return false;
-	});
+			// Output only the items that mod 5 == 0
+			if (inputItem % 5 == 0)
+			{
+				outputItem = inputItem;
+				return true;
+			}
+			return false;
+		});
 
-	gdul::batch_job bjb(jh.make_batch_job(inputs, outputs, process, 30/*batch size*/));
+	gdul::batch_job bjb(jh.make_batch_job(inputs, outputs, process));
 
 	bjb.enable();
 	bjb.wait_until_finished();
-
-	outputs.resize(bjb.get_output_size());
 
 	// Here outputs should contain 0, 5, 10, 15...
 
