@@ -29,7 +29,7 @@ Depends on atomic_shared_ptr.h, thread_local_member.h
 -------------------------------------------------------------------------------------------------------------------------------------------
 
 ## concurrent_object_pool
-Allocates chunks of objects and makes them avaliable for usage via get_object. Return objects using recycle_object. Concurrency safe & lock-free.
+Allocates chunks of objects and makes them avaliable for usage via get. Return objects using recycle. Concurrency safe & lock-free.
 
 Depends on concurrent_queue.h, atomic_shared_ptr.h, thread_local_member.h
 
