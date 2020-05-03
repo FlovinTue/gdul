@@ -93,7 +93,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\include\gdul\WIP_concurrent_priority_queue\concurrent_priority_queue.h" />
+    <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\concurrent_priority_queue.h" />
     <ClInclude Include="pch.h" />
   </ItemGroup>
   <ItemGroup>

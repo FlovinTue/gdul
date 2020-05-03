@@ -89,7 +89,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\include\gdul\pool_allocator\pool_allocator.h" />
+    <ClInclude Include="..\..\..\source\gdul\pool_allocator\pool_allocator.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="tester.h" />
   </ItemGroup>
