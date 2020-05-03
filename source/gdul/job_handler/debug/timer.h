@@ -31,10 +31,17 @@ namespace jh_detail
 class timer
 {
 public:
-	timer();
-
-	float get() const;
-	void reset();
+	timer()
+		: m_fromTime(m_clock.now())
+	{}
+	float get() const
+	{
+		return std::chrono::duration_cast<std::chrono::duration<float>>(m_clock.now() - m_fromTime).count();
+	}
+	void reset()
+	{
+		m_fromTime = m_clock.now();
+	}
 
 private:
 	std::chrono::high_resolution_clock m_clock;

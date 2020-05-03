@@ -37,6 +37,13 @@ namespace gdul{
 
 namespace jh_detail {
 
+enum enable_result : std::uint8_t
+{
+	enable_result_null = 0,
+	enable_result_enabled = 1 << 0,
+	enable_result_enqueue = 1 << 1,
+};
+
 class job_handler_impl;
 
 class job_impl
@@ -63,7 +70,7 @@ public:
 	bool try_add_dependencies(std::uint32_t n = 1);
 	std::uint32_t remove_dependencies(std::uint32_t n = 1);
 
-	bool enable() noexcept;
+	enable_result enable() noexcept;
 	bool enable_if_ready() noexcept;
 
 	job_handler_impl* get_handler() const;

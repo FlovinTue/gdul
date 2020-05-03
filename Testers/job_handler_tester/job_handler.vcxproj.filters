@@ -40,9 +40,6 @@
     <ClCompile Include="..\..\include\gdul\job_handler\debug\job_tracker.cpp">
       <Filter>implementation\debug</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\include\gdul\job_handler\debug\timer.cpp">
-      <Filter>implementation\debug</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\include\gdul\job_handler\debug\time_set.cpp">
       <Filter>implementation\debug</Filter>
     </ClCompile>

@@ -82,10 +82,13 @@ job_queue job::get_target_queue() const noexcept
 }
 bool job::enable() noexcept
 {
-	if (m_impl && m_impl->enable()) {
-		m_impl->get_handler()->enqueue_job(m_impl);
+	if (m_impl) {
+		const jh_detail::enable_result result(m_impl->enable());
 
-		return true;
+		if (result & jh_detail::enable_result_enqueue)
+			m_impl->get_handler()->enqueue_job(m_impl);
+
+		return result & jh_detail::enable_result_enabled;
 	}
 	return false;
 }
