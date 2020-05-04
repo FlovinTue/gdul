@@ -49,9 +49,11 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
+    <IncludePath>$(SolutionDir)Source;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
+    <IncludePath>$(SolutionDir)Source;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -92,10 +94,10 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\include\gdul\WIP_concurrent_queue_fifo\concurrent_queue_fifo.h" />
-    <ClInclude Include="..\..\..\include\gdul\WIP_concurrent_queue_fifo\concurrent_queue_fifo_v2.h" />
-    <ClInclude Include="..\..\..\include\gdul\WIP_concurrent_queue_fifo\concurrent_queue_fifo_v3.h" />
-    <ClInclude Include="..\..\..\include\gdul\WIP_concurrent_queue_fifo\concurrent_queue_fifo_v4.h" />
+    <ClInclude Include="..\..\..\source\gdul\WIP_concurrent_queue_fifo\concurrent_queue_fifo.h" />
+    <ClInclude Include="..\..\..\source\gdul\WIP_concurrent_queue_fifo\concurrent_queue_fifo_v2.h" />
+    <ClInclude Include="..\..\..\source\gdul\WIP_concurrent_queue_fifo\concurrent_queue_fifo_v3.h" />
+    <ClInclude Include="..\..\..\source\gdul\WIP_concurrent_queue_fifo\concurrent_queue_fifo_v4.h" />
     <ClInclude Include="pch.h" />
   </ItemGroup>
   <ItemGroup>
