@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 15
-VisualStudioVersion = 15.0.28307.902
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.30011.22
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "atomic_128", "Testers\atomic_uint128_tester\atomic_uint128.vcxproj", "{F2B36960-1C2E-402A-91BE-CD8C1539E38B}"
 EndProject
@@ -23,7 +23,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "delegate", "Testers\delegat
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "concurrent_queue_fifo", "Testers\concurrent_queue_fifo_tester\concurrent_queue_fifo\concurrent_queue_fifo.vcxproj", "{1FFC44D2-F701-4925-8987-768C3F623870}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "pool_allocator", "Testers\pool_allocator\pool_allocator\pool_allocator.vcxproj", "{A2E8798B-61E2-4AF0-95A2-8D9FAC6A57BA}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "pool_allocator", "Testers\pool_allocator\pool_allocator.vcxproj", "{A2E8798B-61E2-4AF0-95A2-8D9FAC6A57BA}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

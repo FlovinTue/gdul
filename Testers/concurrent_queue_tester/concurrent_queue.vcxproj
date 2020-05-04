@@ -94,7 +94,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\include\gdul\concurrent_queue\concurrent_queue.h" />
+    <ClInclude Include="..\..\source\gdul\concurrent_queue\concurrent_queue.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
     <ClInclude Include="Tester.h" />
@@ -107,7 +107,7 @@
     <ClCompile Include="Main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <Natvis Include="..\..\include\gdul\concurrent_queue\concurrent_queue.natvis" />
+    <Natvis Include="..\..\source\gdul\concurrent_queue\concurrent_queue.natvis" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

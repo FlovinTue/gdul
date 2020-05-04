@@ -5,6 +5,7 @@
     <IntDir>C:\Visual Studio\Projects\$(SolutionName)\$(ProjectName)\Intermediate\</IntDir>
     <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)\External\Include\;</IncludePath>
 	<IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)\include\;</IncludePath>
+	<IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)\source\;</IncludePath>
     <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64;$(SolutionDir)\External\Lib\;$(SolutionDir)\Lib\;</LibraryPath>
     <TargetName Condition="'$(Configuration)'!='Debug'">$(ProjectName)_$(Configuration)</TargetName>
     <TargetName Condition="'$(Configuration)'=='Debug'">$(ProjectName)_$(Configuration)</TargetName>

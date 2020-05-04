@@ -57,6 +57,7 @@ public:
 	static void dump_job_time_sets(const char* location);
 #else
 	static void dump_job_tree(const char*) {};
+	static void dump_job_time_sets(const char*) {};
 #endif
 };
 }

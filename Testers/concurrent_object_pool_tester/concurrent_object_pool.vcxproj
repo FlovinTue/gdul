@@ -90,7 +90,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\include\gdul\concurrent_object_pool\concurrent_object_pool.h" />
+    <ClInclude Include="..\..\source\gdul\concurrent_object_pool\concurrent_object_pool.h" />
     <ClInclude Include="pch.h" />
   </ItemGroup>
   <ItemGroup>
