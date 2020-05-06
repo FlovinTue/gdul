@@ -55,7 +55,6 @@ Supports (partial or full) binding of arguments in its constructor. The amount o
 
 -------------------------------------------------------------------------------------------------------------------------------------------
 ## job_handler
-####  -- Still fairly new, and may not be the most stable --
 A job system
 
 Main features would be:
