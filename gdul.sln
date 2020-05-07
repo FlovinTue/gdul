@@ -15,8 +15,6 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "job_handler", "Testers\job_
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "concurrent_priority_queue", "Testers\concurrent_priority_queue_tester\concurrent_priority_queue.vcxproj", "{5AECC0B4-DD09-443F-820D-053FFCEDF8B3}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "concurrent_priority_queue_unit_test", "Testers\concurrent_priority_queue_tester\Tester.vcxproj", "{45CD5B9F-FEBD-45C0-BB0C-989FC90FD09A}"
-EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "thread_local_member", "Testers\thread_local_member_tester\thread_local_member_tester.vcxproj", "{14B2FC84-037B-47A3-A99A-9F61F4F021B9}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "delegate", "Testers\delegate_tester\delegate_tester.vcxproj", "{6294E62E-CE95-40D8-A176-D30D0046235B}"
@@ -67,10 +65,6 @@ Global
 		{5AECC0B4-DD09-443F-820D-053FFCEDF8B3}.Debug|x86.ActiveCfg = Debug|x64
 		{5AECC0B4-DD09-443F-820D-053FFCEDF8B3}.Release|x64.ActiveCfg = Release|x64
 		{5AECC0B4-DD09-443F-820D-053FFCEDF8B3}.Release|x86.ActiveCfg = Release|x64
-		{45CD5B9F-FEBD-45C0-BB0C-989FC90FD09A}.Debug|x64.ActiveCfg = Debug|x64
-		{45CD5B9F-FEBD-45C0-BB0C-989FC90FD09A}.Debug|x86.ActiveCfg = Debug|x64
-		{45CD5B9F-FEBD-45C0-BB0C-989FC90FD09A}.Release|x64.ActiveCfg = Release|x64
-		{45CD5B9F-FEBD-45C0-BB0C-989FC90FD09A}.Release|x86.ActiveCfg = Release|x64
 		{14B2FC84-037B-47A3-A99A-9F61F4F021B9}.Debug|x64.ActiveCfg = Debug|x64
 		{14B2FC84-037B-47A3-A99A-9F61F4F021B9}.Debug|x64.Build.0 = Debug|x64
 		{14B2FC84-037B-47A3-A99A-9F61F4F021B9}.Debug|x86.ActiveCfg = Debug|x64
