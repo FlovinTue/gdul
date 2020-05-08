@@ -71,7 +71,7 @@ void job_impl::operator()()
 	job_handler::this_job.m_physicalId = swap;
 #endif
 
-	m_finished.store(true, std::memory_order_relaxed);
+	m_finished.store(true, std::memory_order_seq_cst);
 
 	detach_children();
 }
@@ -90,7 +90,7 @@ bool job_impl::try_attach_child(job_impl_shared_ptr child)
 
 		dependee->m_next = std::move(firstDependee);
 
-		if (m_finished.load(std::memory_order_relaxed)) {
+		if (m_finished.load(std::memory_order_seq_cst)) {
 			return false;
 		}
 
