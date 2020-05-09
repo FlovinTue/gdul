@@ -21,12 +21,9 @@
 #pragma once
 
 #include <atomic>
-#include <vector>
-#include <iostream>
-#include <gdul\atomic_shared_ptr\atomic_shared_ptr.h>
-#include <gdul\concurrent_object_pool\concurrent_object_pool.h>
+#include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
+#include <gdul/pool_allocator/pool_allocator.h>
 #include <random>
-#include <sstream>
 
 #ifndef MAKE_UNIQUE_NAME 
 #define CONCAT(a,b)  a##b
@@ -34,7 +31,7 @@
 #define MAKE_UNIQUE_NAME(prefix) EXPAND_AND_CONCAT(prefix, __COUNTER__)
 #endif
 
-#define CSL_PADD(bytes) const std::uint8_t MAKE_UNIQUE_NAME(padding)[bytes] {}
+#define GDUL_CPQ_PADDING(bytes) const std::uint8_t MAKE_UNIQUE_NAME(padding)[bytes] {}
 
 #pragma warning(disable:4505)
 
@@ -52,9 +49,11 @@ constexpr size_type log2ceil(size_type value);
 
 
 }
-// ExpectedEntriesHint should be somewhere between the average and the maximum number of entries
-// contained within the queue at any given time. It is used to calculate the maximum node height 
-// in the skip-list.
+/// <summary>
+/// ExpectedEntriesHint should be somewhere between the average and the maximum number of entries
+/// contained within the queue at any given time. It is used to calculate the maximum node height 
+/// in the skip-list.
+/// </summary>
 template <class KeyType, class ValueType, cpq_detail::size_type ExpectedEntriesHint, class Allocator = std::allocator<std::uint8_t>, class Comparator = std::greater_equal<KeyType>>
 class concurrent_priority_queue
 {
@@ -65,10 +64,18 @@ public:
 	using size_type = cpq_detail::size_type;
 
 	concurrent_priority_queue();
-	~concurrent_priority_queue();
 
+	/// <summary>
+	/// Insert an item in to the queue
+	/// </summary>
+	/// <param name="item">Key value pair to insert</param>
 	void insert(const std::pair<key_type, value_type>& item);
-
+	
+	/// <summary>
+	/// Attempt to retrieve the first item
+	/// </summary>
+	/// <param name="out">The out value for the item</param>
+	/// <returns>Indicates if the operation was successful</returns>
 	bool try_pop(value_type& out);
 private:
 	static constexpr size_type Max_Node_Height = cpq_detail::log2ceil(ExpectedEntriesHint);
@@ -87,6 +94,8 @@ private:
 		std::uint8_t m_height;
 	};
 
+	memory_pool m_nodeMemPool;
+
 	node m_head;
 	node m_end;
 
@@ -94,10 +103,13 @@ private:
 };
 template <class KeyType, class ValueType, cpq_detail::size_type ExpectedEntriesHint, class Allocator, class Comparator>
 concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, Allocator, Comparator>::concurrent_priority_queue() 
-	: m_head()
+	: m_nodeMemPool()
+	, m_head()
 	, m_end()
 	, m_comparator()
 {
+	m_nodeMemPool.init<gdul::allocate_shared_size<node, allocator_type>(), alignof(node)>(128);
+
 	for (size_type i = 0; i < Max_Node_Height; ++i) {
 		m_head.m_next[i].store(&m_end, std::memory_order_relaxed);
 	}
@@ -112,6 +124,8 @@ bool concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, Allocato
 {
 	if (m_head.m_next[0].load(std::memory_order_relaxed) == &m_end)
 		return false;
+
+
 }
 namespace cpq_detail
 {
