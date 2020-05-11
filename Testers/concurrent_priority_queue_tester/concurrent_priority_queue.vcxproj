@@ -94,6 +94,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\concurrent_priority_queue.h" />
+    <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\concurrent_priority_queue_v2.h" />
     <ClInclude Include="pch.h" />
   </ItemGroup>
   <ItemGroup>

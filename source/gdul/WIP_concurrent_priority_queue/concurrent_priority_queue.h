@@ -54,7 +54,7 @@ constexpr size_type log2ceil(size_type value);
 /// contained within the queue at any given time. It is used to calculate the maximum node height 
 /// in the skip-list.
 /// </summary>
-template <class KeyType, class ValueType, cpq_detail::size_type ExpectedEntriesHint, class Allocator = std::allocator<std::uint8_t>, class Comparator = std::greater_equal<KeyType>>
+template <class KeyType, class ValueType, cpq_detail::size_type ExpectedEntriesHint = 64, class Allocator = std::allocator<std::uint8_t>, class Comparator = std::greater_equal<KeyType>>
 class concurrent_priority_queue
 {
 public:
@@ -62,6 +62,7 @@ public:
 	using key_type = KeyType;
 	using value_type = ValueType;
 	using size_type = cpq_detail::size_type;
+	using comparator_type = Comparator;
 
 	concurrent_priority_queue();
 
@@ -74,11 +75,11 @@ public:
 	/// <summary>
 	/// Attempt to retrieve the first item
 	/// </summary>
-	/// <param name="out">The out value for the item</param>
+	/// <param name="out">The out value item</param>
 	/// <returns>Indicates if the operation was successful</returns>
 	bool try_pop(value_type& out);
-private:
 	static constexpr size_type Max_Node_Height = cpq_detail::log2ceil(ExpectedEntriesHint);
+private:
 
 	struct node
 	{
@@ -99,7 +100,7 @@ private:
 	node m_head;
 	node m_end;
 
-	Comparator m_comparator;
+	comparator_type m_comparator;
 };
 template <class KeyType, class ValueType, cpq_detail::size_type ExpectedEntriesHint, class Allocator, class Comparator>
 concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, Allocator, Comparator>::concurrent_priority_queue() 
@@ -117,13 +118,56 @@ concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, Allocator, Co
 template <class KeyType, class ValueType, cpq_detail::size_type ExpectedEntriesHint, class Allocator, class Comparator>
 void concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, Allocator, Comparator>::insert(const std::pair<key_type, value_type>& item)
 {
-
+	// Searching begins at top and whittles down to the bottom. 
+	// Finding the desired value is done at the bottom level *always*
+	// and the upper levels are only there to speed up the search
+	// process.
+	// Values may be inserted only at the bottom and 
+	// they will still be found
 }
 template <class KeyType, class ValueType, cpq_detail::size_type ExpectedEntriesHint, class Allocator, class Comparator>
 bool concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, Allocator, Comparator>::try_pop(value_type& out) 
 {
 	if (m_head.m_next[0].load(std::memory_order_relaxed) == &m_end)
 		return false;
+
+
+	// What about de-linking?
+	// It must happen from bottom-up
+
+	// I can't imagine this being very efficient with not-so-many jobs.
+	// Interested in finding a more effeicient way of inserting. Or... Uh 
+	// Another structure... Uhm. Dang skip list. So unelegant. 
+
+	// Want insertions to... Umm have a predictable cost.
+	// Something resembling this idea would have like 1 atomic fetch add
+	// each skip. Then the linking step would have to compare exchange
+	// avg 3 atomic shared pointers to refer to the new node. 
+
+	// If we use regular atomics. Then those fetch_adds would be loads
+	// A search of 64 items to the middle would have like 6 loads
+	// and 3 cas *optimally*. With chance for being interrupted....
+	// 
+
+	// ... The last part is the worst. Those cas ops are just the worst.
+	// Want to be able to link with ONE cas. Or store.
+
+	// What about some kind of array with linking blocks?
+
+	// Any one node will always have only *one* configuration
+	// of linking block.
+
+	// popping is fine. Good. If the head node has 1 height a pop attempt
+	// should only cost 1 cas. and 1 load.
+
+	// Maybe a heap... Umm.. With 
+
+
+	// ^
+
+	// Want to (still) implement a concurrent_heap. Perhaps fine grained locking
+	// or lock free..
+	// 
 
 
 }
