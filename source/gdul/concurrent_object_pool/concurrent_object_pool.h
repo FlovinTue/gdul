@@ -117,7 +117,11 @@ inline concurrent_object_pool<Object, Allocator>::concurrent_object_pool(std::si
 
 	const std::size_t alignedSize(log2_align(blockSize, Max_Capacity));
 	const std::uint8_t blockIndex((std::uint8_t)std::log2f((float)alignedSize) - 1);
+
+	m_blocksEndIndex.store(blockIndex, std::memory_order_relaxed);
+
 	try_alloc_block(blockIndex);
+
 }
 template<class Object, class Allocator>
 inline concurrent_object_pool<Object, Allocator>::~concurrent_object_pool()
@@ -264,8 +268,10 @@ inline void concurrent_object_pool<Object, Allocator>::try_alloc_block(std::uint
 
 	m_blocks[blockIndex].m_blockKey = blockKey;
 
-	while (std::uint32_t pushIndex = m_blocks[blockIndex].m_pushSync.fetch_add(1, std::memory_order_relaxed) < size) {
+	std::uint32_t pushIndex(m_blocks[blockIndex].m_pushSync.fetch_add(1, std::memory_order_relaxed));
+	while (pushIndex < size) {
 		m_unusedObjects.push(&expected[pushIndex]);
+		pushIndex = m_blocks[blockIndex].m_pushSync.fetch_add(1, std::memory_order_relaxed);
 	}
 
 	m_blocksEndIndex.compare_exchange_strong(blockIndex, blockIndex + 1, std::memory_order_relaxed);
@@ -273,7 +279,7 @@ inline void concurrent_object_pool<Object, Allocator>::try_alloc_block(std::uint
 	std::uint8_t preHintUpdate;
 	do {
 		preHintUpdate = m_blocksEndIndex.load();
-		m_activeBlockKeyHint = m_blocks[preHintUpdate].m_blockKey;
+		m_activeBlockKeyHint = m_blocks[preHintUpdate - 1].m_blockKey;
 	} while (m_blocksEndIndex.load() != preHintUpdate);
 }
 template<class Object, class Allocator>
