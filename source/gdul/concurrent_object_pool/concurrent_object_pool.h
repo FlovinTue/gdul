@@ -154,7 +154,8 @@ inline std::size_t concurrent_object_pool<Object, Allocator>::avaliable() const
 template<class Object, class Allocator>
 inline void concurrent_object_pool<Object, Allocator>::unsafe_reset()
 {
-	const std::uint8_t blockCount(m_blocksEndIndex.load(std::memory_order_relaxed));
+	m_activeBlockKeyHint = 0;
+	const std::uint8_t blockCount(m_blocksEndIndex.exchange(0, std::memory_order_relaxed));
 	for (std::uint8_t i = 0; i < blockCount; ++i){
 		m_blocks[i].~block_node();
 		new (&m_blocks[i]) block_node();
@@ -175,8 +176,8 @@ inline bool concurrent_object_pool<Object, Allocator>::is_obsolete(const Object*
 	const std::uint8_t blockEndIndex(m_blocksEndIndex.load());
 	const std::uint8_t blockLastIndex(blockEndIndex - 1);
 
-	const bool containedWithinNext(blockEndIndex == Capacity_Bits ? false : !is_contained_within(obj, m_blocks[blockEndIndex].m_blockKey));
-	const bool containedWithinLast(!is_contained_within(obj, get_block_key_from(m_blocks[blockLastIndex])));
+	const bool containedWithinNext(blockEndIndex == Capacity_Bits ? false : is_contained_within(obj, m_blocks[blockEndIndex].m_blockKey));
+	const bool containedWithinLast(is_contained_within(obj, get_block_key_from(m_blocks[blockLastIndex])));
 
 	return !(containedWithinLast | containedWithinNext);
 }
@@ -240,7 +241,7 @@ inline void concurrent_object_pool<Object, Allocator>::discard_object(const Obje
 			if (m_blocks[i].m_livingObjects.fetch_sub(1, std::memory_order_relaxed) == 1) {
 				m_blocks[i].m_objects.store(gdul::shared_ptr<Object[]>(nullptr));
 			}
-
+			return;
 		}
 	}
 	assert(false && "Object does not belong in this structure");

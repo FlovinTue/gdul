@@ -19,10 +19,19 @@ int main()
 	std::size_t numAvaliable = pool.avaliable();
 
 	std::vector<int*> out;
-	for (auto i = 0; i < 8; ++i)
-		out.push_back(pool.get());
+	for (auto i = 0; i < 4; ++i)
+	{
+		auto elem(pool.get());
+		*elem = i;
+		out.push_back(elem);
+	}
 
-	out.push_back(pool.get());
+	for (auto& elem : out)
+		pool.recycle(elem);
+
+	int* swapA(pool.get());
+
+	pool.recycle(swapA);
 
     std::cout << "Hello World!\n"; 
 }
