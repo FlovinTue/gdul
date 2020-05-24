@@ -339,7 +339,8 @@ inline bool atomic_shared_ptr<T>::compare_exchange_strong(raw_ptr<T>& expected, 
 template<class T>
 inline bool atomic_shared_ptr<T>::compare_exchange_strong(raw_ptr<T>& expected, shared_ptr<T>&& desired, std::memory_order order) noexcept
 {
-	return compare_exchange_strong(expected, std::move(desired), order, order);
+	const std::memory_order failOrder(order == std::memory_order_release || order == std::memory_order_acq_rel ? std::memory_order_seq_cst : order);
+	return compare_exchange_strong(expected, std::move(desired), order, failOrder);
 }
 template<class T>
 inline bool atomic_shared_ptr<T>::compare_exchange_strong(raw_ptr<T>& expected, const shared_ptr<T>& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept
@@ -359,7 +360,8 @@ inline bool atomic_shared_ptr<T>::compare_exchange_strong(shared_ptr<T>& expecte
 template<class T>
 inline bool atomic_shared_ptr<T>::compare_exchange_strong(shared_ptr<T>& expected, shared_ptr<T>&& desired, std::memory_order order) noexcept
 {
-	return compare_exchange_strong(expected, std::move(desired), order, order);
+	const std::memory_order failOrder(order == std::memory_order_release || order == std::memory_order_acq_rel ? std::memory_order_seq_cst : order);
+	return compare_exchange_strong(expected, std::move(desired), order, failOrder);
 }
 template<class T>
 inline bool atomic_shared_ptr<T>::compare_exchange_strong(shared_ptr<T>& expected, const shared_ptr<T>& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept
@@ -379,7 +381,8 @@ inline bool atomic_shared_ptr<T>::compare_exchange_weak(raw_ptr<T>& expected, co
 template<class T>
 inline bool atomic_shared_ptr<T>::compare_exchange_weak(raw_ptr<T>& expected, shared_ptr<T>&& desired, std::memory_order order) noexcept
 {
-	return compare_exchange_weak(expected, std::move(desired), order, order);
+	const std::memory_order failOrder(order == std::memory_order_release || order == std::memory_order_acq_rel ? std::memory_order_seq_cst : order);
+	return compare_exchange_weak(expected, std::move(desired), order, failOrder);
 }
 template<class T>
 inline bool atomic_shared_ptr<T>::compare_exchange_weak(raw_ptr<T>& expected, const shared_ptr<T>& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept
@@ -399,7 +402,8 @@ inline bool atomic_shared_ptr<T>::compare_exchange_weak(shared_ptr<T>& expected,
 template<class T>
 inline bool atomic_shared_ptr<T>::compare_exchange_weak(shared_ptr<T>& expected, shared_ptr<T>&& desired, std::memory_order order) noexcept
 {
-	return compare_exchange_weak(expected, std::move(desired), order, order);
+	const std::memory_order failOrder(order == std::memory_order_release || order == std::memory_order_acq_rel ? std::memory_order_seq_cst : order);
+	return compare_exchange_weak(expected, std::move(desired), order, failOrder);
 }
 template<class T>
 inline bool atomic_shared_ptr<T>::compare_exchange_weak(shared_ptr<T>& expected, const shared_ptr<T>& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept
