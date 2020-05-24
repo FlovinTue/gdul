@@ -39,8 +39,8 @@ class concurrent_object_pool
 public:
 	concurrent_object_pool();
 	concurrent_object_pool(Allocator allocator);
-	concurrent_object_pool(std::size_t blockSize);
-	concurrent_object_pool(std::size_t blockSize, Allocator allocator);
+	concurrent_object_pool(std::size_t baseCapacity);
+	concurrent_object_pool(std::size_t baseCapacity, Allocator allocator);
 	~concurrent_object_pool();
 
 	constexpr static std::size_t Max_Capacity = std::numeric_limits<std::uint16_t>::max() * 2 * 2 * 2;
@@ -75,7 +75,7 @@ private:
 	static const Object* to_begin(std::uintptr_t blockKey);
 	static const Object* to_end(std::uintptr_t blockKey);
 	static std::uintptr_t to_block_key(const Object* begin, std::uint32_t capacity);
-	static std::uintptr_t get_block_key_from(const block_node* from);
+	static std::uintptr_t get_block_key_from(const block_node& from);
 
 
 	void try_alloc_block(std::uint8_t blockIndex);
@@ -101,11 +101,11 @@ inline concurrent_object_pool<Object, Allocator>::concurrent_object_pool(Allocat
 	: concurrent_object_pool(cop_detail::Defaul_Block_Size, allocator)
 {}
 template<class Object, class Allocator>
-inline concurrent_object_pool<Object, Allocator>::concurrent_object_pool(std::size_t blockSize)
-	: concurrent_object_pool(blockSize, cop_detail::defaul_allocator())
+inline concurrent_object_pool<Object, Allocator>::concurrent_object_pool(std::size_t baseCapacity)
+	: concurrent_object_pool(baseCapacity, cop_detail::defaul_allocator())
 {}
 template<class Object, class Allocator>
-inline concurrent_object_pool<Object, Allocator>::concurrent_object_pool(std::size_t blockSize, Allocator allocator)
+inline concurrent_object_pool<Object, Allocator>::concurrent_object_pool(std::size_t baseCapacity, Allocator allocator)
 	: m_blocks{}
 	, m_blocksEndIndex(0)
 	, m_unusedObjects(allocator)
@@ -115,7 +115,7 @@ inline concurrent_object_pool<Object, Allocator>::concurrent_object_pool(std::si
 	for (std::uint8_t i = 0; i < Capacity_Bits; ++i)
 		m_blocks[i].m_livingObjects.store((std::uint32_t)std::pow(2.f, (float)(i + 1)));
 
-	const std::size_t alignedSize(log2_align(blockSize, Max_Capacity));
+	const std::size_t alignedSize(log2_align(baseCapacity, Max_Capacity));
 	const std::uint8_t blockIndex((std::uint8_t)std::log2f((float)alignedSize) - 1);
 
 	m_blocksEndIndex.store(blockIndex, std::memory_order_relaxed);
@@ -175,7 +175,10 @@ inline bool concurrent_object_pool<Object, Allocator>::is_obsolete(const Object*
 	const std::uint8_t blockEndIndex(m_blocksEndIndex.load());
 	const std::uint8_t blockLastIndex(blockEndIndex - 1);
 
-	return !is_contained_within(obj, m_blocks[blockLastIndex].m_blockKey);
+	const bool containedWithinNext(blockEndIndex == Capacity_Bits ? false : !is_contained_within(obj, m_blocks[blockEndIndex].m_blockKey));
+	const bool containedWithinLast(!is_contained_within(obj, get_block_key_from(m_blocks[blockLastIndex])));
+
+	return !(containedWithinLast | containedWithinNext);
 }
 template<class Object, class Allocator>
 inline bool concurrent_object_pool<Object, Allocator>::is_contained_within(const Object* obj, std::uintptr_t blockKey)
@@ -218,14 +221,14 @@ inline std::uintptr_t concurrent_object_pool<Object, Allocator>::to_block_key(co
 	return blockKey;
 }
 template<class Object, class Allocator>
-inline std::uintptr_t concurrent_object_pool<Object, Allocator>::get_block_key_from(const block_node* from)
+inline std::uintptr_t concurrent_object_pool<Object, Allocator>::get_block_key_from(const block_node& from)
 {
-	if (from->m_blockKey)
-		return from->m_blockKey;
+	if (from.m_blockKey)
+		return from.m_blockKey;
 
-	const gdul::shared_ptr<Object[]> objects(from->m_objects.load(std::memory_order_relaxed));
+	const gdul::shared_ptr<Object[]> objects(from.m_objects.load(std::memory_order_relaxed));
 
-	return to_block_key(objects.get(), objects.item_count());
+	return to_block_key(objects.get(), (std::uint32_t)objects.item_count());
 }
 template<class Object, class Allocator>
 inline void concurrent_object_pool<Object, Allocator>::discard_object(const Object* obj)

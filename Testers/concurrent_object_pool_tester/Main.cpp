@@ -5,6 +5,7 @@
 #include <iostream>
 #include <gdul\concurrent_object_pool\concurrent_object_pool.h>
 #include <vld.h>
+#include <vector>
 
 int main()
 {
@@ -16,6 +17,12 @@ int main()
 	pool.recycle(first);
 	pool.unsafe_reset();
 	std::size_t numAvaliable = pool.avaliable();
+
+	std::vector<int*> out;
+	for (auto i = 0; i < 8; ++i)
+		out.push_back(pool.get());
+
+	out.push_back(pool.get());
 
     std::cout << "Hello World!\n"; 
 }
