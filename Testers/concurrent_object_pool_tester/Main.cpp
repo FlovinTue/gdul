@@ -8,6 +8,10 @@
 
 int main()
 {
+	std::atomic<bool> blah(false);
+	bool exp(false);
+	blah.compare_exchange_weak(exp, true, std::memory_order_release, std::memory_order_acquire);
+
 	std::allocator<std::uint8_t> alloc;
 	gdul::concurrent_object_pool<int, decltype(alloc)> pool(alloc);
 
