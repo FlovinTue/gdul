@@ -66,10 +66,6 @@ private:
 		std::atomic<std::uint32_t> m_livingObjects = Max_Capacity;
 	};
 
-	bool is_obsolete_hint(const Object* obj) const;
-	bool is_obsolete(const Object* obj) const;
-	void discard_object(const Object* obj);
-
 	static bool is_contained_within(const Object* obj, std::uintptr_t blockKey);
 	static std::uint32_t to_capacity(std::uintptr_t blockKey);
 	static const Object* to_begin(std::uintptr_t blockKey);
@@ -77,7 +73,10 @@ private:
 	static std::uintptr_t to_block_key(const Object* begin, std::uint32_t capacity);
 	static std::uintptr_t get_block_key_from(const block_node& from);
 
-
+	bool is_obsolete_hint(const Object* obj) const;
+	bool is_obsolete(const Object* obj) const;
+	void discard_object(const Object* obj);
+	void force_hint_update();
 	void try_alloc_block(std::uint8_t blockIndex);
 
 	std::size_t log2_align(std::size_t from, std::size_t clamp);
@@ -247,6 +246,16 @@ inline void concurrent_object_pool<Object, Allocator>::discard_object(const Obje
 	assert(false && "Object does not belong in this structure");
 }
 template<class Object, class Allocator>
+inline void concurrent_object_pool<Object, Allocator>::force_hint_update()
+{
+	// Keep writing to hint until m_blockEndIndex is stable
+	std::uint8_t preHintUpdate;
+	do {
+		preHintUpdate = m_blocksEndIndex.load();
+		m_activeBlockKeyHint = m_blocks[preHintUpdate - 1].m_blockKey;
+	} while (m_blocksEndIndex.load() != preHintUpdate);
+}
+template<class Object, class Allocator>
 inline void concurrent_object_pool<Object, Allocator>::try_alloc_block(std::uint8_t blockIndex)
 {
 	assert((blockIndex < Capacity_Bits) && "Capacity overflow");
@@ -254,14 +263,15 @@ inline void concurrent_object_pool<Object, Allocator>::try_alloc_block(std::uint
 	if (!(blockIndex < Capacity_Bits))
 		return;
 
-	const std::uint32_t size((std::uint32_t)std::powf(2.f, (float)blockIndex + 1));
-
 	shared_ptr<Object[]> expected(m_blocks[blockIndex].m_objects.load(std::memory_order_relaxed));
 
 	if (expected.get_version() == 2)
 		return;
 
+	const std::uint32_t size((std::uint32_t)std::powf(2.f, (float)blockIndex + 1));
+
 	if (expected.get_version() == 0) {
+
 		shared_ptr<Object[]> desired(gdul::allocate_shared<Object[]>(size, m_allocator));
 		if (m_blocks[blockIndex].m_objects.compare_exchange_strong(expected, desired, std::memory_order_release)) {
 			expected = std::move(desired);
@@ -269,7 +279,6 @@ inline void concurrent_object_pool<Object, Allocator>::try_alloc_block(std::uint
 	}
 
 	const std::uintptr_t blockKey(to_block_key(expected.get(), (std::uint32_t)expected.item_count()));
-
 	m_blocks[blockIndex].m_blockKey = blockKey;
 
 	std::uint32_t pushIndex(m_blocks[blockIndex].m_pushSync.fetch_add(1, std::memory_order_relaxed));
@@ -280,11 +289,7 @@ inline void concurrent_object_pool<Object, Allocator>::try_alloc_block(std::uint
 
 	m_blocksEndIndex.compare_exchange_strong(blockIndex, blockIndex + 1, std::memory_order_relaxed);
 
-	std::uint8_t preHintUpdate;
-	do {
-		preHintUpdate = m_blocksEndIndex.load();
-		m_activeBlockKeyHint = m_blocks[preHintUpdate - 1].m_blockKey;
-	} while (m_blocksEndIndex.load() != preHintUpdate);
+	force_hint_update();
 }
 template<class Object, class Allocator>
 inline std::size_t concurrent_object_pool<Object, Allocator>::log2_align(std::size_t from, std::size_t clamp)
