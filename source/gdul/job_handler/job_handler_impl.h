@@ -86,10 +86,13 @@ private:
 
 	allocator_type m_mainAllocator;
 
-	memory_pool m_jobImplChunkPool;
-	memory_pool m_jobNodeChunkPool;
-	memory_pool m_batchJobChunkPool;
+	memory_pool m_jobImplMemPool;
+	memory_pool m_jobNodeMemPool;
+	memory_pool m_batchJobMemPool;
 
+
+	// * Implement priority queue
+	// * Implement physical id job storage
 	concurrent_queue<job_impl_shared_ptr, allocator_type> m_jobQueues[job_queue_count];
 
 	std::array<worker_impl, Job_Handler_Max_Workers> m_workers;

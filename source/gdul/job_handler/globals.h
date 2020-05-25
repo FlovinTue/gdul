@@ -50,10 +50,5 @@ constexpr std::uint16_t Job_Handler_Max_Workers = 32;
 
 // Batch job will clamp batchSize so that this value is not exceeded
 constexpr std::uint16_t Batch_Job_Max_Batches = Job_Handler_Max_Workers * 3;
-
-// The number of chunks allocated per block
-constexpr std::size_t Job_Allocator_Block_Size = 1024;
-// The number of chunks allocated per block
-constexpr std::size_t Batch_Job_Allocator_Block_Size = 8;
 }
 }
