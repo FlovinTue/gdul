@@ -47,16 +47,16 @@ static size_type random_height(std::mt19937& rng, size_type maxHeight);
 
 constexpr size_type log2ceil(size_type value);
 
-
 }
 /// <summary>
 /// ExpectedEntriesHint should be somewhere between the average and the maximum number of entries
-/// contained within the queue at any given time. It is used to calculate the maximum node height 
+/// contained within the queue at any given time. It is used to calculate the maximum cpq_node height 
 /// in the skip-list.
 /// </summary>
 template <class KeyType, class ValueType, cpq_detail::size_type ExpectedEntriesHint = 64, class Allocator = std::allocator<std::uint8_t>, class Comparator = std::greater_equal<KeyType>>
 class concurrent_priority_queue
 {
+
 public:
 	using allocator_type = Allocator;
 	using key_type = KeyType;
@@ -64,113 +64,103 @@ public:
 	using size_type = cpq_detail::size_type;
 	using comparator_type = Comparator;
 
+	static constexpr size_type Max_Node_Height = cpq_detail::log2ceil(ExpectedEntriesHint);
+
+	class cpq_node
+	{
+	public:
+		cpq_node(value_type& item)
+			: m_nextHint{}
+			, m_item(&item)
+			, m_key()
+			, m_height(0)
+			, m_next(nullptr)
+		{}
+
+		value_type& item() {
+			return m_item;
+		}
+		const value_type& item() const {
+			return m_item;
+		}
+
+	private:
+		friend class concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, Allocator, Comparator>;
+
+		std::uintptr_t to_versioned_ptr(cpq_node* ptr, std::uint16_t version) {
+			const std::uintptr_t ptrValue((std::uintptr_t)ptr);
+			const std::uintptr_t versionValue((std::uintptr_t)version);
+			const std::uintptr_t shiftedVersionValue(versionValue << 48);
+			return (ptrValue | shiftedVersionValue);
+		}
+		void fetch_next_ptr(cpq_node&* outPtr, std::uint16_t& outVersion) {
+			const std::uintptr_t value(m_next.load(std::memory_order_relaxed));
+			const std::uintptr_t ptrValue((value << 16) >> 16);
+			const std::uintptr_t versionValue(value >> 48);
+			outPtr = (cpq_node*)ptrValue;
+			outVersion = (std::uint16_t)versionValue;
+		}
+		bool try_exchange_next(cpq_node* expectedPtr, std::uint16_t expectedVersion, cpq_node* desiredPtr) {
+
+			const std::uintptr_t desired(to_versioned_ptr(desiredPtr, expectedVersion + 1));
+			std::uintptr_t expected(to_versioned_ptr(expectedPtr, expectedVersion));
+			return m_next.compare_exchange_strong(expected, desired, std::memory_order_acquire, std::memory_order_relaxed);
+		}
+
+		cpq_node* m_nextHint[Max_Node_Height];
+
+		value_type& m_item;
+
+		key_type m_key;
+		std::uint8_t m_height;
+
+		std::atomic<std::uintptr_t> m_next;
+	};
+
 	concurrent_priority_queue();
 
 	/// <summary>
 	/// Insert an item in to the queue
 	/// </summary>
 	/// <param name="item">Key value pair to insert</param>
-	void insert(const std::pair<key_type, value_type>& item);
+	void insert(cpq_node* toInsert);
 	
 	/// <summary>
 	/// Attempt to retrieve the first item
 	/// </summary>
 	/// <param name="out">The out value item</param>
 	/// <returns>Indicates if the operation was successful</returns>
-	bool try_pop(value_type& out);
-	static constexpr size_type Max_Node_Height = cpq_detail::log2ceil(ExpectedEntriesHint);
+	bool try_pop(cpq_node*& out);
 private:
 
-	struct node
-	{
-		node()
-			: m_next{}
-			, m_kvPair()
-			, m_height(0)
-		{}
-		atomic_shared_ptr<node> m_next[Max_Node_Height];
+	static constexpr std::uintptr_t Ptr_Mask = ~(std::uintptr_t(std::numeric_limits<std::uint16_t>::max()) << 48);
 
-		std::pair<key_type, value_type> m_kvPair;
-
-		std::uint8_t m_height;
-	};
-
-	memory_pool m_nodeMemPool;
-
-	node m_head;
-	node m_end;
+	std::atomic<uintptr_t> m_head;
 
 	comparator_type m_comparator;
 };
 template <class KeyType, class ValueType, cpq_detail::size_type ExpectedEntriesHint, class Allocator, class Comparator>
 concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, Allocator, Comparator>::concurrent_priority_queue() 
-	: m_nodeMemPool()
-	, m_head()
-	, m_end()
+	: m_head()
 	, m_comparator()
+{}
+
+template<class KeyType, class ValueType, cpq_detail::size_type ExpectedEntriesHint, class Allocator, class Comparator>
+inline bool concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, Allocator, Comparator>::try_pop(cpq_node * &out)
 {
-	m_nodeMemPool.init<gdul::allocate_shared_size<node, allocator_type>(), alignof(node)>(128);
+	std::uintptr_t head(0);
 
-	for (size_type i = 0; i < Max_Node_Height; ++i) {
-		m_head.m_next[i].store(&m_end, std::memory_order_relaxed);
-	}
+	do {
+		head = m_head.load(std::memory_order_relaxed);
+
+		cpq_node* const next((cpq_node*)head & Ptr_Mask);
+		const std::uint16_t version((std::uint16_t)head >> 48);
+
+
+	} while (head & Ptr_Mask);
 }
-template <class KeyType, class ValueType, cpq_detail::size_type ExpectedEntriesHint, class Allocator, class Comparator>
-void concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, Allocator, Comparator>::insert(const std::pair<key_type, value_type>& item)
-{
-	// Searching begins at top and whittles down to the bottom. 
-	// Finding the desired value is done at the bottom level *always*
-	// and the upper levels are only there to speed up the search
-	// process.
-	// Values may be inserted only at the bottom and 
-	// they will still be found
-}
-template <class KeyType, class ValueType, cpq_detail::size_type ExpectedEntriesHint, class Allocator, class Comparator>
-bool concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, Allocator, Comparator>::try_pop(value_type& out) 
-{
-	if (m_head.m_next[0].load(std::memory_order_relaxed) == &m_end)
-		return false;
 
 
-	// What about de-linking?
-	// It must happen from bottom-up
-
-	// I can't imagine this being very efficient with not-so-many jobs.
-	// Interested in finding a more effeicient way of inserting. Or... Uh 
-	// Another structure... Uhm. Dang skip list. So unelegant. 
-
-	// Want insertions to... Umm have a predictable cost.
-	// Something resembling this idea would have like 1 atomic fetch add
-	// each skip. Then the linking step would have to compare exchange
-	// avg 3 atomic shared pointers to refer to the new node. 
-
-	// If we use regular atomics. Then those fetch_adds would be loads
-	// A search of 64 items to the middle would have like 6 loads
-	// and 3 cas *optimally*. With chance for being interrupted....
-	// 
-
-	// ... The last part is the worst. Those cas ops are just the worst.
-	// Want to be able to link with ONE cas. Or store.
-
-	// What about some kind of array with linking blocks?
-
-	// Any one node will always have only *one* configuration
-	// of linking block.
-
-	// popping is fine. Good. If the head node has 1 height a pop attempt
-	// should only cost 1 cas. and 1 load.
-
-	// Maybe a heap... Umm.. With 
-
-
-	// ^
-
-	// Want to (still) implement a concurrent_heap. Perhaps fine grained locking
-	// or lock free..
-	// 
-
-
-}
 namespace cpq_detail
 {
 struct random
