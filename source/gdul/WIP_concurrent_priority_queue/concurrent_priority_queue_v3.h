@@ -23,7 +23,7 @@
 #include <atomic>
 #include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
 #include <gdul/pool_allocator/pool_allocator.h>
-#include <random>
+
 
 #ifndef MAKE_UNIQUE_NAME 
 #define CONCAT(a,b)  a##b
@@ -41,42 +41,31 @@ namespace cpq_detail
 {
 using size_type = std::size_t;
 
-struct random;
-
-static size_type random_height(std::mt19937& rng, size_type maxHeight);
+static size_type random_height(size_type maxHeight);
 
 constexpr size_type log2ceil(size_type value);
 
 template <class PtrType>
-class packed_ptr;
+std::uintptr_t to_packed_ptr(PtrType* ptr, std::uint32_t version, bool tag);
 
-template <class KeyType, class ValueType, size_type Height>
-class node_impl;
+template <class PtrType>
+PtrType* unpack_ptr(std::uintptr_t);
 
 static constexpr std::uintptr_t Ptr_Mask = (std::uintptr_t(1) << 45) - std::uintptr_t(1);
 static constexpr std::uintptr_t Tag_Mask = (std::uintptr_t(1) << 45);
 static constexpr std::uintptr_t Version_Mask = ~(Ptr_Mask | Tag_Mask);
 static constexpr std::uintptr_t Version_Step = Tag_Mask << 1;
-
 }
-/// <summary>
-/// ExpectedEntriesHint should be somewhere between the average and the maximum number of entries
-/// contained within the queue at any given time. It is used to calculate the maximum node height 
-/// in the skip-list.
-/// </summary>
 template <class KeyType, class ValueType, cpq_detail::size_type ExpectedEntriesHint = 64, class Allocator = std::allocator<std::uint8_t>, class Comparator = std::greater_equal<KeyType>>
 class concurrent_priority_queue
 {
-	class node : public cpq_detail::node_impl<KeyType, ValueType, Max_Node_Height>
+	struct node
 	{
-	public:
-		using m_item;
-		using m_key;
+		ValueType m_item;
+		KeyType m_key;
+		std::uint8_t m_height;
 
-	private:
-		friend class concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, Allocator, Comparator>;
-
-		using m_next;
+		std::atomic<std::uintptr_t> m_next[Max_Node_Height];
 	};
 public:
 	using size_type = cpq_detail::size_type;
@@ -89,22 +78,14 @@ public:
 	using comparator_type = Comparator;
 	using node_type = node;
 
-
 	concurrent_priority_queue();
 
-	/// <summary>
-	/// Insert an item in to the queue
-	/// </summary>
-	/// <param name="item">Key value pair to insert</param>
-	void insert(node_type* toInsert);
+	void insert(node_type* item);
 
-	/// <summary>
-	/// Attempt to retrieve the first item
-	/// </summary>
-	/// <param name="out">The out value item</param>
-	/// <returns>Indicates if the operation was successful</returns>
 	bool try_pop(node_type*& out);
 private:
+	bool try_insert(node_type* item);
+	void find_predecessors_successors(node_type* outPredecessor[Max_Node_Height], node_type* outSuccessor[Max_Node_Height], const key_type& key);
 
 	node_type m_head;
 	node_type m_end;
@@ -117,21 +98,92 @@ concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, Allocator, Co
 	, m_end()
 	, m_comparator()
 {
+	m_head.m_key = std::numeric_limits<key_type>::min();
+	m_end.m_key = std::numeric_limits<key_type>::max();
+	m_head.m_height = Max_Node_Height;
+
+	for (std::size_t i = 0; i < Max_Node_Height; ++i) {
+		m_head.m_next[i].store(jh_detail::to_packed_ptr(&m_end, 0, false), std::memory_order_relaxed);
+	}
 }
+
+template<class KeyType, class ValueType, cpq_detail::size_type ExpectedEntriesHint, class Allocator, class Comparator>
+inline void concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, Allocator, Comparator>::insert(node_type* item)
+{
+	// Generate height... &&... Refs? (try to avoid)
+	while (!try_insert(item));
+}
+
+template<class KeyType, class ValueType, cpq_detail::size_type ExpectedEntriesHint, class Allocator, class Comparator>
+inline bool concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, Allocator, Comparator>::try_pop(node_type*& out)
+{
+	return false;
+}
+template<class KeyType, class ValueType, cpq_detail::size_type ExpectedEntriesHint, class Allocator, class Comparator>
+inline bool concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, Allocator, Comparator>::try_insert(node_type* item)
+{
+	node* predecessors[Max_Node_Height];
+	node* successors[Max_Node_Height];
+
+	find_predecessors_successors(predecessors, successors, item->m_key);
+
+	for (std::uint8_t i = 0; i < item->m_height; ++i) {
+		item->m_next[i].store(successors[i], std::memory_order_relaxed);
+	}
+
+
+	return false;
+}
+template<class KeyType, class ValueType, cpq_detail::size_type ExpectedEntriesHint, class Allocator, class Comparator>
+inline void concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, Allocator, Comparator>::find_predecessors_successors(node_type* outPredecessor[Max_Node_Height], node_type* outSuccessor[Max_Node_Height], const key_type& key)
+{
+	for (std::uint8_t i = 0; i < Max_Node_Height; ++i) {
+		const std::uint8_t invertedIndex(Max_Node_Height - i - 1);
+
+		node* current(&m_head);
+		for (;;) {
+			const std::uintptr_t nextValue(current->m_next[invertedIndex].load(std::memory_order_relaxed));
+			node* const nextPtr(cpq_detail::unpack_ptr(nextValue));
+
+			if (!m_comparator(key, next->m_key) ||
+				next == &m_end) {
+				outSuccessor[invertedIndex] = nextPtr;
+				break;
+			}
+			current = nextPtr;
+		}
+		outPredecessor[invertedIndex] = current;
+	}
+}
+
 namespace cpq_detail
 {
-struct random
+static size_type random_height(size_type maxHeight)
 {
-	static std::random_device s_rd;
-	static thread_local std::mt19937 t_rng;
-};
+	struct tl_container
+	{
+		// https://codingforspeed.com/using-faster-psudo-random-generator-xorshift/
 
-static size_type random_height(std::mt19937& rng, size_type maxHeight)
-{
+		std::uint32_t x = 123456789;
+		std::uint32_t y = 362436069;
+		std::uint32_t z = 521288629;
+		std::uint32_t w = 88675123;
+
+		std::uint32_t get() 
+		{
+			std::uint32_t t;
+			t = x ^ (x << 11);
+			x = y; y = z; z = w;
+			return w = w ^ (w >> 19) ^ (t ^ (t >> 8));
+		}
+	//
+
+	}static thread_local t_rng;
+
 	const size_type lowerBound(2);
 	const size_type upperBound(static_cast<size_type>(std::pow(2, maxHeight)));
-	const std::uniform_int_distribution<size_type> dist(lowerBound, upperBound);
-	const size_type random(dist(rng));
+	const size_type range((upperBound + 1) - lowerBound);
+	const size_type random(lowerBound + (t_rng.get() % range));
 	const size_type height(log2ceil(random));
 	const size_type shiftedHeight(height - 1);
 
@@ -153,124 +205,24 @@ constexpr size_type log2ceil(size_type value) {
 
 	return highBit + remainder;
 }
+
 template <class PtrType>
-class packed_ptr
+std::uintptr_t to_packed_ptr(PtrType* ptr, std::uint32_t version, bool tag) 
 {
-public:
-	packed_ptr();
-	packed_ptr(std::uintptr_t value);
+	const std::uintptr_t ptrValue((std::uintptr_t)ptr);
+	const std::uintptr_t tagValue(tag);
+	const std::uintptr_t versionValue(version);
 
-	PtrType* get_ptr();
-	const PtrType* get_ptr() const;
+	const std::uintptr_t shiftedPtrValue(ptrValue >> 3);
+	const std::uintptr_t shiftedTagValue(tagValue << 45);
+	const std::uintptr_t shiftedVersionValue(versionValue << 46);
 
-	void set_ptr(PtrType* ptr);
-
-	std::uint32_t get_version() const;
-	void inc_version();
-
-	bool get_tag() const;
-	void set_tag(bool val) const;
-
-
-private:
-	std::uintptr_t to_packed_ptr(void* ptr, std::uint16_t version) {
-		const std::uintptr_t ptrValue((std::uintptr_t)ptr);
-		const std::uintptr_t versionValue((std::uintptr_t)version);
-		const std::uintptr_t shiftedVersionValue(versionValue << 48);
-		return (ptrValue | shiftedVersionValue);
-	}
-
-	template <class Ptr>
-	void to_ptr_version(std::uintptr_t versionedPtr, Ptr& outPtr, std::uint16_t& outVersion) {
-		const std::uintptr_t value(versionedPtr);
-		const std::uintptr_t ptrValue((value << 16) >> 16);
-		const std::uintptr_t versionValue(value >> 48);
-		outPtr = (Ptr)ptrValue;
-		outVersion = (std::uint16_t)versionValue;
-	}
-
-	std::uintptr_t m_ptr;
-};
-template<class PtrType>
-inline packed_ptr<PtrType>::packed_ptr()
-	: m_ptr(0)
-{}
-template<class PtrType>
-inline packed_ptr<PtrType>::packed_ptr(std::uintptr_t value)
-	: m_ptr(value)
-{}
-template<class PtrType>
-inline PtrType* packed_ptr<PtrType>::get_ptr()
-{
-	return (PtrType*)(m_ptr & Ptr_Mask) << 3;
+	return (shiftedPtrValue | shiftedTagValue | shiftedVersionValue);
 }
-template<class PtrType>
-inline const PtrType* packed_ptr<PtrType>::get_ptr() const
+template <class PtrType>
+PtrType* unpack_ptr(std::uintptr_t packedPtr) 
 {
-	return (PtrType*)(m_ptr & Ptr_Mask) << 3;
+	return (packedPtr & Ptr_Mask) << 3;
 }
-
-template<class PtrType>
-inline void packed_ptr<PtrType>::set_ptr(PtrType* ptr)
-{
-	const std::uintptr_t value((std::uintptr_t)ptr);
-	const std::uintptr_t shifted(value >> 3);
-	m_ptr &= ~(Ptr_Mask);
-	m_ptr |= shifted;
-}
-
-template<class PtrType>
-inline std::uint32_t packed_ptr<PtrType>::get_version() const
-{
-	return (std::uint32_t)(m_ptr >> 46);
-}
-
-template<class PtrType>
-inline void packed_ptr<PtrType>::inc_version()
-{
-	m_ptr += Version_Step;
-}
-
-template<class PtrType>
-inline bool packed_ptr<PtrType>::get_tag() const
-{
-	return m_ptr & Tag_Mask;
-}
-
-template<class PtrType>
-inline void packed_ptr<PtrType>::set_tag(bool val) const
-{
-	m_ptr &= ~Tag_Mask;
-	m_ptr |= (Tag_Mask * val);
-}
-
-/// <summary>
-/// concurrent_priority_queue node. Used to sequence items in the queue.
-/// </summary>
-template <class KeyType, class ValueType, size_type Height>
-class node_impl
-{
-public:
-	using key_type = KeyType;
-	using value_type = ValueType;
-
-	/// <summary>
-	/// node constructor
-	/// </summary>
-	node_impl()
-		: m_item()
-		, m_key()
-		, m_height(0)
-		, m_next{ nullptr }
-	{}
-
-	value_type m_item;
-	const key_type m_key;
-
-	std::atomic<std::uintptr_t> m_next[Max_Node_Height];
-};
-
-std::random_device random::s_rd;
-thread_local std::mt19937 random::t_rng(random::s_rd());
 }
 }
