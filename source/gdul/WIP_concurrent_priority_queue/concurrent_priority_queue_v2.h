@@ -66,7 +66,7 @@ void to_ptr_version(std::uintptr_t versionedPtr, Ptr& outPtr, std::uint16_t& out
 }
 /// <summary>
 /// ExpectedEntriesHint should be somewhere between the average and the maximum number of entries
-/// contained within the queue at any given time. It is used to calculate the maximum cpq_node height 
+/// contained within the queue at any given time. It is used to calculate the maximum node height 
 /// in the skip-list.
 /// </summary>
 template <class KeyType, class ValueType, cpq_detail::size_type ExpectedEntriesHint = 64, class Allocator = std::allocator<std::uint8_t>, class Comparator = std::greater_equal<KeyType>>
@@ -85,20 +85,19 @@ public:
 	/// <summary>
 	/// concurrent_priority_queue node. Used to sequence items in the queue.
 	/// </summary>
-	class cpq_node
+	class node
 	{
 	public:
 		/// <summary>
-		/// cpq_node constructor
+		/// node constructor
 		/// </summary>
 		/// <param name="keyRef">Stores persistent reference to key_type</param>
 		/// <param name="itemRef">Stores persistent reference to value_type</param>
-		cpq_node(const key_type& keyRef, value_type& itemRef)
-			: m_nextHint{}
-			, m_item(itemRef)
+		node(const key_type& keyRef, value_type& itemRef)
+			: m_item(itemRef)
 			, m_key(keyRef)
 			, m_height(0)
-			, m_next(nullptr)
+			, m_next{nullptr}
 		{}
 
 	private:
@@ -148,19 +147,53 @@ public:
 	 	// This would mean at least 3 atomic ops to delink
 		// and 4 atomic ops to link
 
-		cpq_node* m_nextHint[Max_Node_Height];
+		// So. Partial states. This would probably mean helping.... Yeah. 
+		// For example:
+		// head -> 1 -> 2 -> 3
+		// Thread A attempts to remove 1. 
+		// Thread B attempts insert 1 -> B -> 2...
+		// Thread B must exchange the relevant references to 2 in 1
+		// Thread A must remove references to 1 in head.
+
+		// While the m_next of 1 may be flagged using a tag-bit
+		// The m_nextHint may not be.
+		// In the scenario that Thread B wants to insert 1 -> 2 -> B -> 3 and the inserted node refers to 1 as previous at some height,
+		// this means there will be no synchronization in m_next...
+
+		// To GUARANTEE that if we swap the m_nextHint in 1 -> 3 when it has not been partially or wholly removed, we need to re-check after we insert.
+
+		// The original idea about having the hints is that we may do a somewhat bonked-out search in the upper levels, knowing that whatever happens, once we get
+		// to m_next it is always correct. How can we guarantee this though? 
+		// What would be the hazards?
+		// In the last mentioned scenario, B could swap m_nextHint in 1 from 3 to B. Then, a partially stale node would refer to B. This will be fine, since that node will
+		// be going out of scope (probably not. I missed some causality of course), and then B would be found from m_next anyway.
+
+		// The true hazards would be if we had a stale reference to a node that was not participating in the structure. This could mean that we end up in a dead-end. 
+		// What would provoke this? Since we are only allowing removals in the 1st spot, and node references are -> forward, it seems the only way to refer to a stale node
+		// is by removing a node that comes after another. 
+		// SO, inserting in the 1st spot? 
+		// We would naturally know to insert 1st if current 1st > insert. In the event a node is inserted at 1st, it must attempt to link in at head. This linking will begin at... bottom? top? Bottom.
+		// So, when the on-going removal of previous 1st progresses, it will fail CAS of m_next. Then we will have a partially removed node in 2nd place. 
 
 
-		std::uint8_t m_height;
+		// Combination of hazard pointer, accessorsCount, node ref count, atomic m_next ... This ought be slow AF
+		// Discreet find, try_insert(findResult), remove(findResult?) 
+
+		// Massive synchronization traffic expected in the front of queue. Head will hold references to first node. Perhaps we can force this to only be bottom... 
+		// 
+
+
+
 	public:
-		// Hmm... Perhaps use values here... 
-		const key_type& m_key;
 		value_type& m_item;
 
-	private:
-		// Possibly add padding here..
+		std::uint8_t m_height;
+		const key_type m_key;
 
-		std::atomic<std::uintptr_t> m_next;
+	private:
+		// It would seem that the atomic property & memfence does not add THAT much overhead. Rather, almost all of the overhead is attributed to cache-traffic.
+		std::atomic<std::uintptr_t> m_next[Max_Node_Height];
+
 	};
 
 	concurrent_priority_queue();
@@ -169,22 +202,22 @@ public:
 	/// Insert an item in to the queue
 	/// </summary>
 	/// <param name="item">Key value pair to insert</param>
-	void insert(cpq_node* toInsert);
+	void insert(node* toInsert);
 
 	/// <summary>
 	/// Attempt to retrieve the first item
 	/// </summary>
 	/// <param name="out">The out value item</param>
 	/// <returns>Indicates if the operation was successful</returns>
-	bool try_pop(cpq_node*& out);
+	bool try_pop(node*& out);
 private:
 
 	static constexpr std::uintptr_t Ptr_Mask = ~(std::uintptr_t(std::numeric_limits<std::uint16_t>::max()) << 48);
 	static constexpr std::uintptr_t Version_Mask = ~Ptr_Mask;
 	static constexpr std::uintptr_t Version_Step = Ptr_Mask + 1;
 
-	cpq_node m_head;
-	cpq_node m_end;
+	node m_head;
+	node m_end;
 
 	comparator_type m_comparator;
 };
@@ -194,19 +227,19 @@ concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, Allocator, Co
 	, m_end()
 	, m_comparator()
 {
-	for (cpq_node* item = std::begin(m_begin.m_nextHint); item != std::end(m_begin.m_nextHint); ++item)
+	for (node* item = std::begin(m_begin.m_nextHint); item != std::end(m_begin.m_nextHint); ++item)
 		item = &m_end;
 
 	m_begin.m_next.store((std::uintptr_t) & m_end, std::memory_order_relaxed);
 }
 
 template<class KeyType, class ValueType, cpq_detail::size_type ExpectedEntriesHint, class Allocator, class Comparator>
-inline bool concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, Allocator, Comparator>::try_pop(cpq_node*& out)
+inline bool concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, Allocator, Comparator>::try_pop(node*& out)
 {
 	std::uintptr_t head(m_head.load(std::memory_order_acquire));
 
 	while (head & Ptr_Mask) {
-		cpq_node* const headPtr((cpq_node*)head & Ptr_Mask);
+		node* const headPtr((node*)head & Ptr_Mask);
 		const std::uint16_t headVersion(head & ~Ptr_Mask);
 		const std::uint16_t nextHeadVersion((headVersion + Version_Step) & Version_Mask);
 
