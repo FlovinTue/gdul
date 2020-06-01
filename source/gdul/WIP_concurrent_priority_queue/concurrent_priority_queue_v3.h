@@ -21,17 +21,9 @@
 #pragma once
 
 #include <atomic>
-#include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
-#include <gdul/pool_allocator/pool_allocator.h>
-
-
-#ifndef MAKE_UNIQUE_NAME 
-#define CONCAT(a,b)  a##b
-#define EXPAND_AND_CONCAT(a, b) CONCAT(a,b)
-#define MAKE_UNIQUE_NAME(prefix) EXPAND_AND_CONCAT(prefix, __COUNTER__)
-#endif
-
-#define GDUL_CPQ_PADDING(bytes) const std::uint8_t MAKE_UNIQUE_NAME(padding)[bytes] {}
+#include <cstdint>
+#include <memory>
+#include <cmath>
 
 #pragma warning(disable:4505)
 
@@ -62,10 +54,11 @@ class concurrent_priority_queue
 	struct node
 	{
 		ValueType m_item;
-		KeyType m_key;
-		std::uint8_t m_height;
 
 		std::atomic<std::uintptr_t> m_next[Max_Node_Height];
+		KeyType m_key;
+		std::uint8_t m_height = Max_Node_Height;
+		std::atomic<std::uint8_t> m_refs = 0;
 	};
 public:
 	using size_type = cpq_detail::size_type;
@@ -82,10 +75,11 @@ public:
 
 	void insert(node_type* item);
 
-	bool try_pop(node_type*& out);
+	bool try_pop(node_type*& outItem);
 private:
 	bool try_insert(node_type* item);
 	void find_predecessors_successors(node_type* outPredecessor[Max_Node_Height], node_type* outSuccessor[Max_Node_Height], const key_type& key);
+	bool tag(node_type* item);
 
 	node_type m_head;
 	node_type m_end;
@@ -110,15 +104,17 @@ concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, Allocator, Co
 template<class KeyType, class ValueType, cpq_detail::size_type ExpectedEntriesHint, class Allocator, class Comparator>
 inline void concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, Allocator, Comparator>::insert(node_type* item)
 {
-	// Generate height... &&... Refs? (try to avoid)
+	item->m_height = cpq_detail::random_height(Max_Node_Height);
+
 	while (!try_insert(item));
 }
 
 template<class KeyType, class ValueType, cpq_detail::size_type ExpectedEntriesHint, class Allocator, class Comparator>
-inline bool concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, Allocator, Comparator>::try_pop(node_type*& out)
+inline bool concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, Allocator, Comparator>::try_pop(node_type*& outItem)
 {
 	return false;
 }
+
 template<class KeyType, class ValueType, cpq_detail::size_type ExpectedEntriesHint, class Allocator, class Comparator>
 inline bool concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, Allocator, Comparator>::try_insert(node_type* item)
 {
@@ -131,18 +127,25 @@ inline bool concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, A
 		item->m_next[i].store(successors[i], std::memory_order_relaxed);
 	}
 
-
 	return false;
 }
+
 template<class KeyType, class ValueType, cpq_detail::size_type ExpectedEntriesHint, class Allocator, class Comparator>
 inline void concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, Allocator, Comparator>::find_predecessors_successors(node_type* outPredecessor[Max_Node_Height], node_type* outSuccessor[Max_Node_Height], const key_type& key)
 {
 	for (std::uint8_t i = 0; i < Max_Node_Height; ++i) {
 		const std::uint8_t invertedIndex(Max_Node_Height - i - 1);
 
-		node* current(&m_head);
+		// Scenario:
+		// load next node, stall
+		// next node de-linked and removed.
+		// If resuming and loading a next pointer in removed node, that will be tagged, and search may.. Continue? Abort? 
+		// If the node is re-commissioned and assigned new pointers, loading one of those will mean continuing search in an awkward spot...
+		// Is there a way of NOT visiting a node being removed? Or one already removed? De-link before tag? Nah-huh.. Man this is atomic_shared_ptr all over again.. 
+		// So. UUh just hold atomic_shared_ptrs everywhere? lol... 
+		node* predecessor(&m_head);
 		for (;;) {
-			const std::uintptr_t nextValue(current->m_next[invertedIndex].load(std::memory_order_relaxed));
+			const std::uintptr_t nextValue(predecessor->m_next[invertedIndex].load(std::memory_order_relaxed));
 			node* const nextPtr(cpq_detail::unpack_ptr(nextValue));
 
 			if (!m_comparator(key, next->m_key) ||
@@ -150,10 +153,21 @@ inline void concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, A
 				outSuccessor[invertedIndex] = nextPtr;
 				break;
 			}
-			current = nextPtr;
+			predecessor = nextPtr;
 		}
-		outPredecessor[invertedIndex] = current;
+		outPredecessor[invertedIndex] = predecessor;
 	}
+}
+
+template<class KeyType, class ValueType, cpq_detail::size_type ExpectedEntriesHint, class Allocator, class Comparator>
+inline bool concurrent_priority_queue<KeyType, ValueType, ExpectedEntriesHint, Allocator, Comparator>::tag(node_type* item)
+{
+	for (std::uint8_t i = 1; i < item->m_height; ++i) {
+		std::uint8_t const invertedIndex(item->m_height - i);
+
+		item->m_next[invertedIndex].fetch_or(cpq_detail::Tag_Mask, std::memory_order_relaxed);
+	}
+	return !(item->m_next[0].fetch_or(cpq_detail::Tag_Mask, std::memory_order_seq_cst) & cpq_detail::Tag_Mask);
 }
 
 namespace cpq_detail
@@ -169,7 +183,7 @@ static size_type random_height(size_type maxHeight)
 		std::uint32_t z = 521288629;
 		std::uint32_t w = 88675123;
 
-		std::uint32_t get() 
+		std::uint32_t operator()() 
 		{
 			std::uint32_t t;
 			t = x ^ (x << 11);
@@ -183,7 +197,7 @@ static size_type random_height(size_type maxHeight)
 	const size_type lowerBound(2);
 	const size_type upperBound(static_cast<size_type>(std::pow(2, maxHeight)));
 	const size_type range((upperBound + 1) - lowerBound);
-	const size_type random(lowerBound + (t_rng.get() % range));
+	const size_type random(lowerBound + (t_rng() % range));
 	const size_type height(log2ceil(random));
 	const size_type shiftedHeight(height - 1);
 
