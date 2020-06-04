@@ -27,7 +27,7 @@
 #include <stdexcept>
 #include <memory>
 #include <cstddef>
-
+#include <cstring>
 
 #undef max
 
@@ -79,7 +79,7 @@ template <std::uint8_t Align, std::size_t Size>
 struct max_align_storage;
 
 template <class T>
-constexpr bool is_unbounded_array_v = std::is_array_v<T> & (std::extent_v<T> == 0);
+constexpr bool is_unbounded_array_v = std::is_array<T>::value & (std::extent<T>::value == 0);
 
 template <class T>
 using decay_unbounded_t = std::conditional_t<is_unbounded_array_v<T>, std::remove_pointer_t<std::decay_t<T>>, T>;
@@ -132,10 +132,10 @@ class shared_ptr;
 template <class T>
 class raw_ptr;
 
-template <class T, class Allocator, std::enable_if_t<!aspdetail::is_unbounded_array_v<T>> * = nullptr>
+template <class T, class Allocator, std::enable_if_t<!aspdetail::is_unbounded_array_v<T>>* = nullptr>
 constexpr std::size_t allocate_shared_size() noexcept;
 
-template <class T, class Allocator, std::enable_if_t<aspdetail::is_unbounded_array_v<T>> * = nullptr>
+template <class T, class Allocator, std::enable_if_t<aspdetail::is_unbounded_array_v<T>>* = nullptr>
 constexpr std::size_t allocate_shared_size(std::size_t count) noexcept;
 
 template <class T, class Allocator>
@@ -147,7 +147,7 @@ constexpr std::size_t sp_claim_size_custom_delete() noexcept;
 template
 <
 	class T,
-	std::enable_if_t<!aspdetail::is_unbounded_array_v<T>>*,
+	std::enable_if_t<!aspdetail::is_unbounded_array_v<T>>* = nullptr,
 	class Allocator,
 	class ...Args
 >
@@ -156,7 +156,7 @@ inline shared_ptr<T> allocate_shared(Allocator, Args&& ...);
 template
 <
 	class T,
-	std::enable_if_t<aspdetail::is_unbounded_array_v<T>>*,
+	std::enable_if_t<aspdetail::is_unbounded_array_v<T>>* = nullptr,
 	class Allocator,
 	class ...Args
 >
@@ -473,7 +473,7 @@ inline bool atomic_shared_ptr<T>::compare_exchange_weak(typename aspdetail::disa
 
 	const std::uint64_t preCompare(expected_.m_u64 & aspdetail::Versioned_Cb_Mask);
 
-	if (compare_exchange_weak_internal(expected_, desired_, static_cast<aspdetail::CAS_FLAG>(flags), orders)){
+	if (compare_exchange_weak_internal(expected_, desired_, static_cast<aspdetail::CAS_FLAG>(flags), orders)) {
 
 		desired.clear();
 
@@ -482,7 +482,7 @@ inline bool atomic_shared_ptr<T>::compare_exchange_weak(typename aspdetail::disa
 
 	const std::uint64_t postCompare(expected_.m_u64 & aspdetail::Versioned_Cb_Mask);
 
-	if (preCompare != postCompare){
+	if (preCompare != postCompare) {
 		expected = raw_type(expected_);
 	}
 
@@ -706,7 +706,7 @@ inline bool atomic_shared_ptr<T>::compare_exchange_weak_internal(compressed_stor
 template<class T>
 inline void atomic_shared_ptr<T>::try_fill_local_refs(compressed_storage& expected) const noexcept
 {
-	if (!(expected.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] < aspdetail::Local_Ref_Fill_Boundary)){
+	if (!(expected.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] < aspdetail::Local_Ref_Fill_Boundary)) {
 		return;
 	}
 
@@ -714,7 +714,7 @@ inline void atomic_shared_ptr<T>::try_fill_local_refs(compressed_storage& expect
 
 	const compressed_storage initialPtrBlock(expected.m_u64 & aspdetail::Versioned_Cb_Mask);
 
-	do{
+	do {
 		const std::uint8_t localRefs(expected.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF]);
 		const std::uint8_t newRefs(std::numeric_limits<std::uint8_t>::max() - localRefs);
 
@@ -722,15 +722,15 @@ inline void atomic_shared_ptr<T>::try_fill_local_refs(compressed_storage& expect
 		desired.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] = std::numeric_limits<std::uint8_t>::max();
 
 		// Accept 'null' refs, to be able to avoid using compare_exchange_strong during copy_internal
-		if (cb){
+		if (cb) {
 			cb->incref(newRefs);
 		}
 
-		if (m_storage.compare_exchange_weak(expected.m_u64, desired.m_u64, std::memory_order_relaxed)){
+		if (m_storage.compare_exchange_weak(expected.m_u64, desired.m_u64, std::memory_order_relaxed)) {
 			return;
 		}
 
-		if (cb){
+		if (cb) {
 			cb->decref(newRefs);
 		}
 
@@ -808,11 +808,11 @@ inline void atomic_shared_ptr<T>::unsafe_fill_local_refs() const noexcept
 	const compressed_storage current(m_storage.load(std::memory_order_relaxed));
 	aspdetail::control_block_free_type_base<T>* const cb(to_control_block(current));
 
-	if (current.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] < aspdetail::Local_Ref_Fill_Boundary){
+	if (current.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] < aspdetail::Local_Ref_Fill_Boundary) {
 		const std::uint8_t newRefs(std::numeric_limits<std::uint8_t>::max() - current.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF]);
 
 		// Accept 'null' refs, to be able to avoid using compare_exchange_strong during copy_internal
-		if (cb){
+		if (cb) {
 			cb->incref(newRefs);
 		}
 
@@ -949,9 +949,9 @@ template <class T, class Allocator>
 class control_block_make_shared : public control_block_base<T>
 {
 public:
-	template <class ...Args, class U = T, std::enable_if_t<std::is_array<U>::value> * = nullptr>
+	template <class ...Args, class U = T, std::enable_if_t<std::is_array<U>::value>* = nullptr>
 	control_block_make_shared(Allocator alloc, std::uint8_t blockOffset, Args&& ...args);
-	template <class ...Args, class U = T, std::enable_if_t<!std::is_array<U>::value> * = nullptr>
+	template <class ...Args, class U = T, std::enable_if_t<!std::is_array<U>::value>* = nullptr>
 	control_block_make_shared(Allocator alloc, std::uint8_t blockOffset, Args&& ...args);
 
 	void destroy() noexcept override;
@@ -1110,9 +1110,9 @@ struct disable_deduction
 	using type = T;
 };
 template <std::uint8_t Align, std::size_t Size>
-struct 
+struct
 #if 201700 < __cplusplus || _HAS_CXX17
-	alignas(Align) 
+	alignas(Align)
 #else
 	alignas(std::max_align_t)
 #endif
@@ -1306,7 +1306,7 @@ template <class T>
 inline constexpr typename ptr_base<T>::decayed_type* ptr_base<T>::to_object(compressed_storage from) noexcept
 {
 	control_block_free_type_base<T>* const cb(to_control_block(from));
-	if (cb){
+	if (cb) {
 		return cb->get();
 	}
 	return nullptr;
@@ -1315,7 +1315,7 @@ template <class T>
 inline constexpr const typename ptr_base<T>::decayed_type* ptr_base<T>::to_object(compressed_storage from) const noexcept
 {
 	const control_block_free_type_base<T>* const cb(to_control_block(from));
-	if (cb){
+	if (cb) {
 		return cb->get();
 	}
 	return nullptr;
@@ -1351,29 +1351,29 @@ public:
 
 	inline shared_ptr(const shared_ptr<T>& other) noexcept;
 
-	template <class U, std::enable_if_t<std::is_convertible_v<U*, T*>> * = nullptr>
+	template <class U, std::enable_if_t<std::is_convertible<U*, T*>::value>* = nullptr>
 	inline shared_ptr(shared_ptr<U>&& other) noexcept;
 
 	shared_ptr<T>& operator=(const shared_ptr<T>& other) noexcept;
 
-	template <class U, std::enable_if_t<std::is_convertible_v<U*, T*>> * = nullptr>
+	template <class U, std::enable_if_t<std::is_convertible<U*, T*>::value>* = nullptr>
 	shared_ptr<T>& operator=(shared_ptr<U>&& other) noexcept;
 
-	template <class U, std::enable_if_t<std::is_convertible_v<T*, U*>> * = nullptr>
-	inline operator const shared_ptr<U>&() const noexcept;
-	template <class U, std::enable_if_t<std::is_convertible_v<T*, U*>> * = nullptr>
-	inline operator shared_ptr<U>&() noexcept;
-	template <class U, std::enable_if_t<std::is_convertible_v<T*, U*>> * = nullptr>
-	inline explicit operator shared_ptr<U>&&() noexcept;
+	template <class U, std::enable_if_t<std::is_convertible<T*, U*>::value>* = nullptr>
+	inline operator const shared_ptr<U>& () const noexcept;
+	template <class U, std::enable_if_t<std::is_convertible<T*, U*>::value>* = nullptr>
+	inline operator shared_ptr<U>& () noexcept;
+	template <class U, std::enable_if_t<std::is_convertible<T*, U*>::value>* = nullptr>
+	inline explicit operator shared_ptr<U> && () noexcept;
 
-	template <class U, std::enable_if_t<std::is_base_of_v<T, U>> * = nullptr>
-	inline explicit operator const shared_ptr<U>&() const noexcept;
+	template <class U, std::enable_if_t<std::is_base_of<T, U>::value>* = nullptr>
+	inline explicit operator const shared_ptr<U>& () const noexcept;
 
-	template <class U, std::enable_if_t<std::is_base_of_v<T, U>> * = nullptr>
-	inline explicit operator shared_ptr<U>&() noexcept;
+	template <class U, std::enable_if_t<std::is_base_of<T, U>::value>* = nullptr>
+	inline explicit operator shared_ptr<U>& () noexcept;
 
-	template <class U, std::enable_if_t<std::is_base_of_v<T, U>> * = nullptr>
-	inline explicit operator shared_ptr<U>&&() noexcept;
+	template <class U, std::enable_if_t<std::is_base_of<T, U>::value>* = nullptr>
+	inline explicit operator shared_ptr<U> && () noexcept;
 
 	inline explicit shared_ptr(T* object);
 	template <class Allocator>
@@ -1465,12 +1465,12 @@ inline shared_ptr<T>::~shared_ptr() noexcept
 	}
 }
 template<class T>
-template <class U, std::enable_if_t<std::is_convertible_v<U*, T*>>*>
+template <class U, std::enable_if_t<std::is_convertible<U*, T*>::value>*>
 inline shared_ptr<T>::shared_ptr(shared_ptr<U>&& other) noexcept
 	: shared_ptr<T>()
 {
-	memcpy(this, &other, sizeof(shared_ptr<T>));
-	memset(&other, 0, sizeof(shared_ptr<U>));
+	std::memmove(this, &other, sizeof(shared_ptr<T>));
+	std::memset(&other, 0, sizeof(shared_ptr<U>));
 
 	this->m_ptr = this->to_object(this->m_controlBlockStorage);
 }
@@ -1498,38 +1498,38 @@ inline shared_ptr<T>::shared_ptr(T* object)
 	this->m_ptr = this->to_object(this->m_controlBlockStorage);
 }
 template<class T>
-template <class U, std::enable_if_t<std::is_convertible_v<T*, U*>>*>
-inline shared_ptr<T>::operator const shared_ptr<U>&() const noexcept
+template <class U, std::enable_if_t<std::is_convertible<T*, U*>::value>*>
+inline shared_ptr<T>::operator const shared_ptr<U>& () const noexcept
 {
 	return *reinterpret_cast<const shared_ptr<U>*>(this);
 }
 template<class T>
-template <class U, std::enable_if_t<std::is_convertible_v<T*, U*>>*>
-inline shared_ptr<T>::operator shared_ptr<U>&() noexcept
+template <class U, std::enable_if_t<std::is_convertible<T*, U*>::value>*>
+inline shared_ptr<T>::operator shared_ptr<U>& () noexcept
 {
 	return *reinterpret_cast<shared_ptr<U>*>(this);
 }
 template<class T>
-template <class U, std::enable_if_t<std::is_convertible_v<T*, U*>>*>
-inline shared_ptr<T>::operator shared_ptr<U>&&() noexcept
+template <class U, std::enable_if_t<std::is_convertible<T*, U*>::value>*>
+inline shared_ptr<T>::operator shared_ptr<U> && () noexcept
 {
 	return std::move(*reinterpret_cast<shared_ptr<U>*>(this));
 }
 template <class T>
-template <class U, std::enable_if_t<std::is_base_of_v<T, U>>*>
-inline shared_ptr<T>::operator const shared_ptr<U>&() const noexcept 
+template <class U, std::enable_if_t<std::is_base_of<T, U>::value>*>
+inline shared_ptr<T>::operator const shared_ptr<U>& () const noexcept
 {
 	return *reinterpret_cast<const shared_ptr<U>*>(this);
 }
 template <class T>
-template <class U, std::enable_if_t<std::is_base_of_v<T, U>>*>
-inline shared_ptr<T>::operator shared_ptr<U>&() noexcept
+template <class U, std::enable_if_t<std::is_base_of<T, U>::value>*>
+inline shared_ptr<T>::operator shared_ptr<U>& () noexcept
 {
 	return *reinterpret_cast<shared_ptr<U>*>(this);
 }
 template <class T>
-template <class U, std::enable_if_t<std::is_base_of_v<T, U>>*>
-inline shared_ptr<T>::operator shared_ptr<U>&&() noexcept
+template <class U, std::enable_if_t<std::is_base_of<T, U>::value>*>
+inline shared_ptr<T>::operator shared_ptr<U> && () noexcept
 {
 	return std::move(*reinterpret_cast<shared_ptr<U>*>(this));
 }
@@ -1647,7 +1647,7 @@ inline constexpr typename shared_ptr<T>::decayed_type* shared_ptr<T>::get() noex
 template<class T>
 inline std::size_t shared_ptr<T>::item_count() const noexcept
 {
-	if (!this->operator bool())
+	if (!aspdetail::ptr_base<T>::operator bool())
 	{
 		return 0;
 	}
@@ -1737,7 +1737,7 @@ inline shared_ptr<T>& shared_ptr<T>::operator=(const shared_ptr<T>& other) noexc
 	return *this;
 }
 template<class T>
-template <class U, std::enable_if_t<std::is_convertible_v<U*, T*>>*>
+template <class U, std::enable_if_t<std::is_convertible<U*, T*>::value>*>
 inline shared_ptr<T>& shared_ptr<T>::operator=(shared_ptr<U>&& other) noexcept
 {
 	shared_ptr<T>(std::move(other)).swap(*this);
@@ -1985,7 +1985,7 @@ inline constexpr std::size_t sp_claim_size_custom_delete() noexcept
 template
 <
 	class T,
-	std::enable_if_t<!aspdetail::is_unbounded_array_v<T>> * = nullptr,
+	std::enable_if_t<!aspdetail::is_unbounded_array_v<T>>*,
 	class Allocator,
 	class ...Args
 >
@@ -2014,10 +2014,10 @@ inline shared_ptr<T> allocate_shared(Allocator allocator, Args&& ...args)
 	}
 	catch (...)
 	{
-		if (controlBlock){
+		if (controlBlock) {
 			(*controlBlock).~control_block_make_shared();
 		}
-		if (typedBlock){
+		if (typedBlock) {
 			rebound.deallocate(typedBlock, 1);
 		}
 		throw;
@@ -2031,7 +2031,7 @@ inline shared_ptr<T> allocate_shared(Allocator allocator, Args&& ...args)
 template
 <
 	class T,
-	std::enable_if_t<aspdetail::is_unbounded_array_v<T>> * = nullptr,
+	std::enable_if_t<aspdetail::is_unbounded_array_v<T>>*,
 	class Allocator,
 	class ...Args
 >
@@ -2060,7 +2060,7 @@ inline shared_ptr<T> allocate_shared(std::size_t count, Allocator allocator, Arg
 
 		arrayloc = (decayed_type*)(cbend + offset);
 
-		for (std::size_t i = 0; i < count; ++i){
+		for (std::size_t i = 0; i < count; ++i) {
 			new (&arrayloc[i]) decayed_type(std::forward<Args>(args)...);
 		}
 
@@ -2070,13 +2070,13 @@ inline shared_ptr<T> allocate_shared(std::size_t count, Allocator allocator, Arg
 	}
 	catch (...)
 	{
-		if (controlBlock){
+		if (controlBlock) {
 			(*controlBlock).~control_block_make_unbounded_array();
 		}
-		for (std::size_t i = 0; i < constructed; ++i){
+		for (std::size_t i = 0; i < constructed; ++i) {
 			arrayloc[i].~decayed_type();
 		}
-		if (block){
+		if (block) {
 			rebound.deallocate(block, blockSize);
 		}
 		throw;
@@ -2090,7 +2090,7 @@ inline shared_ptr<T> allocate_shared(std::size_t count, Allocator allocator, Arg
 template
 <
 	class T,
-	std::enable_if_t<!aspdetail::is_unbounded_array_v<T>> * = nullptr,
+	std::enable_if_t<!aspdetail::is_unbounded_array_v<T>>* = nullptr,
 	class ...Args
 >
 inline shared_ptr<T> make_shared(Args&& ...args)
@@ -2100,7 +2100,7 @@ inline shared_ptr<T> make_shared(Args&& ...args)
 template
 <
 	class T,
-	std::enable_if_t<aspdetail::is_unbounded_array_v<T>> * = nullptr,
+	std::enable_if_t<aspdetail::is_unbounded_array_v<T>>* = nullptr,
 	class ...Args
 >
 inline shared_ptr<T> make_shared(std::size_t count, Args&& ...args)
