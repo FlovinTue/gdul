@@ -31,10 +31,7 @@
 #pragma warning(push)
 #pragma warning(disable : 4324)
 
-#define GDUL_ENABLE_IF_U128 template <class U = T, std::enable_if_t<std::is_same_v<U, gdul::u128>>* = nullptr>
-#define GDUL_ENABLE_IF_U128_IMP template <class U, std::enable_if_t<std::is_same_v<U, gdul::u128>>*>
-
-namespace gdul{
+namespace gdul {
 
 template <class T>
 class atomic_128;
@@ -42,7 +39,7 @@ class atomic_128;
 union u128
 {
 	constexpr u128() : m_u64{ 0 } {}
-	constexpr u128(std::uint64_t low) : m_u64{ low ,  } {}
+	constexpr u128(std::uint64_t low) : m_u64{ low , } {}
 	constexpr u128(std::uint64_t low, std::uint64_t high) : m_u64{ low,high } {}
 
 	inline constexpr bool operator==(const u128& other) const {
@@ -52,7 +49,7 @@ union u128
 		return !operator==(other);
 	}
 
-	constexpr operator bool() const{
+	constexpr operator bool() const {
 		return m_u64[0] | m_u64[1];
 	}
 
@@ -70,43 +67,142 @@ using atomic_u128 = atomic_128<u128>;
 
 // Utility wrapper class for atomic operations on 128 bit types. 
 // Supplies extra integer utility functionality if used with gdul::u128 as value type
+
+namespace a128_detail {
 template <class T>
-class alignas(16) atomic_128
+class alignas(16) atomic_128_base
 {
-private:
+public:
+	inline constexpr atomic_128_base();
+	inline constexpr atomic_128_base(const T & value) noexcept;
+	inline constexpr atomic_128_base(T && value) noexcept;
+
+	inline bool compare_exchange_strong(T & expected, const T & desired) noexcept;
+
+	inline T exchange(const T & desired) noexcept;
+
+	inline void store(const T & desired) noexcept;
+	inline T load() const noexcept;
+
+	constexpr const T& my_val() const noexcept;
+	constexpr T& my_val() noexcept;
+
+protected:
+	inline bool cas_internal(T * expected, const T * desired) const noexcept;
+
+	mutable T m_storage;
+};
+template<class T>
+inline constexpr atomic_128_base<T>::atomic_128_base()
+	: atomic_128_base<T>(T())
+{
+}
+template <class T>
+inline constexpr atomic_128_base<T>::atomic_128_base(const T& value) noexcept
+	: m_storage(value)
+{
+	static_assert(std::is_trivially_copyable<T>::value, "Value type must be trivially copyable");
+	static_assert(sizeof(T) == 16, "Size of value type must be 16");
+}
+template <class T>
+inline constexpr atomic_128_base<T>::atomic_128_base(T&& value) noexcept
+	: m_storage(value)
+{
+	static_assert(std::is_trivially_copyable<T>::value, "Value type must be trivially copyable");
+	static_assert(sizeof(T) == 16, "Size of value type must be 16");
+}
+template <class T>
+inline bool atomic_128_base<T>::compare_exchange_strong(T& expected, const T& desired) noexcept
+{
+	return cas_internal(&expected, &desired);
+}
+template <class T>
+inline void atomic_128_base<T>::store(const T& desired) noexcept
+{
+	T expected(my_val());
+	while (!compare_exchange_strong(expected, desired));
+}
+template <class T>
+inline T atomic_128_base<T>::load() const noexcept
+{
+	T expectedDesired;
+	cas_internal(&expectedDesired, &expectedDesired);
+	return expectedDesired;
+}
+template <class T>
+inline T atomic_128_base<T>::exchange(const T& desired) noexcept
+{
+	T expected(my_val());
+	while (!compare_exchange_strong(expected, desired));
+	return expected;
+}
+template <class T>
+inline constexpr const T& atomic_128_base<T>::my_val() const noexcept
+{
+	return m_storage;
+}
+template <class T>
+inline constexpr T& atomic_128_base<T>::my_val() noexcept
+{
+	return m_storage;
+}
+#if  defined(_MSC_VER) && !defined(__INTEL_COMPILER)
+template <class T>
+inline bool atomic_128_base<T>::cas_internal(T* const expected, const T* desired) const noexcept
+{
+	return _InterlockedCompareExchange128(reinterpret_cast<volatile std::int64_t*>(&m_storage), ((const std::int64_t*)desired)[1], ((const std::int64_t*)desired)[0], ((std::int64_t*)expected));
+}
+#elif defined(__GNUC__) || defined(__clang__)
+template <class T>
+inline bool atomic_128_base<T>::cas_internal(T* const expected, const T* desired) const noexcept
+{
+	char result;
+	__asm__ __volatile__
+	(
+		"lock cmpxchg16b %1\n\t"
+		"setz %0"
+		: "=q" (result)
+		, "+m" (*reinterpret_cast<volatile std::int64_t*>(&m_storage))
+		, "+d" (((std::int64_t*)expected)[1])
+		, "+a" (((std::int64_t*)expected)[0])
+		: "c" (((const std::int64_t*)desired)[1])
+		, "b" (((const std::int64_t*)desired)[0])
+		: "cc", "memory"
+	);
+	return result;
+}
+#else
+#error Unsupported platform
+#endif
+}
+template <class T>
+class atomic_128 : public a128_detail::atomic_128_base<T>
+{
+};
+template <>
+class atomic_128<u128> : public a128_detail::atomic_128_base<u128>
+{
 	template <class T>
 	struct disable_deduction
 	{
 		using type = T;
 	};
 public:
-	inline constexpr atomic_128();
-	inline constexpr atomic_128(const T& value) noexcept;
+	using a128_detail::atomic_128_base<u128>::atomic_128_base;
 
-	inline bool compare_exchange_strong(T& expected, const T& desired) noexcept;
+	inline u128 exchange_u64(std::uint64_t value, std::uint8_t atIndex) noexcept;
+	inline u128 exchange_u32(std::uint32_t value, std::uint8_t atIndex) noexcept;
+	inline u128 exchange_u16(std::uint16_t value, std::uint8_t atIndex) noexcept;
+	inline u128 exchange_u8(std::uint8_t value, std::uint8_t atIndex) noexcept;
 
-	inline T exchange(const T& desired) noexcept;
-
-	inline void store(const T& desired) noexcept;
-	inline T load() const noexcept;
-
-	constexpr const T& my_val() const noexcept;
-	constexpr T& my_val() noexcept;
-
-	GDUL_ENABLE_IF_U128 inline u128 exchange_u64(std::uint64_t value, std::uint8_t atIndex) noexcept;
-	GDUL_ENABLE_IF_U128 inline u128 exchange_u32(std::uint32_t value, std::uint8_t atIndex) noexcept;
-	GDUL_ENABLE_IF_U128 inline u128 exchange_u16(std::uint16_t value, std::uint8_t atIndex) noexcept;
-	GDUL_ENABLE_IF_U128 inline u128 exchange_u8(std::uint8_t value, std::uint8_t atIndex) noexcept;
-
-	GDUL_ENABLE_IF_U128 inline u128 fetch_add_to_u64(std::uint64_t value, std::uint8_t atIndex) noexcept;
-	GDUL_ENABLE_IF_U128 inline u128 fetch_add_to_u32(std::uint32_t value, std::uint8_t atIndex) noexcept;
-	GDUL_ENABLE_IF_U128 inline u128 fetch_add_to_u16(std::uint16_t value, std::uint8_t atIndex) noexcept;
-	GDUL_ENABLE_IF_U128 inline u128 fetch_add_to_u8(std::uint8_t value, std::uint8_t atIndex) noexcept;
-	GDUL_ENABLE_IF_U128 inline u128 fetch_sub_to_u64(std::uint64_t value, std::uint8_t atIndex) noexcept;
-	GDUL_ENABLE_IF_U128 inline u128 fetch_sub_to_u32(std::uint32_t value, std::uint8_t atIndex) noexcept;
-	GDUL_ENABLE_IF_U128 inline u128 fetch_sub_to_u16(std::uint16_t value, std::uint8_t atIndex) noexcept;
-	GDUL_ENABLE_IF_U128 inline u128 fetch_sub_to_u8(std::uint8_t value, std::uint8_t atIndex) noexcept;
-
+	inline u128 fetch_add_to_u64(std::uint64_t value, std::uint8_t atIndex) noexcept;
+	inline u128 fetch_add_to_u32(std::uint32_t value, std::uint8_t atIndex) noexcept;
+	inline u128 fetch_add_to_u16(std::uint16_t value, std::uint8_t atIndex) noexcept;
+	inline u128 fetch_add_to_u8(std::uint8_t value, std::uint8_t atIndex) noexcept;
+	inline u128 fetch_sub_to_u64(std::uint64_t value, std::uint8_t atIndex) noexcept;
+	inline u128 fetch_sub_to_u32(std::uint32_t value, std::uint8_t atIndex) noexcept;
+	inline u128 fetch_sub_to_u16(std::uint16_t value, std::uint8_t atIndex) noexcept;
+	inline u128 fetch_sub_to_u8(std::uint8_t value, std::uint8_t atIndex) noexcept;
 private:
 	template <class IntegerType>
 	inline u128 fetch_add_to_integer(const typename disable_deduction<IntegerType>::type& value, std::uint8_t atIndex) noexcept;
@@ -114,14 +210,70 @@ private:
 	inline u128 fetch_sub_to_integer(const typename disable_deduction<IntegerType>::type& value, std::uint8_t atIndex) noexcept;
 	template <class IntegerType>
 	inline u128 exchange_integer(const typename disable_deduction<IntegerType>::type& value, std::uint8_t atIndex) noexcept;
-
-	inline bool cas_internal(T* expected, const T* desired) const noexcept;
-
-	mutable T m_storage;
 };
-template <class T>
+
+inline u128 atomic_128<u128>::exchange_u64(std::uint64_t value, std::uint8_t atIndex) noexcept
+{
+	return exchange_integer<decltype(value)>(value, atIndex);
+}
+
+inline u128 atomic_128<u128>::exchange_u32(std::uint32_t value, std::uint8_t atIndex) noexcept
+{
+	return exchange_integer<decltype(value)>(value, atIndex);
+}
+
+inline u128 atomic_128<u128>::exchange_u16(std::uint16_t value, std::uint8_t atIndex) noexcept
+{
+	return exchange_integer<decltype(value)>(value, atIndex);
+}
+
+inline u128 atomic_128<u128>::exchange_u8(const std::uint8_t value, std::uint8_t atIndex) noexcept
+{
+	return exchange_integer<decltype(value)>(value, atIndex);
+}
+
+inline u128 atomic_128<u128>::fetch_add_to_u64(std::uint64_t value, std::uint8_t atIndex) noexcept
+{
+	return fetch_add_to_integer<decltype(value)>(value, atIndex);
+}
+
+inline u128 atomic_128<u128>::fetch_add_to_u32(std::uint32_t value, std::uint8_t atIndex) noexcept
+{
+	return fetch_add_to_integer<decltype(value)>(value, atIndex);
+}
+
+inline u128 atomic_128<u128>::fetch_add_to_u16(std::uint16_t value, std::uint8_t atIndex) noexcept
+{
+	return fetch_add_to_integer<decltype(value)>(value, atIndex);
+}
+
+inline u128 atomic_128<u128>::fetch_add_to_u8(const std::uint8_t value, std::uint8_t atIndex) noexcept
+{
+	return fetch_add_to_integer<decltype(value)>(value, atIndex);
+}
+
+inline u128 atomic_128<u128>::fetch_sub_to_u64(std::uint64_t value, std::uint8_t atIndex) noexcept
+{
+	return fetch_sub_to_integer<decltype(value)>(value, atIndex);
+}
+
+inline u128 atomic_128<u128>::fetch_sub_to_u32(std::uint32_t value, std::uint8_t atIndex) noexcept
+{
+	return fetch_sub_to_integer<decltype(value)>(value, atIndex);
+}
+
+inline u128 atomic_128<u128>::fetch_sub_to_u16(std::uint16_t value, std::uint8_t atIndex) noexcept
+{
+	return fetch_sub_to_integer<decltype(value)>(value, atIndex);
+}
+
+inline u128 atomic_128<u128>::fetch_sub_to_u8(const std::uint8_t value, std::uint8_t atIndex) noexcept
+{
+	return fetch_sub_to_integer<decltype(value)>(value, atIndex);
+}
+
 template<class IntegerType>
-inline u128 atomic_128<T>::fetch_add_to_integer(const typename disable_deduction<IntegerType>::type& value, std::uint8_t atIndex) noexcept
+inline u128 atomic_128<u128>::fetch_add_to_integer(const typename disable_deduction<IntegerType>::type& value, std::uint8_t atIndex) noexcept
 {
 	static_assert(std::is_integral<IntegerType>(), "Only integers allowed as value type");
 
@@ -145,13 +297,13 @@ inline u128 atomic_128<T>::fetch_add_to_integer(const typename disable_deduction
 	do {
 		desired = expected;
 		*target += value;
-	} while (!cas_internal(&expected, &desired));
+	} while (!atomic_128_base<u128>::cas_internal(&expected, &desired));
 
 	return expected;
 }
-template <class T>
+
 template<class IntegerType>
-inline u128 atomic_128<T>::fetch_sub_to_integer(const typename disable_deduction<IntegerType>::type& value, std::uint8_t atIndex) noexcept
+inline u128 atomic_128<u128>::fetch_sub_to_integer(const typename disable_deduction<IntegerType>::type& value, std::uint8_t atIndex) noexcept
 {
 	static_assert(std::is_integral<IntegerType>(), "Only integers allowed as value type");
 
@@ -174,13 +326,13 @@ inline u128 atomic_128<T>::fetch_sub_to_integer(const typename disable_deduction
 	do {
 		desired = expected;
 		*target -= value;
-	} while (!cas_internal(&expected, &desired));
+	} while (!atomic_128_base<u128>::cas_internal(&expected, &desired));
 
 	return expected;
 }
-template <class T>
+
 template<class IntegerType>
-inline u128 atomic_128<T>::exchange_integer(const typename disable_deduction<IntegerType>::type& value, std::uint8_t atIndex) noexcept
+inline u128 atomic_128<u128>::exchange_integer(const typename disable_deduction<IntegerType>::type& value, std::uint8_t atIndex) noexcept
 {
 	static_assert(std::is_integral<IntegerType>(), "Only integers allowed as value type");
 
@@ -203,145 +355,8 @@ inline u128 atomic_128<T>::exchange_integer(const typename disable_deduction<Int
 	do {
 		desired = expected;
 		*target = value;
-	} while (!cas_internal(&expected, &desired));
+	} while (!atomic_128_base<u128>::cas_internal(&expected, &desired));
 
 	return expected;
 }
-template<class T>
-inline constexpr atomic_128<T>::atomic_128()
-	: atomic_128<T>(T())
-{
 }
-template <class T>
-inline constexpr atomic_128<T>::atomic_128(const T & value) noexcept
-	: m_storage(value)
-{
-	static_assert(std::is_trivially_copyable_v<T>, "Value type must be trivially copyable");
-	static_assert(sizeof(T) == 16, "Size of value type must be 16");
-}
-template <class T>
-inline bool atomic_128<T>::compare_exchange_strong(T & expected, const T& desired) noexcept
-{
-	return cas_internal(&expected, &desired);
-}
-template <class T>
-inline T atomic_128<T>::exchange(const T& desired) noexcept
-{
-	T expected(my_val());
-	while (!compare_exchange_strong(expected, desired));
-	return expected;
-}
-template <class T>
-GDUL_ENABLE_IF_U128_IMP inline u128 atomic_128<T>::exchange_u64(std::uint64_t value, std::uint8_t atIndex) noexcept
-{
-	return exchange_integer<decltype(value)>(value, atIndex);
-}
-template <class T>
-GDUL_ENABLE_IF_U128_IMP inline u128 atomic_128<T>::exchange_u32(std::uint32_t value, std::uint8_t atIndex) noexcept
-{
-	return exchange_integer<decltype(value)>(value, atIndex);
-}
-template <class T>
-GDUL_ENABLE_IF_U128_IMP inline u128 atomic_128<T>::exchange_u16(std::uint16_t value, std::uint8_t atIndex) noexcept
-{
-	return exchange_integer<decltype(value)>(value, atIndex);
-}
-template <class T>
-GDUL_ENABLE_IF_U128_IMP inline u128 atomic_128<T>::exchange_u8(const std::uint8_t value, std::uint8_t atIndex) noexcept
-{
-	return exchange_integer<decltype(value)>(value, atIndex);
-}
-template <class T>
-inline void atomic_128<T>::store(const T& desired) noexcept
-{
-	T expected(my_val());
-	while (!compare_exchange_strong(expected, desired));
-}
-template <class T>
-inline T atomic_128<T>::load() const noexcept
-{
-	T expectedDesired;
-	cas_internal(&expectedDesired, &expectedDesired);
-	return expectedDesired;
-}
-template <class T>
-GDUL_ENABLE_IF_U128_IMP inline u128 atomic_128<T>::fetch_add_to_u64(std::uint64_t value, std::uint8_t atIndex) noexcept
-{
-	return fetch_add_to_integer<decltype(value)>(value, atIndex);
-}
-template <class T>
-GDUL_ENABLE_IF_U128_IMP inline u128 atomic_128<T>::fetch_add_to_u32(std::uint32_t value, std::uint8_t atIndex) noexcept
-{
-	return fetch_add_to_integer<decltype(value)>(value, atIndex);
-}
-template <class T>
-GDUL_ENABLE_IF_U128_IMP inline u128 atomic_128<T>::fetch_add_to_u16(std::uint16_t value, std::uint8_t atIndex) noexcept
-{
-	return fetch_add_to_integer<decltype(value)>(value, atIndex);
-}
-template <class T>
-GDUL_ENABLE_IF_U128_IMP inline u128 atomic_128<T>::fetch_add_to_u8(const std::uint8_t value, std::uint8_t atIndex) noexcept
-{
-	return fetch_add_to_integer<decltype(value)>(value, atIndex);
-}
-template <class T>
-GDUL_ENABLE_IF_U128_IMP inline u128 atomic_128<T>::fetch_sub_to_u64(std::uint64_t value, std::uint8_t atIndex) noexcept
-{
-	return fetch_sub_to_integer<decltype(value)>(value, atIndex);
-}
-template <class T>
-GDUL_ENABLE_IF_U128_IMP inline u128 atomic_128<T>::fetch_sub_to_u32(std::uint32_t value, std::uint8_t atIndex) noexcept
-{
-	return fetch_sub_to_integer<decltype(value)>(value, atIndex);
-}
-template <class T>
-GDUL_ENABLE_IF_U128_IMP inline u128 atomic_128<T>::fetch_sub_to_u16(std::uint16_t value, std::uint8_t atIndex) noexcept
-{
-	return fetch_sub_to_integer<decltype(value)>(value, atIndex);
-}
-template <class T>
-GDUL_ENABLE_IF_U128_IMP inline u128 atomic_128<T>::fetch_sub_to_u8(const std::uint8_t value, std::uint8_t atIndex) noexcept
-{
-	return fetch_sub_to_integer<decltype(value)>(value, atIndex);
-}
-template <class T>
-inline constexpr const T& atomic_128<T>::my_val() const noexcept
-{
-	return m_storage;
-}
-template <class T>
-inline constexpr T & atomic_128<T>::my_val() noexcept
-{
-	return m_storage;
-}
-#if  defined(_MSC_VER) && !defined(__INTEL_COMPILER)
-template <class T>
-inline bool atomic_128<T>::cas_internal(T* const expected, const T* desired) const noexcept
-{
-	return _InterlockedCompareExchange128(reinterpret_cast<volatile std::int64_t*>(&m_storage), ((const std::int64_t*)desired)[1], ((const std::int64_t*)desired)[0], ((std::int64_t*)expected));
-}
-#elif defined(__GNUC__) || defined(__clang__)
-template <class T>
-inline bool atomic_128<T>::cas_internal(T* const expected, const T* desired) const noexcept
-{
-	bool result;
-	__asm__ __volatile__
-	(
-		"lock cmpxchg16b %1\n\t"
-		"setz %0"
-		: "=q" (result)
-		, "+m" (reinterpret_cast<volatile std::int64_t*>(&m_storage))
-		, "+d" (((std::int64_t*)expected)[1])
-		, "+a" (((std::int64_t*)expected)[0])
-		: "c" (((const std::int64_t*)desired)[1])
-		, "b" (((const std::int64_t*)desired)[0])
-		: "cc", "memory"
-	);
-	return result;
-}
-#else
-#error Unsupported platform
-#endif
-}
-
-#pragma warning(pop)
