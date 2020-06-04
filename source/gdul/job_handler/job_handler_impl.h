@@ -90,13 +90,6 @@ private:
 	memory_pool m_jobNodeMemPool;
 	memory_pool m_batchJobMemPool;
 
-
-	// * Implement priority queue
-	// - May be able to get away with some sort of 'semi permanent queue'. The jobs in the queue should be pretty static both in their being run each frame
-	// and their priority placement.. So. Some sort of queue that has a possibly elaborate way of shifting jobs up and down or inserting. Then just keep the jobs in there.
-	// Perhaps this CAN be done with a concurrent_priority_queue. Perhaps with some sort of custom solution, or perhaps by supplying unsafe_begin() ? THIS would be neat!
-	// And then if an item ends up out of order, simply.. Ooh wait. Need to handle dependencies and jobs not enqueueued.. Urg. 
-	// * Implement physical id job storage
 	concurrent_queue<job_impl_shared_ptr, allocator_type> m_jobQueues[job_queue_count];
 
 	std::array<worker_impl, Job_Handler_Max_Workers> m_workers;
