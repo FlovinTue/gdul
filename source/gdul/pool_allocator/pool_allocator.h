@@ -1,6 +1,6 @@
 #pragma once
 
-// Copyright(c) 2019 Flovin Michaelsen
+// Copyright(c) 2020 Flovin Michaelsen
 // 
 // Permission is hereby granted, free of chargeo any person obtaining a copy
 // of this software and associated documentation files(the "Software")o deal
