@@ -33,6 +33,9 @@ static constexpr std::size_t Defaul_Block_Size = 8;
 using defaul_allocator = std::allocator<std::uint8_t>;
 }
 
+// Concurrency safe, lock free object pool. Contains an optimization where recycled objects belonging to an 'old' 
+// block will be discarded. This will make the objects retain good cache locality as the structure ages. 
+// Block capacity grows quadratically.
 template <class Object, class Allocator = cop_detail::defaul_allocator>
 class concurrent_object_pool
 {
@@ -83,13 +86,13 @@ private:
 
 	block_node m_blocks[Capacity_Bits];
 
-	std::atomic<std::uint8_t> m_blocksEndIndex;
+	std::atomic<std::uintptr_t> m_activeBlockKeyHint;
 
 	concurrent_queue<Object*, Allocator> m_unusedObjects;
 
-	std::uintptr_t m_activeBlockKeyHint;
-
 	Allocator m_allocator;
+
+	std::atomic<std::uint8_t> m_blocksEndIndex;
 };
 template<class Object, class Allocator>
 inline concurrent_object_pool<Object, Allocator>::concurrent_object_pool()
@@ -106,13 +109,13 @@ inline concurrent_object_pool<Object, Allocator>::concurrent_object_pool(std::si
 template<class Object, class Allocator>
 inline concurrent_object_pool<Object, Allocator>::concurrent_object_pool(std::size_t baseCapacity, Allocator allocator)
 	: m_blocks{}
-	, m_blocksEndIndex(0)
-	, m_unusedObjects(allocator)
 	, m_activeBlockKeyHint(0)
+	, m_unusedObjects(allocator)
 	, m_allocator()
+	, m_blocksEndIndex(0)
 {
 	for (std::uint8_t i = 0; i < Capacity_Bits; ++i)
-		m_blocks[i].m_livingObjects.store((std::uint32_t)std::pow(2.f, (float)(i + 1)));
+		m_blocks[i].m_livingObjects.store((std::uint32_t)std::pow(2.f, (float)(i + 1)), std::memory_order_relaxed);
 
 	const std::size_t alignedSize(log2_align(baseCapacity, Max_Capacity));
 	const std::uint8_t blockIndex((std::uint8_t)std::log2f((float)alignedSize) - 1);
@@ -120,7 +123,6 @@ inline concurrent_object_pool<Object, Allocator>::concurrent_object_pool(std::si
 	m_blocksEndIndex.store(blockIndex, std::memory_order_relaxed);
 
 	try_alloc_block(blockIndex);
-
 }
 template<class Object, class Allocator>
 inline concurrent_object_pool<Object, Allocator>::~concurrent_object_pool()
@@ -153,7 +155,8 @@ inline std::size_t concurrent_object_pool<Object, Allocator>::avaliable() const
 template<class Object, class Allocator>
 inline void concurrent_object_pool<Object, Allocator>::unsafe_reset()
 {
-	m_activeBlockKeyHint = 0;
+	m_activeBlockKeyHint.store(0, std::memory_order_relaxed);
+
 	const std::uint8_t blockCount(m_blocksEndIndex.exchange(0, std::memory_order_relaxed));
 	for (std::uint8_t i = 0; i < blockCount; ++i){
 		m_blocks[i].~block_node();
@@ -167,7 +170,7 @@ inline void concurrent_object_pool<Object, Allocator>::unsafe_reset()
 template<class Object, class Allocator>
 inline bool concurrent_object_pool<Object, Allocator>::is_obsolete_hint(const Object* obj) const
 {
-	return !is_contained_within(obj, m_activeBlockKeyHint);
+	return !is_contained_within(obj, m_activeBlockKeyHint.load(std::memory_order_relaxed));
 }
 template<class Object, class Allocator>
 inline bool concurrent_object_pool<Object, Allocator>::is_obsolete(const Object* obj) const
@@ -249,11 +252,13 @@ template<class Object, class Allocator>
 inline void concurrent_object_pool<Object, Allocator>::force_hint_update()
 {
 	// Keep writing to hint until m_blockEndIndex is stable
-	std::uint8_t preHintUpdate;
+	std::uint8_t preHintUpdate(0);
+	std::uint8_t postHintUpdate(m_blocksEndIndex.load(std::memory_order_relaxed));
 	do {
-		preHintUpdate = m_blocksEndIndex.load();
-		m_activeBlockKeyHint = m_blocks[preHintUpdate - 1].m_blockKey;
-	} while (m_blocksEndIndex.load() != preHintUpdate);
+		preHintUpdate = postHintUpdate;
+		m_activeBlockKeyHint.store(m_blocks[preHintUpdate - 1].m_blockKey, std::memory_order_relaxed);
+		postHintUpdate = m_blocksEndIndex.load(std::memory_order_relaxed);
+	} while (postHintUpdate != preHintUpdate);
 }
 template<class Object, class Allocator>
 inline void concurrent_object_pool<Object, Allocator>::try_alloc_block(std::uint8_t blockIndex)
@@ -287,7 +292,7 @@ inline void concurrent_object_pool<Object, Allocator>::try_alloc_block(std::uint
 		pushIndex = m_blocks[blockIndex].m_pushSync.fetch_add(1, std::memory_order_relaxed);
 	}
 
-	m_blocksEndIndex.compare_exchange_strong(blockIndex, blockIndex + 1, std::memory_order_relaxed);
+	m_blocksEndIndex.compare_exchange_strong(blockIndex, blockIndex + 1, std::memory_order_release);
 
 	force_hint_update();
 }
