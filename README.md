@@ -29,7 +29,7 @@ Depends on atomic_shared_ptr.h, thread_local_member.h
 -------------------------------------------------------------------------------------------------------------------------------------------
 
 ## concurrent_object_pool
-Allocates chunks of objects and makes them avaliable for usage via get_object. Return objects using recycle_object. Concurrency safe & lock-free.
+Allocates chunks of objects and makes them avaliable for usage via get. Return objects using recycle. Concurrency safe & lock-free.
 
 Depends on concurrent_queue.h, atomic_shared_ptr.h, thread_local_member.h
 
@@ -55,7 +55,6 @@ Supports (partial or full) binding of arguments in its constructor. The amount o
 
 -------------------------------------------------------------------------------------------------------------------------------------------
 ## job_handler
-####  -- Still fairly new, and may not be the most stable --
 A job system
 
 Main features would be:
@@ -73,7 +72,7 @@ Job tracking instructions:
 - dump job time sets using job_tracker::dump_job_time_sets(location) 
 
 - graph may be viewed using the Visual Studio dgml extension. 
-- job time sets may be viewed in the small C# app job_time_set_view located in root folder
+- job time sets may be viewed in the small C# app job_time_set_view located in the source folder
 
 
 A quick usage example for job:

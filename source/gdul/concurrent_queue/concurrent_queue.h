@@ -333,6 +333,7 @@ inline void concurrent_queue<T, Allocator>::unsafe_reset()
 
 	for (std::uint16_t i = 0; i < producerCount; ++i) {
 		buffer_type* slot(slots[i].unsafe_get());
+		slot->unsafe_clear();
 		slot->invalidate();
 	}
 
