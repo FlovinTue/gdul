@@ -105,7 +105,7 @@
 					<If Condition="itemCount != ((uint64_t)pBuffer->_m_written - (uint64_t)pBuffer->_m_readSlot)">
 						<Item>pItem->m_data</Item>
 						<Exec>++pItem</Exec>
-						<If Condition="pItem == (pBuffer->m_dataBlock + (uint64_t)pBuffer->_m_written - (uint64_t)pBuffer->_m_readSlot)">
+            <If Condition="(pItem - pBuffer->m_capacity) == pBuffer->m_dataBlock">
 							<Exec>pItem= pBuffer->m_dataBlock</Exec>
 						</If>
 						<Exec>++itemCount</Exec>

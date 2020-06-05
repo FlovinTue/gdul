@@ -86,9 +86,9 @@ private:
 
 	allocator_type m_mainAllocator;
 
-	memory_pool m_jobImplChunkPool;
-	memory_pool m_jobNodeChunkPool;
-	memory_pool m_batchJobChunkPool;
+	memory_pool m_jobImplMemPool;
+	memory_pool m_jobNodeMemPool;
+	memory_pool m_batchJobMemPool;
 
 	concurrent_queue<job_impl_shared_ptr, allocator_type> m_jobQueues[job_queue_count];
 

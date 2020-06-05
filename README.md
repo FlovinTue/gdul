@@ -29,7 +29,9 @@ Depends on atomic_shared_ptr.h, thread_local_member.h
 -------------------------------------------------------------------------------------------------------------------------------------------
 
 ## concurrent_object_pool
-Allocates chunks of objects and makes them avaliable for usage via get. Return objects using recycle. Concurrency safe & lock-free.
+Concurrency safe, lock free object pool. Contains an optimization where recycled objects belonging to an 'old' 
+block will be discarded. This will make the objects retain good cache locality as the structure ages. 
+Block capacity grows quadratically.
 
 Depends on concurrent_queue.h, atomic_shared_ptr.h, thread_local_member.h
 
@@ -55,7 +57,6 @@ Supports (partial or full) binding of arguments in its constructor. The amount o
 
 -------------------------------------------------------------------------------------------------------------------------------------------
 ## job_handler
-####  -- Still fairly new, and may not be the most stable --
 A job system
 
 Main features would be:
