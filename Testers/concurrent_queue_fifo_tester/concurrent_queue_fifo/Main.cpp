@@ -4,7 +4,7 @@
 #include "pch.h"
 #include <vld.h>
 
-#include <gdul/WIP_concurrent_queue_fifo/concurrent_queue_fifo_v4.h>
+#include <gdul/WIP_concurrent_queue_fifo/concurrent_queue_fifo_v6.h>
 
 int main()
 {

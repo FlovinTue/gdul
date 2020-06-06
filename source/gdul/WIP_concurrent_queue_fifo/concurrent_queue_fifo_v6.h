@@ -173,26 +173,17 @@ private:
 
 	inline shared_ptr_buffer_type create_item_buffer(std::size_t withSize);
 
-	inline bool initialize_consumer();
 	inline void initialize_producer();
 
 	inline bool refresh_consumer();
 	inline void refresh_producer();
 
-	inline void try_grow_capacity(size_type& expected);
-
 	static cq_fifo_detail::dummy_container<T, allocator_type> s_dummyContainer;
 
-	tlm<shared_ptr_buffer_type, allocator_type> t_producer; // <----- Ping
-	tlm<shared_ptr_buffer_type, allocator_type> t_spareBuffer;// <--- Pong
-
+	tlm<shared_ptr_buffer_type, allocator_type> t_producer;
 	tlm<shared_ptr_buffer_type, allocator_type> t_consumer;
 
 	atomic_shared_ptr_buffer_type m_back;
-
-	GDUL_CQ_PADDING(64);
-
-	std::atomic<size_type> m_capacity;
 
 	allocator_type m_allocator;
 };
@@ -207,7 +198,6 @@ inline concurrent_queue_fifo<T, Allocator>::concurrent_queue_fifo(Allocator allo
 	: t_producer(s_dummyContainer.m_dummyBuffer, allocator)
 	, t_consumer(s_dummyContainer.m_dummyBuffer, allocator)
 	, m_back(s_dummyContainer.m_dummyBuffer)
-	, m_capacity(cq_fifo_detail::Buffer_Capacity_Default)
 	, m_allocator(allocator)
 {
 }
@@ -425,36 +415,15 @@ inline void concurrent_queue_fifo<T, Allocator>::refresh_producer()
 {
 	assert(t_producer.get()->is_valid() && "producer needs to be initialized");
 
-	shared_ptr_buffer_type producer(std::move(t_producer.get()));
+	shared_ptr_buffer_type& producer(t_producer.get());
 
 	shared_ptr_buffer_type front(producer->find_front());
 
-	size_type capacity(m_capacity.load(std::memory_order_relaxed));
-
-	if (front) {
-		t_producer = std::move(front);
-	}
-	else {
-		shared_ptr_buffer_type& spare(t_spareBuffer.get());
-
-		if (spare &&
-			(spare->get_capacity() != capacity || spare.use_count() != spare.use_count_local())) {
-			spare = shared_ptr_buffer_type(nullptr);
-			if (m_capacity.compare_exchange_strong(capacity, capacity * 2), std::memory_order_relaxed)
-				capacity *= 2;
-		}
-
-		if (!spare)
-			spare = create_item_buffer(capacity);
-		else
-			spare->recycle();
-
-		t_producer = producer->try_exchange_next_buffer(std::move(spare));
+	if (!front) {
+		front = producer->try_exchange_next_buffer(create_item_buffer(producer->get_capacity() * 2));
 	}
 
-	if (producer->get_owner() == std::this_thread::get_id() &&
-		producer->get_capacity() == capacity)
-		t_spareBuffer = std::move(producer);
+	producer = std::move(front);
 }
 namespace cq_fifo_detail
 {
@@ -502,13 +471,9 @@ public:
 	// Try push a buffer to the front of buffer list. Returns value after attempt
 	inline shared_ptr_buffer_type try_exchange_next_buffer(shared_ptr_buffer_type&& desired);
 
-	// The creator producer
-	inline std::thread::id get_owner() const noexcept;
-
 	// Used to signal that this buffer list is to be discarded
 	inline void unsafe_invalidate();
 	inline void unsafe_clear();
-	inline void recycle();
 
 	inline void block_writers();
 	inline void block_readers();
@@ -536,21 +501,20 @@ private:
 	GDUL_ATOMIC_WITH_VIEW(size_type, m_readAt);
 
 	GDUL_CQ_PADDING(64);
-
+	std::atomic<size_type> m_postReadSync;
+	GDUL_CQ_PADDING(64);
+	std::atomic<size_type> m_read;
+	GDUL_CQ_PADDING(64);
 	std::atomic<size_type> m_writeAt;
 	GDUL_CQ_PADDING(64);
 	std::atomic<size_type> m_postWriteSync;
 	GDUL_CQ_PADDING(64);
-
 	GDUL_ATOMIC_WITH_VIEW(size_type, m_written);
-
 	GDUL_CQ_PADDING(64);
 
 	atomic_shared_ptr_buffer_type m_next;
 
-	size_type m_pushRoof;
 	const size_type m_capacity;
-	const std::thread::id m_owner;
 	std::atomic<buffer_state> m_state;
 	item_slot<T>* const m_items;
 };
@@ -559,13 +523,13 @@ template<class T, class Allocator>
 inline item_buffer<T, Allocator>::item_buffer(item_slot<T>* dataBlock, typename item_buffer<T, Allocator>::size_type capacity)
 	: m_preReadSync(0)
 	, m_readAt(0)
+	, m_postReadSync(0)
+	, m_read(0)
 	, m_writeAt(0)
 	, m_postWriteSync(0)
 	, m_written(0)
 	, m_next(nullptr)
-	, m_pushRoof(capacity)
 	, m_capacity(capacity)
-	, m_owner(std::this_thread::get_id())
 	, m_state(buffer_state_valid)
 	, m_items(dataBlock)
 {
@@ -612,8 +576,7 @@ inline void item_buffer<T, Allocator>::unsafe_invalidate()
 	block_readers();
 	block_writers();
 
-	if (m_next)
-	{
+	if (m_next) {
 		m_next.unsafe_get()->unsafe_invalidate();
 	}
 }
@@ -645,19 +608,6 @@ inline typename item_buffer<T, Allocator>::shared_ptr_buffer_type item_buffer<T,
 	} while (back);
 
 	return back;
-}
-template<class T, class Allocator>
-inline std::thread::id item_buffer<T, Allocator>::get_owner() const noexcept
-{
-	return m_owner;
-}
-template<class T, class Allocator>
-inline void item_buffer<T, Allocator>::recycle()
-{
-	const size_type written(m_written.load(std::memory_order_relaxed));
-	m_writeAt.store(written, std::memory_order_relaxed);
-	m_pushRoof = written + m_capacity;
-	m_next = shared_ptr_buffer_type(nullptr);
 }
 template<class T, class Allocator>
 inline typename item_buffer<T, Allocator>::size_type item_buffer<T, Allocator>::size() const
@@ -699,7 +649,10 @@ inline void item_buffer<T, Allocator>::unsafe_clear()
 	m_preReadSync.store(0, std::memory_order_relaxed);
 	m_postWriteSync.store(0, std::memory_order_relaxed);
 
-	if (m_next){
+	m_read.store(0, std::memory_order_relaxed);
+	m_postReadSync.store(0, std::memory_order_relaxed);
+
+	if (m_next) {
 		m_next.unsafe_get()->unsafe_clear();
 	}
 }
@@ -718,8 +671,10 @@ template<class ...Arg>
 inline bool item_buffer<T, Allocator>::try_push(Arg&& ...in)
 {
 	const size_type at(m_writeAt.fetch_add(1, std::memory_order_relaxed));
+	const size_type read(m_read.load(std::memory_order_relaxed));
+	const size_type diff(at - read);
 
-	if (!(at < m_pushRoof)) {
+	if (!(diff < m_capacity)) {
 		return false;
 	}
 
@@ -758,6 +713,47 @@ inline bool item_buffer<T, Allocator>::try_pop(T& out)
 	const size_type at(m_readAt.fetch_add(1, std::memory_order_relaxed));
 
 	write_out(at % m_capacity, out);
+
+	//const size_type postSync(m_postReadSync.fetch_add(1, std::memory_order_acq_rel));
+	//const size_type postAt(m_readAt.load(std::memory_order_relaxed));
+	//if ((postSync + 1) == postAt) {
+	//	size_type xchg(postAt);
+	//	size_type target(0);
+	//	do {
+	//		target = xchg;
+	//		xchg = m_read.exchange(target, std::memory_order_relaxed);
+	//	} while (target < xchg);
+	//}
+	//const size_type postSync(m_postReadSync.fetch_add(1, std::memory_order_acq_rel));
+	//const size_type postAt(m_readAt.load(std::memory_order_relaxed));
+	//if ((postSync + 1) == postAt) {
+	//	const size_type read(m_read.load(std::memory_order_relaxed));
+	//	const size_type diff(postSync - read);
+	//
+	//	if (!(diff < m_capacity / 2)) {
+	//		size_type xchg(postAt);
+	//		size_type target(0);
+	//		do {
+	//			target = xchg;
+	//			xchg = m_read.exchange(target, std::memory_order_relaxed);
+	//		} while (target < xchg);
+	//	}
+	//}
+	const size_type postSync(m_postReadSync.fetch_add(1, std::memory_order_acq_rel));
+	const size_type read(m_read.load(std::memory_order_relaxed));
+	const size_type diff(postSync - read);
+	if (!(diff < m_capacity / 2)) {
+		const size_type postAt(m_readAt.load(std::memory_order_relaxed));
+		if ((postSync + 1) == postAt) {
+
+			size_type xchg(postAt);
+			size_type target(0);
+			do {
+				target = xchg;
+				xchg = m_read.exchange(target, std::memory_order_relaxed);
+			} while (target < xchg);
+		}
+	}
 
 	return true;
 }
@@ -998,6 +994,7 @@ inline dummy_container<T, Allocator>::dummy_container()
 	, m_dummyRawBuffer(&m_dummyItem, 1)
 {
 	m_dummyRawBuffer.block_writers();
+	m_dummyRawBuffer.unsafe_invalidate();
 
 	Allocator alloc;
 	m_dummyBuffer = shared_ptr_buffer_type(&m_dummyRawBuffer, alloc, [](buffer_type*, Allocator&) {});
