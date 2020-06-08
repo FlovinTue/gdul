@@ -55,6 +55,7 @@ int main()
 
 	shared_ptr<int> first;
 	shared_ptr<int> second(nullptr);
+	shared_ptr<int> secondVer(nullptr);
 	shared_ptr<int> third(make_shared<int>(3));
 	shared_ptr<int> fourth(third);
 	shared_ptr<int> fifth(std::move(fourth));

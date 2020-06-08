@@ -5,7 +5,7 @@
 #include <gdul\concurrent_queue\concurrent_queue.h>
 #include "../Common/Timer.h"
 #include <concurrent_queue.h>
-#include <gdul/WIP_concurrent_queue_fifo/concurrent_queue_fifo_v4.h>
+#include <gdul/WIP_concurrent_queue_fifo/concurrent_queue_fifo_v6.h>
 #include <queue>
 #include <mutex>
 #include <random>
@@ -135,7 +135,7 @@ inline double tester<T, Allocator>::ExecuteConcurrent(std::uint32_t runs)
 	m_readSum = 0;
 
 #if defined(GDUL_FIFO)
-	m_queue.reserve(Writes);
+	/*m_queue.reserve(Writes);*/
 #endif
 
 	for (std::uint32_t i = 0; i < runs; ++i) {
@@ -183,7 +183,7 @@ inline double tester<T, Allocator>::ExecuteSingleThread(std::uint32_t runs)
 	m_readSum = 0;
 
 #if defined(GDUL_FIFO)
-	m_queue.reserve(Writes);
+	/*m_queue.reserve(Writes);*/
 #endif
 
 	for (std::uint32_t i = 0; i < runs; ++i) {
@@ -225,7 +225,7 @@ inline double tester<T, Allocator>::ExecuteSingleProducerSingleConsumer(std::uin
 #endif
 
 #if defined(GDUL_FIFO)
-	m_queue.reserve(Writes);
+	/*m_queue.reserve(Writes);*/
 #endif
 
 	double result(0.0);
@@ -276,7 +276,7 @@ inline double tester<T, Allocator>::ExecuteRead(std::uint32_t runs)
 #endif
 
 #if defined(GDUL_FIFO)
-	m_queue.reserve(Writes);
+	/*m_queue.reserve(Writes);*/
 #endif
 
 	double result(0.0);
@@ -334,7 +334,7 @@ inline double tester<T, Allocator>::ExecuteWrite(std::uint32_t runs)
 #endif
 
 #if defined(GDUL_FIFO)
-	m_queue.reserve(Writes);
+	/*m_queue.reserve(Writes);*/
 #endif
 
 	double result(0.0);
@@ -388,7 +388,7 @@ template<class T, class Allocator>
 inline void tester<T, Allocator>::Write(std::uint32_t writes)
 {
 #ifdef GDUL
-	m_queue.reserve(writes);
+	/*m_queue.reserve(Writes);*/
 #endif
 
 	++m_waiting;

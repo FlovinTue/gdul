@@ -184,6 +184,7 @@ private:
 	tlm<shared_ptr_buffer_type, allocator_type> t_consumer;
 
 	atomic_shared_ptr_buffer_type m_back;
+	atomic_shared_ptr_buffer_type m_frontPeek;
 
 	allocator_type m_allocator;
 };
@@ -204,7 +205,6 @@ inline concurrent_queue_fifo<T, Allocator>::concurrent_queue_fifo(Allocator allo
 template<class T, class Allocator>
 inline concurrent_queue_fifo<T, Allocator>::~concurrent_queue_fifo() noexcept
 {
-	unsafe_reset();
 }
 template<class T, class Allocator>
 void concurrent_queue_fifo<T, Allocator>::push(const T& in)
@@ -244,27 +244,36 @@ inline void concurrent_queue_fifo<T, Allocator>::reserve(typename concurrent_que
 {
 	const size_type alignedCapacity(cq_fifo_detail::log2_align<>(capacity));
 
+	shared_ptr_buffer_type newBuffer(nullptr);
+
 	raw_ptr_buffer_type peek(m_back);
 	if (peek == s_dummyContainer.m_dummyBuffer) {
-		m_back.compare_exchange_strong(peek, create_item_buffer(alignedCapacity), std::memory_order_relaxed);
+		newBuffer = create_item_buffer(alignedCapacity);
+
+		if (m_back.compare_exchange_strong(peek, std::move(newBuffer), std::memory_order_relaxed))
+			return;
 	}
 
-	shared_ptr_buffer_type active(nullptr);
-	shared_ptr_buffer_type  front(nullptr);
+	shared_ptr_buffer_type  front(m_back.load(std::memory_order_relaxed));
 
 	do {
-		active = m_back.load(std::memory_order_relaxed);
-		front = active->find_front();
+		shared_ptr_buffer_type newFront(front->find_front());
 
-		if (!front) {
-			front = active;
+		if (newFront) {
+			front = std::move(newFront);
 		}
 
 		if (!(front->get_capacity() < capacity)) {
 			break;
 		}
 
-	} while (!active->try_exchange_next_buffer(create_item_buffer(alignedCapacity)));
+		if (!newBuffer) {
+			newBuffer = create_item_buffer(alignedCapacity);
+		}
+
+	} while (!front->try_exchange_next_buffer(std::move(newBuffer)));
+
+	m_frontPeek = t_producer.get()->find_front();
 }
 template<class T, class Allocator>
 inline void concurrent_queue_fifo<T, Allocator>::unsafe_clear()
@@ -310,18 +319,31 @@ inline bool concurrent_queue_fifo<T, Allocator>::refresh_consumer()
 	shared_ptr_buffer_type& active(t_consumer.get());
 	raw_ptr_buffer_type globalBack(m_back);
 
+	// If we are holding anything else than what is in m_back, this means some other consumer has successfully swapped
+	// in a new buffer. (Or this structure was previously unsafe_reseted).
 	if (active != globalBack) {
+
+		// Load and try with new buffer..
 		active = m_back.load(std::memory_order_relaxed);
 		return true;
 	}
 
+	// If, however, we are holding the active buffer, we try to find the active tail buffer.. 
+	// In case we are holding the dummy, this will return null as well, and refresh will fail.
 	shared_ptr_buffer_type back(active->find_back());
 
+	// In case we find no tail, we are holding the most relevant buffer
 	if (!back)
 		return false;
 
-	t_consumer = back;
+	// We found one.. !
 
+	active->assert_previous(back);
+
+	active = back;
+
+	// As a service to other consumers, try to swap in the buffer we found.
+	// If some other consumer swapped in a tail, we fail here. 
 	m_back.compare_exchange_strong(globalBack, std::move(back), std::memory_order_relaxed);
 
 	return true;
@@ -420,7 +442,8 @@ inline void concurrent_queue_fifo<T, Allocator>::refresh_producer()
 	shared_ptr_buffer_type front(producer->find_front());
 
 	if (!front) {
-		front = producer->try_exchange_next_buffer(create_item_buffer(producer->get_capacity() * 2));
+		reserve(producer->get_capacity() * 2);
+		front = producer->find_front();
 	}
 
 	producer = std::move(front);
@@ -460,6 +483,15 @@ public:
 	// Is this a dummybuffer or one from a destroyed structure?
 	inline bool is_valid() const;
 
+	inline void assert_previous(const shared_ptr_buffer_type& to) {
+		auto ref(this);
+
+		while (ref != to.get()) {
+			assert(!ref->is_active());
+			ref = m_next.unsafe_get();
+		}
+	}
+
 	// Searches the buffer list towards the front for
 	// the front-most buffer
 	inline shared_ptr_buffer_type find_front();
@@ -469,7 +501,7 @@ public:
 	inline shared_ptr_buffer_type find_back();
 
 	// Try push a buffer to the front of buffer list. Returns value after attempt
-	inline shared_ptr_buffer_type try_exchange_next_buffer(shared_ptr_buffer_type&& desired);
+	inline bool try_exchange_next_buffer(shared_ptr_buffer_type&& desired);
 
 	// Used to signal that this buffer list is to be discarded
 	inline void unsafe_invalidate();
@@ -497,9 +529,7 @@ private:
 
 	std::atomic<size_type> m_preReadSync;
 	GDUL_CQ_PADDING(64);
-
 	GDUL_ATOMIC_WITH_VIEW(size_type, m_readAt);
-
 	GDUL_CQ_PADDING(64);
 	std::atomic<size_type> m_postReadSync;
 	GDUL_CQ_PADDING(64);
@@ -550,14 +580,13 @@ inline bool item_buffer<T, Allocator>::is_active() const
 		return true;
 	}
 
+	// Producer enters try_push, claims writeAt, stalls
 	const size_type written(m_written.load(std::memory_order_relaxed));
+	const size_type readAt(m_readAt.load(std::memory_order_relaxed));
+	// Consumer enters and arrives <- here. 
 
-	if (written != m_capacity) {
-		return true;
-	}
-
-	const size_type read(m_readAt.load(std::memory_order_relaxed));
-	if (read != written) {
+	// Fails this check, since m_written has not been updated yet..
+	if (readAt != written) {
 		return true;
 	}
 
@@ -583,31 +612,29 @@ inline void item_buffer<T, Allocator>::unsafe_invalidate()
 template<class T, class Allocator>
 inline typename item_buffer<T, Allocator>::shared_ptr_buffer_type item_buffer<T, Allocator>::find_front()
 {
-	shared_ptr_buffer_type front(nullptr);
 	item_buffer<T, allocator_type>* inspect(this);
 
-	while (inspect->m_next)
-	{
-		front = inspect->m_next.load(std::memory_order_relaxed);
-		inspect = front.get();
+	while (item_buffer<T, allocator_type>* next = inspect->m_next.unsafe_get()){
+		if (!next->m_next)
+			break;
+		inspect = next;
 	}
-	return front;
+	return inspect->m_next.load(std::memory_order_relaxed);
 }
 template<class T, class Allocator>
 inline typename item_buffer<T, Allocator>::shared_ptr_buffer_type item_buffer<T, Allocator>::find_back()
 {
-	shared_ptr_buffer_type back(nullptr);
 	item_buffer<T, allocator_type>* inspect(this);
 
-	do {
-		if (inspect->is_active()) {
-			break;
-		}
-		back = inspect->m_next.load(std::memory_order_seq_cst);
-		inspect = back.get();
-	} while (back);
+	if (inspect->is_active())
+		return shared_ptr_buffer_type(nullptr);
 
-	return back;
+	while (item_buffer<T, allocator_type>* next = inspect->m_next.unsafe_get()) {
+		if (next->is_active())
+			return inspect->m_next.load(std::memory_order_acquire);
+		inspect = next;
+	}
+	return shared_ptr_buffer_type(nullptr);
 }
 template<class T, class Allocator>
 inline typename item_buffer<T, Allocator>::size_type item_buffer<T, Allocator>::size() const
@@ -629,14 +656,12 @@ inline typename item_buffer<T, Allocator>::size_type item_buffer<T, Allocator>::
 	return m_capacity;
 }
 template<class T, class Allocator>
-inline typename item_buffer<T, Allocator>::shared_ptr_buffer_type item_buffer<T, Allocator>::try_exchange_next_buffer(shared_ptr_buffer_type&& desired)
+inline bool item_buffer<T, Allocator>::try_exchange_next_buffer(shared_ptr_buffer_type&& desired)
 {
-	shared_ptr_buffer_type expected(nullptr, m_next.get_version());
-	if (m_next.compare_exchange_strong(expected, desired)) {
-		return  shared_ptr_buffer_type(std::move(desired));
-	}
+	block_writers();
 
-	return shared_ptr_buffer_type(std::move(expected));
+	shared_ptr_buffer_type expected(nullptr);
+	return m_next.compare_exchange_strong(expected, std::move(desired));
 }
 template<class T, class Allocator>
 inline void item_buffer<T, Allocator>::unsafe_clear()
@@ -659,12 +684,12 @@ inline void item_buffer<T, Allocator>::unsafe_clear()
 template<class T, class Allocator>
 inline void item_buffer<T, Allocator>::block_writers()
 {
-	m_writeAt.store(m_capacity, std::memory_order_relaxed);
+	m_writeAt.fetch_add(m_capacity, std::memory_order_relaxed);
 }
 template<class T, class Allocator>
 inline void item_buffer<T, Allocator>::block_readers()
 {
-	m_readAt.store(m_capacity + std::numeric_limits<std::uint16_t>::max(), std::memory_order_relaxed);
+	m_preReadSync.fetch_add(m_capacity, std::memory_order_relaxed);
 }
 template<class T, class Allocator>
 template<class ...Arg>
@@ -714,31 +739,6 @@ inline bool item_buffer<T, Allocator>::try_pop(T& out)
 
 	write_out(at % m_capacity, out);
 
-	//const size_type postSync(m_postReadSync.fetch_add(1, std::memory_order_acq_rel));
-	//const size_type postAt(m_readAt.load(std::memory_order_relaxed));
-	//if ((postSync + 1) == postAt) {
-	//	size_type xchg(postAt);
-	//	size_type target(0);
-	//	do {
-	//		target = xchg;
-	//		xchg = m_read.exchange(target, std::memory_order_relaxed);
-	//	} while (target < xchg);
-	//}
-	//const size_type postSync(m_postReadSync.fetch_add(1, std::memory_order_acq_rel));
-	//const size_type postAt(m_readAt.load(std::memory_order_relaxed));
-	//if ((postSync + 1) == postAt) {
-	//	const size_type read(m_read.load(std::memory_order_relaxed));
-	//	const size_type diff(postSync - read);
-	//
-	//	if (!(diff < m_capacity / 2)) {
-	//		size_type xchg(postAt);
-	//		size_type target(0);
-	//		do {
-	//			target = xchg;
-	//			xchg = m_read.exchange(target, std::memory_order_relaxed);
-	//		} while (target < xchg);
-	//	}
-	//}
 	const size_type postSync(m_postReadSync.fetch_add(1, std::memory_order_acq_rel));
 	const size_type read(m_read.load(std::memory_order_relaxed));
 	const size_type diff(postSync - read);
