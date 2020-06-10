@@ -510,7 +510,16 @@ public:
 	inline void block_writers();
 	inline void block_readers();
 
+	bool is_readers_blocked() const;
+	bool is_writers_blocked() const;
+
 private:
+	inline bool has_blockage_offset(size_type postVar, size_type preVar) const;
+	inline void apply_blockage_offset(std::atomic<size_type>& preVar, std::atomic<size_type>& postVar);
+
+	inline size_type blockage_offset() const;
+	inline size_type blockage_threshhold() const;
+
 	template <class U = T, std::enable_if_t<GDUL_CQ_BUFFER_NOTHROW_PUSH_MOVE(U)>* = nullptr>
 	inline void write_in(size_type slot, U&& in);
 	template <class U = T, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_PUSH_MOVE(U)>* = nullptr>
@@ -579,14 +588,21 @@ inline bool item_buffer<T, Allocator>::is_active() const
 	if (!m_next) {
 		return true;
 	}
+	
+	if (!is_writers_blocked()) {
+		return true;
+	}
 
-	// Producer enters try_push, claims writeAt, stalls
-	const size_type written(m_written.load(std::memory_order_relaxed));
+	const size_type preWrite(m_writeAt.load(std::memory_order_relaxed) - blockage_offset());
+	const size_type written(m_written.load(std::memory_order_seq_cst));
+
+	if (preWrite != written) {
+		return true;
+	}
+
 	const size_type readAt(m_readAt.load(std::memory_order_relaxed));
-	// Consumer enters and arrives <- here. 
 
-	// Fails this check, since m_written has not been updated yet..
-	if (readAt != written) {
+	if (readAt != preWrite) {
 		return true;
 	}
 
@@ -684,40 +700,121 @@ inline void item_buffer<T, Allocator>::unsafe_clear()
 template<class T, class Allocator>
 inline void item_buffer<T, Allocator>::block_writers()
 {
-	m_writeAt.fetch_add(m_capacity, std::memory_order_relaxed);
+	apply_blockage_offset(m_writeAt, m_written);
 }
 template<class T, class Allocator>
 inline void item_buffer<T, Allocator>::block_readers()
 {
-	m_preReadSync.fetch_add(m_capacity, std::memory_order_relaxed);
+	apply_blockage_offset(m_preReadSync, m_read);
+}
+template<class T, class Allocator>
+inline bool item_buffer<T, Allocator>::is_readers_blocked() const
+{
+	return has_blockage_offset(m_read.load(std::memory_order_relaxed), m_preReadSync.load(std::memory_order_relaxed));
+}
+template<class T, class Allocator>
+inline bool item_buffer<T, Allocator>::is_writers_blocked() const
+{
+	return has_blockage_offset(m_written.load(std::memory_order_relaxed), m_writeAt.load(std::memory_order_relaxed));
+}
+template<class T, class Allocator>
+inline bool item_buffer<T, Allocator>::has_blockage_offset(size_type postVar, size_type preVar) const
+{
+	const size_type post(postVar);
+	const size_type pre(preVar);
+
+	return blockage_threshhold() < (pre - post);
+}
+template<class T, class Allocator>
+inline void item_buffer<T, Allocator>::apply_blockage_offset(std::atomic<size_type>& preVar, std::atomic<size_type>& postVar)
+{
+	size_type pre(preVar.load(std::memory_order_relaxed));
+	size_type desired;
+	do {
+		const size_type post(postVar.load(std::memory_order_seq_cst));
+
+		if (has_blockage_offset(post, pre)) {
+			break;
+		}
+
+		desired = pre + blockage_offset();
+
+	} while (!preVar.compare_exchange_strong(pre, desired, std::memory_order_relaxed));
+}
+template<class T, class Allocator>
+inline typename concurrent_queue_fifo<T, Allocator>::size_type item_buffer<T, Allocator>::blockage_offset() const
+{
+	return (m_capacity + Buffer_Lock_Offset);
+}
+template<class T, class Allocator>
+inline typename concurrent_queue_fifo<T, Allocator>::size_type item_buffer<T, Allocator>::blockage_threshhold() const
+{
+	return (m_capacity + Buffer_Lock_Threshhold);
 }
 template<class T, class Allocator>
 template<class ...Arg>
 inline bool item_buffer<T, Allocator>::try_push(Arg&& ...in)
 {
-	const size_type at(m_writeAt.fetch_add(1, std::memory_order_relaxed));
+
 	const size_type read(m_read.load(std::memory_order_relaxed));
+	// Oh boy.. can a producer fail here, followed by another succeeding? 
+	// 1: load 0 m_read
+	// 2: stall
+	// 3: claim high writeslot
+	// 4: check fails
+	//		4.2 try rollback of m_writeAt
+	// 5: block_writers
+	// 6: re-load m_read.... 
+	// is this air-tight?
+	std::atomic_thread_fence(std::memory_order_acquire);
+
+	const size_type at(m_writeAt.fetch_add(1, std::memory_order_relaxed));
 	const size_type diff(at - read);
 
 	if (!(diff < m_capacity)) {
-		return false;
+		size_type expected(at + 1);
+		// Try rollback. (If we can, we should delay blocking the buffer until a producer has allocated a new one)
+		// So as to disencourage a race to allocating the new buffer.. 
+		if (m_writeAt.compare_exchange_strong(expected, at, std::memory_order_relaxed)) {
+			return false;
+		}
+		// else block production
+		block_writers();
+
+		m_writeAt.fetch_sub(1, std::memory_order_relaxed);
+
+		// and make sure there's no stray slots being filled
+		const size_type reRead(m_read.load(std::memory_order_seq_cst));
+		const size_type reDiff(at - reRead);
+		if (!(reDiff < m_capacity))
+			return false;
 	}
 
 	write_in(at % m_capacity, std::forward<Arg>(in)...);
 
-	const size_type postSync(m_postWriteSync.fetch_add(1, std::memory_order_relaxed));
+	size_type postSync(m_postWriteSync.fetch_add(1, std::memory_order_relaxed));
 
 	std::atomic_thread_fence(std::memory_order_release);
 
-	const size_type postAt(m_writeAt.load(std::memory_order_relaxed));
-	if ((postSync + 1) == postAt) {
+	size_type postAt(m_writeAt.load(std::memory_order_relaxed));
+
+	while ((postSync + 1) == postAt) {
 		size_type xchg(postAt);
 		size_type target(0);
 		do {
 			target = xchg;
 			xchg = m_written.exchange(target, std::memory_order_relaxed);
 		} while (target < xchg);
-	}
+
+		const size_type postSyncRe(m_postWriteSync.load(std::memory_order_acquire));
+
+		if (postSyncRe == target) {
+			break;
+		}
+
+		postSync = postSyncRe;
+		postAt = m_writeAt.load(std::memory_order_relaxed);
+	};
 
 	return true;
 }
