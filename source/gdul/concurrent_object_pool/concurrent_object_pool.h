@@ -35,7 +35,7 @@ using defaul_allocator = std::allocator<std::uint8_t>;
 
 // Concurrency safe, lock free object pool. Contains an optimization where recycled objects belonging to an 'old' 
 // block will be discarded. This will make the objects retain good cache locality as the structure ages. 
-// Block capacity grows quadratically.
+// Block capacity grows over time.
 template <class Object, class Allocator = cop_detail::defaul_allocator>
 class concurrent_object_pool
 {
