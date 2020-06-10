@@ -31,7 +31,7 @@ Depends on atomic_shared_ptr.h, thread_local_member.h
 ## concurrent_object_pool
 Concurrency safe, lock free object pool. Contains an optimization where recycled objects belonging to an 'old' 
 block will be discarded. This will make the objects retain good cache locality as the structure ages. 
-Block capacity grows quadratically.
+Block capacity grows over time.
 
 Depends on concurrent_queue.h, atomic_shared_ptr.h, thread_local_member.h
 
