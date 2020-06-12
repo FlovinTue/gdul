@@ -195,19 +195,19 @@ public:
 	inline u128 exchange_u16(std::uint16_t value, std::uint8_t atIndex) noexcept;
 	inline u128 exchange_u8(std::uint8_t value, std::uint8_t atIndex) noexcept;
 
-	inline u128 fetch_add_to_u64(std::uint64_t value, std::uint8_t atIndex) noexcept;
-	inline u128 fetch_add_to_u32(std::uint32_t value, std::uint8_t atIndex) noexcept;
-	inline u128 fetch_add_to_u16(std::uint16_t value, std::uint8_t atIndex) noexcept;
-	inline u128 fetch_add_to_u8(std::uint8_t value, std::uint8_t atIndex) noexcept;
-	inline u128 fetch_sub_to_u64(std::uint64_t value, std::uint8_t atIndex) noexcept;
-	inline u128 fetch_sub_to_u32(std::uint32_t value, std::uint8_t atIndex) noexcept;
-	inline u128 fetch_sub_to_u16(std::uint16_t value, std::uint8_t atIndex) noexcept;
-	inline u128 fetch_sub_to_u8(std::uint8_t value, std::uint8_t atIndex) noexcept;
+	inline u128 fetch_add_u64(std::uint64_t value, std::uint8_t atIndex) noexcept;
+	inline u128 fetch_add_u32(std::uint32_t value, std::uint8_t atIndex) noexcept;
+	inline u128 fetch_add_u16(std::uint16_t value, std::uint8_t atIndex) noexcept;
+	inline u128 fetch_add_u8(std::uint8_t value, std::uint8_t atIndex) noexcept;
+	inline u128 fetch_sub_u64(std::uint64_t value, std::uint8_t atIndex) noexcept;
+	inline u128 fetch_sub_u32(std::uint32_t value, std::uint8_t atIndex) noexcept;
+	inline u128 fetch_sub_u16(std::uint16_t value, std::uint8_t atIndex) noexcept;
+	inline u128 fetch_sub_u8(std::uint8_t value, std::uint8_t atIndex) noexcept;
 private:
 	template <class IntegerType>
-	inline u128 fetch_add_to_integer(const typename disable_deduction<IntegerType>::type& value, std::uint8_t atIndex) noexcept;
+	inline u128 fetch_add_integer(const typename disable_deduction<IntegerType>::type& value, std::uint8_t atIndex) noexcept;
 	template <class IntegerType>
-	inline u128 fetch_sub_to_integer(const typename disable_deduction<IntegerType>::type& value, std::uint8_t atIndex) noexcept;
+	inline u128 fetch_sub_integer(const typename disable_deduction<IntegerType>::type& value, std::uint8_t atIndex) noexcept;
 	template <class IntegerType>
 	inline u128 exchange_integer(const typename disable_deduction<IntegerType>::type& value, std::uint8_t atIndex) noexcept;
 };
@@ -232,48 +232,48 @@ inline u128 atomic_128<u128>::exchange_u8(const std::uint8_t value, std::uint8_t
 	return exchange_integer<decltype(value)>(value, atIndex);
 }
 
-inline u128 atomic_128<u128>::fetch_add_to_u64(std::uint64_t value, std::uint8_t atIndex) noexcept
+inline u128 atomic_128<u128>::fetch_add_u64(std::uint64_t value, std::uint8_t atIndex) noexcept
 {
-	return fetch_add_to_integer<decltype(value)>(value, atIndex);
+	return fetch_add_integer<decltype(value)>(value, atIndex);
 }
 
-inline u128 atomic_128<u128>::fetch_add_to_u32(std::uint32_t value, std::uint8_t atIndex) noexcept
+inline u128 atomic_128<u128>::fetch_add_u32(std::uint32_t value, std::uint8_t atIndex) noexcept
 {
-	return fetch_add_to_integer<decltype(value)>(value, atIndex);
+	return fetch_add_integer<decltype(value)>(value, atIndex);
 }
 
-inline u128 atomic_128<u128>::fetch_add_to_u16(std::uint16_t value, std::uint8_t atIndex) noexcept
+inline u128 atomic_128<u128>::fetch_add_u16(std::uint16_t value, std::uint8_t atIndex) noexcept
 {
-	return fetch_add_to_integer<decltype(value)>(value, atIndex);
+	return fetch_add_integer<decltype(value)>(value, atIndex);
 }
 
-inline u128 atomic_128<u128>::fetch_add_to_u8(const std::uint8_t value, std::uint8_t atIndex) noexcept
+inline u128 atomic_128<u128>::fetch_add_u8(const std::uint8_t value, std::uint8_t atIndex) noexcept
 {
-	return fetch_add_to_integer<decltype(value)>(value, atIndex);
+	return fetch_add_integer<decltype(value)>(value, atIndex);
 }
 
-inline u128 atomic_128<u128>::fetch_sub_to_u64(std::uint64_t value, std::uint8_t atIndex) noexcept
+inline u128 atomic_128<u128>::fetch_sub_u64(std::uint64_t value, std::uint8_t atIndex) noexcept
 {
-	return fetch_sub_to_integer<decltype(value)>(value, atIndex);
+	return fetch_sub_integer<decltype(value)>(value, atIndex);
 }
 
-inline u128 atomic_128<u128>::fetch_sub_to_u32(std::uint32_t value, std::uint8_t atIndex) noexcept
+inline u128 atomic_128<u128>::fetch_sub_u32(std::uint32_t value, std::uint8_t atIndex) noexcept
 {
-	return fetch_sub_to_integer<decltype(value)>(value, atIndex);
+	return fetch_sub_integer<decltype(value)>(value, atIndex);
 }
 
-inline u128 atomic_128<u128>::fetch_sub_to_u16(std::uint16_t value, std::uint8_t atIndex) noexcept
+inline u128 atomic_128<u128>::fetch_sub_u16(std::uint16_t value, std::uint8_t atIndex) noexcept
 {
-	return fetch_sub_to_integer<decltype(value)>(value, atIndex);
+	return fetch_sub_integer<decltype(value)>(value, atIndex);
 }
 
-inline u128 atomic_128<u128>::fetch_sub_to_u8(const std::uint8_t value, std::uint8_t atIndex) noexcept
+inline u128 atomic_128<u128>::fetch_sub_u8(const std::uint8_t value, std::uint8_t atIndex) noexcept
 {
-	return fetch_sub_to_integer<decltype(value)>(value, atIndex);
+	return fetch_sub_integer<decltype(value)>(value, atIndex);
 }
 
 template<class IntegerType>
-inline u128 atomic_128<u128>::fetch_add_to_integer(const typename disable_deduction<IntegerType>::type& value, std::uint8_t atIndex) noexcept
+inline u128 atomic_128<u128>::fetch_add_integer(const typename disable_deduction<IntegerType>::type& value, std::uint8_t atIndex) noexcept
 {
 	static_assert(std::is_integral<IntegerType>(), "Only integers allowed as value type");
 
@@ -303,7 +303,7 @@ inline u128 atomic_128<u128>::fetch_add_to_integer(const typename disable_deduct
 }
 
 template<class IntegerType>
-inline u128 atomic_128<u128>::fetch_sub_to_integer(const typename disable_deduction<IntegerType>::type& value, std::uint8_t atIndex) noexcept
+inline u128 atomic_128<u128>::fetch_sub_integer(const typename disable_deduction<IntegerType>::type& value, std::uint8_t atIndex) noexcept
 {
 	static_assert(std::is_integral<IntegerType>(), "Only integers allowed as value type");
 
