@@ -18,7 +18,39 @@ There are eight different versions of compare_exchange_strong, four of which tak
 
 ## atomic_128
 utility wrapper class for 128 bit atomic operations. 
+```
+#include <gdul\atomic_128\atomic_128.h>
 
+struct custom_struct
+{
+	std::uint64_t data[2];
+};
+
+int main()
+{
+	gdul::atomic_128<custom_struct> custom;
+	const custom_struct in{ 5, 10 };
+
+	custom.store(in);
+
+	const custom_struct out(custom.load());
+
+	custom_struct badExpected{ 5, 9 };
+	custom_struct goodExpected{ 5, 10 };
+	const custom_struct desired{ 15, 25 };
+
+	const bool resultA(custom.compare_exchange_strong(badExpected, desired));
+	const bool resultB(custom.compare_exchange_strong(goodExpected, desired));
+
+	gdul::atomic_128<gdul::u128> integer;
+
+	const gdul::u128 addTo64(integer.fetch_add_u64(1, 0));
+	const gdul::u128 exchange8(integer.exchange_u8(17, 4));
+	const gdul::u128 subTo32(integer.fetch_sub_u32(15, 1));
+
+	return 0;
+}
+```
 -------------------------------------------------------------------------------------------------------------------------------------------
 
 ## concurrent_queue
