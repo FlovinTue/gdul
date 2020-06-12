@@ -1,8 +1,7 @@
 
 #include "pch.h"
-#include <iostream>
 #include <gdul\atomic_128\atomic_128.h>
-#include <atomic>
+
 
 struct custom_struct
 {
