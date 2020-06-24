@@ -34,8 +34,12 @@
 // in THIS scenario we want to limit collisions. (We're going for the optimal solution in few-item scenarios)
 
 
+template <class T, class Key>
 struct rb_node
 {
+	Key m_key;
+	T m_value;
+
 	rb_node* m_parent;
 	rb_node* m_right;
 	rb_node* m_left;
@@ -45,40 +49,45 @@ template <class T, class Key>
 class rb_tree
 {
 public:
-	void insert(const T& in, Key key);
+	using node_type = rb_node<T, Key>;
 
-	const rb_node* find_min() const;
-	const rb_node* find_max() const;
+	void insert(node_type* node);
+
+	const node_type* find_min() const;
+	const node_type* find_max() const;
+	const node_type* find(Key key) const;
+
+	node_type* delete_min();
+	node_type* delete_max();
+	node_type* delete_(Key key);
 
 private:
-	bool try_insert(const T& in, Key key);
+	bool try_insert(node_type* node);
 
-	bool claim_insertion_region(rb_node* above);
-	void attach_to(rb_node* parent);
+	bool claim_insertion_region(node_type* above);
+	void attach_to(node_type* parent, node_type* node);
 
-	void repair_rb_properties_insert(rb_node* above);
-	void repair_rb_properties_delete(rb_node* above);
+	void repair_rb_properties_insert(node_type* around);
+	void repair_rb_properties_delete(node_type* around);
 
-	rb_node* find_parent() const;
+	node_type* find_parent() const;
 };
 
 template<class T, class Key>
-inline void rb_tree<T, Key>::insert(const T& in, Key key)
+inline void rb_tree<T, Key>::insert(node_type* node)
 {
-	while (!try_insert(in, key));
+	while (!try_insert(node));
 }
 
 template<class T, class Key>
-inline bool rb_tree<T, Key>::try_insert(const T& in, Key key)
+inline bool rb_tree<T, Key>::try_insert(node_type* node)
 {
-	rb_node* const parent(find_parent(key));
+	rb_node* const parent(find_parent(node->m_key));
 
 	if (!claim_insertion_region(parent))
 		return false;
 
-	rb_node* newNode(new rb_node());
-
-	attach_to(newNode, parent);
+	attach_to(parent, node);
 
 	repair_rb_properties_insert(parent);
 	
