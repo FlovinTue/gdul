@@ -13,8 +13,6 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "atomic_shared_ptr", "Tester
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "job_handler", "Testers\job_handler_tester\job_handler.vcxproj", "{38AC6E3A-729D-4527-83C6-3805A7274AA8}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "concurrent_priority_queue", "Testers\concurrent_priority_queue_tester\concurrent_priority_queue.vcxproj", "{5AECC0B4-DD09-443F-820D-053FFCEDF8B3}"
-EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "thread_local_member", "Testers\thread_local_member_tester\thread_local_member_tester.vcxproj", "{14B2FC84-037B-47A3-A99A-9F61F4F021B9}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "delegate", "Testers\delegate_tester\delegate_tester.vcxproj", "{6294E62E-CE95-40D8-A176-D30D0046235B}"
@@ -22,6 +20,8 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "concurrent_queue_fifo", "Testers\concurrent_queue_fifo_tester\concurrent_queue_fifo\concurrent_queue_fifo.vcxproj", "{1FFC44D2-F701-4925-8987-768C3F623870}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "pool_allocator", "Testers\pool_allocator\pool_allocator.vcxproj", "{A2E8798B-61E2-4AF0-95A2-8D9FAC6A57BA}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "concurrent_priority_queue", "Testers\concurrent_priority_queue\concurrent_priority_queue.vcxproj", "{9F5FBE3A-88C5-46DE-ADCF-4F06D60676A9}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -61,10 +61,6 @@ Global
 		{38AC6E3A-729D-4527-83C6-3805A7274AA8}.Release|x64.ActiveCfg = Release|x64
 		{38AC6E3A-729D-4527-83C6-3805A7274AA8}.Release|x64.Build.0 = Release|x64
 		{38AC6E3A-729D-4527-83C6-3805A7274AA8}.Release|x86.ActiveCfg = Release|x64
-		{5AECC0B4-DD09-443F-820D-053FFCEDF8B3}.Debug|x64.ActiveCfg = Debug|x64
-		{5AECC0B4-DD09-443F-820D-053FFCEDF8B3}.Debug|x86.ActiveCfg = Debug|x64
-		{5AECC0B4-DD09-443F-820D-053FFCEDF8B3}.Release|x64.ActiveCfg = Release|x64
-		{5AECC0B4-DD09-443F-820D-053FFCEDF8B3}.Release|x86.ActiveCfg = Release|x64
 		{14B2FC84-037B-47A3-A99A-9F61F4F021B9}.Debug|x64.ActiveCfg = Debug|x64
 		{14B2FC84-037B-47A3-A99A-9F61F4F021B9}.Debug|x64.Build.0 = Debug|x64
 		{14B2FC84-037B-47A3-A99A-9F61F4F021B9}.Debug|x86.ActiveCfg = Debug|x64
@@ -89,6 +85,12 @@ Global
 		{A2E8798B-61E2-4AF0-95A2-8D9FAC6A57BA}.Release|x64.ActiveCfg = Release|x64
 		{A2E8798B-61E2-4AF0-95A2-8D9FAC6A57BA}.Release|x64.Build.0 = Release|x64
 		{A2E8798B-61E2-4AF0-95A2-8D9FAC6A57BA}.Release|x86.ActiveCfg = Release|x64
+		{9F5FBE3A-88C5-46DE-ADCF-4F06D60676A9}.Debug|x64.ActiveCfg = Debug|x64
+		{9F5FBE3A-88C5-46DE-ADCF-4F06D60676A9}.Debug|x64.Build.0 = Debug|x64
+		{9F5FBE3A-88C5-46DE-ADCF-4F06D60676A9}.Debug|x86.ActiveCfg = Debug|x64
+		{9F5FBE3A-88C5-46DE-ADCF-4F06D60676A9}.Release|x64.ActiveCfg = Release|x64
+		{9F5FBE3A-88C5-46DE-ADCF-4F06D60676A9}.Release|x64.Build.0 = Release|x64
+		{9F5FBE3A-88C5-46DE-ADCF-4F06D60676A9}.Release|x86.ActiveCfg = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
