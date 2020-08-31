@@ -1,17 +1,37 @@
 // concurrent_priority_queue.cpp : This file contains the 'main' function. Program execution begins and ends there.
 //
-#include <gdul/WIP_concurrent_priority_queue/concurrent_priority_queue_v6.h>
-
+#include <gdul/WIP_concurrent_priority_queue/op_test.h>
 
 
 int main()
 {
-	gdul::concurrent_priority_queue<int, float> q;
+	gdul::cpq q;
+	
 
-	q.push(std::make_pair(1, 1.f));
+	q.push(9);
+	q.push(8);
+	q.push(7);
+	q.push(6);
+	q.push(5);
+	q.push(4);
+	q.push(3);
+	q.push(2);
+	q.push(1);
 
-	std::pair<int, float> out;
-	q.try_pop(out);
+	std::vector<std::uint32_t> outItems;
+
+	for (std::size_t i = 0; i < 9; ++i) {
+		uint32_t out(0);
+		const bool result(q.try_pop(out));
+		assert(result && "Expected success");
+
+		outItems.push_back(out);
+	}
+
+	uint32_t testOut(0);
+	const bool result(q.try_pop(testOut));
+	assert(!result && "Expected failure");
+
 
 }
 

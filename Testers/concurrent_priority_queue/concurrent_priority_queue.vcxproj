@@ -46,10 +46,14 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
     <OutDir>$(SolutionDir)Bin\</OutDir>
+    <IntDir>C:\Visual Studio\Projects\$(SolutionName)\$(ProjectName)\Intermediate\</IntDir>
+    <TargetName>$(ProjectName)_$(Configuration)</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <OutDir>$(SolutionDir)Bin\</OutDir>
+    <IntDir>C:\Visual Studio\Projects\$(SolutionName)\$(ProjectName)\Intermediate\</IntDir>
+    <TargetName>$(ProjectName)_$(Configuration)</TargetName>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -99,6 +103,7 @@
     <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\concurrent_priority_queue_v6.h" />
     <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\inc_dec_test.h" />
     <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\op_test.h" />
+    <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\transactional_memory_heap.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
