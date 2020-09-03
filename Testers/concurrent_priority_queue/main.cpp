@@ -1,6 +1,7 @@
 // concurrent_priority_queue.cpp : This file contains the 'main' function. Program execution begins and ends there.
 //
 #include <gdul/WIP_concurrent_priority_queue/op_test.h>
+#include <concurrent_priority_queue.h>
 
 
 int main()
@@ -32,6 +33,7 @@ int main()
 	const bool result(q.try_pop(testOut));
 	assert(!result && "Expected failure");
 
+	concurrency::concurrent_priority_queue<int> blah;
 
 }
 

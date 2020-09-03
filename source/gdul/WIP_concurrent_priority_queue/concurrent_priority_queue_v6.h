@@ -1,7 +1,9 @@
 #pragma once
 
-
-
+// Perhaps it is futile attempting to parallelize this structure. There will always be contention at the front, and deletions can only happen serially.
+// Something to think of is that if an entirely sorted set is kept, deletion is super-easy. Simply increment the begin ref.
+// If a list is kept, that could be a beginref + offsetCounter, so that the lastmost deletion could win out safely...
+// Good thing about a list version would be that it *can* be kept fully sorted..
 #include <atomic>
 #include <stdint.h>
 #include <memory>

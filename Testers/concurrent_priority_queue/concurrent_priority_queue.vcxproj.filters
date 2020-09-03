@@ -13,5 +13,7 @@
     <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\inc_dec_test.h" />
     <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\op_test.h" />
     <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\transactional_memory_heap.h" />
+    <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\op_test2.h" />
+    <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\concurrent_priority_queue_v7.h" />
   </ItemGroup>
 </Project>

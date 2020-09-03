@@ -101,8 +101,10 @@
     <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\concurrent_priority_queue_v4.h" />
     <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\concurrent_priority_queue_v5.h" />
     <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\concurrent_priority_queue_v6.h" />
+    <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\concurrent_priority_queue_v7.h" />
     <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\inc_dec_test.h" />
     <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\op_test.h" />
+    <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\op_test2.h" />
     <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\transactional_memory_heap.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
