@@ -2,11 +2,17 @@
 //
 #include <gdul/WIP_concurrent_priority_queue/concurrent_priority_queue_v7.h>
 
+#define GDUL_CPQ
+#include "../queue_tester/tester.h"
+
+gdul::concurrent_priority_queue<int, float> q;
+
+using node_t = decltype(q)::node_type;
+
+thread_local gdul::shared_ptr<node_t[]> gdul::tester< std::pair<int, float>, gdul::tracking_allocator<std::pair<int, float>>>::m_nodes;
+
 int main()
 {
-	gdul::concurrent_priority_queue<int, float> q;
-
-	using node_t = decltype(q)::node_type;
 
 	node_t two(std::make_pair	(2, 1.f));
 	node_t six(std::make_pair	(6, 1.f));
@@ -39,6 +45,12 @@ int main()
 	node_t* outFail(nullptr);
 
 	const bool failResult(q.try_pop(outFail));
+
+	gdul::queue_testrun<std::pair<int, float>, gdul::tracking_allocator<std::pair<int, float>>>(
+		1000, 
+		gdul::tracking_allocator<std::pair<int, float>>(), 
+		gdul::test_option_single);
+
 
 }
 

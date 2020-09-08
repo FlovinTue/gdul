@@ -6,9 +6,13 @@
 #include "../Common/Timer.h"
 #include <concurrent_queue.h>
 #include "../Common/tracking_allocator.h"
+#include <limits>
+#include <string>
 
 #if defined(GDUL_FIFO)
 #include <gdul/WIP_concurrent_queue_fifo/concurrent_queue_fifo_v6.h>
+#elif defined(GDUL_CPQ)
+#include <gdul/WIP_concurrent_priority_queue/concurrent_priority_queue_v7.h>
 #endif
 #include <queue>
 #include <mutex>
@@ -20,10 +24,14 @@
 #include <concurrentqueue.h>
 #endif
 
+#undef max
+
 namespace gdul
 {
+#if !defined(GDUL_CPQ)
 extern std::random_device rd;
 extern std::mt19937 rng;
+#endif
 
 template <class T, class Allocator>
 class tester;
@@ -63,8 +71,18 @@ const std::uint32_t WritesPerThread(Writes / Writers);
 const std::uint32_t ReadsPerThread(Writes / Readers);
 
 namespace gdul {
+enum : std::uint32_t
+{
+	test_option_concurrent = 1 << 0,
+	test_option_single = 1 << 1,
+	test_option_singleReadWrite = 1 << 2,
+	test_option_onlyRead = 1 << 3,
+	test_option_onlyWrite = 1 << 4,
+	test_option_all = std::numeric_limits<std::uint32_t>::max(),
+};
+
 template <class T, class Allocator>
-void queue_testrun(std::uint32_t aRuns, Allocator& alloc) {
+void queue_testrun(std::uint32_t aRuns, Allocator alloc, std::uint32_t options = test_option_all) {
 	std::cout << "Pre-run alloc value is: " << gdul::s_allocated << std::endl;
 
 	tester<T, Allocator> tester(alloc);
@@ -75,11 +93,16 @@ void queue_testrun(std::uint32_t aRuns, Allocator& alloc) {
 	double readRes(0.0);
 	double singleProdSingleCon(0.0);
 
-	singleProdSingleCon = tester.ExecuteSingleProducerSingleConsumer(aRuns);
-	writeRes = tester.ExecuteWrite(aRuns);
-	readRes = tester.ExecuteRead(aRuns);
-	singleRes = tester.ExecuteSingleThread(aRuns);
-	concurrentRes = tester.ExecuteConcurrent(aRuns);
+	if (options & test_option_singleReadWrite)
+		singleProdSingleCon = tester.ExecuteSingleProducerSingleConsumer(aRuns);
+	if (options & test_option_onlyWrite)
+		writeRes = tester.ExecuteWrite(aRuns);
+	if (options & test_option_onlyRead)
+		readRes = tester.ExecuteRead(aRuns);
+	if (options & test_option_single)
+		singleRes = tester.ExecuteSingleThread(aRuns);
+	if (options & test_option_concurrent)
+		concurrentRes = tester.ExecuteConcurrent(aRuns);
 
 	std::cout << "\n";
 #ifdef _DEBUG
@@ -147,6 +170,9 @@ private:
 	moodycamel::ConcurrentQueue<T> m_queue;
 #elif defined(MTX_WRAPPER)
 	queue_mutex_wrapper<T> m_queue;
+#elif defined(GDUL_CPQ)
+	concurrent_priority_queue<typename T::first_type, typename T::second_type> m_queue;
+	static thread_local gdul::shared_ptr<typename decltype(m_queue)::node_type[]> m_nodes;
 #endif
 
 	gdul::thread_pool m_writer;
@@ -444,6 +470,10 @@ template<class T, class Allocator>
 inline void tester<T, Allocator>::Write(std::uint32_t writes) {
 #ifdef GDUL
 	/*m_queue.reserve(Writes);*/
+#elif defined(GDUL_CPQ)
+	if (!m_nodes) {
+		m_nodes = gdul::make_shared<typename decltype(m_queue)::node_type[]>(writes);
+	}
 #endif
 
 	++m_waiting;
@@ -456,8 +486,9 @@ inline void tester<T, Allocator>::Write(std::uint32_t writes) {
 		std::this_thread::yield();
 
 	uint32_t sum(0);
-
-	uint32_t seed(gdul::rng());
+#if !defined(GDUL_CPQ)
+	uint32_t seed(rng());
+#endif
 
 #ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
 	for (std::uint32_t j = 0; j < writes; ) {
@@ -473,12 +504,18 @@ inline void tester<T, Allocator>::Write(std::uint32_t writes) {
 	}
 #else
 	for (std::uint32_t j = 0; j < writes; ++j) {
+
+#if !defined(GDUL_CPQ)
 		T in;
 		in.count = seed % (j + 1);
 		//in.count = 1;
 		sum += in.count;
-#ifndef MOODYCAMEL
+#endif
+
+#if !defined(MOODYCAMEL) && !defined(GDUL_CPQ)
 		m_queue.push(in);
+#elif defined(GDUL_CPQ)
+		m_queue.push(&m_nodes[j]);
 #else
 		m_queue.enqueue(in);
 #endif
@@ -501,7 +538,11 @@ inline void tester<T, Allocator>::Read(std::uint32_t reads) {
 
 	uint32_t sum(0);
 
+#if !defined(GDUL_CPQ)
 	T out{ 0 };
+#else
+	typename decltype(m_queue)::node_type* out(nullptr);
+#endif
 #ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
 	for (std::uint32_t j = 0; j < reads;) {
 		while (true) {
@@ -526,7 +567,9 @@ inline void tester<T, Allocator>::Read(std::uint32_t reads) {
 #else
 			if (m_queue.try_dequeue(out)) {
 #endif
+#if !defined(GDUL_CPQ)
 				sum += out.count;
+#endif
 				break;
 			}
 			else {

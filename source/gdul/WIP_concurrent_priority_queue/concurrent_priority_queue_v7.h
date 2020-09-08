@@ -147,7 +147,7 @@ private:
 	// Also ->end
 	node_type m_head;
 
-	const std::uint8_t _padding[std::hardware_destructive_interference_size]{};
+	const std::uint8_t _padding[64/*std::hardware_destructive_interference_size*/]{};
 
 	// ToDo: This should probably be moved in to node_rep instead, using 8bits for recentRefs &
 	// 8bits for refs. Might need to use compare_exchange instead of fetch_add then.. 
