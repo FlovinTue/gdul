@@ -112,7 +112,7 @@ struct node
 		const node* const m_nodeView;
 		std::atomic<std::uintptr_t> m_value;
 	};
-		
+
 	struct alignas(Cache_Line_Size) // Sync block
 	{
 		node_rep m_next[Max_Node_Height];
@@ -144,8 +144,7 @@ public:
 	void push(node_type* node);
 	bool try_pop(node_type*& out);
 
-	// poorly implemented, not for concurrent use yet
-	void clear();
+	void clear(); // poorly implemented, not for concurrent use yet
 
 	bool empty() const noexcept;
 
@@ -181,7 +180,8 @@ inline concurrent_priority_queue<Key, Value, Compare, Allocator>::concurrent_pri
 
 template<class Key, class Value, class Compare, class Allocator>
 inline concurrent_priority_queue<Key, Value, Compare, Allocator>::~concurrent_priority_queue()
-{}
+{
+}
 
 template<class Key, class Value, class Compare, class Allocator>
 inline void concurrent_priority_queue<Key, Value, Compare, Allocator>::push(typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_type* node)
@@ -208,7 +208,7 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_pop(t
 		const std::uint8_t frontHeight(frontNode->m_height);
 
 		std::uint8_t linked(1);
-		for (;linked < frontHeight;++linked) {
+		for (; linked < frontHeight; ++linked) {
 			node_view view(m_head.m_next[linked].load());
 			if (view != frontNode) {
 				break;
@@ -226,7 +226,7 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_pop(t
 			m_head.m_next[layer].m_value.compare_exchange_strong(frontSet[layer].m_value, replacementSet[i].m_value, std::memory_order_seq_cst, std::memory_order_relaxed);
 		}
 
-	}while (!m_head.m_next[0].m_value.compare_exchange_weak(frontSet[0].m_value, replacementSet[0].m_value, std::memory_order_seq_cst, std::memory_order_relaxed));
+	} while (!m_head.m_next[0].m_value.compare_exchange_weak(frontSet[0].m_value, replacementSet[0].m_value, std::memory_order_seq_cst, std::memory_order_relaxed));
 
 	node_type* const claimed(frontSet[0]);
 
@@ -268,16 +268,15 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_link(
 	}
 
 	const std::uintptr_t desired((std::uintptr_t)node);
-	
+
 	// The base layer is what matters. The rest is just search-juice
 	{
 		std::uintptr_t expected(outNext[0].m_value);
 
-		node_type* const sanityCheck(outNext[0]);
+		// Sanity check
+		assert((node_type*)outNext[0] && "Expected value at next");
 
-		assert(sanityCheck && "Expected value at next");
-
-		if (!outCurrent[0].operator node_type*()->m_next[0].m_value.compare_exchange_weak(expected, desired, std::memory_order_seq_cst, std::memory_order_relaxed)) {
+		if (!outCurrent[0].operator node_type * ()->m_next[0].m_value.compare_exchange_weak(expected, desired, std::memory_order_seq_cst, std::memory_order_relaxed)) {
 			return false;
 		}
 	}
@@ -298,7 +297,7 @@ inline void concurrent_priority_queue<Key, Value, Compare, Allocator>::push_inte
 	node_view_set current{};
 	node_view_set next{};
 
-	for(;;){
+	for (;;) {
 		if (prepare_insertion_sets(current, next, node->m_kv.first) &&
 			try_link(node, current, next)) {
 			break;
@@ -314,7 +313,24 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::prepare_i
 	for (size_type i = 0; i < cpq_detail::Max_Node_Height; ++i) {
 		const size_type atLayer(cpq_detail::Max_Node_Height - i - 1);
 
-		// So upper layers contain references to stale nodes..
+		// So upper layers contain references to stale nodes.. Would that be inserters or deleters' responsibility..  ? 
+		// Well deleters are the ones that repair stale node links. Hmm. So. If the deletion de-linking works as it should
+		// it'll de-link from the top and make sure that there are no upper layer links left in the case it succeeds in de-linking bottom layer. *SHOULD*.
+
+		// So, in case we were able to *guarantee* that deleters always successfully deleted all links to the deleted node
+
+		// Could we perhaps end up linking to a deleted node somehow, when de-linking? Like, attempting to delink 1, stalling
+		// and then having 2 be deleted, then linking to 2. ?
+
+		// I suppose if an inserter attempted to link 2 layers at head, beginning at bottom and then stalling would result in a situation
+		// where a stale node could be linked at upper layer. Hmm yeah.
+
+		// What about
+
+		// HEAD----------------**1**----------------2-----------------------------------------END
+		// HEAD----------------**1**----------------2--------------------3--------------------END
+
+		// Deleting 1 with a stale link
 		for (;;) {
 			node_type* const currentNode(outCurrent[atLayer]);
 			outNext[atLayer] = node_view(currentNode->m_next[atLayer].m_value.load(std::memory_order_relaxed));
