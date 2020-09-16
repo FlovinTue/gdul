@@ -3,6 +3,7 @@
 #include <thread>
 #include "../Common/thread_pool.h"
 #include <gdul\concurrent_queue\concurrent_queue.h>
+#include <concurrent_priority_queue.h>
 #include "../Common/Timer.h"
 #include <concurrent_queue.h>
 #include "../Common/tracking_allocator.h"
@@ -26,8 +27,7 @@
 
 #undef max
 
-namespace gdul
-{
+namespace gdul {
 #if !defined(GDUL_CPQ)
 extern std::random_device rd;
 extern std::mt19937 rng;
@@ -64,7 +64,7 @@ public:
 	std::queue<T> m_queue;
 };
 
-const std::uint32_t Writes = 8192;
+const std::uint32_t Writes = 512;
 const std::uint32_t Writers = std::thread::hardware_concurrency() / 2;
 const std::uint32_t Readers = std::thread::hardware_concurrency() / 2;
 const std::uint32_t WritesPerThread(Writes / Writers);
@@ -82,63 +82,72 @@ enum : std::uint32_t
 };
 
 template <class T, class Allocator>
-void queue_testrun(std::uint32_t aRuns, Allocator alloc, std::uint32_t options = test_option_all) {
-	std::cout << "Pre-run alloc value is: " << gdul::s_allocated << std::endl;
-
+void queue_testrun(std::uint32_t runs, Allocator alloc, std::uint32_t options = test_option_all) {
 	tester<T, Allocator> tester(alloc);
+	
+	for (std::uint32_t i = 0; i < runs; ++i) {
+		std::cout << "Pre-run alloc value is: " << gdul::s_allocated << std::endl;
 
-	double concurrentRes(0.0);
-	double singleRes(0.0);
-	double writeRes(0.0);
-	double readRes(0.0);
-	double singleProdSingleCon(0.0);
+		double concurrentRes(0.0);
+		double singleRes(0.0);
+		double writeRes(0.0);
+		double readRes(0.0);
+		double singleProdSingleCon(0.0);
 
-	if (options & test_option_singleReadWrite)
-		singleProdSingleCon = tester.ExecuteSingleProducerSingleConsumer(aRuns);
-	if (options & test_option_onlyWrite)
-		writeRes = tester.ExecuteWrite(aRuns);
-	if (options & test_option_onlyRead)
-		readRes = tester.ExecuteRead(aRuns);
-	if (options & test_option_single)
-		singleRes = tester.ExecuteSingleThread(aRuns);
-	if (options & test_option_concurrent)
-		concurrentRes = tester.ExecuteConcurrent(aRuns);
-
-	std::cout << "\n";
-#ifdef _DEBUG
-	std::string config("Debug mode");
+#if defined(_DEBUG)
+		// Arbitrary value. Works well
+		const int iterations = 100;
 #else
-	std::string config("Release mode");
+		// Arbitrary value. Works well
+		const int iterations = 1000;
 #endif
-	std::string str = std::string(
-		std::string("Executed a total of ") +
-		std::to_string(Writes * aRuns) +
-		std::string(" read & write operations") +
-		std::string("\n") +
-		std::string("Averaging results \n") +
-		std::string("Concurrent (") + std::to_string(Writers) + std::string("Writers, ") + std::to_string(Readers) + std::string("Readers): ") +
-		std::string(std::to_string(concurrentRes / static_cast<double>(aRuns))) + std::string("			// total: ") + std::to_string(concurrentRes) +
-		std::string("s\n") +
-		std::string("Concurrent (") + std::to_string(1) + std::string("Writers, ") + std::to_string(1) + std::string("Readers): ") +
-		std::string(std::to_string(singleProdSingleCon / static_cast<double>(aRuns))) + std::string("			// total: ") + std::to_string(singleProdSingleCon) +
-		std::string("s\n") +
-		std::string("Single thread: ") +
-		std::string(std::to_string(singleRes / static_cast<double>(aRuns))) + std::string("						// total: ") + std::to_string(singleRes) +
-		std::string("s\n") +
-		std::string("Pure writes: (") + std::to_string(Writers) + std::string("): ") +
-		std::string(std::to_string(writeRes / static_cast<double>(aRuns))) + std::string("					// total: ") + std::to_string(writeRes) +
-		std::string("s\n") +
-		std::string("Pure reads: (") + std::to_string(Readers) + std::string("): ") +
-		std::string(std::to_string(readRes / static_cast<double>(aRuns))) + std::string("					// total: ") + std::to_string(readRes) +
-		std::string("s\n") +
-		std::string("Total time is: " + std::to_string(concurrentRes + singleRes + writeRes + readRes + singleProdSingleCon) + "\n") +
-		std::string("per " + std::to_string(Writes) + " operations in ") +
-		config);
 
-	std::cout << str << "\n" << std::endl;
+		if (options & test_option_singleReadWrite)
+			singleProdSingleCon = tester.ExecuteSingleProducerSingleConsumer(iterations);
+		if (options & test_option_onlyWrite)
+			writeRes = tester.ExecuteWrite(iterations);
+		if (options & test_option_onlyRead)
+			readRes = tester.ExecuteRead(iterations);
+		if (options & test_option_single)
+			singleRes = tester.ExecuteSingleThread(iterations);
+		if (options & test_option_concurrent)
+			concurrentRes = tester.ExecuteConcurrent(iterations);
 
-	std::cout << "Post-run alloc value is: " << gdul::s_allocated << std::endl;
+		std::cout << "\n";
+#ifdef _DEBUG
+		std::string config("Debug mode");
+#else
+		std::string config("Release mode");
+#endif
+		std::string str = std::string(
+			std::string("Executed a total of ") +
+			std::to_string(Writes * iterations) +
+			std::string(" read & write operations") +
+			std::string("\n") +
+			std::string("Averaging results \n") +
+			std::string("Concurrent (") + std::to_string(Writers) + std::string("Writers, ") + std::to_string(Readers) + std::string("Readers): ") +
+			std::string(std::to_string(concurrentRes / static_cast<double>(iterations))) + std::string("			// total: ") + std::to_string(concurrentRes) +
+			std::string("s\n") +
+			std::string("Concurrent (") + std::to_string(1) + std::string("Writers, ") + std::to_string(1) + std::string("Readers): ") +
+			std::string(std::to_string(singleProdSingleCon / static_cast<double>(iterations))) + std::string("			// total: ") + std::to_string(singleProdSingleCon) +
+			std::string("s\n") +
+			std::string("Single thread: ") +
+			std::string(std::to_string(singleRes / static_cast<double>(iterations))) + std::string("						// total: ") + std::to_string(singleRes) +
+			std::string("s\n") +
+			std::string("Pure writes: (") + std::to_string(Writers) + std::string("): ") +
+			std::string(std::to_string(writeRes / static_cast<double>(iterations))) + std::string("					// total: ") + std::to_string(writeRes) +
+			std::string("s\n") +
+			std::string("Pure reads: (") + std::to_string(Readers) + std::string("): ") +
+			std::string(std::to_string(readRes / static_cast<double>(iterations))) + std::string("					// total: ") + std::to_string(readRes) +
+			std::string("s\n") +
+			std::string("Total time is: " + std::to_string(concurrentRes + singleRes + writeRes + readRes + singleProdSingleCon) + "\n") +
+			std::string("per " + std::to_string(Writes) + " operations in ") +
+			config);
 
+		std::cout << str << "\n" << std::endl;
+
+		std::cout << "Post-run alloc value is: " << gdul::s_allocated << std::endl;
+	}
 }
 
 template <class T, class Allocator>
@@ -173,6 +182,8 @@ private:
 #elif defined(GDUL_CPQ)
 	concurrent_priority_queue<typename T::first_type, typename T::second_type> m_queue;
 	static thread_local gdul::shared_ptr<typename decltype(m_queue)::node_type[]> m_nodes;
+#elif defined(MS_CPQ)
+	concurrency::concurrent_priority_queue<T> m_queue;
 #endif
 
 	gdul::thread_pool m_writer;
@@ -240,7 +251,7 @@ inline double tester<T, Allocator>::ExecuteConcurrent(std::uint32_t runs) {
 
 #if defined(GDUL) | defined(GDUL_FIFO)
 		m_queue.unsafe_clear();
-#elif defined(MSC_RUNTIME) || defined(MTX_WRAPPER)
+#elif defined(MSC_RUNTIME) || defined(MTX_WRAPPER) || defined(GDUL_CPQ)
 		m_queue.clear();
 #endif
 		m_waiting = 0;
@@ -290,7 +301,7 @@ inline double tester<T, Allocator>::ExecuteSingleThread(std::uint32_t runs) {
 
 #if defined(GDUL) | defined(GDUL_FIFO)
 		m_queue.unsafe_clear();
-#elif defined(MSC_RUNTIME) || defined(MTX_WRAPPER)
+#elif defined(MSC_RUNTIME) || defined(MTX_WRAPPER) || defined(GDUL_CPQ)
 		m_queue.clear();
 #endif
 	}
@@ -339,7 +350,7 @@ inline double tester<T, Allocator>::ExecuteSingleProducerSingleConsumer(std::uin
 		m_isRunning = false;
 #if defined(GDUL) | defined(GDUL_FIFO)
 		m_queue.unsafe_clear();
-#elif defined(MSC_RUNTIME) || defined(MTX_WRAPPER)
+#elif defined(MSC_RUNTIME) || defined(MTX_WRAPPER) || defined(GDUL_CPQ)
 		m_queue.clear();
 #endif
 
@@ -397,7 +408,7 @@ inline double tester<T, Allocator>::ExecuteRead(std::uint32_t runs) {
 
 #if defined(GDUL) | defined(GDUL_FIFO)
 		m_queue.unsafe_clear();
-#elif defined(MSC_RUNTIME) || defined(MTX_WRAPPER)
+#elif defined(MSC_RUNTIME) || defined(MTX_WRAPPER) || defined(GDUL_CPQ)
 		m_queue.clear();
 #endif
 	}
@@ -446,7 +457,7 @@ inline double tester<T, Allocator>::ExecuteWrite(std::uint32_t runs) {
 
 #if  defined(GDUL) | defined(GDUL_FIFO)
 		m_queue.unsafe_clear();
-#elif defined(MSC_RUNTIME)
+#elif defined(MSC_RUNTIME) || defined(GDUL_CPQ)
 		m_queue.clear();
 #elif defined(MOODYCAMEL)
 		T out;
@@ -486,9 +497,7 @@ inline void tester<T, Allocator>::Write(std::uint32_t writes) {
 		std::this_thread::yield();
 
 	uint32_t sum(0);
-#if !defined(GDUL_CPQ)
-	uint32_t seed(rng());
-#endif
+	uint32_t seed(rand());
 
 #ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
 	for (std::uint32_t j = 0; j < writes; ) {
@@ -505,7 +514,9 @@ inline void tester<T, Allocator>::Write(std::uint32_t writes) {
 #else
 	for (std::uint32_t j = 0; j < writes; ++j) {
 
-#if !defined(GDUL_CPQ)
+#if defined(MS_CPQ)
+		T in = seed % (j + 1);
+#elif !defined(GDUL_CPQ)
 		T in;
 		in.count = seed % (j + 1);
 		//in.count = 1;
@@ -515,6 +526,7 @@ inline void tester<T, Allocator>::Write(std::uint32_t writes) {
 #if !defined(MOODYCAMEL) && !defined(GDUL_CPQ)
 		m_queue.push(in);
 #elif defined(GDUL_CPQ)
+		m_nodes[j].m_kv.first = seed & (j + 1);
 		m_queue.push(&m_nodes[j]);
 #else
 		m_queue.enqueue(in);
@@ -567,13 +579,10 @@ inline void tester<T, Allocator>::Read(std::uint32_t reads) {
 #else
 			if (m_queue.try_dequeue(out)) {
 #endif
-#if !defined(GDUL_CPQ)
+#if !defined(GDUL_CPQ) && ! defined(MS_CPQ)
 				sum += out.count;
 #endif
 				break;
-			}
-			else {
-				std::this_thread::yield();
 			}
 		}
 	}

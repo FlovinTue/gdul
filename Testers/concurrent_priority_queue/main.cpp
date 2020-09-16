@@ -3,14 +3,21 @@
 #include <gdul/WIP_concurrent_priority_queue/concurrent_priority_queue_v7.h>
 
 #define GDUL_CPQ
+//#define MS_CPQ
 #include "../queue_tester/tester.h"
+
+namespace gdul {
+std::random_device rd;
+std::mt19937 rng(rd());
+}
 
 gdul::concurrent_priority_queue<int, float> q;
 
 using node_t = decltype(q)::node_type;
 
+#if defined(GDUL_CPQ)
 thread_local gdul::shared_ptr<node_t[]> gdul::tester< std::pair<int, float>, gdul::tracking_allocator<std::pair<int, float>>>::m_nodes;
-
+#endif
 int main()
 {
 
@@ -46,11 +53,19 @@ int main()
 
 	const bool failResult(q.try_pop(outFail));
 
-	gdul::queue_testrun<std::pair<int, float>, gdul::tracking_allocator<std::pair<int, float>>>(
-		1000, 
-		gdul::tracking_allocator<std::pair<int, float>>(), 
-		gdul::test_option_single);
+	q.clear();
 
+#if defined(GDUL_CPQ)
+	using test_type = std::pair<int, float>;
+#else
+	using test_type = std::uint32_t;
+#endif
+
+	// At this point we need to test for correctness of values. Or. Perhaps multi-layer first.
+	gdul::queue_testrun<test_type, gdul::tracking_allocator<test_type>>(
+		100, 
+		gdul::tracking_allocator<std::pair<int, float>>(), 
+		/*gdul::test_option_single | gdul::test_option_onlyRead | gdul::test_option_onlyWrite |*/ gdul::test_option_singleReadWrite);
 
 }
 
