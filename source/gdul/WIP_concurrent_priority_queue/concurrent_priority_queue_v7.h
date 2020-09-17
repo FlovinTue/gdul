@@ -71,9 +71,21 @@ struct node
 		{
 			return (node*)(m_value & Pointer_Mask);
 		}
+		operator const node* () const 
+		{
+			return (const node*)(m_value & Pointer_Mask);
+		}
 
 		operator std::uintptr_t() = delete;
 
+		bool operator ==(node_view other) const
+		{
+			return operator const node * () == other.operator const node * ();
+		}
+		bool operator !=(node_view other) const
+		{
+			return !operator==(other);
+		}
 		std::uint32_t get_version() const
 		{
 			return m_version;
@@ -198,7 +210,11 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_pop(t
 	node_view_set replacementSet;
 
 	do {
-		frontSet[0] = m_head.m_next[0].load();
+		for (std::uint8_t i = 0; i < cpq_detail::Max_Node_Height; ++i) {
+			const std::uint8_t atLayer(cpq_detail::Max_Node_Height - 1 - i);
+
+			frontSet[atLayer] = m_head.m_next[atLayer].load();
+		}
 
 		node_type* const frontNode(frontSet[0]);
 		if (frontNode == &m_head) {
@@ -207,23 +223,27 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_pop(t
 
 		const std::uint8_t frontHeight(frontNode->m_height);
 
-		std::uint8_t linked(1);
-		for (; linked < frontHeight; ++linked) {
-			node_view view(m_head.m_next[linked].load());
-			if (view != frontNode) {
-				break;
+		for (std::uint8_t i = 0; i < frontHeight; ++i) {
+			const std::uint8_t atLayer(frontHeight - 1 - i);
+
+			replacementSet[atLayer] = frontNode->m_next[atLayer].load();
+			replacementSet[atLayer].set_version(frontSet[atLayer].get_version() + 1);
+		}
+
+		for (std::uint8_t i = 0; i < frontHeight - 1; ++i) {
+			const std::uint8_t atLayer(frontHeight - 1 - i);
+
+			if (frontSet[atLayer] == replacementSet[atLayer]) {
+				continue;
 			}
-			frontSet[linked] = view;
-		}
 
-		for (std::uint8_t i = 0; i < linked; ++i) {
-			replacementSet[i] = frontNode->m_next[i].load();
-			replacementSet[i].set_version(frontSet[i].get_version() + 1);
-		}
-
-		for (std::uint8_t i = 1; i < linked; ++i) {
-			const std::uint8_t layer(linked - i);
-			m_head.m_next[layer].m_value.compare_exchange_strong(frontSet[layer].m_value, replacementSet[i].m_value, std::memory_order_seq_cst, std::memory_order_relaxed);
+		retry:
+			if (m_head.m_next[atLayer].m_value.compare_exchange_strong(frontSet[atLayer].m_value, replacementSet[atLayer].m_value, std::memory_order_seq_cst, std::memory_order_relaxed)) {
+				continue;
+			}
+			if (frontSet[atLayer].operator node_type*() == frontNode) {
+				goto retry;
+			}
 		}
 
 	} while (!m_head.m_next[0].m_value.compare_exchange_weak(frontSet[0].m_value, replacementSet[0].m_value, std::memory_order_seq_cst, std::memory_order_relaxed));
@@ -842,3 +862,68 @@ static std::uint8_t random_height()
 
 
 		// If we know it has been deleted, we may just continue. Oh wait.. 
+
+
+
+
+//template<class Key, class Value, class Compare, class Allocator>
+//inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_pop(typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_type*& out)
+//{
+//	node_view_set frontSet;
+//	node_view_set replacementSet;
+//
+//	do {
+//		frontSet[0] = m_head.m_next[0].load();
+//
+//		node_type* const frontNode(frontSet[0]);
+//		if (frontNode == &m_head) {
+//			return false;
+//		}
+//
+//
+//		// Will need to prevent linkage to stale node in upper layer by provoking cas failure in inserters.
+//		// Hmm could get tricky. Me tired
+//
+//		// So the natural way to do this is to enforce linkage of all next links in front node at HEAD. 
+//		// Probably need to load front-> reload all HEAD[height] alt. load entire HEAD[next] stack
+//
+//		// To begin with, probably just load entire head stack up front when doing deletion.
+//
+//
+//
+//		const std::uint8_t frontHeight(frontNode->m_height);
+//
+//		std::uint8_t linked(1);
+//		for (; linked < frontHeight; ++linked) {
+//			node_view view(m_head.m_next[linked].load());
+//			if (view != frontNode) {
+//				break;
+//			}
+//			frontSet[linked] = view;
+//		}
+//
+//		for (std::uint8_t i = 0; i < linked; ++i) {
+//			replacementSet[i] = frontNode->m_next[i].load();
+//			replacementSet[i].set_version(frontSet[i].get_version() + 1);
+//		}
+//
+//		for (std::uint8_t i = 1; i < linked; ++i) {
+//			const std::uint8_t layer(linked - i);
+//			m_head.m_next[layer].m_value.compare_exchange_strong(frontSet[layer].m_value, replacementSet[i].m_value, std::memory_order_seq_cst, std::memory_order_relaxed);
+//		}
+//
+//	} while (!m_head.m_next[0].m_value.compare_exchange_weak(frontSet[0].m_value, replacementSet[0].m_value, std::memory_order_seq_cst, std::memory_order_relaxed));
+//
+//	node_type* const claimed(frontSet[0]);
+//
+//#if defined (_DEBUG)
+//	claimed->m_removed = 1;
+//#endif
+//
+//	unlink_successors(claimed, (node_type*)replacementSet[0]);
+//
+//	out = claimed;
+//
+//
+//	return true;
+//}
