@@ -49,6 +49,8 @@ int main()
 	const bool result5(q.try_pop(outfive));
 	const bool result6(q.try_pop(outsix));
 
+	q.push(&two);
+
 	node_t* outFail(nullptr);
 
 	const bool failResult(q.try_pop(outFail));

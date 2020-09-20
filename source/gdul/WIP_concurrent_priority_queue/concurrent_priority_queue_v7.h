@@ -112,9 +112,9 @@ struct node
 		node_rep(std::uintptr_t value) : m_value(value) {}
 		node_rep(const node_view& view) : m_value(view.m_value) {}
 
-		inline node_view load() const
+		inline node_view load(std::memory_order m = std::memory_order_seq_cst) const
 		{
-			return m_value.load(std::memory_order_relaxed);
+			return m_value.load(m);
 		}
 		inline node_view exchange(node_view with)
 		{
@@ -180,6 +180,14 @@ private:
 	compare_type m_comparator;
 };
 
+
+// States of a link set:
+// 1. Partially partially de-linked
+// 2. Partially linked
+// 3. Linked
+// 4. Partially de-linked & Partially linked
+
+
 template<class Key, class Value, class Compare, class Allocator>
 inline concurrent_priority_queue<Key, Value, Compare, Allocator>::concurrent_priority_queue()
 	: m_head()
@@ -210,10 +218,11 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_pop(t
 	node_view_set replacementSet;
 
 	do {
+
 		for (std::uint8_t i = 0; i < cpq_detail::Max_Node_Height; ++i) {
 			const std::uint8_t atLayer(cpq_detail::Max_Node_Height - 1 - i);
 
-			frontSet[atLayer] = m_head.m_next[atLayer].load();
+			frontSet[atLayer] = m_head.m_next[atLayer].load(std::memory_order_seq_cst); 
 		}
 
 		node_type* const frontNode(frontSet[0]);
@@ -222,6 +231,83 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_pop(t
 		}
 
 		const std::uint8_t frontHeight(frontNode->m_height);
+
+		// Right, so can an inserter link to this after nulling has happened? 
+		// It certainly can inspect it.
+		// So what about:
+		
+		// HEAD-------------------1-------------------END
+		// HEAD-------------------1-------------------END
+		
+		// * inserter loads head layer 2, stalls
+		// * deleter de-links head layer 2 & 1, stalls
+		// * inserter loads head layer 1
+		// Now :
+		
+		// HEAD-------------------END
+		// HEAD-------------------END
+		// 
+		// And inserter holds insertion set
+		// []->1(stale)
+		// []->END
+		
+		// * Inserter links 0.5 at layer 1, fails at layer 2
+		// Now:
+		
+		// HEAD-----------------(0.5->1)--------------END
+		// HEAD------------------0.5------------------END
+		
+		// Now we just need to delete 0.5 and then our deleter will
+		// make sure we have:
+		
+		// HEAD----[1, stale]-----END
+		// HEAD-------------------END
+		
+		
+		// This means, as soon as a node is linked at bottom, any stale upper links may be exposed.
+		// So long as we don't change the original parts of the algorithm, to check for this, we'll have
+		// to guarantee that the upper links only refer to forward nodes when bottom layer links. Perhaps we can just try to preserve
+		// the amount of links already present? In that case, we'd have a stale node at upper layer, but it would never be exposed.
+		
+		// Right. So probably the way to go with this is to make up a different way of linking upper layers for deletion.
+		// Currently, we enforce swapping in all upper next links regardless of the existing link because we want to cause swap
+		// failure for any outstanding linkage for an insertion in progress. So we need to find a new way of enforcing link failure...
+		// The obvious way is to increase version, but we also don't want to auto inc-version, since that'll cause lots of synchronization.
+
+		// !!-------------------------------------
+		// If we have a predictable set of values that can exist in the HEAD stack at any one time, we may CAS inc version only from these values.
+		// !!-------------------------------------
+
+		// When we have a stack loaded what can we see?
+		// Deleters will never begin working on de-linking a new node until front is swapped. 
+		// * Deleter 1, loads stack, stalls
+		// * Inserter inserts new front, stalls
+		// * Deleter 2, loads stack, stalls
+
+
+		// Here deleter 2 will see unknown links in upper layers. These may be messed with
+
+
+		// What about only preserving proper links. Will that not potentially cause degeneration of max height permanently?
+		// Let's investigate:
+
+
+		// HEAD------------------?---------------------------------------3--------------------END
+		// HEAD------------------?------------------2--------------------3--------------------END
+		// HEAD------------------1------------------2--------------------3--------------------END
+
+		// The insertion of 1 with concurrent deletion would end up like this
+		// Transitioning into
+
+		// HEAD---------------------------------------3--------------------END
+		// HEAD------------------2--------------------3--------------------END
+		// HEAD------------------2--------------------3--------------------END
+
+		// So.. No. No degrade.
+
+		// So that old thing about only linking bottom at HEAD? Try it? Will deletion restore proper linkage? No,
+		// not unless all deletions enforce all links.
+
 
 		for (std::uint8_t i = 0; i < frontHeight; ++i) {
 			const std::uint8_t atLayer(frontHeight - 1 - i);
@@ -233,19 +319,21 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_pop(t
 		for (std::uint8_t i = 0; i < frontHeight - 1; ++i) {
 			const std::uint8_t atLayer(frontHeight - 1 - i);
 
+			// What about HEAD / END here? This causes positive test. Probably not desirable. Or is it? Might not matter.
 			if (frontSet[atLayer] == replacementSet[atLayer]) {
 				continue;
 			}
 
-		retry:
 			if (m_head.m_next[atLayer].m_value.compare_exchange_strong(frontSet[atLayer].m_value, replacementSet[atLayer].m_value, std::memory_order_seq_cst, std::memory_order_relaxed)) {
 				continue;
 			}
+			// Retry if an inserter just linked front node
 			if (frontSet[atLayer].operator node_type*() == frontNode) {
-				goto retry;
+				if (m_head.m_next[atLayer].m_value.compare_exchange_strong(frontSet[atLayer].m_value, replacementSet[atLayer].m_value, std::memory_order_seq_cst, std::memory_order_relaxed)) {
+					continue;
+				}
 			}
 		}
-
 	} while (!m_head.m_next[0].m_value.compare_exchange_weak(frontSet[0].m_value, replacementSet[0].m_value, std::memory_order_seq_cst, std::memory_order_relaxed));
 
 	node_type* const claimed(frontSet[0]);
@@ -330,31 +418,27 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::prepare_i
 {
 	std::uninitialized_fill(std::begin(outCurrent), std::end(outCurrent), node_view(&m_head));
 
+#if defined _DEBUG
+		// This will mostly be 1.. So inserter travels to first item and finds it pointing to END and NULL...  Seems like something f'd up with
+		// Post splicing thing..
+
+		std::size_t travveled(0);
+#endif
 	for (size_type i = 0; i < cpq_detail::Max_Node_Height; ++i) {
 		const size_type atLayer(cpq_detail::Max_Node_Height - i - 1);
 
-		// So upper layers contain references to stale nodes.. Would that be inserters or deleters' responsibility..  ? 
-		// Well deleters are the ones that repair stale node links. Hmm. So. If the deletion de-linking works as it should
-		// it'll de-link from the top and make sure that there are no upper layer links left in the case it succeeds in de-linking bottom layer. *SHOULD*.
-
-		// So, in case we were able to *guarantee* that deleters always successfully deleted all links to the deleted node
-
-		// Could we perhaps end up linking to a deleted node somehow, when de-linking? Like, attempting to delink 1, stalling
-		// and then having 2 be deleted, then linking to 2. ?
-
-		// I suppose if an inserter attempted to link 2 layers at head, beginning at bottom and then stalling would result in a situation
-		// where a stale node could be linked at upper layer. Hmm yeah.
-
-		// What about
-
-		// HEAD----------------**1**----------------2-----------------------------------------END
-		// HEAD----------------**1**----------------2--------------------3--------------------END
-
-		// Deleting 1 with a stale link
-		for (;;) {
+		for (;;
+			
+#if defined _DEBUG
+			++travveled
+#endif
+			) {
+			
 			node_type* const currentNode(outCurrent[atLayer]);
 			outNext[atLayer] = node_view(currentNode->m_next[atLayer].m_value.load(std::memory_order_relaxed));
 			node_type* const nextNode(outNext[atLayer]);
+
+			assert(!(atLayer == 1 && !nextNode) && "Sanity check");
 
 			if (!nextNode) {
 				return false;
@@ -927,3 +1011,59 @@ static std::uint8_t random_height()
 //
 //	return true;
 //}
+
+
+
+
+
+
+
+
+	// if an inserter tries to insert at HEAD it either prevents deletion, or fails. This seems pretty certain.
+
+	// So there are two ways for an upper layer link to end up pointing to a stale node.
+	// Either a deleter fails CAS? Ooor the upper layer replacement is pointing to a stale node.
+	// It could also be an inserter finishing linkage after delink has happened.
+
+	// In initial 1-1 test case, there will only be 2 layers. Cas does not seem to fail at upper layer before
+	// stale node linkage. It also seem to succeed at bottom layer. This indicates the whole HEAD stack is exchanged
+	// atomically, yet stale node keeps getting revisited. Does this not indicate that the stale node link originates
+	// from front upper layer. Could front end up with a stale link somehow? Insertions (which is able to supplant nodes)
+	// is only done by inserter. This means the only way front could end up with a stale link would be an inserter supplanting
+	// a deleted node... How would that work? 
+
+	// HEAD-------------------1-------------------END
+	// HEAD-------------------1-------------------END
+	// * inserter loads head layer 2 & 1, stalls
+	// * deleter de-links head layer 2, stalls
+	// * inserter supplants 1 with 0.5, fails linking head layer 2 to 0.5
+
+	// HEAD---------------------------------------1-------------------END
+	// HEAD------------------0.5------------------1-------------------END
+
+	// Yeah, this is not weird at all..
+
+
+
+
+
+
+
+		// So upper layers contain references to stale nodes.. Would that be inserters or deleters' responsibility..  ? 
+		// Well deleters are the ones that repair stale node links. Hmm. So. If the deletion de-linking works as it should
+		// it'll de-link from the top and make sure that there are no upper layer links left in the case it succeeds in de-linking bottom layer. *SHOULD*.
+
+		// So, in case we were able to *guarantee* that deleters always successfully deleted all links to the deleted node
+
+		// Could we perhaps end up linking to a deleted node somehow, when de-linking? Like, attempting to delink 1, stalling
+		// and then having 2 be deleted, then linking to 2. ?
+
+		// I suppose if an inserter attempted to link 2 layers at head, beginning at bottom and then stalling would result in a situation
+		// where a stale node could be linked at upper layer. Hmm yeah.
+
+		// What about
+
+		// HEAD----------------**1**----------------2-----------------------------------------END
+		// HEAD----------------**1**----------------2--------------------3--------------------END
+
+		// Deleting 1 with a stale link
