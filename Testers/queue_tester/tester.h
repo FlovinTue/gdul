@@ -485,6 +485,10 @@ inline void tester<T, Allocator>::Write(std::uint32_t writes) {
 	if (!m_nodes) {
 		m_nodes = gdul::make_shared<typename decltype(m_queue)::node_type[]>(writes);
 	}
+	for (std::size_t i = 0; i < m_nodes.item_count(); ++i) {
+		m_nodes[i].m_removed = 0;
+		m_nodes[i].m_inserted = 0;
+	}
 #endif
 
 	++m_waiting;

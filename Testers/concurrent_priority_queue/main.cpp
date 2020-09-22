@@ -49,8 +49,6 @@ int main()
 	const bool result5(q.try_pop(outfive));
 	const bool result6(q.try_pop(outsix));
 
-	q.push(&two);
-
 	node_t* outFail(nullptr);
 
 	const bool failResult(q.try_pop(outFail));
@@ -67,7 +65,7 @@ int main()
 	gdul::queue_testrun<test_type, gdul::tracking_allocator<test_type>>(
 		100, 
 		gdul::tracking_allocator<std::pair<int, float>>(), 
-		/*gdul::test_option_single | gdul::test_option_onlyRead | gdul::test_option_onlyWrite |*/ gdul::test_option_singleReadWrite);
+		/*gdul::test_option_single | gdul::test_option_onlyRead | gdul::test_option_onlyWrite | */gdul::test_option_singleReadWrite);
 
 }
 
