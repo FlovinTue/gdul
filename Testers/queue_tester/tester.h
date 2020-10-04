@@ -7,13 +7,14 @@
 #include "../Common/Timer.h"
 #include <concurrent_queue.h>
 #include "../Common/tracking_allocator.h"
+#include "../Common/util.h"
 #include <limits>
 #include <string>
 
 #if defined(GDUL_FIFO)
 #include <gdul/WIP_concurrent_queue_fifo/concurrent_queue_fifo_v6.h>
 #elif defined(GDUL_CPQ)
-#include <gdul/WIP_concurrent_priority_queue/concurrent_priority_queue_v7.h>
+#include <gdul/WIP_concurrent_priority_queue/concurrent_priority_queue_v9.h>
 #endif
 #include <queue>
 #include <mutex>
@@ -387,6 +388,10 @@ inline double tester<T, Allocator>::ExecuteRead(std::uint32_t runs) {
 
 		Write(ReadsPerThread * Readers);
 
+#if defined GDUL_CPQ
+		GDUL_ASSERT(m_queue.size() == ReadsPerThread * Readers);
+#endif
+
 		m_isRunning = false;
 
 		m_waiting = Writers;
@@ -485,10 +490,12 @@ inline void tester<T, Allocator>::Write(std::uint32_t writes) {
 	if (!m_nodes) {
 		m_nodes = gdul::make_shared<typename decltype(m_queue)::node_type[]>(writes);
 	}
+#if defined _DEBUG
 	for (std::size_t i = 0; i < m_nodes.item_count(); ++i) {
 		m_nodes[i].m_removed = 0;
 		m_nodes[i].m_inserted = 0;
 	}
+#endif
 #endif
 
 	++m_waiting;

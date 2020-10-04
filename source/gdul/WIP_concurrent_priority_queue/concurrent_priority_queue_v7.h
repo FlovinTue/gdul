@@ -51,7 +51,7 @@ constexpr std::uint8_t calc_max_height(size_type maxEntriesHint)
 static std::uint8_t random_height();
 
 static constexpr size_type Max_Entries_Hint = 1024;
-static constexpr std::uint8_t Max_Node_Height = 2;// cpq_detail::calc_max_height(Max_Entries_Hint);
+static constexpr std::uint8_t Max_Node_Height = cpq_detail::calc_max_height(Max_Entries_Hint);
 
 template <class Key, class Value>
 struct node
@@ -275,9 +275,11 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_pop(t
 			expectedFirst = frontSet[atLayer];
 #endif
 			if (m_head.m_next[atLayer].m_value.compare_exchange_strong(frontSet[atLayer].m_value, replacementSet[atLayer].m_value, std::memory_order_seq_cst, std::memory_order_relaxed)) {
+#if defined _DEBUG
 				replaced = frontSet[atLayer];
 				replacedWith = replacementSet[atLayer];
 				continue;
+#endif
 			}
 			// Retry if an inserter just linked front node
 			if (frontSet[atLayer].operator node_type * () == frontNode) {
@@ -286,8 +288,11 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_pop(t
 				firstActual = expectedSecond;
 			#endif
 				if (m_head.m_next[atLayer].m_value.compare_exchange_strong(frontSet[atLayer].m_value, replacementSet[atLayer].m_value, std::memory_order_seq_cst, std::memory_order_relaxed)) {
+#if defined _DEBUG
 					replaced = frontSet[atLayer];
 					replacedWith = replacementSet[atLayer];
+					continue;
+#endif
 					continue;
 				}
 
@@ -365,7 +370,9 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_link(
 		if (!baseLayerCurrent->m_next[0].m_value.compare_exchange_weak(expected, desired, std::memory_order_seq_cst, std::memory_order_relaxed)) {
 			return false;
 		}
+#if defined _DEBUG
 		node->m_inserted = 1;
+#endif
 	}
 
 	for (size_type layer = 1; layer < nodeHeight; ++layer) {
@@ -515,8 +522,10 @@ inline void concurrent_priority_queue<Key, Value, Compare, Allocator>::unlink_su
 	while (successor != expecting) {
 		node_type* const toReinsert(successor);
 		successor = successor->m_next[0].exchange(nullptr);
+#if defined _DEBUG
 		toReinsert->m_inserted = 0;
-		
+#endif 
+
 #if defined _DEBUG
 		for (std::uint8_t i = 1; i < toReinsert->m_height; ++i) {
 			toReinsert->m_next[i].m_value.store(0, std::memory_order_relaxed);

@@ -1,6 +1,6 @@
 // concurrent_priority_queue.cpp : This file contains the 'main' function. Program execution begins and ends there.
 //
-#include <gdul/WIP_concurrent_priority_queue/concurrent_priority_queue_v7.h>
+#include <gdul/WIP_concurrent_priority_queue/concurrent_priority_queue_v9.h>
 
 #define GDUL_CPQ
 //#define MS_CPQ
@@ -65,7 +65,7 @@ int main()
 	gdul::queue_testrun<test_type, gdul::tracking_allocator<test_type>>(
 		100, 
 		gdul::tracking_allocator<std::pair<int, float>>(), 
-		/*gdul::test_option_single | gdul::test_option_onlyRead | gdul::test_option_onlyWrite | */gdul::test_option_singleReadWrite);
+		gdul::test_option_single |  gdul::test_option_onlyRead|gdul::test_option_onlyWrite  /*| gdul::test_option_singleReadWrite*/);
 
 }
 
