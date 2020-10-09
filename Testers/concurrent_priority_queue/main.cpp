@@ -17,6 +17,7 @@ using node_t = decltype(q)::node_type;
 
 #if defined(GDUL_CPQ)
 thread_local gdul::shared_ptr<node_t[]> gdul::tester< std::pair<int, float>, gdul::tracking_allocator<std::pair<int, float>>>::m_nodes;
+thread_local std::vector< node_t*> gdul::tester< std::pair<int, float>, gdul::tracking_allocator<std::pair<int, float>>>::t_output;
 #endif
 int main()
 {
@@ -65,7 +66,7 @@ int main()
 	gdul::queue_testrun<test_type, gdul::tracking_allocator<test_type>>(
 		100, 
 		gdul::tracking_allocator<std::pair<int, float>>(), 
-		gdul::test_option_single |  gdul::test_option_onlyRead|gdul::test_option_onlyWrite  /*| gdul::test_option_singleReadWrite*/);
+		/*gdul::test_option_single |  gdul::test_option_onlyRead|gdul::test_option_onlyWrite  | */gdul::test_option_singleReadWrite);
 
 }
 

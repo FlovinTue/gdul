@@ -65,7 +65,7 @@ public:
 	std::queue<T> m_queue;
 };
 
-const std::uint32_t Writes = 64;
+const std::uint32_t Writes = 4;
 const std::uint32_t Writers = std::thread::hardware_concurrency() / 2;
 const std::uint32_t Readers = std::thread::hardware_concurrency() / 2;
 const std::uint32_t WritesPerThread(Writes / Writers);
@@ -183,8 +183,15 @@ private:
 #elif defined(GDUL_CPQ)
 	concurrent_priority_queue<typename T::first_type, typename T::second_type> m_queue;
 	static thread_local gdul::shared_ptr<typename decltype(m_queue)::node_type[]> m_nodes;
+
+	static thread_local std::vector<typename decltype(m_queue)::node_type*> t_output;
 #elif defined(MS_CPQ)
 	concurrency::concurrent_priority_queue<T> m_queue;
+#endif
+
+
+#if !defined(GDUL_CPQ)
+	static thread_local std::vector<T> t_output;
 #endif
 
 	gdul::thread_pool m_writer;
@@ -545,12 +552,23 @@ inline void tester<T, Allocator>::Write(std::uint32_t writes) {
 	}
 #endif
 
+#if defined _DEBUG
+	while (m_reader.has_unfinished_tasks()) {
+		std::this_thread::yield();
+	}
+#endif
+
 	m_writtenSum += sum;
 }
 
 template<class T, class Allocator>
 inline void tester<T, Allocator>::Read(std::uint32_t reads) {
 	++m_waiting;
+
+#if defined _DEBUG
+	t_output.clear();
+	t_output.reserve(reads);
+#endif
 
 	while (m_waiting < (Writers + Readers)) {
 		std::this_thread::yield();
@@ -592,6 +610,9 @@ inline void tester<T, Allocator>::Read(std::uint32_t reads) {
 #endif
 #if !defined(GDUL_CPQ) && ! defined(MS_CPQ)
 				sum += out.count;
+#endif
+#if defined _DEBUG
+				t_output.push_back(out);
 #endif
 				break;
 			}
