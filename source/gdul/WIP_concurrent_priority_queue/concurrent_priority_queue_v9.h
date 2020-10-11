@@ -13,6 +13,8 @@
 // Alignment padding
 #pragma warning(disable : 4324)
 
+#define GDUL_CPQ_DEBUG
+
 namespace gdul {
 namespace cpq_detail {
 
@@ -95,7 +97,9 @@ struct node
 		}
 		void set_version(std::uint32_t v)
 		{
-			const std::uint64_t  v64(v);
+			// Avoid version 0, as that's for insertion
+			const std::uint32_t hack(v + !v);
+			const std::uint64_t  v64(hack);
 			const std::uint64_t upper((v64 & ~Bottom_Bits) << 48);
 			const std::uint64_t lower(v64 & Bottom_Bits);
 			const std::uint64_t mask(upper | lower);
@@ -115,9 +119,10 @@ struct node
 	{
 		std::atomic<node_view> m_next[Max_Node_Height];
 		std::uint8_t m_height;
-#if defined (_DEBUG)
+#if defined (GDUL_CPQ_DEBUG)
 		const node* m_nextView[Max_Node_Height]{};
-		std::uint32_t m_version = 0;
+		std::uint32_t m_delinkVersion = 0ul - 1;
+		std::uint32_t m_linkVersion = 0ul - 1;
 		std::uint8_t m_removed = 0;
 		std::uint8_t m_inserted = 0;
 #endif
@@ -172,10 +177,38 @@ private:
 	bool try_link(node_view_set& current, node_view_set& next, node_type* node);
 	void try_link_upper(node_view_set& current, node_view_set& next, node_view node);
 	bool try_swap_front(node_view_set& expectedFront, node_view_set& desiredFront);
-	bool try_splice_at_front(node_view_set& current, node_view_set& next, node_view node);
+	bool try_splice_to_head(node_view_set& current, node_view_set& next, node_type* node);
+
+	bool cas_to_head(node_view& expected, node_view& desired, std::uint8_t layer);
+
+	static void set_version(std::uint32_t version, node_view_set& to, std::uint8_t usingHeight);
 
 	void load_front_set(node_view_set& outSet) const;
 
+#if defined GDUL_CPQ_DEBUG
+	struct expanded_node_view
+	{
+		expanded_node_view() = default;
+		expanded_node_view(node_view v)
+		{
+			n = v;
+			ver = v.get_version();
+		}
+		const node_type* n;
+		std::uint32_t ver;
+	};
+	struct recent_op_info
+	{
+		expanded_node_view current[cpq_detail::Max_Node_Height];
+		expanded_node_view next[cpq_detail::Max_Node_Height];
+		expanded_node_view extra[cpq_detail::Max_Node_Height];
+		const node_type* opNode = nullptr;
+
+		bool result[cpq_detail::Max_Node_Height];
+		bool frontSwap;
+	};
+	inline static thread_local recent_op_info t_recentOp = recent_op_info();
+#endif
 
 	// Also end
 	node_type m_head;
@@ -229,17 +262,17 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_pop(t
 
 		const std::uint8_t frontHeight(frontNode->m_height);
 
+
+		// Why are we loading up->down? Right. Because we de-link up->down
 		for (std::uint8_t i = 0; i < frontHeight; ++i) {
 			const std::uint8_t atLayer(frontHeight - 1 - i);
-
-			// These values should never be the same as head values when using single consumer..
-			// So we're ending up with a front node linking itself in upper layer?? 
 			replacementSet[atLayer] = frontNode->m_next[atLayer].load();
 		}
 
 		if (!try_flag_deletion(frontNode, replacementSet[0], frontSet[0].get_version() + 1, flagged)) {
 			continue;
 		}
+
 
 		deLinked = try_swap_front(frontSet, replacementSet);
 
@@ -255,12 +288,15 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_pop(t
 
 	out = frontNode;
 
-#if defined _DEBUG
+#if defined GDUL_CPQ_DEBUG
 	frontNode->m_removed = 1;
-	frontNode->m_version = frontNode->m_next[0].load(std::memory_order_relaxed).get_version();
+	frontNode->m_delinkVersion = frontNode->m_next[0].load(std::memory_order_relaxed).get_version();
 	for (std::uint8_t i = 0; i < cpq_detail::Max_Node_Height; ++i) {
-		frontNode->m_nextView[i] = frontNode->m_next[i].load(std::memory_order_relaxed);
+		m_head.m_nextView[i] = replacementSet[i];
 	}
+	std::copy(std::begin(frontSet), std::end(frontSet), t_recentOp.current);
+	std::copy(std::begin(replacementSet), std::end(replacementSet), t_recentOp.next);
+	t_recentOp.opNode = frontNode;
 #endif
 
 	return true;
@@ -292,6 +328,15 @@ inline void concurrent_priority_queue<Key, Value, Compare, Allocator>::prepare_i
 			outCurrent[atLayer - 1] = outCurrent[atLayer];
 		}
 	}
+
+	// In case we are inserting at front, we need to make sure that the age of
+	// our view of the upper layers do not exceed that of the base layer. (Lest we might refer to
+	// a stale node in upper layers when succeeding a base layer link)
+	if (at_end(outCurrent[0])) {
+		for (std::uint8_t i = 1; i < node->m_height; ++i) {
+			outNext[i] = m_head.m_next[i].load(std::memory_order_seq_cst);
+		}
+	}
 }
 
 template<class Key, class Value, class Compare, class Allocator>
@@ -320,32 +365,26 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_flag_
 template<class Key, class Value, class Compare, class Allocator>
 inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_swap_front(typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_view_set& expectedFront, typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_view_set& desiredFront)
 {
-	// De-link upper layers from head
 	const node_type* const frontNode(expectedFront[0]);
 	const std::uint8_t frontHeight(frontNode->m_height);
 
 	for (std::uint8_t i = 0; i < frontHeight - 1; ++i) {
 		const std::uint8_t atLayer(frontHeight - 1 - i);
 
-		desiredFront[atLayer].set_version(expectedFront[atLayer].get_version() + 1);
-
-		if (m_head.m_next[atLayer].compare_exchange_strong(expectedFront[atLayer], desiredFront[atLayer], std::memory_order_seq_cst, std::memory_order_relaxed)) {
+		// De-link upper layer
+		if (cas_to_head(expectedFront[atLayer], desiredFront[atLayer], atLayer)) {
 			continue;
 		}
 
 		// Retry if an inserter just linked front node to an upper layer..
-		if (expectedFront[atLayer].operator node_type * () == frontNode) {
-			if (m_head.m_next[atLayer].compare_exchange_strong(expectedFront[atLayer], desiredFront[atLayer], std::memory_order_seq_cst, std::memory_order_relaxed)) {
-				continue;
-			}
+		if ((expectedFront[atLayer].operator node_type * () == frontNode) &&
+			cas_to_head(expectedFront[atLayer], desiredFront[atLayer], atLayer)) {
+			continue;
 		}
 	}
 
 	// De-link base layer
-	desiredFront[0].set_version(expectedFront[0].get_version());
-	const bool deLinked = m_head.m_next[0].compare_exchange_strong(expectedFront[0], desiredFront[0], std::memory_order_seq_cst, std::memory_order_relaxed);
-
-	return deLinked;
+	return cas_to_head(expectedFront[0], desiredFront[0], 0);
 }
 
 template<class Key, class Value, class Compare, class Allocator>
@@ -373,21 +412,32 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_link(
 		node->m_next[i].store(next[i], std::memory_order_relaxed);
 	}
 
-	node_type* const baseLayerCurrent(current[0].operator node_type * ());
+	node_type* const baseLayerCurrent(current[0]);
 
 	node_view expected(next[0]);
-	const node_view desired(node);
+	node_view desired(node);
 
-	GDUL_ASSERT(!baseLayerCurrent->m_removed && "Should not link to deleted node");
-
-	if (!baseLayerCurrent->m_next[0].compare_exchange_weak(expected, desired, std::memory_order_seq_cst, std::memory_order_relaxed)) {
-		return false;
+	if (at_end(baseLayerCurrent)) {
+		desired.set_version(expected.get_version() + 1);
 	}
-#if defined _DEBUG
+
+	const bool result(baseLayerCurrent->m_next[0].compare_exchange_weak(expected, desired, std::memory_order_seq_cst, std::memory_order_relaxed));
+#if defined GDUL_CPQ_DEBUG
 	node->m_inserted = 1;
+	node->m_linkVersion = expected.get_version();
+	baseLayerCurrent->m_nextView[0] = node;
+	std::copy(std::begin(current), std::end(current), t_recentOp.current);
+	std::copy(std::begin(next), std::end(next), t_recentOp.next);
+	t_recentOp.opNode = node;
+	t_recentOp.result[0] = result;
+	t_recentOp.frontSwap = false;
 #endif
 
-	//try_link_upper(current, next, node);
+	if (!result) {
+		return false;
+	}
+
+	try_link_upper(current, next, node);
 
 	return true;
 }
@@ -395,40 +445,83 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_link(
 template<class Key, class Value, class Compare, class Allocator>
 inline void concurrent_priority_queue<Key, Value, Compare, Allocator>::try_link_upper(typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_view_set& current, typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_view_set& next, typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_view node)
 {
-	const std::uint8_t height(node.operator node_type*()->m_height);
+	const std::uint8_t height(node.operator node_type * ()->m_height);
 
-	for (size_type layer = 1; layer < height; ++layer) {
+	for (std::uint8_t layer = 1; layer < height; ++layer) {
 		node_view expected(next[layer]);
-		const node_view desired(node);
-		if (!current[layer].operator node_type * ()->m_next[layer].compare_exchange_weak(expected, node_view(node), std::memory_order_seq_cst, std::memory_order_relaxed)) {
+		node_view desired(node);
+		node_type* const current(current[layer]);
+
+		if (at_end(current)) {
+			desired.set_version(expected.get_version() + 1);
+		}
+
+		const bool result(current->m_next[layer].compare_exchange_weak(expected, node_view(node), std::memory_order_seq_cst, std::memory_order_relaxed));
+#if defined GDUL_CPQ_DEBUG
+		t_recentOp.result[layer] = result;
+		current->m_nextView[layer] = node;
+#endif
+		if (!result) {
 			break;
 		}
 	}
 }
 
 template<class Key, class Value, class Compare, class Allocator>
-inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_splice_at_front(typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_view_set& current, typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_view_set& next, typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_view node)
+inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_splice_to_head(typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_view_set& current, typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_view_set& next, typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_type* node)
 {
-	next[0] = node;
+	// Mimick version of what should be at front node
+	const node_view desired(node, next[0].get_version());
+	next[0] = desired;
+
+#if defined GDUL_CPQ_DEBUG
+	std::copy(std::begin(current), std::end(current), t_recentOp.current);
+	std::copy(std::begin(next), std::end(next), t_recentOp.next);
+	t_recentOp.opNode = node;
+#endif
 
 	if (try_swap_front(current, next)) {
 
+#if defined GDUL_CPQ_DEBUG
+		t_recentOp.frontSwap = true;
+#endif
 		node_view_set headSet;
+		std::uninitialized_fill(std::begin(headSet), std::end(headSet), node_view(&m_head));
 
-		auto headBegin(std::begin(headSet));
-		++headBegin;
-		auto headEndItr(std::end(headSet));
-		headEndItr += node.operator node_type * ()->m_height;
+#if defined GDUL_CPQ_DEBUG
+		std::copy(std::begin(next), std::end(next), t_recentOp.extra);
+#endif
 
-		std::uninitialized_fill(headBegin, headEndItr, node_view(&m_head));
-		std::for_each(headBegin, headEndItr, [this, &next](node_view& n) {n = &m_head; n.set_version(next[0].get_version() + 1); });
-
-		try_link_upper(headSet, next, node);
+		try_link_upper(headSet, next, desired);
 
 		return true;
 	}
 
 	return false;
+}
+
+template<class Key, class Value, class Compare, class Allocator>
+inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::cas_to_head(typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_view& expected, typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_view& desired, std::uint8_t layer)
+{
+	desired.set_version(expected.get_version() + 1);
+
+	if (m_head.m_next[layer].compare_exchange_strong(expected, desired, std::memory_order_seq_cst, std::memory_order_relaxed)) {
+#if defined GDUL_CPQ_DEBUG
+		t_recentOp.result[layer] = true;
+#endif
+		return true;
+	}
+	return false;
+}
+
+template<class Key, class Value, class Compare, class Allocator>
+inline void concurrent_priority_queue<Key, Value, Compare, Allocator>::set_version(std::uint32_t version, typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_view_set& to, std::uint8_t usingHeight)
+{
+	auto begin(std::begin(to));
+	auto end(std::begin(to));
+	end += usingHeight;
+
+	std::for_each(begin, end, [version](node_view& n) {n.set_version(version); });
 }
 
 template<class Key, class Value, class Compare, class Allocator>
@@ -444,45 +537,35 @@ inline void concurrent_priority_queue<Key, Value, Compare, Allocator>::load_fron
 template<class Key, class Value, class Compare, class Allocator>
 inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_push(typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_type* node)
 {
-	node_view_set currentSet;
-	node_view_set nextSet;
+	node_view_set currentSet{};
+	node_view_set nextSet{};
 
 	prepare_insertion_sets(currentSet, nextSet, node);
 
-	// Empty structure. All safe.
-	if (at_end(currentSet[0]) && at_end(nextSet[0])) {
+	// Empty structure, all safe.
+	if (at_end(currentSet[0])) {
 		return try_link(currentSet, nextSet, node);
 	}
 
-	// The node has no version, which means it is not in the process of deletion. All safe.
+	// The node has no version, all safe.
 	if (!nextSet[0].get_version()) {
 		return try_link(currentSet, nextSet, node);
 	}
 
-	// Here ensure that we're not linking to a node that's being removed. 
-	// If it has version set, it means one of three things:
-	// * The node is at front, in the middle of deletion
-	// * The node has been supplanted, and is no longer at front
-	// * The node has been deleted, and does not exist in structure
+	node_view_set frontSet;
+	load_front_set(frontSet);
 
-	// The node is at front. We want to help de-link the node, replacing it with our own. This means we need a special case
-	// where currentSet is HEAD, nextSet is FRONTNEXT and expected is FRONT
-	{
-		node_view_set frontSet;
-		load_front_set(frontSet);
-
-		if (frontSet[0] == currentSet[0] && nextSet[0].get_version() == frontSet[0].get_version() + 1) {
-
-			return try_splice_at_front(currentSet, nextSet, node);
-		}
+	// The node is at front, in the middle of deletion
+	if (frontSet[0] == currentSet[0] && nextSet[0].get_version() == frontSet[0].get_version() + 1) {
+		return try_splice_to_head(currentSet, nextSet, node);
 	}
 
-	// The node has version set (was claimed) but is not at front. We need to know if it's in the list still.
+	// The node has been supplanted, and is no longer at front
 	if (find_node(currentSet[0])) {
 		return try_link(currentSet, nextSet, node);
 	}
 
-	// The node is removed, retry
+	// The node has been deleted, and does not exist in structure
 	return false;
 }
 
@@ -540,7 +623,7 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::find_node
 		}
 
 		at = at->m_next[0].load();
-}
+	}
 
 	return false;
 
@@ -602,7 +685,7 @@ struct tl_container
 		std::random_device rd;
 
 		// randomize starting point
-		for (std::size_t i = rd() % 100; i != 0; --i) {
+		for (std::size_t i = rd() % 1000; i != 0; --i) {
 			t_rng();
 		}
 	}
@@ -651,3 +734,38 @@ static std::uint8_t random_height()
 // * Try flag FRONT node
 // * Help de-link FRONT
 // * In case flag was successful, abort. Else repeat.
+
+
+
+
+
+
+
+
+
+
+
+// Here's current issue:
+
+// HEAD------------------1--------------------END
+// HEAD------------------1--------------------END
+
+// inserter loads HEAD layer 1, stalls
+// deleter deletes FRONT
+// :
+// HEAD------------------END
+// HEAD------------------END
+// 
+// inserter loads HEAD layer 0, inserts 0.5:
+// HEAD-----------------0.5------------------*1*------------------END
+// HEAD-----------------0.5-------------------END
+
+// -I feel like I've been over this scenario! ? Perhaps I intended for height to decay?
+
+// This, of course may only be an issue at HEAD node, since deleters may do not touch any other node.
+// So, we don't want to use a de-linked node in the upper layers of our new insert. 
+// If we reload upper layers when preparing head insertion set, what then? That'll mean the upper nodes in 
+// insertion set will be guaranteed to be equal to or younger than bottom node. Which meeeans! ? In case bottom 
+// linkage succeeds upper may still fail? If bottom fails, bottom fails. The nodes referenced in the inserted node will
+// be guaranteed to be younger than the bottom node, and in case insertion succeeds, this means we will never refer to stale
+// nodes!.. !

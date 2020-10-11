@@ -64,7 +64,7 @@ int main()
 
 	// At this point we need to test for correctness of values. Or. Perhaps multi-layer first.
 	gdul::queue_testrun<test_type, gdul::tracking_allocator<test_type>>(
-		100, 
+		10000, 
 		gdul::tracking_allocator<std::pair<int, float>>(), 
 		/*gdul::test_option_single |  gdul::test_option_onlyRead|gdul::test_option_onlyWrite  | */gdul::test_option_singleReadWrite);
 
