@@ -199,14 +199,12 @@ private:
 	struct recent_op_info
 	{
 		expanded_node_view expected[cpq_detail::Max_Node_Height];
-		expanded_node_view expected2[cpq_detail::Max_Node_Height];
 		expanded_node_view actual[cpq_detail::Max_Node_Height];
 		expanded_node_view next[cpq_detail::Max_Node_Height];
 
 		const node_type* opNode = nullptr;
 
 		bool result[cpq_detail::Max_Node_Height];
-		bool frontSwap;
 
 		uint32_t m_sequenceIndex = 0;
 		uint8_t m_insertionCase = 0;
@@ -214,7 +212,6 @@ private:
 		bool m_invertedLoading = false;
 	};
 	inline static thread_local recent_op_info t_recentOp = recent_op_info();
-	inline static recent_op_info t_nonsense = recent_op_info();
 	inline static std::vector<recent_op_info> t_recentPushes;
 	inline static std::vector<recent_op_info> t_recentPops;
 	inline static thread_local std::uint8_t t_threadRole = 0;
@@ -352,13 +349,8 @@ inline void concurrent_priority_queue<Key, Value, Compare, Allocator>::prepare_i
 	// In case we are inserting at front, we need to make sure that the age of
 	// our view of the upper layers do not exceed that of the base layer. (Lest we might refer to
 	// a stale node in upper layers when succeeding a base layer link)
-#if defined (GDUL_CPQ_DEBUG)
-	t_recentOp.m_invertedLoading = false;
-#endif
+
 	if (at_head(outCurrent[0])) {
-#if defined (GDUL_CPQ_DEBUG)
-		t_recentOp.m_invertedLoading = true;
-#endif
 		load_set(outNext, &m_head, 1);
 	}
 }
@@ -394,63 +386,19 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_flag_
 template<class Key, class Value, class Compare, class Allocator>
 inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_swap_front(typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_view_set& expectedFront, typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_view_set& desiredFront)
 {
-#if defined GDUL_CPQ_DEBUG
-	expanded_node_view expectedCopy[cpq_detail::Max_Node_Height];
-	std::copy(std::begin(expectedFront), std::end(expectedFront), expectedCopy);
-
-	bool performStore = false;
-#endif
-
 	const node_type* const frontNode(expectedFront[0]);
 	const std::uint8_t frontHeight(frontNode->m_height);
 
+
+	bool result = false;
 	for (std::uint8_t i = 0; i < frontHeight - 1; ++i) {
 		const std::uint8_t atLayer(frontHeight - 1 - i);
 
-		// De-link upper layer
-		if (cas_to_head(expectedFront[atLayer], desiredFront[atLayer], atLayer)) {
-#if defined GDUL_CPQ_DEBUG
-			t_recentOp.expected2[atLayer] = node_view();
-			if (desiredFront[atLayer].get_version() == 5) {
-				performStore = true;
-			}
-#endif
-			continue;
-		}
-
-#if defined GDUL_CPQ_DEBUG
-		t_recentOp.expected2[atLayer] = expectedFront[atLayer];
-#endif
-
-		// So what about this? What are the edge cases? If an insertion happens, followed by a delete,
-		// this might cause a bad de-link.... ! Can we try without this? What about concurrent de-linking, yeah 
-		// that stuff about versioning!.. And insertions need to *PRESERVE*, not increase version.
-
-		// Retry if an inserter just linked front node to an upper layer..
-		if ((expectedFront[atLayer].operator node_type * () == frontNode) &&
-			cas_to_head(expectedFront[atLayer], desiredFront[atLayer], atLayer)) {
-#if defined GDUL_CPQ_DEBUG
-			if (desiredFront[atLayer].get_version() == 5) {
-				performStore = true;
-			}
-#endif
-			continue;
-		}
+		// if (within_delinking_range(expectedFront[atLayer]){
+		result = cas_to_head(expectedFront[atLayer], desiredFront[atLayer], atLayer);
+		//{
 	}
 
-	// De-link base layer
-	const bool result(cas_to_head(expectedFront[0], desiredFront[0], 0));
-#if defined GDUL_CPQ_DEBUG
-	if (performStore) {
-		std::copy(std::begin(expectedFront), std::end(expectedFront), t_nonsense.actual);
-		std::copy(std::begin(desiredFront), std::end(desiredFront), t_nonsense.next);
-		std::copy(std::begin(expectedCopy), std::end(expectedCopy), t_nonsense.expected);
-		std::copy(std::begin(t_recentOp.result), std::end(t_recentOp.result), t_nonsense.result);
-		t_nonsense.opNode = frontNode;
-		t_nonsense.m_sequenceIndex = m_sequenceCounter.load(std::memory_order_relaxed);
-		t_nonsense.m_threadRole = t_threadRole;
-	}
-#endif
 	return result;
 }
 
@@ -484,7 +432,8 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_link(
 	node_view desired(node);
 
 	if (at_head(baseLayerCurrent)) {
-		desired.set_version(expected.get_version() + 1);
+		GDUL_ASSERT(false && "Associate version with base layer")
+		//desired.set_version(expected.get_version() + 1);
 	}
 
 #if defined GDUL_CPQ_DEBUG
@@ -503,7 +452,6 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_link(
 	t_recentOp.opNode = node;
 	t_recentOp.result[0] = result;
 	t_recentOp.result[1] = false;
-	t_recentOp.frontSwap = false;
 	t_recentOp.m_sequenceIndex = m_sequenceCounter++;
 #endif
 
@@ -528,7 +476,8 @@ inline void concurrent_priority_queue<Key, Value, Compare, Allocator>::try_link_
 		node_type* const current(atSet[layer]);
 
 		if (at_head(current)) {
-			desired.set_version(expected.get_version() + 1);
+			GDUL_ASSERT(false && "Associate version with base layer")
+			//desired.set_version(expected.get_version() + 1);
 		}
 
 		const bool result(current->m_next[layer].compare_exchange_strong(expected, desired, std::memory_order_seq_cst, std::memory_order_relaxed));
@@ -556,7 +505,6 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_splic
 	if (try_swap_front(frontSet, replacementSet)) {
 
 #if defined GDUL_CPQ_DEBUG
-		t_recentOp.frontSwap = true;
 		t_recentOp.m_sequenceIndex = m_sequenceCounter++;
 #endif
 		node_view_set headSet;
@@ -580,7 +528,8 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_splic
 template<class Key, class Value, class Compare, class Allocator>
 inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::cas_to_head(typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_view& expected, typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_view& desired, std::uint8_t layer)
 {
-	desired.set_version(expected.get_version() + 1);
+	GDUL_ASSERT(false && "Associate version with base layer")
+	//desired.set_version(expected.get_version() + 1);
 
 	const bool result(m_head.m_next[layer].compare_exchange_strong(expected, desired, std::memory_order_seq_cst, std::memory_order_relaxed));
 #if defined GDUL_CPQ_DEBUG
@@ -651,7 +600,7 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_push(
 		if (replacementSet[0].get_version() == frontSet[0].get_version() + 1) {
 
 			for (std::uint8_t i = 0, height = node->m_height; i < height; ++i) {
-				node->m_next[i].store(replacementSet[i], std::memory_order_relaxed);
+				node->m_next[i].store(node_view(replacementSet[i].operator node_type * (), 0), std::memory_order_relaxed);
 			}
 #if defined (GDUL_CPQ_DEBUG)
 			t_recentOp.m_insertionCase = 3;
@@ -826,202 +775,3 @@ static std::uint8_t random_height()
 }
 
 #pragma warning(pop)
-
-
-
-// Current state is
-
-// for push:
-// * Compile insertion set. - This may contain any nodes, both living or dead nodes
-// * Ensure bottom node in insertion set is still living. 
-// * Check which insertion case we are dealing with: At main list body or after an ongoing de-link (at FRONT)
-
-// * If inserting at main list, simply attempt to link in.
-// * If inserting after an ongoing de-link (FRONT), perform a combined help_delink along with linking node at HEAD
-
-// The main point of uncertainty is linkage of upper layers. Linking should be blocked at upper layers at front node, in case
-// the ongoing linked node has been removed. -- The mechanism is complex though, and there is a big chance of unforseen things 
-// happening.
-
-
-
-// for pop:
-// * Load HEAD set, top to bottom
-// * Try flag FRONT node
-// * Help de-link FRONT
-// * In case flag was successful, abort. Else repeat.
-
-
-
-
-
-
-
-
-
-
-
-// Here's current issue:
-
-// HEAD------------------1--------------------END
-// HEAD------------------1--------------------END
-
-// inserter loads HEAD layer 1, stalls
-// deleter deletes FRONT
-// :
-// HEAD------------------END
-// HEAD------------------END
-// 
-// inserter loads HEAD layer 0, inserts 0.5:
-// HEAD-----------------0.5------------------*1*------------------END
-// HEAD-----------------0.5-------------------END
-
-// -I feel like I've been over this scenario! ? Perhaps I intended for height to decay?
-
-// This, of course may only be an issue at HEAD node, since deleters may do not touch any other node.
-// So, we don't want to use a de-linked node in the upper layers of our new insert. 
-// If we reload upper layers when preparing head insertion set, what then? That'll mean the upper nodes in 
-// insertion set will be guaranteed to be equal to or younger than bottom node. Which meeeans! ? In case bottom 
-// linkage succeeds upper may still fail? If bottom fails, bottom fails. The nodes referenced in the inserted node will
-// be guaranteed to be younger than the bottom node, and in case insertion succeeds, this means we will never refer to stale
-// nodes!.. !
-
-
-
-
-
-
-// Further notes:
-// Investigate total guarantee of age of reference when linking. Might still be some cases where stale nodes may be referenced.. !
-
-// HEAD------------------1-----------------------------------------END
-// HEAD------------------1--------------------2--------------------END
-
-
-// Loading 1 layer 1, is there anywhere we may link if it is removed? 
-
-// No, links may only de-link at HEAD, and we have handled that case. 
-
-// What about replacementSet ? Does that need a different load order? And nextSet for that matter?
-
-// Both are currently loaded up->down and may essentially be the new set at HEAD...... ?
-
-
-
-
-
-
-
-
-
-// What about splicing... What are we doing then? We're doing a de-link with our own node inserted. What then? Can we guarantee 
-// validity of HEAD->FRONT->[next] pointers.. Well, they should be valid. There must be no living links to FRONT when bottom layer 
-// is de linked. 
-
-// What about head then. Upper layers... What are the different situations that can happen here? Is there a way for a stale reference
-// to sneak in via failed de link? We can't expect any front node to be fully linked. The front node may be currently linking, and 
-// a deleter begins to remove it. Prevention of further linkage must be guaranteed. Version should prevent this fine. We're always
-// increasing version by cas in the upper layers before a de link, this should prevent further linkage. Can one of these cas' fail ? I suppose
-// we could just ensure that the version was one we want to see(not-below or equal. Below being defined as [current - 256] or something)
-
-
-
-
-
-// HEAD------------------END
-// HEAD------------------END
-// Inserter links 1 ->
-// HEAD------------------1------------------END
-// HEAD------------------1------------------END
-
-// From here, inserter prepares an insertion set 
-// [HEAD][->1]
-// [HEAD][->1]
-// and succeeds linking at both layers to node(0)
-
-// Deleter removes 0 first & 1 second.
-
-
-
-// empty -> 1 -> 0, 1 -> 1 -> empty, with 0 link at upper...
-
-// So the inserter first links 1, then 0. This could make more sense, since 0 was the stray
-// link found in upper layer.
-
-// So somehow inserter links upper layer to 0 after deleter removes 1 & has loaded whatever was in that place
-
-// When the deleter removed 1, it expected HEAD links to be:
-// [->?]
-// [->1] 
-// but found 
-// [->0]
-// [->1]
-
-// When inserter linked upper layer to 0 it expected [->1][->1]. This is could be the case:
-
-// Inserter loads [->1][->1 (version 0 )], links base layer to 0
-// Deleter loads head set, links both layers to 1, with upper being version 0
-// Deleter loads [->1][->1]
-// Inserter links upper layer to 0, since version is still 0
-// Deleter attempts to de link 1 at upper but finds 0!
-
-// In short. Versioning at HEAD needs to be sorted. Probably, all head links should increase independantly
-
-
-
-//So deleter expected to find 1, version 1 in upper slot.Let's see.. This version should only exist after first insert. So 
-//we failed upper link when deleting 0 ? That doens't make sense. Inserter linked 0 with expected version 1 at both slots. All in
-//order..
-//
-//Here deleter should find 0, 0 with versions 2, 2. If it loads HEAD set partially, it may find 0, 1 with versions 2, 1
-//So in this case:
-//	Deleter loads HEAD, finds 0, 1 with version 2, 1
-//		Deleter attempts delink at upper, fails, delinks lower.->HEAD contains 1, 1 with versions 3, 1
-//		Deleter loads HEAD finds 1, 1, versions 3, 1
-//		Inserter links upper to 0->HEAD contains 1, 0 versions 3, 2
-//		Deleter attempts delink at upper, fails
-//		Deleter delink lower.
-//
-//		So how did the delink fail at upper with 0, 1 ?
-//
-
-
-// So we have a fundamental issue with our loading order in try_pop. Since we are loading upper layers first, these may out-age base layer. This will cause failures in de-linking, 
-// followed by a delink at base layer. 
-
-// What can we do to fix this? We may enforce delinkage at upper layers by binding it to total op failure. We can also try reversing load order. But if I recall correctly, this had
-// other issues.
-
-// Hmm. Inverting load order actually worked well. Very well. I need to work out why.
-
-// So if age of upper layers may be younger than that of bottom. In case we see a more recent node at layer 1, we might end up delinking at layer 1.. Could we cause inversion of forward pointers?
-
-
-// If we have 1->2->3 at upper, and expect 2 at bottom, we could want to link 3 where 1 resided. That's fine. Well. Ok then.. I'm sure problems'll show themselves when we increase layers and/or list length..
-
-// Deleter removes 0(2)1(1)0(3)
-// Inserter links 1, 0, 0
-
-
-
-// Want retry buffer! 
-
-
-//So if two deleters compete: 
-//
-//	* both load front set from bottom
-//	* first loads bottom layer
-//	* other loads bottom layer
-//	* first delinks upper layers
-//	* other loads upper layers
-//	* first delinks bottom
-//	* other 'delinks' upper layers (now referring to stale node!)
-
-// This is why we need to make versioning more uniform with regards to bottom layer. Everything should slave to bottom layer, THAT is how we keep things in order.
-
-// In this case, we could make the assumption that if the upper layers were 'higher' then that of base layer version, they could not be a part
-// of the currently inspected front node link.
-// Will have to figure out how to handle HEAD insertions. Should those increase version? It is a fact that the values there should be assumed to be 'new'.
-// That is, they shouldn't be subject to ABA issues. 
-// This approach is more general & clear than the current, and has the added benefit of making the 'second case' upper layer HEAD linking (where we
-// check for recent linkage of current node) obsolete. -- We get that for free (along with any other similar situations).

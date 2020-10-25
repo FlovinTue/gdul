@@ -14,7 +14,7 @@
 #if defined(GDUL_FIFO)
 #include <gdul/WIP_concurrent_queue_fifo/concurrent_queue_fifo_v6.h>
 #elif defined(GDUL_CPQ)
-#include <gdul/WIP_concurrent_priority_queue/concurrent_priority_queue_v9.h>
+#include <gdul/WIP_concurrent_priority_queue/concurrent_priority_queue_v10.h>
 #endif
 #include <queue>
 #include <mutex>
@@ -497,11 +497,8 @@ inline void tester<T, Allocator>::Write(std::uint32_t writes) {
 	if (!m_nodes) {
 		m_nodes = gdul::make_shared<typename decltype(m_queue)::node_type[]>(writes);
 	}
-#if defined _DEBUG
-	for (std::size_t i = 0; i < m_nodes.item_count(); ++i) {
-		m_nodes[i].m_removed = 0;
-		m_nodes[i].m_inserted = 0;
-	}
+#if defined GDUL_CPQ_DEBUG
+	std::memset(m_nodes.get(), 0, m_nodes.item_count() * sizeof(typename decltype(m_nodes)::decayed_type));
 #endif
 #endif
 
@@ -545,7 +542,7 @@ inline void tester<T, Allocator>::Write(std::uint32_t writes) {
 		m_queue.push(in);
 #elif defined(GDUL_CPQ)
 		m_nodes[j].m_kv.first = seed & (j + 1);
-		m_queue.push(&m_nodes[j]);
+		m_queue.push(&m_nodes[j]); 
 #else
 		m_queue.enqueue(in);
 #endif
@@ -565,7 +562,7 @@ template<class T, class Allocator>
 inline void tester<T, Allocator>::Read(std::uint32_t reads) {
 	++m_waiting;
 
-#if defined _DEBUG
+#if defined GDUL_CPQ_DEBUG
 	t_output.clear();
 	t_output.reserve(reads);
 #endif
@@ -611,7 +608,7 @@ inline void tester<T, Allocator>::Read(std::uint32_t reads) {
 #if !defined(GDUL_CPQ) && ! defined(MS_CPQ)
 				sum += out.count;
 #endif
-#if defined _DEBUG
+#if defined GDUL_CPQ_DEBUG
 				t_output.push_back(out);
 #endif
 				break;
