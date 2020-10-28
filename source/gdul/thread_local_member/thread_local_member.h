@@ -153,8 +153,8 @@ inline void index_pool<Dummy>::push_pool_entry(shared_ptr<node> entry)
 	} while (!m_topPool.compare_exchange_strong(top, std::move(toInsert)));
 }
 
-template <class T, size_type N, class ...Args>
-constexpr std::array<T, N> make_array(Args&&... args);
+template <class T, size_type ArraySize, class ...Args>
+constexpr std::array<T, ArraySize> make_array(Args&&... args);
 
 }
 // Abstraction to enable members to be thread local. Internally, fast path contains 1 integer 
@@ -727,15 +727,15 @@ struct instance_tracker
 	std::uint64_t m_iteration;
 };
 
-template<class T, size_type ...Ix, typename ...Args>
-constexpr std::array<T, sizeof ...(Ix)> repeat(std::index_sequence<Ix...>, Args&&... args)
+template<class T, size_type ArraySize, std::size_t ...Ix, class ...Args>
+constexpr std::array<T, ArraySize> repeat(std::index_sequence<Ix...>, Args&&... args)
 {
-	return std::array<T, sizeof ...(Ix)>{ {((void)Ix, T(std::forward<Args&&>(args)...))...} };
+	return std::array<T, ArraySize>{ { ((void)Ix, T(std::forward<Args>(args)))... } };
 }
-template <class T, size_type N, class ...Args>
-constexpr std::array<T, N> make_array(Args&&... args)
+template <class T, size_type ArraySize, class ...Args>
+constexpr std::array<T, ArraySize> make_array(Args&&... args)
 {
-	return std::array<T, N>(repeat<T>(std::make_index_sequence<N>(), std::forward<Args&&>(args)...));
+	return std::array<T, ArraySize>(repeat<T, ArraySize>(std::make_index_sequence<sizeof...(Args)>(), std::forward<Args>(args)...));
 }
 }
 template <class T, class Allocator>
