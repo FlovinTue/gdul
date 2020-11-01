@@ -21,28 +21,6 @@ namespace cpq_detail {
 
 using size_type = std::size_t;
 
-static constexpr std::uintptr_t Bottom_Bits = (((1 << 1) | 1) << 1) | 1;
-static constexpr std::uintptr_t Pointer_Mask = (std::numeric_limits<std::uintptr_t>::max() >> 16) - Bottom_Bits;
-static constexpr std::uintptr_t Version_Mask = ~Pointer_Mask;
-static constexpr std::uint32_t Max_Version_Mask = (std::numeric_limits<std::uint16_t>::max() * 2 * 2 * 2) - 1;
-static constexpr std::uint8_t Cache_Line_Size = 64;
-static constexpr std::uint8_t In_Range_Delta = std::numeric_limits<std::uint8_t>::max();
-static constexpr size_type Max_Entries_Hint = 1024;
-static constexpr std::uint8_t Max_Node_Height = 2;// cpq_detail::calc_max_height(Max_Entries_Hint);
-
-enum exchange_link_result : std::uint8_t
-{
-	exchange_link_outside_range = 0,
-	exchange_link_success = 1,
-	exchange_link_other_link = 2, 
-};
-enum flag_node_result : std::uint8_t
-{
-	flag_node_fail = 0,
-	flag_node_success = 1,
-	flag_node_other = 2,
-};
-
 constexpr size_type log2ceil(size_type value)
 {
 	size_type highBit(0);
@@ -65,6 +43,29 @@ constexpr std::uint8_t calc_max_height(size_type maxEntriesHint)
 
 	return croppedHeight;
 }
+
+static constexpr std::uintptr_t Bottom_Bits = (((1 << 1) | 1) << 1) | 1;
+static constexpr std::uintptr_t Pointer_Mask = (std::numeric_limits<std::uintptr_t>::max() >> 16) - Bottom_Bits;
+static constexpr std::uintptr_t Version_Mask = ~Pointer_Mask;
+static constexpr std::uint32_t Max_Version_Mask = (std::numeric_limits<std::uint16_t>::max() * 2 * 2 * 2) - 1;
+static constexpr std::uint8_t Cache_Line_Size = 64;
+static constexpr std::uint8_t In_Range_Delta = std::numeric_limits<std::uint8_t>::max();
+static constexpr size_type Max_Entries_Hint = 1024;
+static constexpr std::uint8_t Max_Node_Height = cpq_detail::calc_max_height(Max_Entries_Hint);
+
+enum exchange_link_result : std::uint8_t
+{
+	exchange_link_outside_range = 0,
+	exchange_link_success = 1,
+	exchange_link_other_link = 2, 
+};
+enum flag_node_result : std::uint8_t
+{
+	flag_node_fail = 0,
+	flag_node_success = 1,
+	flag_node_other = 2,
+};
+
 static std::uint8_t random_height();
 
 
@@ -130,7 +131,7 @@ struct node
 
 	struct alignas(Cache_Line_Size) // Sync block
 	{
-		std::atomic<node_view> m_next[Max_Node_Height];
+		std::atomic<node_view> m_next[Max_Node_Height]{};
 		std::uint8_t m_height;
 #if defined (GDUL_CPQ_DEBUG)
 		const node* m_nextView[Max_Node_Height]{};
@@ -188,7 +189,7 @@ private:
 	bool try_push(node_type* node);
 
 	bool try_delink_front(node_view_set& expectedFront, node_view_set& desiredFront, std::uint8_t versionOffset = 0);
-	bool try_splice_to_head(node_view_set& current, node_view_set& next, node_type* node);
+	bool try_splice_to_head(node_view_set& current, node_view_set& next, node_view node);
 
 	bool try_link_to_head(node_view_set& next, node_view node);
 	void try_link_to_head_upper(node_view_set& next, node_view node, std::uint32_t version);
@@ -291,8 +292,8 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_pop(t
 	}
 #endif
 
-	node_view_set frontSet;
-	node_view_set replacementSet;
+	node_view_set frontSet{};
+	node_view_set replacementSet{};
 
 	cpq_detail::flag_node_result flagResult(cpq_detail::flag_node_fail);
 	bool deLinked(false);
@@ -406,8 +407,13 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_delin
 	for (std::uint8_t i = 0; i < numUpperLayers; ++i) {
 		const std::uint8_t layer(frontHeight - 1 - i);
 
-		if (exchange_head_link(&m_head, expectedFront[layer], desiredFront[layer], nextVersion, layer) == cpq_detail::exchange_link_outside_range) {
+		const cpq_detail::exchange_link_result result(exchange_head_link(&m_head, expectedFront[layer], desiredFront[layer], nextVersion, layer));
+
+		if (result == cpq_detail::exchange_link_outside_range) {
 			return false;
+		}
+		if (result != cpq_detail::exchange_link_success) {
+			desiredFront[layer] = expectedFront[layer];
 		}
 	}
 
@@ -492,13 +498,13 @@ inline void concurrent_priority_queue<Key, Value, Compare, Allocator>::try_link_
 }
 
 template<class Key, class Value, class Compare, class Allocator>
-inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_splice_to_head(typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_view_set& frontSet, typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_view_set& replacementSet, typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_type* node)
+inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_splice_to_head(typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_view_set& frontSet, typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_view_set& replacementSet, typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_view node)
 {
 	replacementSet[0] = node;
 
 	if (try_delink_front(frontSet, replacementSet, 1)) {
 
-		try_link_to_head_upper(replacementSet, node_view(node, replacementSet[0].get_version()), replacementSet[0].get_version());
+		try_link_to_head_upper(replacementSet, node, replacementSet[0].get_version());
 
 		return true;
 	}
@@ -509,8 +515,8 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_splic
 template<class Key, class Value, class Compare, class Allocator>
 inline void concurrent_priority_queue<Key, Value, Compare, Allocator>::load_set(typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_view_set& outSet, typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_type* at, std::uint8_t offset)
 {
-	const std::uint8_t height(at->m_height);
-	for (std::uint8_t i = offset; i < height; ++i) {
+	const std::uint8_t atHeight(at->m_height);
+	for (std::uint8_t i = offset; i < atHeight; ++i) {
 		outSet[i] = at->m_next[i].load(std::memory_order_seq_cst);
 	}
 }
@@ -544,21 +550,22 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_push(
 	}
 
 	// optimize this... Can probably use currentSet & nextSet, but for correctness, reload totally.
-	node_view_set frontSet;
+	node_view_set frontSet{};
 	load_set(frontSet, &m_head);
 
 	// Inserting after front node...
 	if (currentSet[0] == frontSet[0]) {
 
 		// optimize this... Can probably use currentSet & nextSet, but for correctness, reload totally.
-		node_view_set replacementSet;
+		node_view_set replacementSet{};
 		load_set(replacementSet, frontSet[0]);
 
 		// Front node is in the middle of deletion, attempt special case splice to head
 		if (replacementSet[0].get_version() == frontSet[0].get_version() + 1) {
+			std::copy(std::begin(frontSet) + node->m_height, std::end(frontSet), std::begin(replacementSet) + node->m_height);
 
-			for (std::uint8_t i = 0, height = node->m_height; i < height; ++i) {
-				node->m_next[i].store(node_view(replacementSet[i].operator node_type * (), 0), std::memory_order_relaxed);
+			for (std::uint8_t i = 0; i < node->m_height; ++i) {
+				node->m_next[i].store(replacementSet[i], std::memory_order_relaxed);
 			}
 #if defined (GDUL_CPQ_DEBUG)
 			t_recentOp.m_insertionCase = 3;
@@ -806,7 +813,7 @@ static std::uint8_t random_height()
 			break;
 		}
 	}
-	result = 2;
+
 	return result;
 }
 }

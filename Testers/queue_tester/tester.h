@@ -65,7 +65,7 @@ public:
 	std::queue<T> m_queue;
 };
 
-const std::uint32_t Writes = 4;
+const std::uint32_t Writes = 8;
 const std::uint32_t Writers = std::thread::hardware_concurrency() / 2;
 const std::uint32_t Readers = std::thread::hardware_concurrency() / 2;
 const std::uint32_t WritesPerThread(Writes / Writers);
@@ -494,7 +494,7 @@ inline void tester<T, Allocator>::Write(std::uint32_t writes) {
 #ifdef GDUL
 	/*m_queue.reserve(Writes);*/
 #elif defined(GDUL_CPQ)
-	if (!m_nodes) {
+	if (!(writes < m_nodes.item_count())) {
 		m_nodes = gdul::make_shared<typename decltype(m_queue)::node_type[]>(writes);
 	}
 #if defined GDUL_CPQ_DEBUG
@@ -541,6 +541,7 @@ inline void tester<T, Allocator>::Write(std::uint32_t writes) {
 #if !defined(MOODYCAMEL) && !defined(GDUL_CPQ)
 		m_queue.push(in);
 #elif defined(GDUL_CPQ)
+		GDUL_ASSERT(j < m_nodes.item_count());
 		m_nodes[j].m_kv.first = seed & (j + 1);
 		m_queue.push(&m_nodes[j]); 
 #else
