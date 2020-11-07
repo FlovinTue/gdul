@@ -74,11 +74,13 @@ const std::uint32_t ReadsPerThread(Writes / Readers);
 namespace gdul {
 enum : std::uint32_t
 {
-	test_option_concurrent = 1 << 0,
+	test_option_mpmc = 1 << 0,
 	test_option_single = 1 << 1,
-	test_option_singleReadWrite = 1 << 2,
-	test_option_onlyRead = 1 << 3,
-	test_option_onlyWrite = 1 << 4,
+	test_option_spsc = 1 << 2,
+	test_option_mc = 1 << 3,
+	test_option_mp = 1 << 4,
+	test_option_spmc = 1 << 5,
+	test_option_mpsc = 1 << 6,
 	test_option_all = std::numeric_limits<std::uint32_t>::max(),
 };
 
@@ -94,6 +96,8 @@ void queue_testrun(std::uint32_t runs, Allocator alloc, std::uint32_t options = 
 		double writeRes(0.0);
 		double readRes(0.0);
 		double singleProdSingleCon(0.0);
+		double spmcRes(0.0);
+		double mpscRes(0.0);
 
 #if defined(_DEBUG)
 		// Arbitrary value. Works well
@@ -103,16 +107,21 @@ void queue_testrun(std::uint32_t runs, Allocator alloc, std::uint32_t options = 
 		const int iterations = 1000;
 #endif
 
-		if (options & test_option_singleReadWrite)
-			singleProdSingleCon = tester.ExecuteSingleProducerSingleConsumer(iterations);
-		if (options & test_option_onlyWrite)
-			writeRes = tester.ExecuteWrite(iterations);
-		if (options & test_option_onlyRead)
-			readRes = tester.ExecuteRead(iterations);
+		if (options & test_option_spsc)
+			singleProdSingleCon = tester.ExecuteSPSC(iterations);
+		if (options & test_option_mp)
+			writeRes = tester.ExecuteMP(iterations);
+		if (options & test_option_mc)
+			readRes = tester.ExecuteMC(iterations);
 		if (options & test_option_single)
 			singleRes = tester.ExecuteSingleThread(iterations);
-		if (options & test_option_concurrent)
-			concurrentRes = tester.ExecuteConcurrent(iterations);
+		if (options & test_option_mpmc)
+			concurrentRes = tester.ExecuteMPMC(iterations);
+		if (options & test_option_spmc)
+			spmcRes = tester.ExecuteSPMC(iterations);
+		if (options & test_option_mpsc)
+			mpscRes = tester.ExecuteMPSC(iterations);
+
 
 		std::cout << "\n";
 #ifdef _DEBUG
@@ -126,22 +135,28 @@ void queue_testrun(std::uint32_t runs, Allocator alloc, std::uint32_t options = 
 			std::string(" read & write operations") +
 			std::string("\n") +
 			std::string("Averaging results \n") +
-			std::string("Concurrent (") + std::to_string(Writers) + std::string("Writers, ") + std::to_string(Readers) + std::string("Readers): ") +
+			std::string("MPMC (") + std::to_string(Writers) + std::string("Writers, ") + std::to_string(Readers) + std::string("Readers): ") +
 			std::string(std::to_string(concurrentRes / static_cast<double>(iterations))) + std::string("			// total: ") + std::to_string(concurrentRes) +
 			std::string("s\n") +
-			std::string("Concurrent (") + std::to_string(1) + std::string("Writers, ") + std::to_string(1) + std::string("Readers): ") +
+			std::string("SPSC (") + std::to_string(1) + std::string("Writers, ") + std::to_string(1) + std::string("Readers): ") +
 			std::string(std::to_string(singleProdSingleCon / static_cast<double>(iterations))) + std::string("			// total: ") + std::to_string(singleProdSingleCon) +
 			std::string("s\n") +
 			std::string("Single thread: ") +
 			std::string(std::to_string(singleRes / static_cast<double>(iterations))) + std::string("						// total: ") + std::to_string(singleRes) +
 			std::string("s\n") +
-			std::string("Pure writes: (") + std::to_string(Writers) + std::string("): ") +
+			std::string("MP: (") + std::to_string(Writers) + std::string("): ") +
 			std::string(std::to_string(writeRes / static_cast<double>(iterations))) + std::string("					// total: ") + std::to_string(writeRes) +
 			std::string("s\n") +
-			std::string("Pure reads: (") + std::to_string(Readers) + std::string("): ") +
+			std::string("MC: (") + std::to_string(Readers) + std::string("): ") +
 			std::string(std::to_string(readRes / static_cast<double>(iterations))) + std::string("					// total: ") + std::to_string(readRes) +
 			std::string("s\n") +
-			std::string("Total time is: " + std::to_string(concurrentRes + singleRes + writeRes + readRes + singleProdSingleCon) + "\n") +
+			std::string("SPMC (") + "1" + std::string("Writers, ") + std::to_string(Readers) + std::string("Readers): ") +
+			std::string(std::to_string(spmcRes / static_cast<double>(iterations))) + std::string("			// total: ") + std::to_string(spmcRes) +
+			std::string("s\n") +
+			std::string("MPSC (") + std::to_string(Writers) + std::string("Writers, ") + "1" + std::string("Readers): ") +
+			std::string(std::to_string(mpscRes / static_cast<double>(iterations))) + std::string("			// total: ") + std::to_string(mpscRes) +
+			std::string("s\n") +
+			std::string("Total time is: " + std::to_string(concurrentRes + singleRes + writeRes + readRes + singleProdSingleCon + spmcRes + mpscRes) + "\n") +
 			std::string("per " + std::to_string(Writes) + " operations in ") +
 			config);
 
@@ -158,11 +173,13 @@ public:
 	tester(Allocator& alloc);
 	~tester();
 
-	double ExecuteConcurrent(std::uint32_t runs);
+	double ExecuteMPMC(std::uint32_t runs);
 	double ExecuteSingleThread(std::uint32_t runs);
-	double ExecuteSingleProducerSingleConsumer(std::uint32_t runs);
-	double ExecuteRead(std::uint32_t runs);
-	double ExecuteWrite(std::uint32_t runs);
+	double ExecuteSPSC(std::uint32_t runs);
+	double ExecuteMC(std::uint32_t runs);
+	double ExecuteMP(std::uint32_t runs);
+	double ExecuteSPMC(std::uint32_t runs);
+	double ExecuteMPSC(std::uint32_t runs);
 
 private:
 	bool CheckResults() const;
@@ -230,7 +247,7 @@ inline tester<T, Allocator>::~tester() {
 	m_reader.decommission();
 }
 template<class T, class Allocator>
-inline double tester<T, Allocator>::ExecuteConcurrent(std::uint32_t runs) {
+inline double tester<T, Allocator>::ExecuteMPMC(std::uint32_t runs) {
 #if defined(GDUL) | defined(GDUL_FIFO)
 	m_queue.unsafe_reset();
 #endif
@@ -269,7 +286,109 @@ inline double tester<T, Allocator>::ExecuteConcurrent(std::uint32_t runs) {
 		m_isRunning = false;
 	}
 
-	std::cout << "ExecuteConcurrent Threw " << m_thrown;
+	std::cout << "ExecuteMPMC Threw " << m_thrown;
+	if (!CheckResults()) {
+		std::cout << " and failed check (w" << m_writtenSum << " / r" << m_readSum << ")";
+	}
+	std::cout << std::endl;
+
+	return result;
+}
+template<class T, class Allocator>
+inline double tester<T, Allocator>::ExecuteSPMC(std::uint32_t runs)
+{
+#if defined(GDUL) | defined(GDUL_FIFO)
+	m_queue.unsafe_reset();
+#endif
+
+	double result(0.0);
+	m_thrown = 0;
+	m_writtenSum = 0;
+	m_readSum = 0;
+
+#if defined(GDUL_FIFO)
+	m_queue.reserve(Writes);
+#endif
+
+	for (std::uint32_t i = 0; i < runs; ++i) {
+		
+		m_waiting = Writers - 1;
+
+		for (std::uint32_t j = 0; j < Readers; ++j)
+			m_reader.add_task(std::bind(&tester::Read, this, ReadsPerThread));
+
+		gdul::timer<float> time;
+		m_isRunning = true;
+
+		Write(Writes);
+
+		while (m_writer.has_unfinished_tasks() | m_reader.has_unfinished_tasks())
+			std::this_thread::yield();
+
+#if defined(GDUL) | defined(GDUL_FIFO)
+		m_queue.unsafe_clear();
+#elif defined(MSC_RUNTIME) || defined(MTX_WRAPPER) || defined(GDUL_CPQ)
+		m_queue.clear();
+#endif
+		m_waiting = 0;
+
+		result += time.get();
+
+		m_isRunning = false;
+	}
+
+	std::cout << "ExecuteSPMC Threw " << m_thrown;
+	if (!CheckResults()) {
+		std::cout << " and failed check (w" << m_writtenSum << " / r" << m_readSum << ")";
+	}
+	std::cout << std::endl;
+
+	return result;
+}
+template<class T, class Allocator>
+inline double tester<T, Allocator>::ExecuteMPSC(std::uint32_t runs)
+{
+#if defined(GDUL) | defined(GDUL_FIFO)
+	m_queue.unsafe_reset();
+#endif
+
+	double result(0.0);
+	m_thrown = 0;
+	m_writtenSum = 0;
+	m_readSum = 0;
+
+#if defined(GDUL_FIFO)
+	m_queue.reserve(Writes);
+#endif
+
+	for (std::uint32_t i = 0; i < runs; ++i) {
+
+		m_waiting = Readers - 1;
+
+		for (std::uint32_t j = 0; j < Readers; ++j)
+			m_writer.add_task(std::bind(&tester::Write, this, WritesPerThread));
+
+		gdul::timer<float> time;
+		m_isRunning = true;
+
+		Read(ReadsPerThread * Readers);
+
+		while (m_writer.has_unfinished_tasks() | m_reader.has_unfinished_tasks())
+			std::this_thread::yield();
+
+#if defined(GDUL) | defined(GDUL_FIFO)
+		m_queue.unsafe_clear();
+#elif defined(MSC_RUNTIME) || defined(MTX_WRAPPER) || defined(GDUL_CPQ)
+		m_queue.clear();
+#endif
+		m_waiting = 0;
+
+		result += time.get();
+
+		m_isRunning = false;
+	}
+
+	std::cout << "ExecuteMPSC Threw " << m_thrown;
 	if (!CheckResults()) {
 		std::cout << " and failed check (w" << m_writtenSum << " / r" << m_readSum << ")";
 	}
@@ -323,7 +442,7 @@ inline double tester<T, Allocator>::ExecuteSingleThread(std::uint32_t runs) {
 	return result;
 }
 template<class T, class Allocator>
-inline double tester<T, Allocator>::ExecuteSingleProducerSingleConsumer(std::uint32_t runs) {
+inline double tester<T, Allocator>::ExecuteSPSC(std::uint32_t runs) {
 #if  defined(GDUL) | defined(GDUL_FIFO)
 	m_queue.unsafe_reset();
 #endif
@@ -364,7 +483,7 @@ inline double tester<T, Allocator>::ExecuteSingleProducerSingleConsumer(std::uin
 
 	}
 
-	std::cout << "ExecuteSingleProducerSingleConsumer Threw " << m_thrown;
+	std::cout << "ExecuteSPSC Threw " << m_thrown;
 	if (!CheckResults()) {
 		std::cout << " and failed check (w" << m_writtenSum << " / r" << m_readSum << ")";
 	}
@@ -373,7 +492,7 @@ inline double tester<T, Allocator>::ExecuteSingleProducerSingleConsumer(std::uin
 	return result;
 }
 template<class T, class Allocator>
-inline double tester<T, Allocator>::ExecuteRead(std::uint32_t runs) {
+inline double tester<T, Allocator>::ExecuteMC(std::uint32_t runs) {
 #if  defined(GDUL) | defined(GDUL_FIFO)
 	m_queue.unsafe_reset();
 #endif
@@ -425,7 +544,7 @@ inline double tester<T, Allocator>::ExecuteRead(std::uint32_t runs) {
 #endif
 	}
 
-	std::cout << "ExecuteRead Threw " << m_thrown;
+	std::cout << "ExecuteMC Threw " << m_thrown;
 	if (!CheckResults()) {
 		std::cout << " and failed check (w" << m_writtenSum << " / r" << m_readSum << ")";
 	}
@@ -434,7 +553,7 @@ inline double tester<T, Allocator>::ExecuteRead(std::uint32_t runs) {
 	return result;
 }
 template<class T, class Allocator>
-inline double tester<T, Allocator>::ExecuteWrite(std::uint32_t runs) {
+inline double tester<T, Allocator>::ExecuteMP(std::uint32_t runs) {
 #if  defined(GDUL) | defined(GDUL_FIFO)
 	m_queue.unsafe_reset();
 #endif
@@ -477,7 +596,7 @@ inline double tester<T, Allocator>::ExecuteWrite(std::uint32_t runs) {
 #endif
 	}
 
-	std::cout << "ExecuteWrite Threw " << m_thrown << std::endl;
+	std::cout << "ExecuteMP Threw " << m_thrown << std::endl;
 
 	return result;
 }

@@ -9,6 +9,7 @@
 #include <random>
 #include <iostream>
 #include "../Testers/Common/util.h"
+#include <mutex>
 
 #pragma warning(push)
 // Alignment padding
@@ -51,7 +52,7 @@ static constexpr std::uint32_t Max_Version_Mask = (std::numeric_limits<std::uint
 static constexpr std::uint8_t Cache_Line_Size = 64;
 static constexpr std::uint8_t In_Range_Delta = std::numeric_limits<std::uint8_t>::max();
 static constexpr size_type Max_Entries_Hint = 1024;
-static constexpr std::uint8_t Max_Node_Height = 2;// cpq_detail::calc_max_height(Max_Entries_Hint);
+static constexpr std::uint8_t Max_Node_Height = 3;// cpq_detail::calc_max_height(Max_Entries_Hint);
 
 enum exchange_link_result : std::uint8_t
 {
@@ -190,7 +191,7 @@ private:
 
 	bool try_push(node_type* node);
 
-	bool try_delink_front(node_view_set& expectedFront, node_view_set& desiredFront, std::uint8_t versionOffset = 0);
+	bool try_delink_front(node_view_set& expectedFront, node_view_set& desiredFront, std::uint8_t versionOffset = 1);
 	bool try_replace_front(node_view_set& current, node_view_set& next, node_view node);
 
 	bool try_link_to_head(node_view_set& next, node_view node);
@@ -236,7 +237,10 @@ private:
 		uint32_t m_sequenceIndex = 0;
 		uint8_t m_insertionCase = 0;
 		std::uint8_t m_threadRole = 0;
+		std::thread::id m_threadId;
 	};
+	inline static std::mutex s_pushMutex;
+	inline static std::mutex s_popMutex;
 	inline static thread_local recent_op_info t_recentOp = recent_op_info();
 	inline static std::vector<recent_op_info> t_recentPushes;
 	inline static std::vector<recent_op_info> t_recentPops;
@@ -284,6 +288,8 @@ inline void concurrent_priority_queue<Key, Value, Compare, Allocator>::push(type
 	t_recentOp.opNode = node;
 	node->m_inserted = 1;
 	t_recentOp.m_sequenceIndex = m_sequenceCounter++;
+	t_recentOp.m_threadId = std::this_thread::get_id();
+	std::unique_lock lock(s_pushMutex);
 	t_recentPushes.push_back(t_recentOp);
 #endif
 }
@@ -307,13 +313,11 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_pop(t
 		node_view_set frontSet{};
 		node_view_set replacementSet{};
 
-		//load_set(frontSet, &m_head);
-
-		frontSet[0] = m_head.m_next[0].load();
+		frontSet[0] = m_head.m_next[0].load(std::memory_order_relaxed);
 
 		frontNode = frontSet[0];
 
-		std::fill(std::begin(frontSet) + 1, std::end(frontSet), frontSet[0]);
+		std::fill(std::begin(frontSet) + 1, std::begin(frontSet) + frontNode->m_height, frontSet[0]);
 
 		if (at_end(frontNode)) {
 			return false;
@@ -343,6 +347,8 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_pop(t
 	//frontNode->m_delinkVersion = frontSet[0].get_version();
 	t_recentOp.opNode = frontNode;
 	t_recentOp.m_sequenceIndex = m_sequenceCounter++;
+	t_recentOp.m_threadId = std::this_thread::get_id();
+	std::unique_lock lock(s_popMutex);
 	t_recentPops.push_back(t_recentOp);
 #endif
 
@@ -378,7 +384,7 @@ inline void concurrent_priority_queue<Key, Value, Compare, Allocator>::prepare_i
 
 	// Why does this work? Age and all that? But what does that matter? (it's only upper layers)
 	if (at_head(atSet[0])) {
-		std::fill(std::begin(nextSet) + 1, std::begin(nextSet) + node->m_height, nextSet[0]);
+		load_set(nextSet, &m_head, 1);
 	}
 }
 
@@ -409,7 +415,8 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_delin
 {
 	const std::uint8_t frontHeight(expectedFront[0].operator const node_type * ()->m_height);
 	const std::uint8_t numUpperLayers(frontHeight - 1);
-	const std::uint32_t upperLayerNextVersion(expectedFront[0].get_version() + 1);
+	const std::uint32_t baseLayerVersion(expectedFront[0].get_version());
+	const std::uint32_t upperLayerNextVersion(baseLayerVersion + 1);
 
 
 	for (std::uint8_t i = 0; i < numUpperLayers; ++i) {
@@ -425,9 +432,9 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_delin
 		}
 	}
 
-	const std::uint32_t bottomLayerNextVersion(upperLayerNextVersion + versionOffset);
+	const std::uint32_t bottomLayerNextVersion(baseLayerVersion + versionOffset);
 
-	perform_version_upkeep(expectedFront, bottomLayerNextVersion);
+	perform_version_upkeep(expectedFront, baseLayerVersion, versionOffset);
 
 	return exchange_node_link(&m_head, expectedFront[0], desiredFront[0], bottomLayerNextVersion, 0) == cpq_detail::exchange_link_success;
 }
@@ -471,18 +478,20 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_link_
 template<class Key, class Value, class Compare, class Allocator>
 inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_link_to_head(typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_view_set& next, typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_view node)
 {
-	std::uint32_t nextVersion(next[0].get_version() + 1);
+	constexpr std::uint8_t versionOffset(1);
+	const std::uint32_t baseLayerVersion(next[0].get_version());
+	const std::uint32_t baseLayerNextVersion(baseLayerVersion + versionOffset);
 
-	perform_version_upkeep(next, nextVersion);
+	perform_version_upkeep(next, baseLayerVersion, versionOffset);
 
-	if (exchange_node_link(&m_head, next[0], node, nextVersion, 0) != cpq_detail::exchange_link_success) {
+	if (exchange_node_link(&m_head, next[0], node, baseLayerNextVersion, 0) != cpq_detail::exchange_link_success) {
 		return false;
 	}
 
-	try_link_to_head_upper(next, node, nextVersion);
+	try_link_to_head_upper(next, node, baseLayerNextVersion);
 
 #if defined GDUL_CPQ_DEBUG
-	node.operator node_type* ()->m_linkVersion = nextVersion;
+	node.operator node_type* ()->m_linkVersion = baseLayerNextVersion;
 #endif
 
 	return true;
@@ -582,13 +591,13 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_push(
 			return try_replace_front(atSet, nextSet, node);
 		}
 
-		// All good, nothing going on with front node. Just insert regularly
-		else {
-#if defined (GDUL_CPQ_DEBUG)
-			t_recentOp.m_insertionCase = 4;
-#endif
-			return try_link_to_node(atSet, nextSet, node);
-		}
+//		// All good, nothing going on with front node. Just insert regularly
+//		else {
+//#if defined (GDUL_CPQ_DEBUG)
+//			t_recentOp.m_insertionCase = 4;
+//#endif
+//			return try_link_to_node(atSet, nextSet, node);
+//		}
 	}
 
 	// Inserting after flagged node that has been supplanted in the middle of deletion
@@ -834,7 +843,7 @@ static std::uint8_t random_height()
 			break;
 		}
 	}
-	result = 2;
+	result = cpq_detail::Max_Node_Height;
 	return result;
 }
 }
