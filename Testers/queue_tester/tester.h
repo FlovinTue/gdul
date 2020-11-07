@@ -65,7 +65,7 @@ public:
 	std::queue<T> m_queue;
 };
 
-const std::uint32_t Writes = 2048;
+const std::uint32_t Writes = 128;
 const std::uint32_t Writers = std::thread::hardware_concurrency() / 2;
 const std::uint32_t Readers = std::thread::hardware_concurrency() / 2;
 const std::uint32_t WritesPerThread(Writes / Writers);
@@ -316,11 +316,11 @@ inline double tester<T, Allocator>::ExecuteSPMC(std::uint32_t runs)
 
 		for (std::uint32_t j = 0; j < Readers; ++j)
 			m_reader.add_task(std::bind(&tester::Read, this, ReadsPerThread));
+			
+		m_writer.add_task(std::bind(&tester::Write, this, Writes));
 
 		gdul::timer<float> time;
 		m_isRunning = true;
-
-		Write(Writes);
 
 		while (m_writer.has_unfinished_tasks() | m_reader.has_unfinished_tasks())
 			std::this_thread::yield();
@@ -367,11 +367,11 @@ inline double tester<T, Allocator>::ExecuteMPSC(std::uint32_t runs)
 
 		for (std::uint32_t j = 0; j < Readers; ++j)
 			m_writer.add_task(std::bind(&tester::Write, this, WritesPerThread));
+	
+		m_reader.add_task(std::bind(&tester::Read, this, ReadsPerThread * Readers));
 
 		gdul::timer<float> time;
 		m_isRunning = true;
-
-		Read(ReadsPerThread * Readers);
 
 		while (m_writer.has_unfinished_tasks() | m_reader.has_unfinished_tasks())
 			std::this_thread::yield();

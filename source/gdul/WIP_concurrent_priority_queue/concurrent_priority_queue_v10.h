@@ -15,7 +15,8 @@
 // Alignment padding
 #pragma warning(disable : 4324)
 
-#define GDUL_CPQ_DEBUG
+//#define GDUL_CPQ_DEBUG
+//#define DYNAMIC_SCAN
 
 namespace gdul {
 namespace cpq_detail {
@@ -52,7 +53,7 @@ static constexpr std::uint32_t Max_Version_Mask = (std::numeric_limits<std::uint
 static constexpr std::uint8_t Cache_Line_Size = 64;
 static constexpr std::uint8_t In_Range_Delta = std::numeric_limits<std::uint8_t>::max();
 static constexpr size_type Max_Entries_Hint = 1024;
-static constexpr std::uint8_t Max_Node_Height = 3;// cpq_detail::calc_max_height(Max_Entries_Hint);
+static constexpr std::uint8_t Max_Node_Height =  cpq_detail::calc_max_height(Max_Entries_Hint);
 
 enum exchange_link_result : std::uint8_t
 {
@@ -138,10 +139,10 @@ struct node
 		std::uint8_t m_height;
 #if defined (GDUL_CPQ_DEBUG)
 		const node* m_nextView[Max_Node_Height]{};
-		std::uint32_t m_delinkVersion = 0ul - 1;
-		std::uint32_t m_linkVersion = 0ul - 1;
+		std::uint8_t m_delinked = 0;
 		std::uint8_t m_removed = 0;
 		std::uint8_t m_inserted = 0;
+		std::uint8_t m_flagged = 0;
 #endif
 	};
 
@@ -206,7 +207,7 @@ private:
 	static void try_link_to_node_upper(node_view_set& at, node_view_set& next, node_view node);
 	static bool try_link_to_node(node_view_set& at, node_view_set& next, node_view node);
 
-	static cpq_detail::flag_node_result flag_node(node_view node, node_view next);
+	static cpq_detail::flag_node_result flag_node(node_view at, node_view& next);
 	
 	static cpq_detail::exchange_link_result exchange_head_link(node_type* at, node_view& expected, node_view& desired, std::uint32_t desiredVersion, std::uint8_t layer);
 	static cpq_detail::exchange_link_result exchange_node_link(node_type* at, node_view& expected, node_view& desired, std::uint32_t desiredVersion, std::uint8_t layer);
@@ -327,6 +328,9 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_pop(t
 
 		flagResult = flag_node(frontSet[0], replacementSet[0]);
 
+#if defined GDUL_CPQ_DEBUG
+		frontNode->m_flagged = flagResult;
+#endif
 		if (flagResult == cpq_detail::flag_node_unexpected) {
 			continue;
 		}
@@ -338,13 +342,18 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_pop(t
 			deLinked = (frontSet[0] == replacementSet[0]) || !find_node(frontNode);
 		}
 
+#if defined GDUL_CPQ_DEBUG
+		else if (deLinked){
+			frontNode->m_delinked = 1;
+		}
+#endif
+
 	} while (flagResult != cpq_detail::flag_node_success || !deLinked);
 
 	out = frontNode;
 
 #if defined GDUL_CPQ_DEBUG
 	frontNode->m_removed = 1;
-	//frontNode->m_delinkVersion = frontSet[0].get_version();
 	t_recentOp.opNode = frontNode;
 	t_recentOp.m_sequenceIndex = m_sequenceCounter++;
 	t_recentOp.m_threadId = std::this_thread::get_id();
@@ -382,24 +391,23 @@ inline void concurrent_priority_queue<Key, Value, Compare, Allocator>::prepare_i
 		}
 	}
 
-	// Why does this work? Age and all that? But what does that matter? (it's only upper layers)
 	if (at_head(atSet[0])) {
 		load_set(nextSet, &m_head, 1);
 	}
 }
 
 template<class Key, class Value, class Compare, class Allocator>
-inline cpq_detail::flag_node_result concurrent_priority_queue<Key, Value, Compare, Allocator>::flag_node(typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_view node, typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_view next)
+inline cpq_detail::flag_node_result concurrent_priority_queue<Key, Value, Compare, Allocator>::flag_node(typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_view at, typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_view& next)
 {
 	// Small chance of loop around and deadlocking
 
-	const std::uint32_t nextVersion(node.get_version() + 1);
+	const std::uint32_t nextVersion(at.get_version() + 1);
 
 	if (next.get_version() == nextVersion) {
 		return cpq_detail::flag_node_compeditor;
 	}
 
-	if (node.operator node_type* ()->m_next[0].compare_exchange_strong(next, node_view(next, nextVersion), std::memory_order_relaxed)) {
+	if (at.operator node_type* ()->m_next[0].compare_exchange_strong(next, node_view(next, nextVersion), std::memory_order_relaxed)) {
 		return cpq_detail::flag_node_success;
 	}
 
@@ -469,9 +477,6 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_link_
 
 	try_link_to_node_upper(atSet, expectedSet, node);
 
-#if defined GDUL_CPQ_DEBUG
-	node.operator node_type*()->m_linkVersion = 0;
-#endif
 	return true;
 }
 
@@ -489,10 +494,6 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_link_
 	}
 
 	try_link_to_head_upper(next, node, baseLayerNextVersion);
-
-#if defined GDUL_CPQ_DEBUG
-	node.operator node_type* ()->m_linkVersion = baseLayerNextVersion;
-#endif
 
 	return true;
 }
@@ -843,7 +844,7 @@ static std::uint8_t random_height()
 			break;
 		}
 	}
-	result = cpq_detail::Max_Node_Height;
+
 	return result;
 }
 }
