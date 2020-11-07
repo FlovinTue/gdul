@@ -65,7 +65,7 @@ public:
 	std::queue<T> m_queue;
 };
 
-const std::uint32_t Writes = 8;
+const std::uint32_t Writes = 2048;
 const std::uint32_t Writers = std::thread::hardware_concurrency() / 2;
 const std::uint32_t Readers = std::thread::hardware_concurrency() / 2;
 const std::uint32_t WritesPerThread(Writes / Writers);
@@ -135,25 +135,25 @@ void queue_testrun(std::uint32_t runs, Allocator alloc, std::uint32_t options = 
 			std::string(" read & write operations") +
 			std::string("\n") +
 			std::string("Averaging results \n") +
-			std::string("MPMC (") + std::to_string(Writers) + std::string("Writers, ") + std::to_string(Readers) + std::string("Readers): ") +
+			std::string("MPMC (") + std::to_string(Writers) + std::string(", ") + std::to_string(Readers) + std::string("): ") +
 			std::string(std::to_string(concurrentRes / static_cast<double>(iterations))) + std::string("			// total: ") + std::to_string(concurrentRes) +
 			std::string("s\n") +
-			std::string("SPSC (") + std::to_string(1) + std::string("Writers, ") + std::to_string(1) + std::string("Readers): ") +
+			std::string("SPSC (") + std::to_string(1) + std::string(", ") + std::to_string(1) + std::string("): ") +
 			std::string(std::to_string(singleProdSingleCon / static_cast<double>(iterations))) + std::string("			// total: ") + std::to_string(singleProdSingleCon) +
 			std::string("s\n") +
 			std::string("Single thread: ") +
-			std::string(std::to_string(singleRes / static_cast<double>(iterations))) + std::string("						// total: ") + std::to_string(singleRes) +
+			std::string(std::to_string(singleRes / static_cast<double>(iterations))) + std::string("			// total: ") + std::to_string(singleRes) +
 			std::string("s\n") +
 			std::string("MP: (") + std::to_string(Writers) + std::string("): ") +
-			std::string(std::to_string(writeRes / static_cast<double>(iterations))) + std::string("					// total: ") + std::to_string(writeRes) +
+			std::string(std::to_string(writeRes / static_cast<double>(iterations))) + std::string("			// total: ") + std::to_string(writeRes) +
 			std::string("s\n") +
 			std::string("MC: (") + std::to_string(Readers) + std::string("): ") +
-			std::string(std::to_string(readRes / static_cast<double>(iterations))) + std::string("					// total: ") + std::to_string(readRes) +
+			std::string(std::to_string(readRes / static_cast<double>(iterations))) + std::string("			// total: ") + std::to_string(readRes) +
 			std::string("s\n") +
-			std::string("SPMC (") + "1" + std::string("Writers, ") + std::to_string(Readers) + std::string("Readers): ") +
+			std::string("SPMC (") + "1" + std::string(", ") + std::to_string(Readers) + std::string("): ") +
 			std::string(std::to_string(spmcRes / static_cast<double>(iterations))) + std::string("			// total: ") + std::to_string(spmcRes) +
 			std::string("s\n") +
-			std::string("MPSC (") + std::to_string(Writers) + std::string("Writers, ") + "1" + std::string("Readers): ") +
+			std::string("MPSC (") + std::to_string(Writers) + std::string(", ") + "1" + std::string("): ") +
 			std::string(std::to_string(mpscRes / static_cast<double>(iterations))) + std::string("			// total: ") + std::to_string(mpscRes) +
 			std::string("s\n") +
 			std::string("Total time is: " + std::to_string(concurrentRes + singleRes + writeRes + readRes + singleProdSingleCon + spmcRes + mpscRes) + "\n") +
