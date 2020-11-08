@@ -53,7 +53,7 @@ static constexpr std::uint32_t Max_Version_Mask = (std::numeric_limits<std::uint
 static constexpr std::uint8_t Cache_Line_Size = 64;
 static constexpr std::uint8_t In_Range_Delta = std::numeric_limits<std::uint8_t>::max();
 static constexpr size_type Max_Entries_Hint = 1024;
-static constexpr std::uint8_t Max_Node_Height =  cpq_detail::calc_max_height(Max_Entries_Hint);
+static constexpr std::uint8_t Max_Node_Height = 2;// cpq_detail::calc_max_height(Max_Entries_Hint);
 
 enum exchange_link_result : std::uint8_t
 {
@@ -237,7 +237,6 @@ private:
 
 		uint32_t m_sequenceIndex = 0;
 		uint8_t m_insertionCase = 0;
-		std::uint8_t m_threadRole = 0;
 		std::thread::id m_threadId;
 	};
 	inline static thread_local recent_op_info t_recentOp = recent_op_info();
@@ -245,7 +244,6 @@ private:
 	inline static std::atomic_uint s_recentPopIx = 0;
 	inline static gdul::shared_ptr<recent_op_info[]> s_recentPushes = gdul::make_shared<recent_op_info[]>(16);
 	inline static gdul::shared_ptr<recent_op_info[]> s_recentPops = gdul::make_shared<recent_op_info[]>(16);
-	inline static thread_local std::uint8_t t_threadRole = 0;
 
 	std::atomic<uint32_t> m_sequenceCounter = 0;
 #endif
@@ -277,8 +275,6 @@ inline void concurrent_priority_queue<Key, Value, Compare, Allocator>::push(type
 {
 	node->m_height = cpq_detail::random_height();
 #if defined GDUL_CPQ_DEBUG
-	t_threadRole = 2;
-
 	for (auto itr = std::begin(t_recentOp.result); itr != std::end(t_recentOp.result); ++itr) {
 		*itr = cpq_detail::exchange_link_null_value;
 	}
@@ -298,7 +294,6 @@ template<class Key, class Value, class Compare, class Allocator>
 inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_pop(typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_type*& out)
 {
 #if defined GDUL_CPQ_DEBUG
-	t_threadRole = 1;
 	for (auto itr = std::begin(t_recentOp.result); itr != std::end(t_recentOp.result); ++itr) {
 		*itr = cpq_detail::exchange_link_null_value;
 	}
@@ -335,6 +330,19 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_pop(t
 		}
 
 		deLinked = try_delink_front(frontSet, replacementSet);
+
+
+		// !!----------------------------------------!!
+
+		// We're having a rare issue with delinking nodes twice. Roughly, it'll probably
+		// go something like 
+		// * deleter 1 loads value, stalls
+		// * inserter 1 supplants node
+		// * deleter 2 removes two nodes
+		// * deleter 1 wakes, fails delink and is unable to find node 
+
+		// This might require a redesign.. 
+		// !!----------------------------------------!!
 
 		if (!deLinked && flagResult == cpq_detail::flag_node_success) {
 

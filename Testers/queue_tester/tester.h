@@ -66,7 +66,7 @@ public:
 	std::queue<T> m_queue;
 };
 
-const std::uint32_t Writes = 16;
+const std::uint32_t Writes = 8;
 const std::uint32_t Writers = std::thread::hardware_concurrency() / 2;
 const std::uint32_t Readers = std::thread::hardware_concurrency() / 2;
 const std::uint32_t WritesPerThread(Writes / Writers);
