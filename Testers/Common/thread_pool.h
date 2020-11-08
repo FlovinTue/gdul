@@ -10,13 +10,15 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
+#undef max
+
 namespace gdul
 {
 
 class thread_pool
 {
 public:
-	thread_pool(std::uint32_t threads = std::thread::hardware_concurrency(), std::uint32_t affinityBegin = 0);
+	thread_pool(std::uint32_t coreMask);
 	~thread_pool();
 
 	void add_task(std::function<void()> task);
@@ -38,16 +40,16 @@ private:
 	std::atomic<std::uint32_t> m_taskCounter;
 };
 
-thread_pool::thread_pool(std::uint32_t threads, std::uint32_t affinityBegin) :
+thread_pool::thread_pool(std::uint32_t coreMask) :
 	m_inCommission(true),
 	m_taskCounter(0)
 {
-	const std::size_t numCores(std::thread::hardware_concurrency());
-	for (std::uint32_t i = 0; i < threads; ++i)
-	{
-		const std::uint64_t affinity((((std::uint64_t)affinityBegin + i) % numCores));
-		const std::uint64_t affinityMask((std::size_t(1) << affinity));
-		m_threads.push_back(std::thread(&thread_pool::idle, this, affinityMask));
+	for (std::uint32_t i = 0; i < 32 && i < std::thread::hardware_concurrency(); ++i) {
+		const std::uint64_t mask(1ull << i);
+
+		if (coreMask & mask) {
+			m_threads.push_back(std::thread(&thread_pool::idle, this, mask));
+		}
 	}
 }
 

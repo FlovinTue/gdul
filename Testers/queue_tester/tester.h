@@ -65,7 +65,7 @@ public:
 	std::queue<T> m_queue;
 };
 
-const std::uint32_t Writes = 128;
+const std::uint32_t Writes = 2048;
 const std::uint32_t Writers = std::thread::hardware_concurrency() / 2;
 const std::uint32_t Readers = std::thread::hardware_concurrency() / 2;
 const std::uint32_t WritesPerThread(Writes / Writers);
@@ -228,8 +228,8 @@ inline tester<T, Allocator>::tester(Allocator&
 #endif
 ) :
 	m_isRunning(false),
-	m_writer(Writers, 0),
-	m_reader(Readers, Writers),
+	m_writer((1 << 0) | (1 << 2) | (1 << 4) | (1 << 6)),
+	m_reader((1 << 1) | (1 << 3) | (1 << 5) | (1 << 7)),
 	m_writtenSum(0),
 	m_readSum(0),
 	m_thrown(0),
