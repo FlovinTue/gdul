@@ -9,13 +9,13 @@
 #include <random>
 #include <iostream>
 #include "../Testers/Common/util.h"
-#include <mutex>
+#include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
 
 #pragma warning(push)
 // Alignment padding
 #pragma warning(disable : 4324)
 
-//#define GDUL_CPQ_DEBUG
+#define GDUL_CPQ_DEBUG
 //#define DYNAMIC_SCAN
 
 namespace gdul {
@@ -240,11 +240,11 @@ private:
 		std::uint8_t m_threadRole = 0;
 		std::thread::id m_threadId;
 	};
-	inline static std::mutex s_pushMutex;
-	inline static std::mutex s_popMutex;
 	inline static thread_local recent_op_info t_recentOp = recent_op_info();
-	inline static std::vector<recent_op_info> t_recentPushes;
-	inline static std::vector<recent_op_info> t_recentPops;
+	inline static std::atomic_uint s_recentPushIx = 0;
+	inline static std::atomic_uint s_recentPopIx = 0;
+	inline static gdul::shared_ptr<recent_op_info[]> s_recentPushes = gdul::make_shared<recent_op_info[]>(16);
+	inline static gdul::shared_ptr<recent_op_info[]> s_recentPops = gdul::make_shared<recent_op_info[]>(16);
 	inline static thread_local std::uint8_t t_threadRole = 0;
 
 	std::atomic<uint32_t> m_sequenceCounter = 0;
@@ -290,8 +290,7 @@ inline void concurrent_priority_queue<Key, Value, Compare, Allocator>::push(type
 	node->m_inserted = 1;
 	t_recentOp.m_sequenceIndex = m_sequenceCounter++;
 	t_recentOp.m_threadId = std::this_thread::get_id();
-	std::unique_lock lock(s_pushMutex);
-	t_recentPushes.push_back(t_recentOp);
+	s_recentPushes[s_recentPushIx++] = t_recentOp;
 #endif
 }
 
@@ -343,7 +342,7 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_pop(t
 		}
 
 #if defined GDUL_CPQ_DEBUG
-		else if (deLinked){
+		else if (deLinked) {
 			frontNode->m_delinked = 1;
 		}
 #endif
@@ -357,8 +356,7 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_pop(t
 	t_recentOp.opNode = frontNode;
 	t_recentOp.m_sequenceIndex = m_sequenceCounter++;
 	t_recentOp.m_threadId = std::this_thread::get_id();
-	std::unique_lock lock(s_popMutex);
-	t_recentPops.push_back(t_recentOp);
+	s_recentPops[s_recentPopIx++] = t_recentOp;
 #endif
 
 	return true;
@@ -455,8 +453,8 @@ inline void concurrent_priority_queue<Key, Value, Compare, Allocator>::clear()
 	}
 
 #if defined (GDUL_CPQ_DEBUG)
-	t_recentPops.clear();
-	t_recentPushes.clear();
+	s_recentPushIx = 0;
+	s_recentPopIx = 0;
 #endif
 }
 

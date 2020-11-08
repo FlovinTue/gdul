@@ -8,6 +8,7 @@
 #include <concurrent_queue.h>
 #include "../Common/tracking_allocator.h"
 #include "../Common/util.h"
+#include "../Common/watch_dog.h"
 #include <limits>
 #include <string>
 
@@ -65,7 +66,7 @@ public:
 	std::queue<T> m_queue;
 };
 
-const std::uint32_t Writes = 2048;
+const std::uint32_t Writes = 16;
 const std::uint32_t Writers = std::thread::hardware_concurrency() / 2;
 const std::uint32_t Readers = std::thread::hardware_concurrency() / 2;
 const std::uint32_t WritesPerThread(Writes / Writers);
@@ -88,6 +89,10 @@ template <class T, class Allocator>
 void queue_testrun(std::uint32_t runs, Allocator alloc, std::uint32_t options = test_option_all) {
 	tester<T, Allocator> tester(alloc);
 	
+	watch_dog watchDog;
+
+	watchDog.start(1000 * 5);
+
 	for (std::uint32_t i = 0; i < runs; ++i) {
 		std::cout << "Pre-run alloc value is: " << gdul::s_allocated << std::endl;
 
@@ -106,6 +111,8 @@ void queue_testrun(std::uint32_t runs, Allocator alloc, std::uint32_t options = 
 		// Arbitrary value. Works well
 		const int iterations = 1000;
 #endif
+
+		watchDog.pet();
 
 		if (options & test_option_spsc)
 			singleProdSingleCon = tester.ExecuteSPSC(iterations);
@@ -164,6 +171,8 @@ void queue_testrun(std::uint32_t runs, Allocator alloc, std::uint32_t options = 
 
 		std::cout << "Post-run alloc value is: " << gdul::s_allocated << std::endl;
 	}
+
+	watchDog.stop();
 }
 
 template <class T, class Allocator>
