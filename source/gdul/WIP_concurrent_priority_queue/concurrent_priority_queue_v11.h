@@ -77,12 +77,12 @@ static std::uint8_t random_height();
 constexpr std::uint32_t version_delta(std::uint32_t from, std::uint32_t to)
 {
 	const std::uint32_t delta(to - from);
-	return delta & Max_Version_Mask;
+	return delta & Version_Mask;
 }
 constexpr std::uint32_t version_next(std::uint32_t from, std::uint32_t step = 1)
 {
 	const std::uint32_t next(from + step);
-	return next & Max_Version_Mask;
+	return next & Version_Mask;
 }
 
 template <class Key, class Value>
@@ -640,9 +640,9 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::check_for
 	}
 
 	// An insertion was made, our claim has been supplanted
-	if (matchingVersion) {
-		return false;
-	}
+	//if (matchingVersion) {
+	//	return false;
+	//}
 
 	// If we can't find the node in the structure and version still belongs to us, it must be ours :)
 	if (!find_node(of, actual, &m_head)) {
@@ -658,7 +658,7 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::check_for
 template<class Key, class Value, class Compare, class Allocator>
 inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::in_range(std::uint32_t version, std::uint32_t inRangeOf)
 {
-	return version_delta(version, inRangeOf) < cpq_detail::In_Range_Delta;
+	return cpq_detail::version_delta(version, inRangeOf) < cpq_detail::In_Range_Delta;
 }
 
 template<class Key, class Value, class Compare, class Allocator>
@@ -680,7 +680,7 @@ inline cpq_detail::exchange_link_result concurrent_priority_queue<Key, Value, Co
 			break;
 		}
 
-		if (!in_range(desiredVersion, expectedVersion)) {
+		if (!in_range(expectedVersion, desiredVersion)) {
 			result = cpq_detail::exchange_link_outside_range;
 			break;
 		}
