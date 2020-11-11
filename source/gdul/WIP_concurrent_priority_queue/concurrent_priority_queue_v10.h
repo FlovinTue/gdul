@@ -310,9 +310,11 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_pop(t
 
 		frontSet[0] = m_head.m_next[0].load(std::memory_order_relaxed);
 
-		frontNode = frontSet[0];
 
-		std::fill(std::begin(frontSet) + 1, std::begin(frontSet) + frontNode->m_height, frontSet[0]);
+		const node_view frontView(frontSet[0]);
+		frontNode = frontView;
+
+		std::fill(std::begin(frontSet) + 1, std::begin(frontSet) + frontNode->m_height, frontView);
 
 		if (at_end(frontNode)) {
 			return false;
@@ -320,7 +322,7 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_pop(t
 
 		load_set(replacementSet, frontNode);
 
-		flagResult = flag_node(frontSet[0], replacementSet[0]);
+		flagResult = flag_node(frontView, replacementSet[0]);
 
 #if defined GDUL_CPQ_DEBUG
 		frontNode->m_flagged = flagResult;
@@ -344,10 +346,24 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_pop(t
 		// This might require a redesign.. 
 		// !!----------------------------------------!!
 
+
+		//if (!deLinked && flagResult == cpq_detail::flag_node_success) {
+
+		//	deLinked = (frontSet[0] == replacementSet[0]) || !find_node(frontNode);
+		//}
+
 		if (!deLinked && flagResult == cpq_detail::flag_node_success) {
 
-			deLinked = (frontSet[0] == replacementSet[0]) || !find_node(frontNode);
+			deLinked = (frontSet[0] == replacementSet[0]);
+
+			if (!delinked) {
+				deLinked = 
+					frontNode->m_next[0].load(std::memory_order_relaxed).get_version() == frontView.get_version() + 1
+					&& !find_node(frontNode);
+			}
 		}
+
+
 
 #if defined GDUL_CPQ_DEBUG
 		else if (deLinked) {

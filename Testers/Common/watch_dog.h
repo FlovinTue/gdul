@@ -89,8 +89,13 @@ inline void watch_dog_impl<T>::guard()
 			std::this_thread::sleep_for(std::chrono::milliseconds(sleepMs));
 		}
 		else {
-			std::cout << "WOOF, WOOF" << std::endl;
-			m_whenWoken();
+			if (IsDebuggerPresent()) {
+				pet();
+			}
+			else {
+				std::cout << "WOOF, WOOF" << std::endl;
+				m_whenWoken();
+			}
 		}
 	}
 }

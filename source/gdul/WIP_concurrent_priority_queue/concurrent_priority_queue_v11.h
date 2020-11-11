@@ -74,6 +74,16 @@ enum flag_node_result : std::uint8_t
 
 static std::uint8_t random_height();
 
+constexpr std::uint32_t version_delta(std::uint32_t from, std::uint32_t to)
+{
+	const std::uint32_t delta(to - from);
+	return delta & Max_Version_Mask;
+}
+constexpr std::uint32_t version_next(std::uint32_t from, std::uint32_t step = 1)
+{
+	const std::uint32_t next(from + step);
+	return next & Max_Version_Mask;
+}
 
 template <class Key, class Value>
 struct node
@@ -199,16 +209,17 @@ private:
 	bool try_link_to_head(node_view_set& next, node_view node);
 	void try_link_to_head_upper(node_view_set& next, node_view node, std::uint32_t version);
 
+	bool check_for_delink_helping(node_view of, node_view actual, node_view triedReplacement);
+	
 	// Preliminarily perform when desired base layer version increases the Max_Entries_Hint multiple (expectedV / Max_Entries_Hint) < (desiredV / Max_Entries_Hint) 
 	// This should be cheap and may be performed by both inserters and deleters.
 	void perform_version_upkeep(node_view_set& at, std::uint32_t baseLayerVersion, std::uint8_t versionStep);
 
-	static bool find_node(const node_type* begin, const node_type* node);
+	static bool find_node(const node_type* node, const node_type* begin, const node_type* end);
 	static bool in_range(std::uint32_t version, std::uint32_t inRangeOf);
 	static void load_set(node_view_set& outSet, node_type* at, std::uint8_t offset = 0);
 	static void try_link_to_node_upper(node_view_set& at, node_view_set& next, node_view node);
 	static bool try_link_to_node(node_view_set& at, node_view_set& next, node_view node);
-	static bool check_for_delink_helping(node_view of, node_view actual, node_view triedReplacement);
 
 	static cpq_detail::flag_node_result flag_node(node_view at, node_view& next);
 	
@@ -400,13 +411,14 @@ inline cpq_detail::flag_node_result concurrent_priority_queue<Key, Value, Compar
 {
 	// Small chance of loop around and deadlocking
 
-	const std::uint32_t nextVersion(at.get_version() + 1);
+	const std::uint32_t nextVersion(cpq_detail::version_next(at.get_version()));
 
 	if (next.get_version() == nextVersion) {
 		return cpq_detail::flag_node_compeditor;
 	}
 
 	if (at.operator node_type* ()->m_next[0].compare_exchange_strong(next, node_view(next, nextVersion), std::memory_order_relaxed)) {
+		next.set_version(nextVersion);
 		return cpq_detail::flag_node_success;
 	}
 
@@ -423,7 +435,7 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_delin
 	const std::uint8_t frontHeight(expectedFront[0].operator const node_type * ()->m_height);
 	const std::uint8_t numUpperLayers(frontHeight - 1);
 	const std::uint32_t baseLayerVersion(expectedFront[0].get_version());
-	const std::uint32_t upperLayerNextVersion(baseLayerVersion + 1);
+	const std::uint32_t upperLayerNextVersion(cpq_detail::version_next(baseLayerVersion));
 
 
 	for (std::uint8_t i = 0; i < numUpperLayers; ++i) {
@@ -439,7 +451,7 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_delin
 		}
 	}
 
-	const std::uint32_t bottomLayerNextVersion(baseLayerVersion + versionOffset);
+	const std::uint32_t bottomLayerNextVersion(cpq_detail::version_next(baseLayerVersion, versionOffset));
 
 	perform_version_upkeep(expectedFront, baseLayerVersion, versionOffset);
 
@@ -482,11 +494,10 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_link_
 template<class Key, class Value, class Compare, class Allocator>
 inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_link_to_head(typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_view_set& next, typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_view node)
 {
-	constexpr std::uint8_t versionOffset(1);
 	const std::uint32_t baseLayerVersion(next[0].get_version());
-	const std::uint32_t baseLayerNextVersion(baseLayerVersion + versionOffset);
+	const std::uint32_t baseLayerNextVersion(cpq_detail::version_next(baseLayerVersion));
 
-	perform_version_upkeep(next, baseLayerVersion, versionOffset);
+	perform_version_upkeep(next, baseLayerVersion, 1);
 
 	if (exchange_node_link(&m_head, next[0], node, baseLayerNextVersion, 0) != cpq_detail::exchange_link_success) {
 		return false;
@@ -583,7 +594,7 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_push(
 		atSet[0] = front;
 
 		// Front node is in the middle of deletion, attempt special case splice to head
-		if (nextSet[0].get_version() == atSet[0].get_version() + 1) {
+		if (nextSet[0].get_version() == cpq_detail::version_next(atSet[0].get_version())) {
 			
 #if defined (GDUL_CPQ_DEBUG)
 			t_recentOp.m_insertionCase = 3;
@@ -593,7 +604,7 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_push(
 	}
 
 	// Inserting after flagged node that has been supplanted in the middle of deletion
-	if (find_node(&m_head, atSet[0])) {
+	if (find_node(atSet[0], &m_head, &m_head)) {
 #if defined (GDUL_CPQ_DEBUG)
 		t_recentOp.m_insertionCase = 4;
 #endif
@@ -607,7 +618,7 @@ template<class Key, class Value, class Compare, class Allocator>
 inline void concurrent_priority_queue<Key, Value, Compare, Allocator>::perform_version_upkeep(node_view_set& at, std::uint32_t baseLayerVersion, std::uint8_t versionStep)
 {
 	const std::uint32_t maxEntriesMultiPre(baseLayerVersion / cpq_detail::Max_Entries_Hint);
-	const std::uint32_t nextVersion(baseLayerVersion + versionStep);
+	const std::uint32_t nextVersion(cpq_detail::version_next(baseLayerVersion, versionStep));
 	const std::uint32_t maxEntriesMultiPost(nextVersion / cpq_detail::Max_Entries_Hint);
 	const std::uint8_t delta(maxEntriesMultiPost - maxEntriesMultiPre);
 
@@ -618,23 +629,26 @@ inline void concurrent_priority_queue<Key, Value, Compare, Allocator>::perform_v
 template<class Key, class Value, class Compare, class Allocator>
 inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::check_for_delink_helping(typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_view of, typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_view actual, typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_view triedReplacement)
 {
+	const std::uint32_t triedVersion(triedReplacement.get_version());
+	const std::uint32_t actualVersion(actual.get_version());
+	const bool matchingVersion(triedVersion == actualVersion);
+
 	// All good, some other actor did our replacment for us
-	if (actual == triedReplacement) {
+	if (actual == triedReplacement && 
+		matchingVersion) {
 		return true;
 	}
 
-	const std::uint32_t triedVersion(triedReplacement.get_version());
-	const std::uint32_t actualVersion(actual.get_version());
-
 	// An insertion was made, our claim has been supplanted
-	if (triedVersion == actualVersion) {
+	if (matchingVersion) {
 		return false;
 	}
 
 	// If we can't find the node in the structure and version still belongs to us, it must be ours :)
-	if (!find_node(actual, of)) {
+	if (!find_node(of, actual, &m_head)) {
 		const node_type* const ofNode(of);
-		const bool stillUnclaimed(ofNode->m_next[0].load(std::memory_order_relaxed).get_version() == triedVersion);
+		const std::uint32_t currentVersion(ofNode->m_next[0].load(std::memory_order_relaxed).get_version());
+		const bool stillUnclaimed(currentVersion == triedVersion);
 
 		return stillUnclaimed;
 	}
@@ -644,9 +658,7 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::check_for
 template<class Key, class Value, class Compare, class Allocator>
 inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::in_range(std::uint32_t version, std::uint32_t inRangeOf)
 {
-	const std::uint32_t delta(version - inRangeOf);
-	const std::uint32_t deltaActual(delta & cpq_detail::Max_Version_Mask);
-	return deltaActual < cpq_detail::In_Range_Delta;
+	return version_delta(version, inRangeOf) < cpq_detail::In_Range_Delta;
 }
 
 template<class Key, class Value, class Compare, class Allocator>
@@ -716,7 +728,7 @@ inline cpq_detail::exchange_link_result concurrent_priority_queue<Key, Value, Co
 }
 
 template<class Key, class Value, class Compare, class Allocator>
-inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::find_node(const typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_type* begin, const typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_type* node)
+inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::find_node(const typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_type* node, const typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_type* begin, const typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_type* end)
 {
 	// Might also be able to take a source node argument, so as to skip loading head here.. 
 
@@ -769,15 +781,16 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::find_node
 
 #else // Linear base layer scan
 
+	compare_type comparator;
 	const key_type k(node->m_kv.first);
 	const node_type* at(begin->m_next[0].load(std::memory_order_relaxed));
 
 	for (;;) {
-		if (at_end(at)) {
+		if (at == end) {
 			break;
 		}
 
-		if (m_comparator(k, at->m_kv.first)) {
+		if (comparator(k, at->m_kv.first)) {
 			break;
 		}
 
