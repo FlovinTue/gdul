@@ -51,7 +51,7 @@ constexpr std::uint8_t calc_max_height(size_type maxEntriesHint)
 static constexpr std::uintptr_t Bottom_Bits = (((1 << 1) | 1) << 1) | 1;
 static constexpr std::uintptr_t Pointer_Mask = (std::numeric_limits<std::uintptr_t>::max() >> 16) - Bottom_Bits;
 static constexpr std::uintptr_t Version_Mask = ~Pointer_Mask;
-static constexpr std::uint32_t Max_Version_Mask = (std::numeric_limits<std::uint16_t>::max() * 2 * 2 * 2) - 1;
+static constexpr std::uint32_t Max_Version_Mask = (std::numeric_limits<std::uint32_t>::max() >> (16 - 3));
 static constexpr std::uint8_t Cache_Line_Size = 64;
 static constexpr std::uint8_t In_Range_Delta = std::numeric_limits<std::uint8_t>::max();
 static constexpr size_type Max_Entries_Hint = 1024;
@@ -77,12 +77,12 @@ static std::uint8_t random_height();
 constexpr std::uint32_t version_delta(std::uint32_t from, std::uint32_t to)
 {
 	const std::uint32_t delta(to - from);
-	return delta & Version_Mask;
+	return delta & Max_Version_Mask;
 }
 constexpr std::uint32_t version_next(std::uint32_t from, std::uint32_t step = 1)
 {
 	const std::uint32_t next(from + step);
-	return next & Version_Mask;
+	return next & Max_Version_Mask;
 }
 
 template <class Key, class Value>
@@ -195,6 +195,7 @@ private:
 	using node_view = typename cpq_detail::node<Key, Value>::node_view;
 	using node_view_set = node_view[cpq_detail::Max_Node_Height];
 
+	bool find_node(const node_type* node) const;
 	void prepare_insertion_sets(node_view_set& atSet, node_view_set& nextSet, const node_type* node);
 
 	bool at_end(const node_type*) const;
@@ -215,7 +216,6 @@ private:
 	// This should be cheap and may be performed by both inserters and deleters.
 	void perform_version_upkeep(node_view_set& at, std::uint32_t baseLayerVersion, std::uint8_t versionStep);
 
-	static bool find_node(const node_type* node, const node_type* begin, const node_type* end);
 	static bool in_range(std::uint32_t version, std::uint32_t inRangeOf);
 	static void load_set(node_view_set& outSet, node_type* at, std::uint8_t offset = 0);
 	static void try_link_to_node_upper(node_view_set& at, node_view_set& next, node_view node);
@@ -328,7 +328,7 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_pop(t
 		node_view nodeClaimView(frontSet[0]);
 		nodeClaim = nodeClaimView;
 
-		std::fill(std::begin(frontSet) + 1, std::begin(frontSet) + nodeClaim->m_height, nodeClaimView);
+		std::fill(std::begin(frontSet) + 1, std::begin(frontSet) + nodeClaim->m_height, frontSet[0]);
 
 		if (at_end(nodeClaim)) {
 			return false;
@@ -336,7 +336,7 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_pop(t
 
 		load_set(replacementSet, nodeClaim);
 
-		flagResult = flag_node(nodeClaimView, replacementSet[0]);
+		flagResult = flag_node(frontSet[0], replacementSet[0]);
 
 #if defined GDUL_CPQ_DEBUG
 		nodeClaim->m_flagged = flagResult;
@@ -348,10 +348,9 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_pop(t
 		deLinked = try_delink_front(frontSet, replacementSet);
 
 		if (!deLinked && flagResult == cpq_detail::flag_node_success) {
-			deLinked = check_for_delink_helping(nodeClaimView, frontSet[0], replacementSet[0]);
+
+			deLinked = (frontSet[0] == replacementSet[0]) || !find_node(nodeClaim);
 		}
-
-
 
 #if defined GDUL_CPQ_DEBUG
 		else if (deLinked) {
@@ -604,7 +603,7 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_push(
 	}
 
 	// Inserting after flagged node that has been supplanted in the middle of deletion
-	if (find_node(atSet[0], &m_head, &m_head)) {
+	if (find_node(atSet[0])) {
 #if defined (GDUL_CPQ_DEBUG)
 		t_recentOp.m_insertionCase = 4;
 #endif
@@ -645,7 +644,7 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::check_for
 	//}
 
 	// If we can't find the node in the structure and version still belongs to us, it must be ours :)
-	if (!find_node(of, actual, &m_head)) {
+	if (!find_node(of)) {
 		const node_type* const ofNode(of);
 		const std::uint32_t currentVersion(ofNode->m_next[0].load(std::memory_order_relaxed).get_version());
 		const bool stillUnclaimed(currentVersion == triedVersion);
@@ -728,8 +727,14 @@ inline cpq_detail::exchange_link_result concurrent_priority_queue<Key, Value, Co
 }
 
 template<class Key, class Value, class Compare, class Allocator>
-inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::find_node(const typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_type* node, const typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_type* begin, const typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_type* end)
+inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::find_node(const typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_type* node) const
 {
+	//!!-----------------------------------------------------!!
+	// For this to not be ambiguous, de-linking needs to be guaranteed. That is, there may be *NO* remaining links in the
+	// list when a node is de-linked at bottom layer.
+	//!!-----------------------------------------------------!!
+
+
 	// Might also be able to take a source node argument, so as to skip loading head here.. 
 
 #if defined DYNAMIC_SCAN
@@ -781,16 +786,15 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::find_node
 
 #else // Linear base layer scan
 
-	compare_type comparator;
 	const key_type k(node->m_kv.first);
-	const node_type* at(begin->m_next[0].load(std::memory_order_relaxed));
+	const node_type* at(m_head.m_next[0].load());
 
 	for (;;) {
-		if (at == end) {
+		if (at_end(at)) {
 			break;
 		}
 
-		if (comparator(k, at->m_kv.first)) {
+		if (m_comparator(k, at->m_kv.first)) {
 			break;
 		}
 
@@ -798,7 +802,7 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::find_node
 			return true;
 		}
 
-		at = at->m_next[0].load(std::memory_order_relaxed);
+		at = at->m_next[0].load();
 	}
 
 	return false;
