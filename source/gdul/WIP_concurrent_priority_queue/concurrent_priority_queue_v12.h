@@ -15,7 +15,7 @@
 // Alignment padding
 #pragma warning(disable : 4324)
 
-#define GDUL_CPQ_DEBUG
+//#define GDUL_CPQ_DEBUG
 //#define DYNAMIC_SCAN
 
 // Todo must move version handling to functions so that edge cases around max_version is handled properly.
@@ -345,24 +345,16 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_pop(t
 		const std::uint32_t preVersion(nextSet[0].get_version());
 #endif
 
-		// Found an issue with flagging. Here's a scenario:
-
-		// * Deleter 1 loads front (front version 0), stalls
-		// * Inserter inserts new node (front version 1)
-		// * Deleter 2 loads & deletes new node (front version 2)
-		// * Deleter 2 loads front
-		// * Deleter 2 loads nextSet[0]
-		// * Deleter 2 flags front, (nextSet[0] now contains version 3)
-		// * Deleter 1 loads nextSet[0]
-		// * Deleter 1 successfully flags front (nextSet[0] now contains version 1)
-
-		// This can cause two (or more) different failures: An inserter might think
-		// front node that actually is in the middle of deletion, is not. Also, 
-		// if the Deleter 2 has to check for helping, it'll find a different version
-		// than expected!
-
-		// Might have no option but to reload front. Perhaps can get away with some sort of in_range check thing.
-
+		// Right so this seems to work.
+		// I just realized though that this is part of a larger issue. Having old flagged nodes sitting around in the list can cause other issues. 
+		// I should probably see about finding a way to reset the flagging. 
+		// ---------------------------- !--------------------------------------------------
+		//const node_view reload = m_head.m_next[0].load(std::memory_order_relaxed);
+		//if (nodeClaimView != reload) {
+		//	continue;
+		//}
+		//nodeClaimView = reload;
+		// ---------------------------- !--------------------------------------------------
 
 		std::fill(std::begin(frontSet), std::begin(frontSet) + nodeClaim->m_height, nodeClaimView);
 
@@ -441,7 +433,15 @@ inline void concurrent_priority_queue<Key, Value, Compare, Allocator>::prepare_i
 template<class Key, class Value, class Compare, class Allocator>
 inline cpq_detail::flag_node_result concurrent_priority_queue<Key, Value, Compare, Allocator>::flag_node(typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_view at, typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_view& next)
 {
-	// Small chance of loop around and deadlocking
+	// if we see a 'higher' version expected at next than that at head
+	// we should simply return flag_node_unexpected...
+
+	// The problem is we might have a node circulating with v1 for Max_Version times. Then that will appear
+	// to be of higher version. Forever. And we'll have a lockup.
+
+	// We can, of course, reload head to see if version has increased there. 
+
+
 
 	const std::uint32_t nextVersion(cpq_detail::version_step_one(at.get_version()));
 
@@ -671,11 +671,6 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::check_for
 		return true;
 	}
 
-	// An insertion was made, our claim has been supplanted
-	//if (matchingVersion) {
-	//	return false;
-	//}
-
 	// If we can't find the node in the structure and version still belongs to us, it must be ours :)
 	if (!find_node(of)) {
 		const node_type* const ofNode(of);
@@ -762,12 +757,6 @@ inline cpq_detail::exchange_link_result concurrent_priority_queue<Key, Value, Co
 template<class Key, class Value, class Compare, class Allocator>
 inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::find_node(const typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_type* node) const
 {
-	//!!-----------------------------------------------------!!
-	// For this to not be ambiguous, de-linking needs to be guaranteed. That is, there may be *NO* remaining links in the
-	// list when a node is de-linked at bottom layer.
-	//!!-----------------------------------------------------!!
-
-
 	// Might also be able to take a source node argument, so as to skip loading head here.. 
 
 #if defined DYNAMIC_SCAN
@@ -813,7 +802,7 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::find_node
 		}
 
 		at = at->m_next[0].load();
-	}
+}
 
 	return false;
 
