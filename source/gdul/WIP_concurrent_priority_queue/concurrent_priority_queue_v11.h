@@ -62,7 +62,7 @@ enum exchange_link_result : std::uint8_t
 	exchange_link_null_value = 0,
 	exchange_link_outside_range = 1,
 	exchange_link_success = 2,
-	exchange_link_other_link = 3, 
+	exchange_link_other_link = 3,
 };
 enum flag_node_result : std::uint8_t
 {
@@ -151,10 +151,11 @@ struct node
 		std::uint8_t m_height;
 #if defined (GDUL_CPQ_DEBUG)
 		const node* m_nextView[Max_Node_Height]{};
+		std::uint32_t m_flaggedVersion = 0;
+		std::uint32_t m_preFlagVersion = 0;
 		std::uint8_t m_delinked = 0;
 		std::uint8_t m_removed = 0;
 		std::uint8_t m_inserted = 0;
-		std::uint8_t m_flagged = 0;
 #endif
 	};
 
@@ -211,7 +212,7 @@ private:
 	void try_link_to_head_upper(node_view_set& next, node_view node, std::uint32_t version);
 
 	bool check_for_delink_helping(node_view of, node_view actual, node_view triedReplacement);
-	
+
 	// Preliminarily perform when desired base layer version increases the Max_Entries_Hint multiple (expectedV / Max_Entries_Hint) < (desiredV / Max_Entries_Hint) 
 	// This should be cheap and may be performed by both inserters and deleters.
 	void perform_version_upkeep(node_view_set& at, std::uint32_t baseLayerVersion, std::uint8_t versionStep);
@@ -222,7 +223,7 @@ private:
 	static bool try_link_to_node(node_view_set& at, node_view_set& next, node_view node);
 
 	static cpq_detail::flag_node_result flag_node(node_view at, node_view& next);
-	
+
 	static cpq_detail::exchange_link_result exchange_head_link(node_type* at, node_view& expected, node_view& desired, std::uint32_t desiredVersion, std::uint8_t layer);
 	static cpq_detail::exchange_link_result exchange_node_link(node_type* at, node_view& expected, node_view& desired, std::uint32_t desiredVersion, std::uint8_t layer);
 
@@ -320,36 +321,58 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_pop(t
 
 	do {
 		node_view_set frontSet{};
-		node_view_set replacementSet{};
+		node_view_set nextSet{};
 
-		frontSet[0] = m_head.m_next[0].load(std::memory_order_relaxed);
-
-
-		node_view nodeClaimView(frontSet[0]);
+		node_view nodeClaimView(m_head.m_next[0].load(std::memory_order_relaxed));
 		nodeClaim = nodeClaimView;
-
-		std::fill(std::begin(frontSet) + 1, std::begin(frontSet) + nodeClaim->m_height, frontSet[0]);
 
 		if (at_end(nodeClaim)) {
 			return false;
 		}
 
-		load_set(replacementSet, nodeClaim);
+		load_set(nextSet, nodeClaim);
+#if defined GDUL_CPQ_DEBUG
+		const std::uint32_t preVersion(nextSet[0].get_version());
+#endif
 
-		flagResult = flag_node(frontSet[0], replacementSet[0]);
+		// Found an issue with flagging. Here's a scenario:
+
+		// * Deleter 1 loads front (front version 0), stalls
+		// * Inserter inserts new node (front version 1)
+		// * Deleter 2 loads & deletes new node (front version 2)
+		// * Deleter 2 loads front
+		// * Deleter 2 loads nextSet[0]
+		// * Deleter 2 flags front, (nextSet[0] now contains version 3)
+		// * Deleter 1 loads nextSet[0]
+		// * Deleter 1 successfully flags front (nextSet[0] now contains version 1)
+
+		// This can cause two (or more) different failures: An inserter might think
+		// front node that actually is in the middle of deletion, is not. Also, 
+		// if the Deleter 2 has to check for helping, it'll find a different version
+		// than expected!
+
+		// Might have no option but to reload front. Perhaps can get away with some sort of in_range check thing.
+
+
+		std::fill(std::begin(frontSet), std::begin(frontSet) + nodeClaim->m_height, nodeClaimView);
+
+		flagResult = flag_node(frontSet[0], nextSet[0]);
 
 #if defined GDUL_CPQ_DEBUG
-		nodeClaim->m_flagged = flagResult;
+		if (flagResult == cpq_detail::flag_node_success) {
+			nodeClaim->m_flaggedVersion = nextSet[0].get_version();
+			nodeClaim->m_preFlagVersion = preVersion;
+		}
 #endif
 		if (flagResult == cpq_detail::flag_node_unexpected) {
 			continue;
 		}
 
-		deLinked = try_delink_front(frontSet, replacementSet);
+		deLinked = try_delink_front(frontSet, nextSet);
 
 		if (!deLinked && flagResult == cpq_detail::flag_node_success) {
 
-			deLinked = (frontSet[0] == replacementSet[0]) || !find_node(nodeClaim);
+			deLinked = check_for_delink_helping(nodeClaimView, frontSet[0], nextSet[0]);
 		}
 
 #if defined GDUL_CPQ_DEBUG
@@ -416,12 +439,12 @@ inline cpq_detail::flag_node_result concurrent_priority_queue<Key, Value, Compar
 		return cpq_detail::flag_node_compeditor;
 	}
 
-	if (at.operator node_type* ()->m_next[0].compare_exchange_strong(next, node_view(next, nextVersion), std::memory_order_relaxed)) {
+	if (at.operator node_type * ()->m_next[0].compare_exchange_strong(next, node_view(next, nextVersion), std::memory_order_relaxed)) {
 		next.set_version(nextVersion);
 		return cpq_detail::flag_node_success;
 	}
 
-	if  (next.get_version() == nextVersion) {
+	if (next.get_version() == nextVersion) {
 		return cpq_detail::flag_node_compeditor;
 	}
 
@@ -532,11 +555,11 @@ inline void concurrent_priority_queue<Key, Value, Compare, Allocator>::try_link_
 }
 
 template<class Key, class Value, class Compare, class Allocator>
-inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_replace_front(typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_view_set& frontSet, typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_view_set& replacementSet, typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_view node)
+inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_replace_front(typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_view_set& frontSet, typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_view_set& nextSet, typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_view node)
 {
-	replacementSet[0] = node;
+	nextSet[0] = node;
 
-	if (try_delink_front(frontSet, replacementSet, 1)) {
+	if (try_delink_front(frontSet, nextSet, 1)) {
 
 		try_link_to_head_upper(frontSet, node, frontSet[0].get_version());
 
@@ -586,7 +609,7 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_push(
 	const node_view front(m_head.m_next[0].load(std::memory_order_seq_cst));
 
 	// Inserting after front node...
-	if (atSet[0] == front){
+	if (atSet[0] == front) {
 		// In case we are looking at front node, we need to make sure our view of head base layer version 
 		// is younger than that of front base layer version. Else we might think it'd be okay with a
 		// regular link at front node in the middle of deletion!
@@ -594,7 +617,7 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_push(
 
 		// Front node is in the middle of deletion, attempt special case splice to head
 		if (nextSet[0].get_version() == cpq_detail::version_next(atSet[0].get_version())) {
-			
+
 #if defined (GDUL_CPQ_DEBUG)
 			t_recentOp.m_insertionCase = 3;
 #endif
@@ -633,7 +656,7 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::check_for
 	const bool matchingVersion(triedVersion == actualVersion);
 
 	// All good, some other actor did our replacment for us
-	if (actual == triedReplacement && 
+	if (actual == triedReplacement &&
 		matchingVersion) {
 		return true;
 	}
@@ -673,7 +696,7 @@ inline cpq_detail::exchange_link_result concurrent_priority_queue<Key, Value, Co
 
 	do {
 		const std::uint32_t expectedVersion(expected.get_version());
-		
+
 		if (expectedVersion == desiredVersion) {
 			result = cpq_detail::exchange_link_other_link;
 			break;

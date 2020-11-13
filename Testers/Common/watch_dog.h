@@ -3,6 +3,7 @@
 #include <functional>
 #include <chrono>
 #include <iostream>
+#include <mutex>
 
 namespace gdul {
 template <class T = void>
@@ -17,8 +18,7 @@ public:
 	watch_dog_impl();
 	~watch_dog_impl();
 
-	void start(std::uint32_t ms, std::function<void()> whenWoken = []() {__debugbreak(); });
-	void stop();
+	void give_instruction(std::uint32_t sleepFor, std::function<void()> whenWoken = []() {__debugbreak(); });
 	void pet();
 
 
@@ -26,6 +26,7 @@ private:
 	void guard();
 	std::size_t get_ms() const;
 
+	std::mutex m_mtx;
 	std::atomic<std::size_t> m_lastPet;
 	std::atomic_bool m_alive;
 	std::uint32_t m_threshHold;
@@ -43,31 +44,24 @@ inline watch_dog_impl<T>::watch_dog_impl()
 template<class T>
 inline watch_dog_impl<T>::~watch_dog_impl()
 {
-	stop();
+	m_alive = false;
+	m_thread.join();
 }
 template<class T>
-inline void watch_dog_impl<T>::start(std::uint32_t ms, std::function<void()> whenWoken)
+inline void watch_dog_impl<T>::give_instruction(std::uint32_t sleepFor, std::function<void()> whenWoken)
 {
-	if (m_thread.get_id() != std::thread().get_id()) {
-		m_thread.join();
-	}
+	std::unique_lock lock(m_mtx);
 
 	m_whenWoken = whenWoken;
-	m_threshHold = ms;
+	m_threshHold = sleepFor;
 	m_alive = true;
 
 	pet();
 
-	m_thread = std::thread(&watch_dog_impl<T>::guard, this);
+	if (m_thread.get_id() == std::thread().get_id()) {
+		m_thread = std::thread(&watch_dog_impl<T>::guard, this);
+	}
 }
-
-template<class T>
-inline void watch_dog_impl<T>::stop()
-{
-	m_alive = false;
-	m_thread.join();
-}
-
 template<class T>
 inline void watch_dog_impl<T>::pet()
 {
@@ -85,17 +79,22 @@ inline void watch_dog_impl<T>::guard()
 	const std::size_t sleepMs(std::max<std::size_t>(1, (m_threshHold / 4)));
 
 	while (m_alive) {
-		if ((get_ms() - m_lastPet) < m_threshHold) {
-			std::this_thread::sleep_for(std::chrono::milliseconds(sleepMs));
-		}
-		else {
-			if (IsDebuggerPresent()) {
-				pet();
+		bool continueSleep(0);
+
+		{
+			std::unique_lock lock(m_mtx);
+
+			if ((get_ms() - m_lastPet) < m_threshHold) {
+				continueSleep = true;
 			}
 			else {
 				std::cout << "WOOF, WOOF" << std::endl;
 				m_whenWoken();
 			}
+			
+		}
+		if (continueSleep) {
+			std::this_thread::sleep_for(std::chrono::milliseconds(sleepMs));
 		}
 	}
 }
