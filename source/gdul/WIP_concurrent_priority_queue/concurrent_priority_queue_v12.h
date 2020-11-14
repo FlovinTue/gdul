@@ -76,6 +76,7 @@ static std::uint8_t random_height();
 
 constexpr std::uint32_t version_delta(std::uint32_t from, std::uint32_t to)
 {
+	// Todo handle 0 as special case. Return MAX?
 	const std::uint32_t delta(to - from);
 	return delta & Max_Version_Mask;
 }
@@ -345,17 +346,6 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_pop(t
 		const std::uint32_t preVersion(nextSet[0].get_version());
 #endif
 
-		// Right so this seems to work.
-		// I just realized though that this is part of a larger issue. Having old flagged nodes sitting around in the list can cause other issues. 
-		// I should probably see about finding a way to reset the flagging. 
-		// ---------------------------- !--------------------------------------------------
-		//const node_view reload = m_head.m_next[0].load(std::memory_order_relaxed);
-		//if (nodeClaimView != reload) {
-		//	continue;
-		//}
-		//nodeClaimView = reload;
-		// ---------------------------- !--------------------------------------------------
-
 		std::fill(std::begin(frontSet), std::begin(frontSet) + nodeClaim->m_height, nodeClaimView);
 
 		flagResult = flag_node(frontSet[0], nextSet[0]);
@@ -375,6 +365,10 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_pop(t
 		if (!deLinked && flagResult == cpq_detail::flag_node_success) {
 
 			deLinked = check_for_delink_helping(nodeClaimView, frontSet[0], nextSet[0]);
+
+			if (!delinked) {
+				unflag_node(nodeClaim, nextSet[0]);
+			}
 		}
 
 #if defined GDUL_CPQ_DEBUG
@@ -433,20 +427,15 @@ inline void concurrent_priority_queue<Key, Value, Compare, Allocator>::prepare_i
 template<class Key, class Value, class Compare, class Allocator>
 inline cpq_detail::flag_node_result concurrent_priority_queue<Key, Value, Compare, Allocator>::flag_node(typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_view at, typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_view& next)
 {
-	// if we see a 'higher' version expected at next than that at head
-	// we should simply return flag_node_unexpected...
-
-	// The problem is we might have a node circulating with v1 for Max_Version times. Then that will appear
-	// to be of higher version. Forever. And we'll have a lockup.
-
-	// We can, of course, reload head to see if version has increased there. 
-
-
-
+	const std::uint32_t expectedVersion(next.get_version());
 	const std::uint32_t nextVersion(cpq_detail::version_step_one(at.get_version()));
 
-	if (next.get_version() == nextVersion) {
+	if (expectedVersion == nextVersion) {
 		return cpq_detail::flag_node_compeditor;
+	}
+
+	if (cpq_detail::In_Flag_Range_Delta < cpq_detail::version_delta(expectedVersion, next)) {
+		return cpq_detail::flag_node_unexpected;
 	}
 
 	if (at.operator node_type * ()->m_next[0].compare_exchange_strong(next, node_view(next, nextVersion), std::memory_order_relaxed)) {
@@ -894,3 +883,29 @@ static std::uint8_t random_height()
 }
 
 #pragma warning(pop)
+
+
+
+
+// Right so this seems to work.
+// I just realized though that this is part of a larger issue. Having old flagged nodes sitting around in the list can cause other issues. 
+// I should probably see about finding a way to reset the flagging. 
+// ---------------------------- !--------------------------------------------------
+//const node_view reload = m_head.m_next[0].load(std::memory_order_relaxed);
+//if (nodeClaimView != reload) {
+//	continue;
+//}
+//nodeClaimView = reload;
+// ---------------------------- !--------------------------------------------------
+// So the one responsible could probably attempt to reset version in the case delink fails. The issue then, of course, is
+// that we might run in to ABA issues, where other stalling deleters would set it again. Hmm yeah, though perhaps they will
+// automatically fail delink then? :| And they would reset? Perhaps perhaps.
+
+	// if we see a 'higher' version expected at next than that at head
+	// we should simply return flag_node_unexpected...
+
+	// The problem is we might have a node circulating with v1 for Max_Version times. Then that will appear
+	// to be of higher version. Forever. And we'll have a lockup.
+
+	// We can, of course, reload head to see if version has increased there. 
+
