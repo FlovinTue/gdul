@@ -91,7 +91,7 @@ void queue_testrun(std::uint32_t runs, Allocator alloc, std::uint32_t options = 
 	
 	static watch_dog watchDog;
 
-	watchDog.give_instruction(1000 * 5);
+	watchDog.give_instruction(1000 * 10);
 
 	for (std::uint32_t i = 0; i < runs; ++i) {
 		std::cout << "Pre-run alloc value is: " << gdul::s_allocated << std::endl;

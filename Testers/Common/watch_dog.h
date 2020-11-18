@@ -90,6 +90,7 @@ inline void watch_dog_impl<T>::guard()
 			else {
 				std::cout << "WOOF, WOOF" << std::endl;
 				m_whenWoken();
+				pet();
 			}
 			
 		}

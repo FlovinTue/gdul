@@ -15,10 +15,8 @@
 // Alignment padding
 #pragma warning(disable : 4324)
 
-//#define GDUL_CPQ_DEBUG
+#define GDUL_CPQ_DEBUG
 //#define DYNAMIC_SCAN
-
-// Todo must move version handling to functions so that edge cases around max_version is handled properly.
 
 namespace gdul {
 namespace cpq_detail {
@@ -48,14 +46,14 @@ constexpr std::uint8_t calc_max_height(size_type maxEntriesHint)
 	return croppedHeight;
 }
 
-static constexpr std::uintptr_t Bottom_Bits = (((1 << 1) | 1) << 1) | 1;
+static constexpr std::uintptr_t Bottom_Bits = ~(std::uintptr_t(std::numeric_limits<std::uintptr_t>::max()) << 3);
 static constexpr std::uintptr_t Pointer_Mask = (std::numeric_limits<std::uintptr_t>::max() >> 16) - Bottom_Bits;
 static constexpr std::uintptr_t Version_Mask = ~Pointer_Mask;
 static constexpr std::uint32_t Max_Version_Mask = (std::numeric_limits<std::uint32_t>::max() >> (16 - 3));
+static constexpr std::uint32_t In_Range_Delta = Max_Version_Mask / 2;
 static constexpr std::uint8_t Cache_Line_Size = 64;
-static constexpr std::uint8_t In_Range_Delta = std::numeric_limits<std::uint8_t>::max();
 static constexpr size_type Max_Entries_Hint = 1024;
-static constexpr std::uint8_t Max_Node_Height = 2;// cpq_detail::calc_max_height(Max_Entries_Hint);
+static constexpr std::uint8_t Max_Node_Height = cpq_detail::calc_max_height(Max_Entries_Hint);
 
 enum exchange_link_result : std::uint8_t
 {
@@ -94,6 +92,13 @@ constexpr std::uint32_t version_step(std::uint32_t from, std::uint8_t step)
 		return result;
 	}
 	return version_step_one(result);
+}
+constexpr bool in_range(std::uint32_t version, std::uint32_t inRangeOf)
+{
+	const std::uint32_t delta(version_delta(version, inRangeOf));
+	const bool zeroExcept(version == 0);
+
+	return delta < In_Range_Delta || zeroExcept;
 }
 
 template <class Key, class Value>
@@ -228,13 +233,12 @@ private:
 	// This should be cheap and may be performed by both inserters and deleters.
 	void perform_version_upkeep(node_view_set& at, std::uint32_t baseLayerVersion, std::uint8_t versionStep);
 
-	static bool in_range(std::uint32_t version, std::uint32_t inRangeOf);
 	static void load_set(node_view_set& outSet, node_type* at, std::uint8_t offset = 0);
+	static void unflag_node(node_type* at, node_view& next);
 	static void try_link_to_node_upper(node_view_set& at, node_view_set& next, node_view node);
 	static bool try_link_to_node(node_view_set& at, node_view_set& next, node_view node);
 
 	static cpq_detail::flag_node_result flag_node(node_view at, node_view& next);
-
 	static cpq_detail::exchange_link_result exchange_head_link(node_type* at, node_view& expected, node_view& desired, std::uint32_t desiredVersion, std::uint8_t layer);
 	static cpq_detail::exchange_link_result exchange_node_link(node_type* at, node_view& expected, node_view& desired, std::uint32_t desiredVersion, std::uint8_t layer);
 
@@ -268,8 +272,8 @@ private:
 	inline static thread_local recent_op_info t_recentOp = recent_op_info();
 	inline static std::atomic_uint s_recentPushIx = 0;
 	inline static std::atomic_uint s_recentPopIx = 0;
-	inline static gdul::shared_ptr<recent_op_info[]> s_recentPushes = gdul::make_shared<recent_op_info[]>(16);
-	inline static gdul::shared_ptr<recent_op_info[]> s_recentPops = gdul::make_shared<recent_op_info[]>(16);
+	inline static gdul::shared_ptr<recent_op_info[]> s_recentPushes = gdul::make_shared<recent_op_info[]>(8);
+	inline static gdul::shared_ptr<recent_op_info[]> s_recentPops = gdul::make_shared<recent_op_info[]>(8);
 
 	std::atomic<uint32_t> m_sequenceCounter = 0;
 #endif
@@ -366,7 +370,7 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_pop(t
 
 			deLinked = check_for_delink_helping(nodeClaimView, frontSet[0], nextSet[0]);
 
-			if (!delinked) {
+			if (!deLinked) {
 				unflag_node(nodeClaim, nextSet[0]);
 			}
 		}
@@ -420,6 +424,7 @@ inline void concurrent_priority_queue<Key, Value, Compare, Allocator>::prepare_i
 	}
 
 	if (at_head(atSet[0])) {
+		// Todo add version check optimization here.(Don't need to load everything, everytime)
 		load_set(nextSet, &m_head, 1);
 	}
 }
@@ -434,7 +439,7 @@ inline cpq_detail::flag_node_result concurrent_priority_queue<Key, Value, Compar
 		return cpq_detail::flag_node_compeditor;
 	}
 
-	if (cpq_detail::In_Flag_Range_Delta < cpq_detail::version_delta(expectedVersion, next)) {
+	if (!cpq_detail::in_range(expectedVersion, nextVersion)) {
 		return cpq_detail::flag_node_unexpected;
 	}
 
@@ -580,6 +585,68 @@ inline void concurrent_priority_queue<Key, Value, Compare, Allocator>::load_set(
 template<class Key, class Value, class Compare, class Allocator>
 inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_push(typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_type* node)
 {
+
+	//So when we're inserting in the middle of the list, we're relying on the fact that our inserts may only happen BEFORE whatever we're 
+	//referencing as ->next. 
+	//For us to end up with a stale ->next reference the node we linked to would have to be delinked. This would block linkage at base layer.
+	//
+	//
+	//Our search goes topLayer->descendCurrent->...bottomLayer so bottomLayer is always youngest. It's perfectly possible that we have a stale 
+	//reference in our upper layers of the search set. How could such an insert succeed though? If we find a ->next reference that exceeds our
+	//key, we'll descend in the CURRENT node. In this case, HEAD, then we proceed to investigate the ->next reference on the lower layer. In this case
+	//layer 0, moving on to node 1. Here though, we find ->END
+	//
+	//
+	//So this might be what happened:
+	//Current state of list is 
+	//HEAD---->1->END
+	//HEAD->0->1->END
+	//
+	//* Inserter loads layer 1 at HEAD, descends, stalls
+	//* Deleter removes 0, 1
+	//* Other Inserter links 0
+	//
+	//Now
+	//HEAD---->END
+	//HEAD->0->END
+	//
+	//* Inserter wakes, probes forward and finds good spot after 0, links
+
+	// Might work with incrementally inserting references in the inserted node after succeeding the corresponding layer link.
+	// (This would, I think, also get rid of the need for reverse-loading head in case of head insertion. Perhaps could even
+	// do head insertion regular node insert.! ) 
+
+	// On issue is in case would be that we might 'cut off' a lane.. Loading ->next referring to END before
+	// the desired next reference has been stored
+	// This lane would ever only be repaired upon deletion of the next node with equal or more height as the inserted node.
+
+	// What about reloading any links coming from HEAD ? Is the problem fundamental, can we end with the same situation in the middle of list? 
+	// No we cannot end up in the same situation linking in the middle of list. Since delinks only happen at HEAD that's the only place that we 
+	// can load a link and have it disappear underneath us. Given the same situation in the middle of the list, we'd fail the initial link
+	// at bottom (or rather, we wouldn't be able to try, since that would be flagged, and would not exist in list).
+
+	// So that means we have two options:
+	// * Reload any links coming from HEAD (and, I suppose, abort if they're changed)
+	// * Or add forward-links incrementally after succeeding upper layer link.
+
+	// So it's the descending part
+
+	// !----------------------------------------------------------
+	// So I think I just thought of an alternative.. 
+	// Check version of the lower layer(s?) in case the descent is through HEAD
+	// This might also be useful for the HEAD insertion case inside prepare_insertion_set 
+	// (we might get away with not reloading upper layers every time)
+	// !----------------------------------------------------------
+
+	// So what we want to do is to make sure base layer is in range of upper layers.. ? Right?
+	// (The upper layer may out-version the bottom, but not the other way around)
+	// scanning into. Hmm shall have to consider.
+
+	// Yeah, I think we need to synchronize version with whatever link is the root for forward scanning.
+
+	// So we will only have to care about this if the above-forward scanning links will take part in the ->next references
+	// in the inserted node. But wait. Hmm we're not synchronizing with any other node than base layer. Yeah this is a confusing issue.
+
 	node_view_set atSet{};
 	node_view_set nextSet{};
 
@@ -672,9 +739,10 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::check_for
 	return false;
 }
 template<class Key, class Value, class Compare, class Allocator>
-inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::in_range(std::uint32_t version, std::uint32_t inRangeOf)
+inline void concurrent_priority_queue<Key, Value, Compare, Allocator>::unflag_node(typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_type* at, typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_view& next)
 {
-	return cpq_detail::version_delta(version, inRangeOf) < cpq_detail::In_Range_Delta;
+	const node_view desired(next, 0);
+	at->m_next[0].compare_exchange_strong(next, desired, std::memory_order_relaxed);
 }
 
 template<class Key, class Value, class Compare, class Allocator>
@@ -696,7 +764,7 @@ inline cpq_detail::exchange_link_result concurrent_priority_queue<Key, Value, Co
 			break;
 		}
 
-		if (!in_range(expectedVersion, desiredVersion)) {
+		if (!cpq_detail::in_range(expectedVersion, desiredVersion)) {
 			result = cpq_detail::exchange_link_outside_range;
 			break;
 		}
