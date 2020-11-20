@@ -15,7 +15,7 @@
 #if defined(GDUL_FIFO)
 #include <gdul/WIP_concurrent_queue_fifo/concurrent_queue_fifo_v6.h>
 #elif defined(GDUL_CPQ)
-#include <gdul/WIP_concurrent_priority_queue/concurrent_priority_queue_v12.h>
+#include <gdul/WIP_concurrent_priority_queue/concurrent_priority_queue_v13.h>
 #endif
 #include <queue>
 #include <mutex>

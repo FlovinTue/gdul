@@ -233,7 +233,7 @@ private:
 	// This should be cheap and may be performed by both inserters and deleters.
 	void perform_version_upkeep(node_view_set& at, std::uint32_t baseLayerVersion, std::uint8_t versionStep);
 
-	static void load_set(node_view_set& outSet, node_type* at, std::uint8_t offset = 0);
+	static void load_set(node_view_set& outSet, node_type* at, std::uint8_t offset = 0, std::uint8_t max = cpq_detail::Max_Node_Height);
 	static void unflag_node(node_type* at, node_view& next);
 	static void try_link_to_node_upper(node_view_set& at, node_view_set& next, node_view node);
 	static bool try_link_to_node(node_view_set& at, node_view_set& next, node_view node);
@@ -399,10 +399,13 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_pop(t
 template<class Key, class Value, class Compare, class Allocator>
 inline void concurrent_priority_queue<Key, Value, Compare, Allocator>::prepare_insertion_sets(node_view_set& atSet, node_view_set& nextSet, const node_type* node)
 {
+	const std::uint8_t nodeHeight(node->m_height);
+
 	atSet[cpq_detail::Max_Node_Height - 1] = &m_head;
 
 	const key_type key(node->m_kv.first);
 
+	//bool beganProbing(false);
 	for (std::uint8_t i = 0; i < cpq_detail::Max_Node_Height; ++i) {
 		const std::uint8_t layer(cpq_detail::Max_Node_Height - i - 1);
 
@@ -415,6 +418,17 @@ inline void concurrent_priority_queue<Key, Value, Compare, Allocator>::prepare_i
 				break;
 			}
 
+			//if (!beganProbing) {
+			//	
+			//	for (std::uint8_t verifyIndex = layer + 1; verifyIndex < nodeHeight; ++verifyIndex) {
+			//		// Perform checks here..
+			//		// So we need to verify that the nodes have not been delinked. We may have the option of
+			//		// checking the version in the nodes to make sure it's in range of the link version. Probably  
+			//		// both versions and compare performance.
+			//	}
+			//	beganProbing = true;
+			//}
+
 			atSet[layer] = nextNode;
 		}
 
@@ -424,8 +438,7 @@ inline void concurrent_priority_queue<Key, Value, Compare, Allocator>::prepare_i
 	}
 
 	if (at_head(atSet[0])) {
-		// Todo add version check optimization here.(Don't need to load everything, everytime)
-		load_set(nextSet, &m_head, 1);
+		load_set(nextSet, &m_head, 1, nodeHeight);
 	}
 }
 
@@ -574,10 +587,9 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_repla
 }
 
 template<class Key, class Value, class Compare, class Allocator>
-inline void concurrent_priority_queue<Key, Value, Compare, Allocator>::load_set(typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_view_set& outSet, typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_type* at, std::uint8_t offset)
+inline void concurrent_priority_queue<Key, Value, Compare, Allocator>::load_set(typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_view_set& outSet, typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_type* at, std::uint8_t offset, std::uint8_t max)
 {
-	const std::uint8_t atHeight(at->m_height);
-	for (std::uint8_t i = offset; i < atHeight; ++i) {
+	for (std::uint8_t i = offset; i < max; ++i) {
 		outSet[i] = at->m_next[i].load(std::memory_order_seq_cst);
 	}
 }
@@ -585,68 +597,6 @@ inline void concurrent_priority_queue<Key, Value, Compare, Allocator>::load_set(
 template<class Key, class Value, class Compare, class Allocator>
 inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::try_push(typename concurrent_priority_queue<Key, Value, Compare, Allocator>::node_type* node)
 {
-
-	//So when we're inserting in the middle of the list, we're relying on the fact that our inserts may only happen BEFORE whatever we're 
-	//referencing as ->next. 
-	//For us to end up with a stale ->next reference the node we linked to would have to be delinked. This would block linkage at base layer.
-	//
-	//
-	//Our search goes topLayer->descendCurrent->...bottomLayer so bottomLayer is always youngest. It's perfectly possible that we have a stale 
-	//reference in our upper layers of the search set. How could such an insert succeed though? If we find a ->next reference that exceeds our
-	//key, we'll descend in the CURRENT node. In this case, HEAD, then we proceed to investigate the ->next reference on the lower layer. In this case
-	//layer 0, moving on to node 1. Here though, we find ->END
-	//
-	//
-	//So this might be what happened:
-	//Current state of list is 
-	//HEAD---->1->END
-	//HEAD->0->1->END
-	//
-	//* Inserter loads layer 1 at HEAD, descends, stalls
-	//* Deleter removes 0, 1
-	//* Other Inserter links 0
-	//
-	//Now
-	//HEAD---->END
-	//HEAD->0->END
-	//
-	//* Inserter wakes, probes forward and finds good spot after 0, links
-
-	// Might work with incrementally inserting references in the inserted node after succeeding the corresponding layer link.
-	// (This would, I think, also get rid of the need for reverse-loading head in case of head insertion. Perhaps could even
-	// do head insertion regular node insert.! ) 
-
-	// On issue is in case would be that we might 'cut off' a lane.. Loading ->next referring to END before
-	// the desired next reference has been stored
-	// This lane would ever only be repaired upon deletion of the next node with equal or more height as the inserted node.
-
-	// What about reloading any links coming from HEAD ? Is the problem fundamental, can we end with the same situation in the middle of list? 
-	// No we cannot end up in the same situation linking in the middle of list. Since delinks only happen at HEAD that's the only place that we 
-	// can load a link and have it disappear underneath us. Given the same situation in the middle of the list, we'd fail the initial link
-	// at bottom (or rather, we wouldn't be able to try, since that would be flagged, and would not exist in list).
-
-	// So that means we have two options:
-	// * Reload any links coming from HEAD (and, I suppose, abort if they're changed)
-	// * Or add forward-links incrementally after succeeding upper layer link.
-
-	// So it's the descending part
-
-	// !----------------------------------------------------------
-	// So I think I just thought of an alternative.. 
-	// Check version of the lower layer(s?) in case the descent is through HEAD
-	// This might also be useful for the HEAD insertion case inside prepare_insertion_set 
-	// (we might get away with not reloading upper layers every time)
-	// !----------------------------------------------------------
-
-	// So what we want to do is to make sure base layer is in range of upper layers.. ? Right?
-	// (The upper layer may out-version the bottom, but not the other way around)
-	// scanning into. Hmm shall have to consider.
-
-	// Yeah, I think we need to synchronize version with whatever link is the root for forward scanning.
-
-	// So we will only have to care about this if the above-forward scanning links will take part in the ->next references
-	// in the inserted node. But wait. Hmm we're not synchronizing with any other node than base layer. Yeah this is a confusing issue.
-
 	node_view_set atSet{};
 	node_view_set nextSet{};
 
@@ -859,7 +809,7 @@ inline bool concurrent_priority_queue<Key, Value, Compare, Allocator>::find_node
 		}
 
 		at = at->m_next[0].load();
-}
+	}
 
 	return false;
 
@@ -977,3 +927,106 @@ static std::uint8_t random_height()
 
 	// We can, of course, reload head to see if version has increased there. 
 
+
+
+		// Todo add version check optimization here.(Don't need to load everything, everytime)
+		// Reloading upper layers should do if the lowest layer outversion them. If the lowest layer
+		// Outversion them, it can mean one of two things: An insertion is happening, and is travelling
+		// up the set or a deletion is happening and has raced-past the loading. In the first case, it doesn't
+		// matter what happens, in the second it *may* matter. Also what about node heights? Upper layers are
+		// frequently at a lower version. Perhaps the version approach is a bit futile.. ? 
+
+		// The relationship of an upper version to a lower one... The upper will mostly be lower. It might be higher in the 
+		// middle of deletion. 
+		// We can conclusively say, that if version has increased on a particular link, the linked node might have been deleted.
+		// .. CONCLUSIVELY.
+
+
+
+//So when we're inserting in the middle of the list, we're relying on the fact that our inserts may only happen BEFORE whatever we're 
+//referencing as ->next. 
+//For us to end up with a stale ->next reference the node we linked to would have to be delinked. This would block linkage at base layer.
+//
+//
+//Our search goes topLayer->descendCurrent->...bottomLayer so bottomLayer is always youngest. It's perfectly possible that we have a stale 
+//reference in our upper layers of the search set. How could such an insert succeed though? If we find a ->next reference that exceeds our
+//key, we'll descend in the CURRENT node. In this case, HEAD, then we proceed to investigate the ->next reference on the lower layer. In this case
+//layer 0, moving on to node 1. Here though, we find ->END
+//
+//
+//So this might be what happened:
+//Current state of list is 
+//HEAD---->1->END
+//HEAD->0->1->END
+//
+//* Inserter loads layer 1 at HEAD, descends, stalls
+//* Deleter removes 0, 1
+//* Other Inserter links 0
+//
+//Now
+//HEAD---->END
+//HEAD->0->END
+//
+//* Inserter wakes, probes forward and finds good spot after 0, links
+
+// Might work with incrementally inserting references in the inserted node after succeeding the corresponding layer link.
+// (This would, I think, also get rid of the need for reverse-loading head in case of head insertion. Perhaps could even
+// do head insertion regular node insert.! ) 
+
+// On issue is in case would be that we might 'cut off' a lane.. Loading ->next referring to END before
+// the desired next reference has been stored
+// This lane would ever only be repaired upon deletion of the next node with equal or more height as the inserted node.
+
+// What about reloading any links coming from HEAD ? Is the problem fundamental, can we end with the same situation in the middle of list? 
+// No we cannot end up in the same situation linking in the middle of list. Since delinks only happen at HEAD that's the only place that we 
+// can load a link and have it disappear underneath us. Given the same situation in the middle of the list, we'd fail the initial link
+// at bottom (or rather, we wouldn't be able to try, since that would be flagged, and would not exist in list).
+
+// So that means we have two options:
+// * Reload any links coming from HEAD (and, I suppose, abort if they're changed)
+// * Or add forward-links incrementally after succeeding upper layer link.
+
+// So it's the descending part
+
+// !----------------------------------------------------------
+// So I think I just thought of an alternative.. 
+// Check version of the lower layer(s?) in case the descent is through HEAD
+// This might also be useful for the HEAD insertion case inside prepare_insertion_set 
+// (we might get away with not reloading upper layers every time)
+// !----------------------------------------------------------
+
+// So what we want to do is to make sure base layer is in range of upper layers.. ? Right?
+// (The upper layer may out-version the bottom, but not the other way around)
+// scanning into. Hmm shall have to consider.
+
+// Yeah, I think we need to synchronize version with whatever link is the root for forward scanning.
+
+// So we will only have to care about this if the above-forward scanning links will take part in the ->next references
+// in the inserted node. But wait. Hmm we're not synchronizing with any other node than base layer. Yeah this is a confusing issue.
+
+
+
+// Hmm what would be the most natural way of ensuring the validity of links? I think we may want to be able to store them
+// in and publish the entire node as a package. Otherwise we will risk corrupting the list's performance. 
+// Let's try a scenario again, but skipping HEAD base layer:
+
+//HEAD---->1->END
+//HEAD---->1->END
+//HEAD->0->1->END
+//
+//* Inserter loads layer 2 at HEAD, descends, stalls
+//* Deleter removes 0, 1
+//* Other Inserter links 0
+//
+//Now
+//HEAD---->END
+//HEAD->0->END
+//HEAD->0->END
+
+//* Inserter wakes, probes forward and finds good spot after 0, links
+// In both scenarios, the top link is invalid. So what needs to happen is, any links above the forward probe 
+// need to be validated. How does one validate? 
+// Just reload and see if anything changed? That is a bit backward moving and potentially bad for performance.
+// Is there an alternative? Perhaps reload and check that the links are still > own key ? That way we are only
+// guaranteeing the rule that all links point forward. -- Which is sufficient. No wait. That would still be subject
+// to the above bug. 
