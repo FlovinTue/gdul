@@ -15,7 +15,7 @@
 #if defined(GDUL_FIFO)
 #include <gdul/WIP_concurrent_queue_fifo/concurrent_queue_fifo_v6.h>
 #elif defined(GDUL_CPQ)
-#include <gdul/WIP_concurrent_priority_queue/concurrent_priority_queue_v13.h>
+#include <gdul/WIP_concurrent_priority_queue/concurrent_priority_queue_v14.h>
 #endif
 #include <queue>
 #include <mutex>
@@ -91,7 +91,7 @@ void queue_testrun(std::uint32_t runs, Allocator alloc, std::uint32_t options = 
 	
 	static watch_dog watchDog;
 
-	watchDog.give_instruction(1000 * 10);
+	watchDog.give_instruction(1000 * 15);
 
 	for (std::uint32_t i = 0; i < runs; ++i) {
 		std::cout << "Pre-run alloc value is: " << gdul::s_allocated << std::endl;

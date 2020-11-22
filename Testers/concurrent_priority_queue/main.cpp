@@ -1,6 +1,6 @@
 // concurrent_priority_queue.cpp : This file contains the 'main' function. Program execution begins and ends there.
 //
-#include <gdul/WIP_concurrent_priority_queue/concurrent_priority_queue_v13.h>
+#include <gdul/WIP_concurrent_priority_queue/concurrent_priority_queue_v14.h>
 
 #define GDUL_CPQ
 //#define MS_CPQ
@@ -22,7 +22,6 @@ thread_local std::vector< node_t*> gdul::tester< std::pair<int, float>, gdul::tr
 
 int main()
 {
-
 	node_t two(std::make_pair	(2, 1.f));
 	node_t six(std::make_pair	(6, 1.f));
 	node_t three(std::make_pair	(3, 1.f));
