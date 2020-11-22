@@ -277,6 +277,21 @@ private:
 
 	std::atomic<uint32_t> m_sequenceCounter = 0;
 #endif
+	struct link_pack
+	{
+		struct alignas(cpq_detail::Cache_Line_Size) link
+		{
+			std::atomic<node_view> m_link;
+		};
+
+		std::atomic<node_view>& operator[](size_type index)
+		{
+			return m_links[index].m_link;
+		}
+
+	private:
+		link m_links[cpq_detail::Max_Node_Height];
+	};
 
 	// Also end
 	node_type m_head;

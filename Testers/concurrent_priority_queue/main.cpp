@@ -19,6 +19,7 @@ using node_t = decltype(q)::node_type;
 thread_local gdul::shared_ptr<node_t[]> gdul::tester< std::pair<int, float>, gdul::tracking_allocator<std::pair<int, float>>>::m_nodes;
 thread_local std::vector< node_t*> gdul::tester< std::pair<int, float>, gdul::tracking_allocator<std::pair<int, float>>>::t_output;
 #endif
+
 int main()
 {
 
@@ -65,8 +66,7 @@ int main()
 	// At this point we need to test for correctness of values. Or. Perhaps multi-layer first.
 	gdul::queue_testrun<test_type, gdul::tracking_allocator<test_type>>(
 		1000000, 
-		gdul::tracking_allocator<std::pair<int, float>>(), 
-		/*gdul::test_option_single | gdul::test_option_mc | gdul::test_option_mp  | gdul::test_option_spsc |*/ gdul::test_option_mpsc | gdul::test_option_spmc | gdul::test_option_mpmc );
+		gdul::tracking_allocator<std::pair<int, float>>() );
 
 }
 

@@ -21,5 +21,6 @@
     <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\concurrent_priority_queue_v11.h" />
     <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\concurrent_priority_queue_v12.h" />
     <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\concurrent_priority_queue_v13.h" />
+    <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\concurrent_priority_queue_v14.h" />
   </ItemGroup>
 </Project>
