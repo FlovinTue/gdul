@@ -66,7 +66,7 @@ public:
 	std::queue<T> m_queue;
 };
 
-const std::uint32_t Writes = 2048;
+const std::uint32_t Writes = 1024;
 const std::uint32_t Writers = std::thread::hardware_concurrency() / 2;
 const std::uint32_t Readers = std::thread::hardware_concurrency() / 2;
 const std::uint32_t WritesPerThread(Writes / Writers);
@@ -94,7 +94,7 @@ void queue_testrun(std::uint32_t runs, Allocator alloc, std::uint32_t options = 
 	watchDog.give_instruction(1000 * 15);
 
 	for (std::uint32_t i = 0; i < runs; ++i) {
-		std::cout << "Pre-run alloc value is: " << gdul::s_allocated << std::endl;
+		std::cout << "Pre-run alloc value is: " << gdul::s_allocated.load() << std::endl;
 
 		double concurrentRes(0.0);
 		double singleRes(0.0);
@@ -169,7 +169,7 @@ void queue_testrun(std::uint32_t runs, Allocator alloc, std::uint32_t options = 
 
 		std::cout << str << "\n" << std::endl;
 
-		std::cout << "Post-run alloc value is: " << gdul::s_allocated << std::endl;
+		std::cout << "Post-run alloc value is: " << gdul::s_allocated.load() << std::endl;
 	}
 }
 
@@ -284,7 +284,7 @@ inline double tester<T, Allocator>::ExecuteMPMC(std::uint32_t runs) {
 #if defined(GDUL) | defined(GDUL_FIFO)
 		m_queue.unsafe_clear();
 #elif defined(MSC_RUNTIME) || defined(MTX_WRAPPER) || defined(GDUL_CPQ)
-		m_queue.clear();
+		m_queue.unsafe_clear();
 #endif
 		m_waiting = 0;
 
@@ -335,7 +335,7 @@ inline double tester<T, Allocator>::ExecuteSPMC(std::uint32_t runs)
 #if defined(GDUL) | defined(GDUL_FIFO)
 		m_queue.unsafe_clear();
 #elif defined(MSC_RUNTIME) || defined(MTX_WRAPPER) || defined(GDUL_CPQ)
-		m_queue.clear();
+		m_queue.unsafe_clear();
 #endif
 		m_waiting = 0;
 
@@ -386,7 +386,7 @@ inline double tester<T, Allocator>::ExecuteMPSC(std::uint32_t runs)
 #if defined(GDUL) | defined(GDUL_FIFO)
 		m_queue.unsafe_clear();
 #elif defined(MSC_RUNTIME) || defined(MTX_WRAPPER) || defined(GDUL_CPQ)
-		m_queue.clear();
+		m_queue.unsafe_clear();
 #endif
 		m_waiting = 0;
 
@@ -436,7 +436,7 @@ inline double tester<T, Allocator>::ExecuteSingleThread(std::uint32_t runs) {
 #if defined(GDUL) | defined(GDUL_FIFO)
 		m_queue.unsafe_clear();
 #elif defined(MSC_RUNTIME) || defined(MTX_WRAPPER) || defined(GDUL_CPQ)
-		m_queue.clear();
+		m_queue.unsafe_clear();
 #endif
 	}
 
@@ -485,7 +485,7 @@ inline double tester<T, Allocator>::ExecuteSPSC(std::uint32_t runs) {
 #if defined(GDUL) | defined(GDUL_FIFO)
 		m_queue.unsafe_clear();
 #elif defined(MSC_RUNTIME) || defined(MTX_WRAPPER) || defined(GDUL_CPQ)
-		m_queue.clear();
+		m_queue.unsafe_clear();
 #endif
 
 	}
@@ -521,10 +521,6 @@ inline double tester<T, Allocator>::ExecuteMC(std::uint32_t runs) {
 
 		Write(ReadsPerThread * Readers);
 
-#if defined GDUL_CPQ
-		GDUL_ASSERT(m_queue.size() == ReadsPerThread * Readers);
-#endif
-
 		m_isRunning = false;
 
 		m_waiting = Writers;
@@ -547,7 +543,7 @@ inline double tester<T, Allocator>::ExecuteMC(std::uint32_t runs) {
 #if defined(GDUL) | defined(GDUL_FIFO)
 		m_queue.unsafe_clear();
 #elif defined(MSC_RUNTIME) || defined(MTX_WRAPPER) || defined(GDUL_CPQ)
-		m_queue.clear();
+		m_queue.unsafe_clear();
 #endif
 	}
 
@@ -596,7 +592,7 @@ inline double tester<T, Allocator>::ExecuteMP(std::uint32_t runs) {
 #if  defined(GDUL) | defined(GDUL_FIFO)
 		m_queue.unsafe_clear();
 #elif defined(MSC_RUNTIME) || defined(GDUL_CPQ)
-		m_queue.clear();
+		m_queue.unsafe_clear();
 #elif defined(MOODYCAMEL)
 		T out;
 		while (m_queue.try_dequeue(out));

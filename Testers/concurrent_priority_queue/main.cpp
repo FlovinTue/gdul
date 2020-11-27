@@ -54,7 +54,7 @@ int main()
 
 	const bool failResult(q.try_pop(outFail));
 
-	q.clear();
+	q.unsafe_clear();
 
 #if defined(GDUL_CPQ)
 	using test_type = std::pair<int, float>;
@@ -63,9 +63,9 @@ int main()
 #endif
 
 	// At this point we need to test for correctness of values. Or. Perhaps multi-layer first.
-	gdul::queue_testrun<test_type, gdul::tracking_allocator<test_type>>(
+	gdul::queue_testrun<test_type, gdul::tracking_allocator<std::pair<int, float>>>(
 		1000000, 
-		gdul::tracking_allocator<std::pair<int, float>>() );
+		gdul::tracking_allocator<std::pair<int, float>>(), gdul::test_option_spmc );
 
 }
 
