@@ -78,16 +78,18 @@ constexpr std::uint32_t version_delta(std::uint32_t from, std::uint32_t to)
 constexpr std::uint32_t version_add_one(std::uint32_t from)
 {
 	const std::uint32_t next(from + 1);
-	const std::uint32_t zeroAdjust(!(bool)next);
-	const std::uint32_t zeroAvoid(next + zeroAdjust);
-	return zeroAvoid & Max_Version_Mask;
+	const std::uint32_t masked(next & Max_Version_Mask);
+	const std::uint32_t zeroAdjust(!(bool)masked);
+
+	return masked + zeroAdjust;
 }
 constexpr std::uint32_t version_sub_one(std::uint32_t from)
 {
 	const std::uint32_t next(from - 1);
 	const std::uint32_t zeroAdjust(!(bool)next);
-	const std::uint32_t zeroAvoid(next - zeroAdjust);
-	return zeroAvoid & Max_Version_Mask;
+	const std::uint32_t adjusted(next - zeroAdjust);
+
+	return adjusted & Max_Version_Mask;
 }
 constexpr std::uint32_t version_step(std::uint32_t from, std::uint8_t step)
 {
@@ -148,21 +150,20 @@ struct node
 		{
 			const std::uint64_t pointerValue(m_value & Version_Mask);
 			const std::uint64_t lower(pointerValue & Bottom_Bits);
-			const std::uint64_t upper(pointerValue >> 48);
+			const std::uint64_t upper(pointerValue >> 45);
 			const std::uint64_t conc(lower + upper);
 
 			return (std::uint32_t)conc;
 		}
 		void set_version(std::uint32_t v)
 		{
-			const std::uint64_t  v64(v);
-			const std::uint64_t upper((v64 & ~Bottom_Bits) << 48);
+			const std::uint64_t v64(v);
 			const std::uint64_t lower(v64 & Bottom_Bits);
-			const std::uint64_t mask(upper | lower);
-
+			const std::uint64_t upper((v64 << 45) & ~Pointer_Mask);
+			const std::uint64_t versionValue(upper | lower);
 			const std::uint64_t pointerValue(m_value & Pointer_Mask);
 
-			m_value = (mask | pointerValue);
+			m_value = (versionValue | pointerValue);
 		}
 		union
 		{
@@ -176,7 +177,6 @@ struct node
 #if defined (GDUL_CPQ_DEBUG)
 	const node* m_nextView[NodeHeight]{};
 	std::uint32_t m_flaggedVersion = 0;
-	std::uint32_t m_preFlagVersion = 0;
 	std::uint8_t m_delinked = 0;
 	std::uint8_t m_removed = 0;
 	std::uint8_t m_inserted = 0;
@@ -210,6 +210,7 @@ public:
 	void push(node_type* node);
 	bool try_pop(node_type*& out);
 
+	void clear();
 	void unsafe_clear();
 
 	bool empty() const noexcept;
@@ -244,11 +245,8 @@ private:
 
 	static cpq_detail::flag_node_result flag_node(node_view at, node_view& next);
 
-#if !defined GDUL_CPQ_DEBUG
-	static 
-#endif
-		cpq_detail::exchange_link_result exchange_head_link(std::atomic<node_view>* link, node_view& expected, node_view& desired, std::uint32_t desiredVersion, std::uint8_t layer);
-	static cpq_detail::exchange_link_result exchange_node_link(std::atomic<node_view>* link, node_view& expected, node_view& desired, std::uint32_t desiredVersion, std::uint8_t layer);
+	static cpq_detail::exchange_link_result exchange_head_link(std::atomic<node_view>* link, node_view& expected, node_view& desired, std::uint32_t desiredVersion, std::uint8_t dbgLayer, node_view dbgNode);
+	static cpq_detail::exchange_link_result exchange_node_link(std::atomic<node_view>* link, node_view& expected, node_view& desired, std::uint32_t desiredVersion, std::uint8_t dbgLayer, node_view dbgNode);
 
 
 #if defined GDUL_CPQ_DEBUG
@@ -350,32 +348,31 @@ inline bool concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::try
 	cpq_detail::flag_node_result flagResult(cpq_detail::flag_node_unexpected);
 	bool deLinked(false);
 
-	node_type* nodeClaim(nullptr);
+	node_type* frontNode(nullptr);
 
 	do {
-		node_view_set frontSet{};
-		node_view_set nextSet{};
-		node_view nodeClaimView(GDUL_CPQ_HEAD_VAR.m_next[0].load(std::memory_order_relaxed));
+		node_view frontNodeView(GDUL_CPQ_HEAD_VAR.m_next[0].load(std::memory_order_seq_cst));
+		frontNode = frontNodeView;
 
-		nodeClaim = nodeClaimView;
-
-		if (at_end(nodeClaim)) {
+		if (at_end(frontNode)) {
 			return false;
 		}
 
-		load_set(nextSet, nodeClaim);
-#if defined GDUL_CPQ_DEBUG
-		const std::uint32_t preVersion(nextSet[0].get_version());
-#endif
+		node_view_set frontSet{};
+		node_view_set nextSet{};
 
-		std::fill(std::begin(frontSet), std::begin(frontSet) + nodeClaim->m_height, nodeClaimView);
+		const std::uint8_t claimHeight(frontNode->m_height);
+
+		frontSet[0] = frontNodeView;
+
+		load_set(frontSet, &GDUL_CPQ_HEAD_VAR, 1, claimHeight);
+		load_set(nextSet, frontNode, 0, claimHeight);
 
 		flagResult = flag_node(frontSet[0], nextSet[0]);
 
 #if defined GDUL_CPQ_DEBUG
 		if (flagResult == cpq_detail::flag_node_success) {
-			nodeClaim->m_flaggedVersion = nextSet[0].get_version();
-			nodeClaim->m_preFlagVersion = preVersion;
+			frontNode->m_flaggedVersion = nextSet[0].get_version();
 		}
 #endif
 		if (flagResult == cpq_detail::flag_node_unexpected) {
@@ -386,26 +383,26 @@ inline bool concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::try
 
 		if (!deLinked && flagResult == cpq_detail::flag_node_success) {
 
-			deLinked = check_for_delink_helping(nodeClaimView, frontSet[0], nextSet[0]);
+			deLinked = check_for_delink_helping(frontNodeView, frontSet[0], nextSet[0]);
 
 			if (!deLinked) {
-				unflag_node(nodeClaim, nextSet[0]);
+				unflag_node(frontNode, nextSet[0]);
 			}
 		}
 
 #if defined GDUL_CPQ_DEBUG
 		else if (deLinked) {
-			nodeClaim->m_delinked = 1;
+			frontNode->m_delinked = 1;
 		}
 #endif
 
 	} while (flagResult != cpq_detail::flag_node_success || !deLinked);
 
-	out = nodeClaim;
+	out = frontNode;
 
 #if defined GDUL_CPQ_DEBUG
-	nodeClaim->m_removed = 1;
-	t_recentOp.opNode = nodeClaim;
+	frontNode->m_removed = 1;
+	t_recentOp.opNode = frontNode;
 	t_recentOp.m_sequenceIndex = m_sequenceCounter++;
 	t_recentOp.m_threadId = std::this_thread::get_id();
 	s_recentPops[s_recentPopIx++ % s_recentPops.item_count()] = t_recentOp;
@@ -509,11 +506,15 @@ inline bool concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::try
 	const std::uint32_t baseLayerVersion(expectedFront[0].get_version());
 	const std::uint32_t upperLayerNextVersion(cpq_detail::version_add_one(baseLayerVersion));
 
+	if (baseLayerVersion == 0) {
+		__debugbreak();
+	}
+
 
 	for (std::uint8_t i = 0; i < numUpperLayers; ++i) {
 		const std::uint8_t layer(frontHeight - 1 - i);
 
-		const cpq_detail::exchange_link_result result(exchange_head_link(&GDUL_CPQ_HEAD_VAR.m_next[layer], expectedFront[layer], desiredFront[layer], upperLayerNextVersion, layer));
+		const cpq_detail::exchange_link_result result(exchange_head_link(&GDUL_CPQ_HEAD_VAR.m_next[layer], expectedFront[layer], desiredFront[layer], upperLayerNextVersion, layer, &GDUL_CPQ_HEAD_VAR));
 
 		if (result == cpq_detail::exchange_link_outside_range) {
 			return false;
@@ -527,7 +528,21 @@ inline bool concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::try
 
 	perform_version_upkeep(frontHeight, baseLayerVersion, bottomLayerNextVersion, expectedFront);
 
-	return exchange_node_link(&GDUL_CPQ_HEAD_VAR.m_next[0], expectedFront[0], desiredFront[0], bottomLayerNextVersion, 0) == cpq_detail::exchange_link_success;
+	return exchange_node_link(&GDUL_CPQ_HEAD_VAR.m_next[0], expectedFront[0], desiredFront[0], bottomLayerNextVersion, 0, &GDUL_CPQ_HEAD_VAR) == cpq_detail::exchange_link_success;
+}
+
+template<class Key, class Value, typename cpq_detail::size_type TypicalSizeHint, class Compare>
+inline void concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::clear()
+{
+	node_type* dump(nullptr);
+	while (try_pop(dump));
+
+#if defined (GDUL_CPQ_DEBUG)
+	s_recentPushIx = 0;
+	s_recentPopIx = 0;
+	std::fill(s_recentPushes.get(), s_recentPushes.get() + s_recentPushes.item_count(), recent_op_info());
+	std::fill(s_recentPops.get(), s_recentPops.get() + s_recentPops.item_count(), recent_op_info());
+#endif
 }
 
 template<class Key, class Value, typename cpq_detail::size_type TypicalSizeHint, class Compare>
@@ -557,7 +572,7 @@ inline bool concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::try
 {
 	node_type* const baseLayerNode(atSet[0]);
 
-	if (exchange_node_link(&baseLayerNode->m_next[0], expectedSet[0], node, 0, 0) != cpq_detail::exchange_link_success) {
+	if (exchange_node_link(&baseLayerNode->m_next[0], expectedSet[0], node, 0, 0, baseLayerNode) != cpq_detail::exchange_link_success) {
 		return false;
 	}
 
@@ -574,7 +589,7 @@ inline bool concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::try
 
 	perform_version_upkeep(node.operator const node_type*()->m_height, baseLayerVersion, baseLayerNextVersion, next);
 
-	if (exchange_node_link(&GDUL_CPQ_HEAD_VAR.m_next[0], next[0], node, baseLayerNextVersion, 0) != cpq_detail::exchange_link_success) {
+	if (exchange_node_link(&GDUL_CPQ_HEAD_VAR.m_next[0], next[0], node, baseLayerNextVersion, 0, &GDUL_CPQ_HEAD_VAR) != cpq_detail::exchange_link_success) {
 		return false;
 	}
 
@@ -589,7 +604,7 @@ inline void concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::try
 	const std::uint8_t height(node.operator node_type * ()->m_height);
 
 	for (std::uint8_t layer = 1; layer < height; ++layer) {
-		if (exchange_head_link(&GDUL_CPQ_HEAD_VAR.m_next[layer], expectedSet[layer], node, version, layer) == cpq_detail::exchange_link_outside_range) {
+		if (exchange_head_link(&GDUL_CPQ_HEAD_VAR.m_next[layer], expectedSet[layer], node, version, layer, &GDUL_CPQ_HEAD_VAR) == cpq_detail::exchange_link_outside_range) {
 			break;
 		}
 	}
@@ -602,7 +617,7 @@ inline void concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::try
 	const std::uint8_t height(node.operator node_type * ()->m_height);
 
 	for (std::uint8_t layer = 1; layer < height; ++layer) {
-		exchange_node_link(&atSet[layer].operator node_type* ()->m_next[layer], expectedSet[layer], node, expectedSet[layer].get_version(), layer);
+		exchange_node_link(&atSet[layer].operator node_type* ()->m_next[layer], expectedSet[layer], node, expectedSet[layer].get_version(), layer, atSet[layer].operator node_type * ());
 	}
 }
 
@@ -753,10 +768,10 @@ inline void concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::unf
 }
 
 template<class Key, class Value, typename cpq_detail::size_type TypicalSizeHint, class Compare>
-inline cpq_detail::exchange_link_result concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::exchange_head_link(std::atomic<typename concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::node_view>* link, typename concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::node_view& expected, typename concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::node_view& desired, std::uint32_t desiredVersion, std::uint8_t layer)
+inline cpq_detail::exchange_link_result concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::exchange_head_link(std::atomic<typename concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::node_view>* link, typename concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::node_view& expected, typename concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::node_view& desired, std::uint32_t desiredVersion, std::uint8_t dbgLayer, node_view dbgNode)
 {
 #if defined GDUL_CPQ_DEBUG
-	t_recentOp.expected[layer] = expected;
+	t_recentOp.expected[dbgLayer] = expected;
 #endif
 
 	desired.set_version(desiredVersion);
@@ -779,21 +794,21 @@ inline cpq_detail::exchange_link_result concurrent_priority_queue<Key, Value, Ty
 
 
 #if defined GDUL_CPQ_DEBUG
-	t_recentOp.result[layer] = result;
-	t_recentOp.actual[layer] = expected;
-	t_recentOp.desired[layer] = desired;
+	t_recentOp.result[dbgLayer] = result;
+	t_recentOp.actual[dbgLayer] = expected;
+	t_recentOp.desired[dbgLayer] = desired;
 	if (result && expected.get_version()) {
-		m_dummy.m_nextView[layer] = desired;
+		dbgNode.operator node_type* ()->m_nextView[dbgLayer] = desired;
 	}
 #endif
 
 	return result;
 }
 template<class Key, class Value, typename cpq_detail::size_type TypicalSizeHint, class Compare>
-inline cpq_detail::exchange_link_result concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::exchange_node_link(std::atomic<typename concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::node_view>* link, typename concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::node_view& expected, typename concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::node_view& desired, std::uint32_t desiredVersion, std::uint8_t layer)
+inline cpq_detail::exchange_link_result concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::exchange_node_link(std::atomic<typename concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::node_view>* link, typename concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::node_view& expected, typename concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::node_view& desired, std::uint32_t desiredVersion, std::uint8_t dbgLayer, node_view dbgNode)
 {
 #if defined GDUL_CPQ_DEBUG
-	t_recentOp.expected[layer] = expected;
+	t_recentOp.expected[dbgLayer] = expected;
 #endif
 
 	desired.set_version(desiredVersion);
@@ -805,11 +820,11 @@ inline cpq_detail::exchange_link_result concurrent_priority_queue<Key, Value, Ty
 	}
 
 #if defined GDUL_CPQ_DEBUG
-	t_recentOp.result[layer] = result;
-	t_recentOp.actual[layer] = expected;
-	t_recentOp.desired[layer] = desired;
+	t_recentOp.result[dbgLayer] = result;
+	t_recentOp.actual[dbgLayer] = expected;
+	t_recentOp.desired[dbgLayer] = desired;
 	if (result && expected.get_version()) {
-		//at->m_nextView[layer] = desired;
+		dbgNode.operator node_type*()->m_nextView[dbgLayer] = desired;
 	}
 #endif
 
