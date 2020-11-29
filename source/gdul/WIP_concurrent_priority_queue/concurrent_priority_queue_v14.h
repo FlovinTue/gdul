@@ -3,19 +3,21 @@
 #include <atomic>
 #include <stdint.h>
 #include <memory>
-#include <thread>
+#include <random>
+
+#define GDUL_CPQ_DEBUG
+#if defined GDUL_CPQ_DEBUG
 #include <cassert>
 #include <utility>
-#include <random>
-#include <iostream>
+#include <thread>
 #include "../Testers/Common/util.h"
 #include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
+#endif
 
 #pragma warning(push)
 // Alignment padding
 #pragma warning(disable : 4324)
 
-//#define GDUL_CPQ_DEBUG
 #define GDUL_CPQ_HEAD_VAR m_dummy
 
 namespace gdul {
@@ -626,7 +628,7 @@ inline bool concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::try
 {
 	nextSet[0] = node;
 
-	if (try_delink_front(frontSet, nextSet, 1)) {
+	if (try_delink_front(frontSet, nextSet, 2)) {
 
 		try_link_to_head_upper(frontSet, node, frontSet[0].get_version());
 
@@ -684,6 +686,12 @@ inline bool concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::try
 		// regular link at front node in the middle of deletion!
 		atSet[0] = front;
 
+
+		// !! -- Something here, loading old views and linking them in during first step of head splicing -- !
+
+		//load_set(atSet, &GDUL_CPQ_HEAD_VAR, 1, std::max<std::uint8_t>(node->m_height, front.operator node_type * ()->m_height));
+		//load_set()
+
 		// Front node is in the middle of deletion, attempt special case splice to head
 		if (nextSet[0].get_version() == cpq_detail::version_add_one(atSet[0].get_version())) {
 
@@ -692,6 +700,8 @@ inline bool concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::try
 #endif
 			return try_replace_front(atSet, nextSet, node);
 		}
+
+		return false;
 	}
 
 	// Inserting after flagged node that has been supplanted in the middle of deletion
@@ -710,7 +720,7 @@ inline void concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::per
 {
 	const std::uint32_t maxEntriesMultiPre(baseVersion / TypicalSizeHint);
 	const std::uint32_t maxEntriesMultiPost(nextVersion / TypicalSizeHint);
-	const std::uint8_t delta(maxEntriesMultiPost - maxEntriesMultiPre);
+	const bool delta(maxEntriesMultiPost - maxEntriesMultiPre);
 
 	if (delta) {
 		for (std::uint8_t i = aboveLayer; i < Link_Tower_Height; ++i) {
@@ -768,7 +778,7 @@ inline void concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::unf
 }
 
 template<class Key, class Value, typename cpq_detail::size_type TypicalSizeHint, class Compare>
-inline cpq_detail::exchange_link_result concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::exchange_head_link(std::atomic<typename concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::node_view>* link, typename concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::node_view& expected, typename concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::node_view& desired, std::uint32_t desiredVersion, std::uint8_t dbgLayer, node_view dbgNode)
+inline cpq_detail::exchange_link_result concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::exchange_head_link(std::atomic<typename concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::node_view>* link, typename concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::node_view& expected, typename concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::node_view& desired, std::uint32_t desiredVersion, [[maybe_unused]] std::uint8_t dbgLayer, [[maybe_unused]]node_view dbgNode)
 {
 #if defined GDUL_CPQ_DEBUG
 	t_recentOp.expected[dbgLayer] = expected;
@@ -805,7 +815,7 @@ inline cpq_detail::exchange_link_result concurrent_priority_queue<Key, Value, Ty
 	return result;
 }
 template<class Key, class Value, typename cpq_detail::size_type TypicalSizeHint, class Compare>
-inline cpq_detail::exchange_link_result concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::exchange_node_link(std::atomic<typename concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::node_view>* link, typename concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::node_view& expected, typename concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::node_view& desired, std::uint32_t desiredVersion, std::uint8_t dbgLayer, node_view dbgNode)
+inline cpq_detail::exchange_link_result concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::exchange_node_link(std::atomic<typename concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::node_view>* link, typename concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::node_view& expected, typename concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::node_view& desired, std::uint32_t desiredVersion, [[maybe_unused]] std::uint8_t dbgLayer, [[maybe_unused]] node_view dbgNode)
 {
 #if defined GDUL_CPQ_DEBUG
 	t_recentOp.expected[dbgLayer] = expected;

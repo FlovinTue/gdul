@@ -91,7 +91,7 @@ void queue_testrun(std::uint32_t runs, Allocator alloc, std::uint32_t options = 
 	
 	static watch_dog watchDog;
 
-	//watchDog.give_instruction(1000 * 15);
+	watchDog.give_instruction(1000 * 25);
 
 	for (std::uint32_t i = 0; i < runs; ++i) {
 		std::cout << "Pre-run alloc value is: " << gdul::s_allocated.load() << std::endl;
@@ -112,7 +112,7 @@ void queue_testrun(std::uint32_t runs, Allocator alloc, std::uint32_t options = 
 		const int iterations = 1000;
 #endif
 
-		//watchDog.pet();
+		watchDog.pet();
 
 		if (options & test_option_spsc)
 			singleProdSingleCon = tester.ExecuteSPSC(iterations);

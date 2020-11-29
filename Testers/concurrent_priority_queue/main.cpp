@@ -65,7 +65,7 @@ int main()
 	// At this point we need to test for correctness of values. Or. Perhaps multi-layer first.
 	gdul::queue_testrun<test_type, gdul::tracking_allocator<std::pair<int, float>>>(
 		1000000, 
-		gdul::tracking_allocator<std::pair<int, float>>() );
+		gdul::tracking_allocator<std::pair<int, float>>(), gdul::test_option_mpsc);
 
 }
 

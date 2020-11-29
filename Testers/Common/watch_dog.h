@@ -4,6 +4,8 @@
 #include <chrono>
 #include <iostream>
 #include <mutex>
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
 
 namespace gdul {
 template <class T = void>
@@ -89,6 +91,7 @@ inline void watch_dog_impl<T>::guard()
 			}
 			else {
 				std::cout << "WOOF, WOOF" << std::endl;
+				MessageBeep(MB_ICONERROR);
 				m_whenWoken();
 				pet();
 			}
