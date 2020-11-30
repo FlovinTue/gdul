@@ -5,7 +5,7 @@
 #include <memory>
 #include <random>
 
-#define GDUL_CPQ_DEBUG
+//#define GDUL_CPQ_DEBUG
 #if defined GDUL_CPQ_DEBUG
 #include <cassert>
 #include <utility>
@@ -417,6 +417,9 @@ inline bool concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::try
 template<class Key, class Value, typename cpq_detail::size_type TypicalSizeHint, class Compare>
 inline bool concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::prepare_insertion_sets(node_view_set& atSet, node_view_set& nextSet, const node_type* node)
 {
+	// For future, may optimize here. If descending to bottom layer at HEAD, then we may detect if we're at front node
+	// (To avoid reloading during insertion case 3)
+
 	const std::uint8_t nodeHeight(node->m_height);
 
 	atSet[Link_Tower_Height - 1] = &m_dummy;
@@ -508,15 +511,10 @@ inline bool concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::try
 	const std::uint32_t baseLayerVersion(expectedFront[0].get_version());
 	const std::uint32_t upperLayerNextVersion(cpq_detail::version_add_one(baseLayerVersion));
 
-	if (baseLayerVersion == 0) {
-		__debugbreak();
-	}
-
-
 	for (std::uint8_t i = 0; i < numUpperLayers; ++i) {
 		const std::uint8_t layer(frontHeight - 1 - i);
 
-		const cpq_detail::exchange_link_result result(exchange_head_link(&GDUL_CPQ_HEAD_VAR.m_next[layer], expectedFront[layer], desiredFront[layer], upperLayerNextVersion, layer, &GDUL_CPQ_HEAD_VAR));
+		const cpq_detail::exchange_link_result result(exchange_head_link(&GDUL_CPQ_HEAD_VAR.m_next[layer], expectedFront[layer], desiredFront[layer], upperLayerNextVersion, layer, &m_dummy));
 
 		if (result == cpq_detail::exchange_link_outside_range) {
 			return false;
@@ -530,7 +528,11 @@ inline bool concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::try
 
 	perform_version_upkeep(frontHeight, baseLayerVersion, bottomLayerNextVersion, expectedFront);
 
-	return exchange_node_link(&GDUL_CPQ_HEAD_VAR.m_next[0], expectedFront[0], desiredFront[0], bottomLayerNextVersion, 0, &GDUL_CPQ_HEAD_VAR) == cpq_detail::exchange_link_success;
+	if (exchange_node_link(&GDUL_CPQ_HEAD_VAR.m_next[0], expectedFront[0], desiredFront[0], bottomLayerNextVersion, 0, &m_dummy) == cpq_detail::exchange_link_success) {
+		expectedFront[0] = desiredFront[0];
+		return true;
+	}
+	return false;
 }
 
 template<class Key, class Value, typename cpq_detail::size_type TypicalSizeHint, class Compare>
@@ -591,7 +593,7 @@ inline bool concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::try
 
 	perform_version_upkeep(node.operator const node_type*()->m_height, baseLayerVersion, baseLayerNextVersion, next);
 
-	if (exchange_node_link(&GDUL_CPQ_HEAD_VAR.m_next[0], next[0], node, baseLayerNextVersion, 0, &GDUL_CPQ_HEAD_VAR) != cpq_detail::exchange_link_success) {
+	if (exchange_node_link(&GDUL_CPQ_HEAD_VAR.m_next[0], next[0], node, baseLayerNextVersion, 0, &m_dummy) != cpq_detail::exchange_link_success) {
 		return false;
 	}
 
@@ -606,7 +608,7 @@ inline void concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::try
 	const std::uint8_t height(node.operator node_type * ()->m_height);
 
 	for (std::uint8_t layer = 1; layer < height; ++layer) {
-		if (exchange_head_link(&GDUL_CPQ_HEAD_VAR.m_next[layer], expectedSet[layer], node, version, layer, &GDUL_CPQ_HEAD_VAR) == cpq_detail::exchange_link_outside_range) {
+		if (exchange_head_link(&GDUL_CPQ_HEAD_VAR.m_next[layer], expectedSet[layer], node, version, layer, &m_dummy) == cpq_detail::exchange_link_outside_range) {
 			break;
 		}
 	}
@@ -627,6 +629,15 @@ template<class Key, class Value, typename cpq_detail::size_type TypicalSizeHint,
 inline bool concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::try_replace_front(typename concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::node_view_set& frontSet, typename concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::node_view_set& nextSet, typename concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::node_view node)
 {
 	nextSet[0] = node;
+
+	const node_type* const toInsert(node);
+	const node_type* const currentFront(frontSet[0]);
+
+	if (toInsert->m_height < currentFront->m_height) {
+		load_set(frontSet, &GDUL_CPQ_HEAD_VAR, 1, currentFront->m_height);
+	}
+
+	load_set(nextSet, currentFront, 1, currentFront->m_height);
 
 	if (try_delink_front(frontSet, nextSet, 2)) {
 
@@ -681,19 +692,15 @@ inline bool concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare>::try
 
 	// Inserting after front node...
 	if (atSet[0] == front) {
-		// In case we are looking at front node, we need to make sure our view of head base layer version 
-		// is younger than that of front base layer version. Else we might think it'd be okay with a
-		// regular link at front node in the middle of deletion!
-		atSet[0] = front;
 
-
-		// !! -- Something here, loading old views and linking them in during first step of head splicing -- !
-
-		//load_set(atSet, &GDUL_CPQ_HEAD_VAR, 1, std::max<std::uint8_t>(node->m_height, front.operator node_type * ()->m_height));
-		//load_set()
-
+		
 		// Front node is in the middle of deletion, attempt special case splice to head
-		if (nextSet[0].get_version() == cpq_detail::version_add_one(atSet[0].get_version())) {
+		if (nextSet[0].get_version() == cpq_detail::version_add_one(front.get_version())) {
+
+			// In case we are looking at front node, we need to make sure our view of head base layer version 
+			// is younger than that of front base layer version. Else we might think it'd be okay with a
+			// regular link at front node in the middle of deletion!
+			atSet[0] = front;
 
 #if defined (GDUL_CPQ_DEBUG)
 			t_recentOp.m_insertionCase = 3;
