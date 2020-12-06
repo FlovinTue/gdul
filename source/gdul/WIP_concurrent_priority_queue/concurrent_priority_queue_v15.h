@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <memory>
 #include <random>
+#include <gdul/WIP_concurrent_priority_queue/concurrent_scratch_pool.h>
 
 //#define GDUL_CPQ_DEBUG
 #if defined GDUL_CPQ_DEBUG
@@ -196,10 +197,10 @@ struct node
 /// <param name="TypicalSizeHint">How many items is expected to be in the list at any one time</param>
 /// <param name="Compare">Comparator to decide node ordering</param>
 template <
-	class Key, 
-	class Value, 
-	typename cpq_detail::size_type TypicalSizeHint = 512, 
-	class Compare = std::less<Key>, 
+	class Key,
+	class Value,
+	typename cpq_detail::size_type TypicalSizeHint = 512,
+	class Compare = std::less<Key>,
 	class Allocator = std::allocator<cpq_detail::node<Key, Value, cpq_detail::calc_max_height(TypicalSizeHint)>>
 >
 class concurrent_priority_queue
@@ -212,19 +213,32 @@ public:
 	using node_type = cpq_detail::node<Key, Value, Link_Tower_Height>;
 	using size_type = typename cpq_detail::size_type;
 	using comparator_type = Compare;
+	using allocator_type = Allocator;
 
 	concurrent_priority_queue();
+	concurrent_priority_queue(Allocator alloc);
 	~concurrent_priority_queue() noexcept;
 
-	void push(node_type* node);
-	bool try_pop(node_type*& out);
+	void push(const std::pair<Key, Value>& node);
+	void push(std::pair<Key, Value>&& node);
+
+	bool try_pop(std::pair<Key, Value>& out);
 
 	void clear();
 	bool empty() const noexcept;
 
 	void unsafe_clear();
 
+	/// <summary>
+	/// Reset the internal node scratch pool. This must be done periodically.
+	/// Assumes no concurrent inserts and an empty structure
+	/// </summary>
+	void unsafe_reset_scratch_pool();
+
 private:
+	template <class In>
+	void push_internal(In&& in);
+
 	using node_view = typename node_type::node_view;
 	using node_view_set = node_view[Link_Tower_Height];
 
@@ -322,16 +336,23 @@ private:
 		link_pack m_next;
 	};
 
+	concurrent_scratch_pool<node_type, Allocator> m_nodePool;
+
 	faux_head_node m_head;
 
 	node_type m_dummy;
 
 	compare_type m_comparator;
 };
-
 template<class Key, class Value, typename cpq_detail::size_type TypicalSizeHint, class Compare, class Allocator>
 inline concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare, Allocator>::concurrent_priority_queue()
-	: m_head()
+	: concurrent_priority_queue(Allocator())
+{
+}
+template<class Key, class Value, typename cpq_detail::size_type TypicalSizeHint, class Compare, class Allocator>
+inline concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare, Allocator>::concurrent_priority_queue(Allocator alloc)
+	: m_nodePool(TypicalSizeHint, alloc)
+	, m_head()
 	, m_dummy()
 {
 	m_dummy.m_kv.first = std::numeric_limits<key_type>::max();
@@ -348,15 +369,32 @@ inline concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare, Allocator
 }
 
 template<class Key, class Value, typename cpq_detail::size_type TypicalSizeHint, class Compare, class Allocator>
-inline void concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare, Allocator>::push(typename concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare, Allocator>::node_type* node)
+inline void concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare, Allocator>::push(std::pair<Key, Value>&& in)
 {
-	node->m_height = cpq_detail::random_height(Link_Tower_Height);
+	push_internal(std::move(in));
+}
+
+template<class Key, class Value, typename cpq_detail::size_type TypicalSizeHint, class Compare, class Allocator>
+inline void concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare, Allocator>::push(const std::pair<Key, Value>& in)
+{
+	push_internal(in);
+}
+
+template<class Key, class Value, typename cpq_detail::size_type TypicalSizeHint, class Compare, class Allocator>
+template<class In>
+inline void concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare, Allocator>::push_internal(In&& in)
+{
+	node_type* const n(m_nodePool.get());
+	n->m_kv = std::forward<In>(in);
+	n->m_height = cpq_detail::random_height(Link_Tower_Height);
+
 #if defined GDUL_CPQ_DEBUG
 	for (auto itr = std::begin(t_recentOp.result); itr != std::end(t_recentOp.result); ++itr) {
 		*itr = cpq_detail::exchange_link_null_value;
-	}
+}
 #endif
-	while (!try_push(node));
+
+	while (!try_push(n));
 
 #if defined (GDUL_CPQ_DEBUG)
 	t_recentOp.opNode = node;
@@ -368,7 +406,7 @@ inline void concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare, Allo
 }
 
 template<class Key, class Value, typename cpq_detail::size_type TypicalSizeHint, class Compare, class Allocator>
-inline bool concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare, Allocator>::try_pop(typename concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare, Allocator>::node_type*& out)
+inline bool concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare, Allocator>::try_pop(std::pair<Key, Value>& out)
 {
 
 #if defined GDUL_CPQ_DEBUG
@@ -430,7 +468,7 @@ inline bool concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare, Allo
 
 	} while (flagResult != cpq_detail::flag_node_success || !deLinked);
 
-	out = frontNode;
+	out = std::move(frontNode->m_kv);
 
 #if defined GDUL_CPQ_DEBUG
 	frontNode->m_removed = 1;
@@ -574,7 +612,7 @@ inline bool concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare, Allo
 template<class Key, class Value, typename cpq_detail::size_type TypicalSizeHint, class Compare, class Allocator>
 inline void concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare, Allocator>::clear()
 {
-	node_type* dump(nullptr);
+	std::pair<Key, Value> dump;
 	while (try_pop(dump));
 
 #if defined (GDUL_CPQ_DEBUG)

@@ -1,6 +1,6 @@
 // concurrent_priority_queue.cpp : This file contains the 'main' function. Program execution begins and ends there.
 //
-#include <gdul/WIP_concurrent_priority_queue/concurrent_priority_queue_v14.h>
+#include <gdul/WIP_concurrent_priority_queue/concurrent_priority_queue_v15.h>
 
 #define GDUL_CPQ
 //#define MS_CPQ
@@ -13,35 +13,28 @@ std::mt19937 rng(rd());
 
 gdul::concurrent_priority_queue<int, float> q;
 
-using node_t = decltype(q)::node_type;
-
-#if defined(GDUL_CPQ)
-thread_local gdul::shared_ptr<node_t[]> gdul::tester< std::pair<int, float>, gdul::tracking_allocator<std::pair<int, float>>>::m_nodes;
-thread_local std::vector< node_t*> gdul::tester< std::pair<int, float>, gdul::tracking_allocator<std::pair<int, float>>>::t_output;
-#endif
-
 int main()
 {
-	node_t two(std::make_pair	(2, 1.f));
-	node_t six(std::make_pair	(6, 1.f));
-	node_t three(std::make_pair	(3, 1.f));
-	node_t four(std::make_pair	(4, 1.f));
-	node_t one(std::make_pair	(1, 1.f));
-	node_t five(std::make_pair	(5, 1.f));
+	std::pair<int, float> two	(std::make_pair(2, 1.f));
+	std::pair<int, float> six	(std::make_pair(6, 1.f));
+	std::pair<int, float> three	(std::make_pair(3, 1.f));
+	std::pair<int, float> four	(std::make_pair(4, 1.f));
+	std::pair<int, float> one	(std::make_pair(1, 1.f));
+	std::pair<int, float> five	(std::make_pair(5, 1.f));
 
-	q.push(&two);
-	q.push(&six);
-	q.push(&three);
-	q.push(&four);
-	q.push(&one);
-	q.push(&five);
+	q.push(two);
+	q.push(six);
+	q.push(three);
+	q.push(four);
+	q.push(one);
+	q.push(five);
 	
-	node_t* outone(nullptr);
-	node_t* outtwo(nullptr);
-	node_t* outthree(nullptr);
-	node_t* outfour(nullptr);
-	node_t* outfive(nullptr);
-	node_t* outsix(nullptr);
+	std::pair<int, float> outone;
+	std::pair<int, float> outtwo;
+	std::pair<int, float> outthree;
+	std::pair<int, float> outfour;
+	std::pair<int, float> outfive;
+	std::pair<int, float> outsix;
 
 	const bool result1(q.try_pop(outone));
 	const bool result2(q.try_pop(outtwo));
@@ -50,7 +43,7 @@ int main()
 	const bool result5(q.try_pop(outfive));
 	const bool result6(q.try_pop(outsix));
 
-	node_t* outFail(nullptr);
+	std::pair<int, float> outFail;
 
 	const bool failResult(q.try_pop(outFail));
 

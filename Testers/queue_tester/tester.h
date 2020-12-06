@@ -15,7 +15,7 @@
 #if defined(GDUL_FIFO)
 #include <gdul/WIP_concurrent_queue_fifo/concurrent_queue_fifo_v6.h>
 #elif defined(GDUL_CPQ)
-#include <gdul/WIP_concurrent_priority_queue/concurrent_priority_queue_v14.h>
+#include <gdul/WIP_concurrent_priority_queue/concurrent_priority_queue_v15.h>
 #endif
 #include <queue>
 #include <mutex>
@@ -206,9 +206,6 @@ private:
 	queue_mutex_wrapper<T> m_queue;
 #elif defined(GDUL_CPQ)
 	concurrent_priority_queue<typename T::first_type, typename T::second_type> m_queue;
-	static thread_local gdul::shared_ptr<typename decltype(m_queue)::node_type[]> m_nodes;
-
-	static thread_local std::vector<typename decltype(m_queue)::node_type*> t_output;
 #elif defined(MS_CPQ)
 	concurrency::concurrent_priority_queue<T> m_queue;
 #endif
@@ -615,13 +612,6 @@ template<class T, class Allocator>
 inline void tester<T, Allocator>::Write(std::uint32_t writes) {
 #ifdef GDUL
 	/*m_queue.reserve(Writes);*/
-#elif defined(GDUL_CPQ)
-	if (!(writes < m_nodes.item_count())) {
-		m_nodes = gdul::make_shared<typename decltype(m_queue)::node_type[]>(writes);
-	}
-#if defined GDUL_CPQ_DEBUG
-	std::memset(m_nodes.get(), 0, m_nodes.item_count() * sizeof(typename decltype(m_nodes)::decayed_type));
-#endif
 #endif
 
 	++m_waiting;
@@ -663,9 +653,7 @@ inline void tester<T, Allocator>::Write(std::uint32_t writes) {
 #if !defined(MOODYCAMEL) && !defined(GDUL_CPQ)
 		m_queue.push(in);
 #elif defined(GDUL_CPQ)
-		GDUL_ASSERT(j < m_nodes.item_count());
-		m_nodes[j].m_kv.first = seed & (j + 1);
-		m_queue.push(&m_nodes[j]); 
+		m_queue.push(std::pair<typename T::first_type, typename T::second_type>(seed & (j + 1), typename T::second_type()));
 #else
 		m_queue.enqueue(in);
 #endif
@@ -699,11 +687,8 @@ inline void tester<T, Allocator>::Read(std::uint32_t reads) {
 
 	uint32_t sum(0);
 
-#if !defined(GDUL_CPQ)
-	T out{ 0 };
-#else
-	typename decltype(m_queue)::node_type* out(nullptr);
-#endif
+	T out;
+
 #ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
 	for (std::uint32_t j = 0; j < reads;) {
 		while (true) {

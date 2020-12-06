@@ -4,7 +4,6 @@
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\concurrent_priority_queue.h" />
     <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\concurrent_priority_queue_v2.h" />
     <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\concurrent_priority_queue_v3.h" />
     <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\concurrent_priority_queue_v4.h" />
@@ -22,5 +21,9 @@
     <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\concurrent_priority_queue_v12.h" />
     <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\concurrent_priority_queue_v13.h" />
     <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\concurrent_priority_queue_v14.h" />
+    <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\memory_reclaimer.h" />
+    <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\concurrent_scratch_pool.h" />
+    <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\concurrent_priority_queue_v1.h" />
+    <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\concurrent_priority_queue_v15.h" />
   </ItemGroup>
 </Project>
