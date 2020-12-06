@@ -21,7 +21,7 @@
 #pragma warning(disable : 4324)
 // ----------------------------
 
-#define GDUL_CPQ_HEAD_VAR m_head
+#define GDUL_CPQ_HEAD_VAR m_dummy
 
 namespace gdul {
 namespace cpq_detail {
@@ -481,6 +481,12 @@ inline bool concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare, Allo
 	return true;
 }
 
+template<class Key, class Value, typename cpq_detail::size_type TypicalSizeHint, class Compare, class Allocator>
+inline void concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare, Allocator>::unsafe_reset_scratch_pool()
+{
+	assert(empty() && "Bad call to unsafe_reset_scratch_pool, there are still items in the list");
+	m_nodePool.unsafe_reset();
+}
 
 template<class Key, class Value, typename cpq_detail::size_type TypicalSizeHint, class Compare, class Allocator>
 inline bool concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare, Allocator>::prepare_insertion_sets(node_view_set& atSet, node_view_set& nextSet, const node_type* node)
@@ -630,6 +636,7 @@ inline void concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare, Allo
 		GDUL_CPQ_HEAD_VAR.m_next[i].store(&m_dummy, std::memory_order_relaxed);
 	}
 
+	unsafe_reset_scratch_pool();
 
 #if defined (GDUL_CPQ_DEBUG)
 	s_recentPushIx = 0;

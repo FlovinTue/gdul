@@ -11,10 +11,12 @@ std::random_device rd;
 std::mt19937 rng(rd());
 }
 
-gdul::concurrent_priority_queue<int, float> q;
+
 
 int main()
 {
+	gdul::concurrent_priority_queue<int, float, 8> q;
+
 	std::pair<int, float> two	(std::make_pair(2, 1.f));
 	std::pair<int, float> six	(std::make_pair(6, 1.f));
 	std::pair<int, float> three	(std::make_pair(3, 1.f));
@@ -27,6 +29,10 @@ int main()
 	q.push(three);
 	q.push(four);
 	q.push(one);
+	q.push(five);
+	q.push(five);
+	q.push(five);
+	q.push(five);
 	q.push(five);
 	
 	std::pair<int, float> outone;
@@ -42,6 +48,12 @@ int main()
 	const bool result4(q.try_pop(outfour));
 	const bool result5(q.try_pop(outfive));
 	const bool result6(q.try_pop(outsix));
+	const bool result7(q.try_pop(outsix));
+	const bool result8(q.try_pop(outsix));
+	const bool result9(q.try_pop(outsix));
+	const bool result10(q.try_pop(outsix));
+
+	q.unsafe_reset_scratch_pool();
 
 	std::pair<int, float> outFail;
 

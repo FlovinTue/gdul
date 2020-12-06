@@ -12,7 +12,7 @@ namespace gdul {
 namespace csp_detail {
 using size_type = std::size_t;
 
-static constexpr size_type Tl_Scratch_Size = 8;
+static constexpr size_type Tl_Scratch_Size = 32;
 }
 
 template <class T, class Allocator = std::allocator<T>>
@@ -128,7 +128,7 @@ inline void concurrent_scratch_pool<T, Allocator>::unsafe_reset()
 	const size_type claimed(m_indexClaim.exchange(0, std::memory_order_relaxed));
 
 	if (m_block.item_count() < claimed) {
-		m_block = allocate_shared<T[]>(claimed);
+		m_block = gdul::allocate_shared<T[]>(claimed, m_allocator);
 	}
 
 	++m_iteration;
