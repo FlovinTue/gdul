@@ -1049,3 +1049,12 @@ static std::uint8_t random_height(size_type maxHeight)
 
 // How about thread_check_in()
 // And then put responsibility on the user to make sure this is called regularly. Like, once per frame.
+
+
+
+
+
+
+
+// Idea
+// Go for qsbr. Use the previous idea of tl batching recycles along with submitting the entire list as a new set?  
