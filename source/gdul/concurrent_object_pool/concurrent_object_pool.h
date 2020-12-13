@@ -188,7 +188,7 @@ inline bool concurrent_object_pool<Object, Allocator>::is_contained_within(const
 {
 	const Object* const begin(to_begin(blockKey));
 
-	return !(obj < begin) & (obj < (begin + to_capacity(blockKey)));
+	return (!(obj < begin)) & (obj < (begin + to_capacity(blockKey)));
 }
 template<class Object, class Allocator>
 inline std::uint32_t concurrent_object_pool<Object, Allocator>::to_capacity(std::uintptr_t blockKey)

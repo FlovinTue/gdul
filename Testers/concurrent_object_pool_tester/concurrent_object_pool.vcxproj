@@ -80,7 +80,7 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <AdditionalIncludeDirectories>$(SolutionDir)Include\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <LanguageStandard>stdcpp14</LanguageStandard>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -91,6 +91,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\..\source\gdul\concurrent_object_pool\concurrent_object_pool.h" />
+    <ClInclude Include="..\..\source\gdul\concurrent_object_pool\guarded_pool.h" />
     <ClInclude Include="pch.h" />
   </ItemGroup>
   <ItemGroup>
