@@ -135,7 +135,11 @@ inline Object* concurrent_object_pool<Object, Allocator>::get()
 	Object* out;
 
 	while (!m_unusedObjects.try_pop(out)) {
-		try_alloc_block(m_blocksEndIndex.load(std::memory_order_relaxed));
+
+		const std::uint8_t endIndex(m_blocksEndIndex.load(std::memory_order_acquire));
+		if (!m_unusedObjects.try_pop(out)) {
+			try_alloc_block(endIndex);
+		}
 	}
 	return out;
 }
