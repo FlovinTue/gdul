@@ -160,17 +160,15 @@ private:
 
 	std::pair<size_type, size_type> update_index_cache(tl_container& tl);
 
-	static bool is_contained_within(const T* obj, std::uintptr_t blockKey);
+	static bool is_contained_within(const T* item, std::uintptr_t blockKey);
 	static size_type to_capacity(std::uintptr_t blockKey);
 	static const T* to_begin(std::uintptr_t blockKey);
 	static const T* to_end(std::uintptr_t blockKey);
 	static std::uintptr_t to_block_key(const T* begin, size_type capacity);
-	static std::uintptr_t get_block_key_from(const block_node& from);
 
-	bool is_obsolete_hint(const T* obj) const;
-	bool is_obsolete(const T* obj) const;
-	void discard_item(const T* obj);
-	void force_hint_update();
+	bool is_up_to_date(const T* item) const;
+	void discard_item(const T* item);
+
 	void try_alloc_block(std::uint8_t blockIndex);
 
 	// Shameless reuse of index-pool from tlm
@@ -184,7 +182,7 @@ private:
 	concurrent_queue<tl_cache, Allocator> m_fullCaches;
 	concurrent_queue<tl_cache, Allocator> m_emptyCaches;
 
-	std::atomic<std::uintptr_t> m_activeBlockKeyHint;
+	inline static std::atomic_uint s_debugDiscardCount = 0;
 
 	size_type m_tlCacheSize;
 	
@@ -212,7 +210,6 @@ inline guarded_pool<T, Allocator>::guarded_pool(typename guarded_pool<T, Allocat
 	: m_indexPool()
 	, m_blocks{}
 	, m_indices{}
-	, m_activeBlockKeyHint(0)
 	, t_tlContainer(allocator)
 	, m_tlCacheSize(0)
 	, m_fullCaches(allocator)
@@ -245,6 +242,11 @@ inline T* guarded_pool<T, Allocator>::get()
 
 	while (!fetch_from_tl_cache(ret)) {
 		tl_container& tl(t_tlContainer);
+
+		if (tl.m_cache) {
+			m_emptyCaches.push(std::move(tl.m_cache));
+		}
+
 		tl.m_cache = acquire_tl_cache_full();
 		tl.m_cacheIndex = 0;
 	}
@@ -255,7 +257,7 @@ inline T* guarded_pool<T, Allocator>::get()
 template<class T, class Allocator>
 inline void guarded_pool<T, Allocator>::recycle(T* item)
 {
-	if (!is_obsolete_hint(item) || !is_obsolete(item)) {
+	if (is_up_to_date(item)) {
 		tl_container& tl(t_tlContainer);
 		add_to_tl_deferred_reclaim_cache(item, tl);
 	}
@@ -288,8 +290,6 @@ inline std::invoke_result_t<Fn, Args...> guarded_pool<T, Allocator>::guard(Fn f,
 template<class T, class Allocator>
 inline void guarded_pool<T, Allocator>::unsafe_reset()
 {
-	m_activeBlockKeyHint.store(0, std::memory_order_relaxed);
-
 	const std::uint8_t blockCount(m_blocksEndIndex.exchange(0, std::memory_order_relaxed));
 	for (std::uint8_t i = 0; i < blockCount; ++i) {
 		m_blocks[i].m_blockKey = 0;
@@ -301,21 +301,24 @@ inline void guarded_pool<T, Allocator>::unsafe_reset()
 	m_emptyCaches.unsafe_reset();
 	m_fullCaches.unsafe_reset();
 }
-template<class T, class Allocator>
-inline bool guarded_pool<T, Allocator>::is_obsolete_hint(const T* obj) const
-{
-	return !is_contained_within(obj, m_activeBlockKeyHint.load(std::memory_order_relaxed));
-}
-template<class T, class Allocator>
-inline bool guarded_pool<T, Allocator>::is_obsolete(const T* obj) const
-{
-	const std::uint8_t blockEndIndex(m_blocksEndIndex.load());
-	const std::uint8_t blockLastIndex(blockEndIndex - 1);
 
-	const bool containedWithinNext(blockEndIndex == Capacity_Bits ? false : is_contained_within(obj, m_blocks[blockEndIndex].m_blockKey));
-	const bool containedWithinLast(is_contained_within(obj, get_block_key_from(m_blocks[blockLastIndex])));
+// Look at up_to_date.. Make foolproof.
+template<class T, class Allocator>
+inline bool guarded_pool<T, Allocator>::is_up_to_date(const T* item) const
+{
+	assert(m_blocksEndIndex.load() != 0 && "Expected to find value, is pool initialized?");
 
-	return !(containedWithinLast | containedWithinNext);
+	const size_type blocksEnd(m_blocksEndIndex.load(std::memory_order_relaxed));
+	const size_type lastBlock(blocksEnd - 1);
+	const size_type nextBlock(lastBlock + 1); // Speculative, in case this item was allocated really recently
+
+	if (is_contained_within(item, m_blocks[lastBlock].m_blockKey)) {
+		return true;
+	}
+	if (is_contained_within(item, m_blocks[nextBlock].m_blockKey) && blocksEnd < Capacity_Bits) {
+		return true;
+	}
+	return false;
 }
 template<class T, class Allocator>
 inline void guarded_pool<T, Allocator>::add_to_tl_deferred_reclaim_cache(T* item, tl_container& tl)
@@ -348,7 +351,7 @@ inline void guarded_pool<T, Allocator>::evaluate_caches_for_reclamation(tl_conta
 
 	for (std::size_t i = caches.size() - 1; i < caches.size(); --i) {
 		if (!caches[i].first) {
-			m_emptyCaches.push(std::move(caches[i].second));
+			m_fullCaches.push(std::move(caches[i].second));
 			caches[i] = std::move(caches.back());
 			caches.pop_back();
 		}
@@ -360,7 +363,11 @@ inline typename guarded_pool<T, Allocator>::tl_cache guarded_pool<T, Allocator>:
 	tl_cache ret(nullptr);
 
 	while (!m_fullCaches.try_pop(ret)) {
-		try_alloc_block(m_blocksEndIndex.load(std::memory_order_relaxed));
+		const std::uint8_t endIndex(m_blocksEndIndex.load(std::memory_order_acquire));
+
+		if (!m_fullCaches.try_pop(ret)) {
+			try_alloc_block(endIndex);
+		}
 	}
 
 	return ret;
@@ -409,14 +416,21 @@ inline std::pair<typename guarded_pool<T, Allocator>::size_type, typename guarde
 
 		tl.m_indexCache[i] = current;
 	}
+
+	const size_type ownIndex(tl.m_userIndex);
+	const size_type ownBit(size_type(1) << ownIndex);
+
+	masks.first &= ~ownBit;
+	masks.second &= ~ownBit;
+
 	return masks;
 }
 template<class T, class Allocator>
-inline bool guarded_pool<T, Allocator>::is_contained_within(const T* obj, std::uintptr_t blockKey)
+inline bool guarded_pool<T, Allocator>::is_contained_within(const T* item, std::uintptr_t blockKey)
 {
 	const T* const begin(to_begin(blockKey));
 
-	return !(obj < begin) & (obj < (begin + to_capacity(blockKey)));
+	return !(item < begin) && (item < (begin + to_capacity(blockKey)));
 }
 template<class T, class Allocator>
 inline typename guarded_pool<T, Allocator>::size_type guarded_pool<T, Allocator>::to_capacity(std::uintptr_t blockKey)
@@ -442,7 +456,7 @@ inline const T* guarded_pool<T, Allocator>::to_end(std::uintptr_t blockKey)
 template<class T, class Allocator>
 inline std::uintptr_t guarded_pool<T, Allocator>::to_block_key(const T* begin, size_type capacity)
 {
-	constexpr std::uintptr_t toShift(64 - Capacity_Bits);
+	constexpr std::uintptr_t toShift((sizeof(std::uintptr_t) * 8) - Capacity_Bits);
 	const std::uintptr_t capacityBase(capacity);
 	const std::uintptr_t capacityShift(capacityBase << toShift);
 	const std::uintptr_t ptrBase((std::uintptr_t)begin);
@@ -452,41 +466,21 @@ inline std::uintptr_t guarded_pool<T, Allocator>::to_block_key(const T* begin, s
 	return blockKey;
 }
 template<class T, class Allocator>
-inline std::uintptr_t guarded_pool<T, Allocator>::get_block_key_from(const block_node& from)
-{
-	if (from.m_blockKey)
-		return from.m_blockKey;
-
-	const gdul::shared_ptr<T[]> objects(from.m_items.load(std::memory_order_relaxed));
-
-	return to_block_key(objects.get(), (size_type)objects.item_count());
-}
-template<class T, class Allocator>
-inline void guarded_pool<T, Allocator>::discard_item(const T* obj)
+inline void guarded_pool<T, Allocator>::discard_item(const T* item)
 {
 	const std::uint8_t blockCount(m_blocksEndIndex.load(std::memory_order_acquire));
 
 	for (std::uint8_t i = 0; i < blockCount; ++i) {
-		if (is_contained_within(obj, m_blocks[i].m_blockKey)) {
+		if (is_contained_within(item, m_blocks[i].m_blockKey)) {
 			if (m_blocks[i].m_livingItems.fetch_sub(1, std::memory_order_relaxed) == 1) {
 				m_blocks[i].m_items.store(gdul::shared_ptr<T[]>(nullptr));
 			}
+			++s_debugDiscardCount;
+
 			return;
 		}
 	}
 	assert(false && "Item does not belong in this structure");
-}
-template<class T, class Allocator>
-inline void guarded_pool<T, Allocator>::force_hint_update()
-{
-	// Keep writing to hint until m_blockEndIndex is stable
-	std::uint8_t preHintUpdate(0);
-	std::uint8_t postHintUpdate(m_blocksEndIndex.load(std::memory_order_relaxed));
-	do {
-		preHintUpdate = postHintUpdate;
-		m_activeBlockKeyHint.store(m_blocks[preHintUpdate - 1].m_blockKey, std::memory_order_relaxed);
-		postHintUpdate = m_blocksEndIndex.load(std::memory_order_relaxed);
-	} while (postHintUpdate != preHintUpdate);
 }
 template<class T, class Allocator>
 inline void guarded_pool<T, Allocator>::try_alloc_block(std::uint8_t blockIndex)
@@ -518,16 +512,15 @@ inline void guarded_pool<T, Allocator>::try_alloc_block(std::uint8_t blockIndex)
 	size_type pushIndex(m_blocks[blockIndex].m_pushSync.fetch_add(m_tlCacheSize, std::memory_order_relaxed));
 	while (pushIndex < size) {
 		tl_cache cache(gdul::allocate_shared<T*[]>(m_tlCacheSize, m_allocator));
-		for (size_type i = pushIndex; i < pushIndex + m_tlCacheSize; ++i) {
+		for (size_type i = pushIndex; i < (pushIndex + m_tlCacheSize); ++i) {
 			cache[i - pushIndex] = &expected[i];
 		}
 		m_fullCaches.push(std::move(cache));
 		pushIndex = m_blocks[blockIndex].m_pushSync.fetch_add(m_tlCacheSize, std::memory_order_relaxed);
 	}
 
+	// Might just update this before. 
 	m_blocksEndIndex.compare_exchange_strong(blockIndex, blockIndex + 1, std::memory_order_release);
-
-	force_hint_update();
 }
 namespace gp_detail {
 inline size_type log2_align(size_type from, size_type clamp)

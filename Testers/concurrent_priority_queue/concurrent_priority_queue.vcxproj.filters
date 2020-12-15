@@ -25,6 +25,5 @@
     <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\concurrent_scratch_pool.h" />
     <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\concurrent_priority_queue_v1.h" />
     <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\concurrent_priority_queue_v15.h" />
-    <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\guarded_object_pool.h" />
   </ItemGroup>
 </Project>

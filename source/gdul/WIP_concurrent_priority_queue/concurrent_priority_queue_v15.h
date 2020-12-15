@@ -5,6 +5,7 @@
 #include <memory>
 #include <random>
 #include <gdul/WIP_concurrent_priority_queue/concurrent_scratch_pool.h>
+#include <gdul/concurrent_object_pool/guarded_pool.h>
 
 //#define GDUL_CPQ_DEBUG
 #if defined GDUL_CPQ_DEBUG
@@ -21,6 +22,7 @@
 #pragma warning(disable : 4324)
 // ----------------------------
 
+#define GDUL_CPQ_GUARDED_POOL
 #define GDUL_CPQ_HEAD_VAR m_dummy
 
 namespace gdul {
@@ -219,10 +221,11 @@ public:
 	concurrent_priority_queue(Allocator alloc);
 	~concurrent_priority_queue() noexcept;
 
-	void push(const std::pair<Key, Value>& node);
-	void push(std::pair<Key, Value>&& node);
+	void push(const std::pair<Key, Value>& in);
+	void push(std::pair<Key, Value>&& in);
 
 	bool try_pop(std::pair<Key, Value>& out);
+
 
 	void clear();
 	bool empty() const noexcept;
@@ -238,6 +241,7 @@ public:
 private:
 	template <class In>
 	void push_internal(In&& in);
+	bool try_pop_internal(std::pair<Key, Value>& out);
 
 	using node_view = typename node_type::node_view;
 	using node_view_set = node_view[Link_Tower_Height];
@@ -336,8 +340,12 @@ private:
 		link_pack m_next;
 	};
 
-	concurrent_scratch_pool<node_type, Allocator> m_nodePool;
 
+#if defined GDUL_CPQ_GUARDED_POOL
+	guarded_pool<node_type, Allocator> m_nodePool;
+#else
+	concurrent_scratch_pool<node_type, Allocator> m_nodePool;
+#endif
 	faux_head_node m_head;
 
 	node_type m_dummy;
@@ -351,7 +359,11 @@ inline concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare, Allocator
 }
 template<class Key, class Value, typename cpq_detail::size_type TypicalSizeHint, class Compare, class Allocator>
 inline concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare, Allocator>::concurrent_priority_queue(Allocator alloc)
+#if defined GDUL_CPQ_GUARDED_POOL
+	: m_nodePool(TypicalSizeHint, TypicalSizeHint / std::thread::hardware_concurrency(), alloc)
+#else
 	: m_nodePool(TypicalSizeHint, alloc)
+#endif
 	, m_head()
 	, m_dummy()
 {
@@ -393,9 +405,11 @@ inline void concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare, Allo
 		*itr = cpq_detail::exchange_link_null_value;
 }
 #endif
-
+#if defined GDUL_CPQ_GUARDED_POOL
+	while (!m_nodePool.guard(&concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare, Allocator>::try_push, this, n));
+#else
 	while (!try_push(n));
-
+#endif
 #if defined (GDUL_CPQ_DEBUG)
 	t_recentOp.opNode = node;
 	node->m_inserted = 1;
@@ -407,6 +421,16 @@ inline void concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare, Allo
 
 template<class Key, class Value, typename cpq_detail::size_type TypicalSizeHint, class Compare, class Allocator>
 inline bool concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare, Allocator>::try_pop(std::pair<Key, Value>& out)
+{
+#if defined GDUL_CPQ_GUARDED_POOL
+	return m_nodePool.guard(&concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare, Allocator>::try_pop_internal, this, out);
+#else
+	return try_pop_internal(out);
+#endif
+}
+
+template<class Key, class Value, typename cpq_detail::size_type TypicalSizeHint, class Compare, class Allocator>
+inline bool concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare, Allocator>::try_pop_internal(std::pair<Key, Value>& out)
 {
 
 #if defined GDUL_CPQ_DEBUG
@@ -470,6 +494,10 @@ inline bool concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare, Allo
 
 	out = std::move(frontNode->m_kv);
 
+#if defined GDUL_CPQ_GUARDED_POOL
+	m_nodePool.recycle(frontNode);
+#endif
+
 #if defined GDUL_CPQ_DEBUG
 	frontNode->m_removed = 1;
 	t_recentOp.opNode = frontNode;
@@ -484,8 +512,10 @@ inline bool concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare, Allo
 template<class Key, class Value, typename cpq_detail::size_type TypicalSizeHint, class Compare, class Allocator>
 inline void concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare, Allocator>::unsafe_reset_scratch_pool()
 {
+#if !defined GDUL_CPQ_GUARDED_POOL
 	assert(empty() && "Bad call to unsafe_reset_scratch_pool, there are still items in the list");
 	m_nodePool.unsafe_reset();
+#endif
 }
 
 template<class Key, class Value, typename cpq_detail::size_type TypicalSizeHint, class Compare, class Allocator>
@@ -619,7 +649,11 @@ template<class Key, class Value, typename cpq_detail::size_type TypicalSizeHint,
 inline void concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare, Allocator>::clear()
 {
 	std::pair<Key, Value> dump;
-	while (try_pop(dump));
+#if defined GDUL_CPQ_GUARDED_POOL
+	while (m_nodePool.guard(&concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare, Allocator>::try_pop_internal, this, dump));
+#else
+	while (try_pop_internal(dump));
+#endif
 
 #if defined (GDUL_CPQ_DEBUG)
 	s_recentPushIx = 0;
