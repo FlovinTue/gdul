@@ -59,7 +59,7 @@ int main()
 
 	const bool failResult(q.try_pop(outFail));
 
-	q.unsafe_clear();
+	q.clear();
 
 #if defined(GDUL_CPQ)
 	using test_type = std::pair<int, float>;

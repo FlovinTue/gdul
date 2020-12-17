@@ -12,7 +12,7 @@ namespace gdul {
 namespace csp_detail {
 using size_type = std::size_t;
 
-static constexpr size_type Tl_Scratch_Size = 32;
+static constexpr size_type Tl_Cache_Size = 32;
 }
 
 template <class T, class Allocator = std::allocator<T>>
@@ -27,10 +27,15 @@ public:
 	concurrent_scratch_pool(size_type initialPoolSize, Allocator alloc);
 	~concurrent_scratch_pool();
 
-	// Concurrency safe
+	/// <summary>
+	/// Concurrency safe
+	/// </summary>
+	/// <returns>Unused item</returns>
 	T* get();
 
-	// Assumes no outstanding references to objects as well as no concurrent access
+	/// <summary>
+	/// Assumes no outstanding references to objects as well as no concurrent access
+	/// </summary>
 	void unsafe_reset();
 
 private:
@@ -39,12 +44,6 @@ private:
 	{
 		shared_ptr<T[]> m_items;
 		shared_ptr<excess_block> m_next;
-	};
-
-	struct alignas(std::hardware_destructive_interference_size)
-	{
-		std::atomic<size_type> m_indexClaim;
-		atomic_shared_ptr<excess_block> m_excessBlocks;
 	};
 
 	struct tl_container
@@ -60,6 +59,12 @@ private:
 
 	T* acquire_tl_scratch(size_type atIndex);
 
+	struct /* anonymous struct */ alignas(std::hardware_destructive_interference_size) 
+	{
+		std::atomic<size_type> m_indexClaim;
+		atomic_shared_ptr<excess_block> m_excessBlocks;
+	};
+
 	tlm<tl_container> t_details;
 	shared_ptr<T[]> m_block;
 	std::size_t m_iteration;
@@ -71,13 +76,13 @@ private:
 
 template<class T, class Allocator>
 inline concurrent_scratch_pool<T, Allocator>::concurrent_scratch_pool()
-	: concurrent_scratch_pool(csp_detail::Tl_Scratch_Size, Allocator())
+	: concurrent_scratch_pool(csp_detail::Tl_Cache_Size, Allocator())
 {
 }
 
 template<class T, class Allocator>
 inline concurrent_scratch_pool<T, Allocator>::concurrent_scratch_pool(Allocator alloc)
-	: concurrent_scratch_pool(csp_detail::Tl_Scratch_Size, alloc)
+	: concurrent_scratch_pool(csp_detail::Tl_Cache_Size, alloc)
 {
 }
 
@@ -90,7 +95,7 @@ inline concurrent_scratch_pool<T, Allocator>::concurrent_scratch_pool(size_type 
 template<class T, class Allocator>
 inline concurrent_scratch_pool<T, Allocator>::concurrent_scratch_pool(size_type initialPoolSize, Allocator alloc)
 	: t_details(tl_container{ 0, 0, nullptr }, alloc)
-	, m_block(allocate_shared<T[]>(((initialPoolSize / csp_detail::Tl_Scratch_Size + ((bool)(initialPoolSize % csp_detail::Tl_Scratch_Size)))* csp_detail::Tl_Scratch_Size /* align value to Tl_Scratch_Size */), alloc))
+	, m_block(allocate_shared<T[]>(((initialPoolSize / csp_detail::Tl_Cache_Size + ((bool)(initialPoolSize % csp_detail::Tl_Cache_Size)))* csp_detail::Tl_Cache_Size /* align value to Tl_Cache_Size */), alloc))
 	, m_iteration(1)
 	, m_allocator(alloc)
 {
@@ -113,7 +118,7 @@ inline T* concurrent_scratch_pool<T, Allocator>::get()
 		return &tl.localScratch[tl.localScratchIndex++];
 	}
 
-	if (!(tl.localScratchIndex < csp_detail::Tl_Scratch_Size)) {
+	if (!(tl.localScratchIndex < csp_detail::Tl_Cache_Size)) {
 		reset_tl_scratch(tl);
 	}
 
@@ -154,7 +159,7 @@ template<class T, class Allocator>
 inline void concurrent_scratch_pool<T, Allocator>::reset_tl_scratch(tl_container& tl)
 {
 	tl.localScratchIndex = 0;
-	tl.localScratch = acquire_tl_scratch(m_indexClaim.fetch_add(csp_detail::Tl_Scratch_Size));
+	tl.localScratch = acquire_tl_scratch(m_indexClaim.fetch_add(csp_detail::Tl_Cache_Size));
 }
 
 template<class T, class Allocator>
@@ -165,7 +170,7 @@ inline T* concurrent_scratch_pool<T, Allocator>::acquire_tl_scratch(size_type at
 	}
 
 	shared_ptr<excess_block> node(gdul::allocate_shared<excess_block>(m_allocator));
-	node->m_items = gdul::allocate_shared<T[]>(csp_detail::Tl_Scratch_Size, m_allocator);
+	node->m_items = gdul::allocate_shared<T[]>(csp_detail::Tl_Cache_Size, m_allocator);
 
 	T* const ret(node->m_items.get());
 

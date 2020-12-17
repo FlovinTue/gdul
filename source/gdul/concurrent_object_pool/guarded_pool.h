@@ -143,6 +143,14 @@ private:
 		std::vector<std::pair<size_type, tl_cache>> m_deferredReclaimCaches;
 	};
 
+	struct critical_sec
+	{
+		critical_sec(size_type& tlIndex) : m_tlIndex(++tlIndex) {}
+		~critical_sec() { ++m_tlIndex; }
+
+		size_type& m_tlIndex;
+	};
+
 	struct alignas(std::hardware_destructive_interference_size) user_index { size_type i; };
 
 
@@ -163,7 +171,6 @@ private:
 	static bool is_contained_within(const T* item, std::uintptr_t blockKey);
 	static size_type to_capacity(std::uintptr_t blockKey);
 	static const T* to_begin(std::uintptr_t blockKey);
-	static const T* to_end(std::uintptr_t blockKey);
 	static std::uintptr_t to_block_key(const T* begin, size_type capacity);
 
 	bool is_up_to_date(const T* item) const;
@@ -182,10 +189,8 @@ private:
 	concurrent_queue<tl_cache, Allocator> m_fullCaches;
 	concurrent_queue<tl_cache, Allocator> m_emptyCaches;
 
-	inline static std::atomic_uint s_debugDiscardCount = 0;
-
 	size_type m_tlCacheSize;
-	
+
 	Allocator m_allocator;
 
 	std::atomic<std::uint8_t> m_blocksEndIndex;
@@ -272,19 +277,15 @@ inline std::invoke_result_t<Fn, Args...> guarded_pool<T, Allocator>::guard(Fn f,
 {
 	tl_container& tl(t_tlContainer);
 	size_type userIndex(tl.m_userIndex);
-	
+
 	if (m_indices.size() < tl.m_userIndex) {
 		tl.m_userIndex = m_indexPool.get(m_allocator);
 		userIndex = tl.m_userIndex;
 	}
 
-	++m_indices[userIndex].i;
+	const critical_sec cs(m_indices[userIndex].i);
 
-	auto ret(std::invoke(f, std::forward<Args>(args)...));
-
-	++m_indices[userIndex].i;
-
-	return ret;
+	return std::invoke(f, std::forward<Args>(args)...);
 }
 
 template<class T, class Allocator>
@@ -326,7 +327,7 @@ inline void guarded_pool<T, Allocator>::add_to_tl_deferred_reclaim_cache(T* item
 	size_type reclaimIndex(tl.m_reclaimCacheIndex++);
 
 	if (!(reclaimIndex < m_tlCacheSize)) {
-		
+
 		evaluate_caches_for_reclamation(tl);
 
 		tl.m_deferredReclaimCache = acquire_tl_cache_empty();
@@ -449,11 +450,6 @@ inline const T* guarded_pool<T, Allocator>::to_begin(std::uintptr_t blockKey)
 	return (const T*)ptrBlock;
 }
 template<class T, class Allocator>
-inline const T* guarded_pool<T, Allocator>::to_end(std::uintptr_t blockKey)
-{
-	return to_begin(blockKey) + to_capacity(blockKey);
-}
-template<class T, class Allocator>
 inline std::uintptr_t guarded_pool<T, Allocator>::to_block_key(const T* begin, size_type capacity)
 {
 	constexpr std::uintptr_t toShift((sizeof(std::uintptr_t) * 8) - Capacity_Bits);
@@ -475,8 +471,6 @@ inline void guarded_pool<T, Allocator>::discard_item(const T* item)
 			if (m_blocks[i].m_livingItems.fetch_sub(1, std::memory_order_relaxed) == 1) {
 				m_blocks[i].m_items.store(gdul::shared_ptr<T[]>(nullptr));
 			}
-			++s_debugDiscardCount;
-
 			return;
 		}
 	}
@@ -511,7 +505,7 @@ inline void guarded_pool<T, Allocator>::try_alloc_block(std::uint8_t blockIndex)
 	// Divide into tl caches & add to cachepool
 	size_type pushIndex(m_blocks[blockIndex].m_pushSync.fetch_add(m_tlCacheSize, std::memory_order_relaxed));
 	while (pushIndex < size) {
-		tl_cache cache(gdul::allocate_shared<T*[]>(m_tlCacheSize, m_allocator));
+		tl_cache cache(gdul::allocate_shared<T* []>(m_tlCacheSize, m_allocator));
 		for (size_type i = pushIndex; i < (pushIndex + m_tlCacheSize); ++i) {
 			cache[i - pushIndex] = &expected[i];
 		}

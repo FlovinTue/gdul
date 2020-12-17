@@ -22,7 +22,7 @@
 #pragma warning(disable : 4324)
 // ----------------------------
 
-#define GDUL_CPQ_GUARDED_POOL
+//#define GDUL_CPQ_GUARDED_POOL
 #define GDUL_CPQ_HEAD_VAR m_dummy
 
 namespace gdul {
@@ -53,11 +53,11 @@ constexpr std::uint8_t calc_max_height(size_type TypicalSizeHint)
 	return croppedHeight;
 }
 
-static constexpr std::uintptr_t Bottom_Bits = ~(std::uintptr_t(std::numeric_limits<std::uintptr_t>::max()) << 3);
-static constexpr std::uintptr_t Pointer_Mask = (std::numeric_limits<std::uintptr_t>::max() >> 16) - Bottom_Bits;
-static constexpr std::uintptr_t Version_Mask = ~Pointer_Mask;
-static constexpr std::uint32_t Max_Version_Mask = (std::numeric_limits<std::uint32_t>::max() >> (16 - 3));
-static constexpr std::uint32_t In_Range_Delta = Max_Version_Mask / 2;
+constexpr std::uintptr_t Bottom_Bits = ~(std::uintptr_t(std::numeric_limits<std::uintptr_t>::max()) << 3);
+constexpr std::uintptr_t Pointer_Mask = (std::numeric_limits<std::uintptr_t>::max() >> 16) - Bottom_Bits;
+constexpr std::uintptr_t Version_Mask = ~Pointer_Mask;
+constexpr std::uint32_t Max_Version = (std::numeric_limits<std::uint32_t>::max() >> (16 - 3));
+constexpr std::uint32_t In_Range_Delta = Max_Version / 2;
 
 enum exchange_link_result : std::uint8_t
 {
@@ -79,12 +79,12 @@ static std::uint8_t random_height(size_type);
 constexpr std::uint32_t version_delta(std::uint32_t from, std::uint32_t to)
 {
 	const std::uint32_t delta(to - from);
-	return delta & Max_Version_Mask;
+	return delta & Max_Version;
 }
 constexpr std::uint32_t version_add_one(std::uint32_t from)
 {
 	const std::uint32_t next(from + 1);
-	const std::uint32_t masked(next & Max_Version_Mask);
+	const std::uint32_t masked(next & Max_Version);
 	const std::uint32_t zeroAdjust(!(bool)masked);
 
 	return masked + zeroAdjust;
@@ -95,7 +95,7 @@ constexpr std::uint32_t version_sub_one(std::uint32_t from)
 	const std::uint32_t zeroAdjust(!(bool)next);
 	const std::uint32_t adjusted(next - zeroAdjust);
 
-	return adjusted & Max_Version_Mask;
+	return adjusted & Max_Version;
 }
 constexpr std::uint32_t version_step(std::uint32_t from, std::uint8_t step)
 {
@@ -192,7 +192,7 @@ struct node
 };
 }
 /// <summary>
-/// A concurrency safe priority queue based on skip list design
+/// A concurrency safe lock-free priority queue based on skip list design
 /// </summary>
 /// <param name="Key">Key type</param>
 /// <param name="Value">Value type</param>
@@ -217,20 +217,52 @@ public:
 	using comparator_type = Compare;
 	using allocator_type = Allocator;
 
+	/// <summary>
+	/// Constructor
+	/// </summary>
 	concurrent_priority_queue();
+
+	/// <summary>
+	/// Constructor
+	/// </summary>
+	/// <param name="alloc">Allocator passed to node pool</param>
 	concurrent_priority_queue(Allocator alloc);
+
+	/// <summary>
+	/// Destructor
+	/// </summary>
+	/// <returns></returns>
 	~concurrent_priority_queue() noexcept;
 
+	/// <summary>
+	/// Enqueue an item
+	/// </summary>
+	/// <param name="in">Item to be enqueued</param>
 	void push(const std::pair<Key, Value>& in);
+
+	/// <summary>
+	/// Enqueue an item
+	/// </summary>
+	/// <param name="in">Item to be enqueued using move semantics</param>
 	void push(std::pair<Key, Value>&& in);
 
+	/// <summary>
+	/// Attempt to dequeue the top item
+	/// </summary>
+	/// <param name="out">Item to be written. Will be remain unmodified in case of failure</param>
+	/// <returns>true on success, false otherwise</returns>
 	bool try_pop(std::pair<Key, Value>& out);
 
-
+	/// <summary>
+	/// Clear items from list
+	/// </summary>
 	void clear();
-	bool empty() const noexcept;
 
-	void unsafe_clear();
+	/// <summary>
+	/// Query for items
+	/// </summary>
+	/// <returns>True if any item is present</returns>
+	bool empty() const noexcept;
 
 	/// <summary>
 	/// Reset the internal node scratch pool. This must be done periodically.
@@ -243,6 +275,8 @@ private:
 	void push_internal(In&& in);
 	bool try_pop_internal(std::pair<Key, Value>& out);
 
+	void clear_internal();
+
 	using node_view = typename node_type::node_view;
 	using node_view_set = node_view[Link_Tower_Height];
 
@@ -254,7 +288,7 @@ private:
 
 	bool try_push(node_type* node);
 
-	bool try_delink_front(node_view_set& expectedFront, node_view_set& desiredFront, std::uint8_t versionOffset = 1);
+	bool try_delink_front(node_view_set& expectedFront, node_view_set& desiredFront, std::uint8_t versionOffset, std::uint8_t frontHeight);
 	bool try_replace_front(node_view_set& current, node_view_set& next, node_view node);
 
 	bool try_link_to_head(node_view_set& next, node_view node);
@@ -332,7 +366,7 @@ private:
 			}
 
 			std::atomic<node_view> m_topLayers[Link_Tower_Height - 1];
-			std::atomic<node_view> m_baseLayer;
+			alignas(64)std::atomic<node_view> m_baseLayer;
 		};
 
 
@@ -346,11 +380,12 @@ private:
 #else
 	concurrent_scratch_pool<node_type, Allocator> m_nodePool;
 #endif
-	faux_head_node m_head;
+	//alignas(64) faux_head_node m_head;
 
+	// Also end
 	node_type m_dummy;
 
-	compare_type m_comparator;
+	alignas(64) compare_type m_comparator;
 };
 template<class Key, class Value, typename cpq_detail::size_type TypicalSizeHint, class Compare, class Allocator>
 inline concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare, Allocator>::concurrent_priority_queue()
@@ -364,7 +399,7 @@ inline concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare, Allocator
 #else
 	: m_nodePool(TypicalSizeHint, alloc)
 #endif
-	, m_head()
+	//, m_head()
 	, m_dummy()
 {
 	m_dummy.m_kv.first = std::numeric_limits<key_type>::max();
@@ -455,12 +490,12 @@ inline bool concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare, Allo
 		node_view_set frontSet{};
 		node_view_set nextSet{};
 
-		const std::uint8_t claimHeight(frontNode->m_height);
+		const std::uint8_t frontHeight(frontNode->m_height);
 
 		frontSet[0] = frontNodeView;
 
-		load_set(frontSet, &GDUL_CPQ_HEAD_VAR, 1, claimHeight);
-		load_set(nextSet, frontNode, 0, claimHeight);
+		load_set(frontSet, &GDUL_CPQ_HEAD_VAR, 1, frontHeight);
+		load_set(nextSet, frontNode, 0, frontHeight);
 
 		flagResult = flag_node(frontSet[0], nextSet[0]);
 
@@ -473,7 +508,7 @@ inline bool concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare, Allo
 			continue;
 		}
 
-		deLinked = try_delink_front(frontSet, nextSet);
+		deLinked = try_delink_front(frontSet, nextSet, 1, frontHeight);
 
 		if (!deLinked && flagResult == cpq_detail::flag_node_success) {
 
@@ -507,6 +542,39 @@ inline bool concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare, Allo
 #endif
 
 	return true;
+}
+
+template<class Key, class Value, typename cpq_detail::size_type TypicalSizeHint, class Compare, class Allocator>
+inline void concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare, Allocator>::clear_internal()
+{
+	node_view_set frontSet{};
+	node_view_set nextSet{};
+
+	node_type* frontNode(nullptr);
+
+	do {
+		frontSet[0] = (GDUL_CPQ_HEAD_VAR.m_next[0].load(std::memory_order_seq_cst));
+		frontNode = frontSet[0];
+
+		if (at_end(frontNode)) {
+			return;
+		}
+
+		load_set(frontSet, &GDUL_CPQ_HEAD_VAR, 1);
+
+		std::fill(std::begin(nextSet), std::end(nextSet), &m_dummy);
+
+	} while (!try_delink_front(frontSet, nextSet, 1, Link_Tower_Height));
+
+
+#if defined ( GDUL_CPQ_GUARDED_POOL )
+	while (!at_end(frontNode)) {
+		node_type* const next(frontNode->m_next[0].load(std::memory_order_relaxed));
+		m_nodePool.recycle(frontNode);
+		frontNode = next;
+	}
+#endif
+
 }
 
 template<class Key, class Value, typename cpq_detail::size_type TypicalSizeHint, class Compare, class Allocator>
@@ -614,9 +682,8 @@ inline cpq_detail::flag_node_result concurrent_priority_queue<Key, Value, Typica
 }
 
 template<class Key, class Value, typename cpq_detail::size_type TypicalSizeHint, class Compare, class Allocator>
-inline bool concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare, Allocator>::try_delink_front(typename concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare, Allocator>::node_view_set& expectedFront, typename concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare, Allocator>::node_view_set& desiredFront, std::uint8_t versionOffset)
+inline bool concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare, Allocator>::try_delink_front(typename concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare, Allocator>::node_view_set& expectedFront, typename concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare, Allocator>::node_view_set& desiredFront, std::uint8_t versionOffset, std::uint8_t frontHeight)
 {
-	const std::uint8_t frontHeight(expectedFront[0].operator const node_type * ()->m_height);
 	const std::uint8_t numUpperLayers(frontHeight - 1);
 	const std::uint32_t baseLayerVersion(expectedFront[0].get_version());
 	const std::uint32_t upperLayerNextVersion(cpq_detail::version_add_one(baseLayerVersion));
@@ -650,9 +717,9 @@ inline void concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare, Allo
 {
 	std::pair<Key, Value> dump;
 #if defined GDUL_CPQ_GUARDED_POOL
-	while (m_nodePool.guard(&concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare, Allocator>::try_pop_internal, this, dump));
+	m_nodePool.guard(&concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare, Allocator>::clear_internal, this);
 #else
-	while (try_pop_internal(dump));
+	clear_internal();
 #endif
 
 #if defined (GDUL_CPQ_DEBUG)
@@ -666,6 +733,15 @@ inline void concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare, Allo
 template<class Key, class Value, typename cpq_detail::size_type TypicalSizeHint, class Compare, class Allocator>
 inline void concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare, Allocator>::unsafe_clear()
 {
+#if defined ( GDUL_CPQ_GUARDED_POOL )
+	node_type* front(GDUL_CPQ_HEAD_VAR.m_next[0].load(std::memory_order_relaxed));
+
+	while (!at_end(front)) {
+		m_nodePool.recycle(front);
+		front = front->m_next[0].load(std::memory_order_relaxed);
+	}
+#endif
+
 	for (size_type i = 0; i < Link_Tower_Height; ++i) {
 		GDUL_CPQ_HEAD_VAR.m_next[i].store(&m_dummy, std::memory_order_relaxed);
 	}
@@ -748,13 +824,15 @@ inline bool concurrent_priority_queue<Key, Value, TypicalSizeHint, Compare, Allo
 	const node_type* const toInsert(node);
 	const node_type* const currentFront(frontSet[0]);
 
-	if (toInsert->m_height < currentFront->m_height) {
-		load_set(frontSet, &GDUL_CPQ_HEAD_VAR, 1, currentFront->m_height);
+	const std::uint8_t frontHeight(currentFront->m_height);
+
+	if (toInsert->m_height < frontHeight) {
+		load_set(frontSet, &GDUL_CPQ_HEAD_VAR, 1, frontHeight);
 	}
 
-	load_set(nextSet, currentFront, 1, currentFront->m_height);
+	load_set(nextSet, currentFront, 1, frontHeight);
 
-	if (try_delink_front(frontSet, nextSet, 2)) {
+	if (try_delink_front(frontSet, nextSet, 2, frontHeight)) {
 
 		try_link_to_head_upper(frontSet, node, frontSet[0].get_version());
 
