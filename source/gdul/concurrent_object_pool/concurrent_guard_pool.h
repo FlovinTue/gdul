@@ -50,10 +50,11 @@ inline static size_type log2_align(size_type from, size_type clamp);
 
 }
 /// <summary>
-/// Concurrency safe, lock free object pool. 
+/// Concurrency safe, lock free object pool with an additional method of ensuring
+/// safe memory reclamation of shared-access objects.
 /// </summary>
 template <class T, class Allocator = gp_detail::defaul_allocator>
-class guarded_pool
+class concurrent_guard_pool
 {
 public:
 	using size_type = typename gp_detail::size_type;
@@ -64,30 +65,30 @@ public:
 	/// <summary>
 	/// constructor
 	/// </summary>
-	guarded_pool();
+	concurrent_guard_pool();
 	/// <summary>
 	/// constructor
 	/// </summary>
 	/// <param name="allocator">allocator to use</param>
-	guarded_pool(Allocator allocator);
+	concurrent_guard_pool(Allocator allocator);
 	/// <summary>
 	/// constructor
 	/// </summary>
 	/// <param name="baseCapacity">initial global cached items</param>
 	/// <param name="tlCacheSize">size of the thread local caches</param>
-	guarded_pool(size_type baseCapacity, size_type tlCacheSize);
+	concurrent_guard_pool(size_type baseCapacity, size_type tlCacheSize);
 	/// <summary>
 	/// constructor
 	/// </summary>
 	/// <param name="baseCapacity">initial global cached items</param>
 	/// <param name="tlCacheSize">size of the thread local caches</param>
 	/// <param name="allocator">allocator to use</param>
-	guarded_pool(size_type baseCapacity, size_type tlCacheSize, Allocator allocator);
+	concurrent_guard_pool(size_type baseCapacity, size_type tlCacheSize, Allocator allocator);
 
 	/// <summary>
 	/// destructor
 	/// </summary>
-	~guarded_pool();
+	~concurrent_guard_pool();
 
 	/// <summary>
 	/// fetch item
@@ -158,9 +159,6 @@ private:
 
 	void evaluate_caches_for_reclamation(tl_container& tl);
 
-	void submit_tl_cache_empty(tl_cache cache);
-	void submit_tl_cache_full(tl_cache cache);
-
 	tl_cache acquire_tl_cache_full();
 	tl_cache acquire_tl_cache_empty();
 
@@ -186,8 +184,8 @@ private:
 	std::array<user_index, gp_detail::Max_Users> m_indices;
 	tlm<tl_container, Allocator> t_tlContainer;
 
-	concurrent_queue<tl_cache, Allocator> m_fullCaches;
-	concurrent_queue<tl_cache, Allocator> m_emptyCaches;
+	alignas(64) concurrent_queue<tl_cache, Allocator> m_fullCaches;
+	alignas(64) concurrent_queue<tl_cache, Allocator> m_emptyCaches;
 
 	size_type m_tlCacheSize;
 
@@ -196,22 +194,22 @@ private:
 	std::atomic<std::uint8_t> m_blocksEndIndex;
 };
 template<class T, class Allocator>
-inline guarded_pool<T, Allocator>::guarded_pool()
-	: guarded_pool(gp_detail::Defaul_Block_Size, gp_detail::Defaul_Tl_Cache_Size, Allocator())
+inline concurrent_guard_pool<T, Allocator>::concurrent_guard_pool()
+	: concurrent_guard_pool(gp_detail::Defaul_Block_Size, gp_detail::Defaul_Tl_Cache_Size, Allocator())
 {
 }
 template<class T, class Allocator>
-inline guarded_pool<T, Allocator>::guarded_pool(Allocator allocator)
-	: guarded_pool(gp_detail::Defaul_Block_Size, gp_detail::Defaul_Tl_Cache_Size, allocator)
+inline concurrent_guard_pool<T, Allocator>::concurrent_guard_pool(Allocator allocator)
+	: concurrent_guard_pool(gp_detail::Defaul_Block_Size, gp_detail::Defaul_Tl_Cache_Size, allocator)
 {
 }
 template<class T, class Allocator>
-inline guarded_pool<T, Allocator>::guarded_pool(typename guarded_pool<T, Allocator>::size_type baseCapacity, size_type tlCacheSize)
-	: guarded_pool(baseCapacity, tlCacheSize, Allocator())
+inline concurrent_guard_pool<T, Allocator>::concurrent_guard_pool(typename concurrent_guard_pool<T, Allocator>::size_type baseCapacity, size_type tlCacheSize)
+	: concurrent_guard_pool(baseCapacity, tlCacheSize, Allocator())
 {
 }
 template<class T, class Allocator>
-inline guarded_pool<T, Allocator>::guarded_pool(typename guarded_pool<T, Allocator>::size_type baseCapacity, size_type tlCacheSize, Allocator allocator)
+inline concurrent_guard_pool<T, Allocator>::concurrent_guard_pool(typename concurrent_guard_pool<T, Allocator>::size_type baseCapacity, size_type tlCacheSize, Allocator allocator)
 	: m_indexPool()
 	, m_blocks{}
 	, m_indices{}
@@ -235,13 +233,13 @@ inline guarded_pool<T, Allocator>::guarded_pool(typename guarded_pool<T, Allocat
 	try_alloc_block(blockIndex);
 }
 template<class T, class Allocator>
-inline guarded_pool<T, Allocator>::~guarded_pool()
+inline concurrent_guard_pool<T, Allocator>::~concurrent_guard_pool()
 {
 	unsafe_reset();
 }
 
 template<class T, class Allocator>
-inline T* guarded_pool<T, Allocator>::get()
+inline T* concurrent_guard_pool<T, Allocator>::get()
 {
 	T* ret;
 
@@ -260,7 +258,7 @@ inline T* guarded_pool<T, Allocator>::get()
 }
 
 template<class T, class Allocator>
-inline void guarded_pool<T, Allocator>::recycle(T* item)
+inline void concurrent_guard_pool<T, Allocator>::recycle(T* item)
 {
 	if (is_up_to_date(item)) {
 		tl_container& tl(t_tlContainer);
@@ -273,7 +271,7 @@ inline void guarded_pool<T, Allocator>::recycle(T* item)
 
 template<class T, class Allocator>
 template<class Fn, class ...Args>
-inline std::invoke_result_t<Fn, Args...> guarded_pool<T, Allocator>::guard(Fn f, Args && ...args)
+inline std::invoke_result_t<Fn, Args...> concurrent_guard_pool<T, Allocator>::guard(Fn f, Args && ...args)
 {
 	tl_container& tl(t_tlContainer);
 	size_type userIndex(tl.m_userIndex);
@@ -289,7 +287,7 @@ inline std::invoke_result_t<Fn, Args...> guarded_pool<T, Allocator>::guard(Fn f,
 }
 
 template<class T, class Allocator>
-inline void guarded_pool<T, Allocator>::unsafe_reset()
+inline void concurrent_guard_pool<T, Allocator>::unsafe_reset()
 {
 	const std::uint8_t blockCount(m_blocksEndIndex.exchange(0, std::memory_order_relaxed));
 	for (std::uint8_t i = 0; i < blockCount; ++i) {
@@ -305,7 +303,7 @@ inline void guarded_pool<T, Allocator>::unsafe_reset()
 
 // Look at up_to_date.. Make foolproof.
 template<class T, class Allocator>
-inline bool guarded_pool<T, Allocator>::is_up_to_date(const T* item) const
+inline bool concurrent_guard_pool<T, Allocator>::is_up_to_date(const T* item) const
 {
 	assert(m_blocksEndIndex.load() != 0 && "Expected to find value, is pool initialized?");
 
@@ -322,7 +320,7 @@ inline bool guarded_pool<T, Allocator>::is_up_to_date(const T* item) const
 	return false;
 }
 template<class T, class Allocator>
-inline void guarded_pool<T, Allocator>::add_to_tl_deferred_reclaim_cache(T* item, tl_container& tl)
+inline void concurrent_guard_pool<T, Allocator>::add_to_tl_deferred_reclaim_cache(T* item, tl_container& tl)
 {
 	size_type reclaimIndex(tl.m_reclaimCacheIndex++);
 
@@ -338,7 +336,7 @@ inline void guarded_pool<T, Allocator>::add_to_tl_deferred_reclaim_cache(T* item
 	tl.m_deferredReclaimCache[reclaimIndex] = item;
 }
 template<class T, class Allocator>
-inline void guarded_pool<T, Allocator>::evaluate_caches_for_reclamation(tl_container& tl)
+inline void concurrent_guard_pool<T, Allocator>::evaluate_caches_for_reclamation(tl_container& tl)
 {
 	const std::pair<size_type, size_type> accessMasks(update_index_cache(tl));
 
@@ -359,7 +357,7 @@ inline void guarded_pool<T, Allocator>::evaluate_caches_for_reclamation(tl_conta
 	}
 }
 template<class T, class Allocator>
-inline typename guarded_pool<T, Allocator>::tl_cache guarded_pool<T, Allocator>::acquire_tl_cache_full()
+inline typename concurrent_guard_pool<T, Allocator>::tl_cache concurrent_guard_pool<T, Allocator>::acquire_tl_cache_full()
 {
 	tl_cache ret(nullptr);
 
@@ -374,7 +372,7 @@ inline typename guarded_pool<T, Allocator>::tl_cache guarded_pool<T, Allocator>:
 	return ret;
 }
 template<class T, class Allocator>
-inline typename guarded_pool<T, Allocator>::tl_cache guarded_pool<T, Allocator>::acquire_tl_cache_empty()
+inline typename concurrent_guard_pool<T, Allocator>::tl_cache concurrent_guard_pool<T, Allocator>::acquire_tl_cache_empty()
 {
 	tl_cache result;
 
@@ -385,7 +383,7 @@ inline typename guarded_pool<T, Allocator>::tl_cache guarded_pool<T, Allocator>:
 	return result;
 }
 template<class T, class Allocator>
-inline bool guarded_pool<T, Allocator>::fetch_from_tl_cache(T*& outItem)
+inline bool concurrent_guard_pool<T, Allocator>::fetch_from_tl_cache(T*& outItem)
 {
 	tl_container& tl(t_tlContainer);
 
@@ -400,7 +398,7 @@ inline bool guarded_pool<T, Allocator>::fetch_from_tl_cache(T*& outItem)
 	return true;
 }
 template<class T, class Allocator>
-inline std::pair<typename guarded_pool<T, Allocator>::size_type, typename guarded_pool<T, Allocator>::size_type> guarded_pool<T, Allocator>::update_index_cache(tl_container& tl)
+inline std::pair<typename concurrent_guard_pool<T, Allocator>::size_type, typename concurrent_guard_pool<T, Allocator>::size_type> concurrent_guard_pool<T, Allocator>::update_index_cache(tl_container& tl)
 {
 	std::pair<size_type, size_type> masks{};
 
@@ -427,14 +425,14 @@ inline std::pair<typename guarded_pool<T, Allocator>::size_type, typename guarde
 	return masks;
 }
 template<class T, class Allocator>
-inline bool guarded_pool<T, Allocator>::is_contained_within(const T* item, std::uintptr_t blockKey)
+inline bool concurrent_guard_pool<T, Allocator>::is_contained_within(const T* item, std::uintptr_t blockKey)
 {
 	const T* const begin(to_begin(blockKey));
 
 	return !(item < begin) && (item < (begin + to_capacity(blockKey)));
 }
 template<class T, class Allocator>
-inline typename guarded_pool<T, Allocator>::size_type guarded_pool<T, Allocator>::to_capacity(std::uintptr_t blockKey)
+inline typename concurrent_guard_pool<T, Allocator>::size_type concurrent_guard_pool<T, Allocator>::to_capacity(std::uintptr_t blockKey)
 {
 	constexpr std::uintptr_t toShift(64 - Capacity_Bits);
 	const std::uintptr_t capacity(blockKey >> toShift);
@@ -442,7 +440,7 @@ inline typename guarded_pool<T, Allocator>::size_type guarded_pool<T, Allocator>
 	return (size_type)capacity;
 }
 template<class T, class Allocator>
-inline const T* guarded_pool<T, Allocator>::to_begin(std::uintptr_t blockKey)
+inline const T* concurrent_guard_pool<T, Allocator>::to_begin(std::uintptr_t blockKey)
 {
 	const std::uintptr_t noCapacity(blockKey << Capacity_Bits);
 	const std::uintptr_t ptrBlock(noCapacity >> 16);
@@ -450,7 +448,7 @@ inline const T* guarded_pool<T, Allocator>::to_begin(std::uintptr_t blockKey)
 	return (const T*)ptrBlock;
 }
 template<class T, class Allocator>
-inline std::uintptr_t guarded_pool<T, Allocator>::to_block_key(const T* begin, size_type capacity)
+inline std::uintptr_t concurrent_guard_pool<T, Allocator>::to_block_key(const T* begin, size_type capacity)
 {
 	constexpr std::uintptr_t toShift((sizeof(std::uintptr_t) * 8) - Capacity_Bits);
 	const std::uintptr_t capacityBase(capacity);
@@ -462,7 +460,7 @@ inline std::uintptr_t guarded_pool<T, Allocator>::to_block_key(const T* begin, s
 	return blockKey;
 }
 template<class T, class Allocator>
-inline void guarded_pool<T, Allocator>::discard_item(const T* item)
+inline void concurrent_guard_pool<T, Allocator>::discard_item(const T* item)
 {
 	const std::uint8_t blockCount(m_blocksEndIndex.load(std::memory_order_acquire));
 
@@ -477,7 +475,7 @@ inline void guarded_pool<T, Allocator>::discard_item(const T* item)
 	assert(false && "Item does not belong in this structure");
 }
 template<class T, class Allocator>
-inline void guarded_pool<T, Allocator>::try_alloc_block(std::uint8_t blockIndex)
+inline void concurrent_guard_pool<T, Allocator>::try_alloc_block(std::uint8_t blockIndex)
 {
 	assert((blockIndex < Capacity_Bits) && "Capacity overflow");
 

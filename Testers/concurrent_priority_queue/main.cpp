@@ -1,6 +1,6 @@
 // concurrent_priority_queue.cpp : This file contains the 'main' function. Program execution begins and ends there.
 //
-#include <gdul/WIP_concurrent_priority_queue/concurrent_priority_queue_v15.h>
+#include <gdul/WIP_concurrent_priority_queue/concurrent_priority_queue_v16.h>
 
 #define GDUL_CPQ
 //#define MS_CPQ
@@ -15,7 +15,8 @@ std::mt19937 rng(rd());
 
 int main()
 {
-	gdul::concurrent_priority_queue<int, float, 8> q;
+	std::allocator<std::uint8_t> alloc;
+	gdul::concurrent_priority_queue<int, float, 8> q(alloc);
 
 	std::pair<int, float> two	(std::make_pair(2, 1.f));
 	std::pair<int, float> six	(std::make_pair(6, 1.f));

@@ -15,16 +15,42 @@ using size_type = std::size_t;
 static constexpr size_type Tl_Cache_Size = 32;
 }
 
-template <class T, class Allocator = std::allocator<T>>
+/// <summary>
+/// Concurrency safe lock-free scratch pool for efficient object reuse
+/// </summary>
+template <class T, class Allocator = std::allocator<std::uint8_t>>
 class concurrent_scratch_pool
 {
 public:
 	using size_type = typename csp_detail::size_type;
 
+	/// <summary>
+	/// Constructor
+	/// </summary>
 	concurrent_scratch_pool();
+
+	/// <summary>
+	/// Constructor
+	/// </summary>
+	/// <param name="alloc">Allocator to use for blocks</param>
 	concurrent_scratch_pool(Allocator alloc);
-	concurrent_scratch_pool(size_type initialPoolSize);
-	concurrent_scratch_pool(size_type initialPoolSize, Allocator alloc);
+
+	/// <summary>
+	/// Constructor
+	/// </summary>
+	/// <param name="InitialScratchSize">Initial size of the scratch block</param>
+	concurrent_scratch_pool(size_type InitialScratchSize);
+
+	/// <summary>
+	/// Constructor
+	/// </summary>
+	/// <param name="InitialScratchSize">Initial size of the scratch block</param>
+	/// <param name="alloc">Allocator to use for blocks</param>
+	concurrent_scratch_pool(size_type InitialScratchSize, Allocator alloc);
+
+	/// <summary>
+	/// Destructor
+	/// </summary>
 	~concurrent_scratch_pool();
 
 	/// <summary>
@@ -34,12 +60,12 @@ public:
 	T* get();
 
 	/// <summary>
-	/// Assumes no outstanding references to objects as well as no concurrent access
+	/// Resets the scratch block for reuse. Assumes no outstanding item references and 
+	/// exclusive access
 	/// </summary>
 	void unsafe_reset();
 
 private:
-
 	struct excess_block
 	{
 		shared_ptr<T[]> m_items;
@@ -54,15 +80,15 @@ private:
 	};
 	void destroy_excess();
 
-	void reset_tl(tl_container& tl);
+	void reset_tl_container(tl_container& tl);
 	void reset_tl_scratch(tl_container& tl);
 
-	T* acquire_tl_scratch(size_type atIndex);
+	T* acquire_tl_scratch();
 
 	struct /* anonymous struct */ alignas(std::hardware_destructive_interference_size) 
 	{
-		std::atomic<size_type> m_indexClaim;
 		atomic_shared_ptr<excess_block> m_excessBlocks;
+		std::atomic<size_type> m_indexClaim;
 	};
 
 	tlm<tl_container> t_details;
@@ -87,15 +113,15 @@ inline concurrent_scratch_pool<T, Allocator>::concurrent_scratch_pool(Allocator 
 }
 
 template<class T, class Allocator>
-inline concurrent_scratch_pool<T, Allocator>::concurrent_scratch_pool(size_type initialPoolSize)
-	: concurrent_scratch_pool(initialPoolSize, Allocator())
+inline concurrent_scratch_pool<T, Allocator>::concurrent_scratch_pool(size_type InitialScratchSize)
+	: concurrent_scratch_pool(InitialScratchSize, Allocator())
 {
 }
 
 template<class T, class Allocator>
-inline concurrent_scratch_pool<T, Allocator>::concurrent_scratch_pool(size_type initialPoolSize, Allocator alloc)
+inline concurrent_scratch_pool<T, Allocator>::concurrent_scratch_pool(size_type InitialScratchSize, Allocator alloc)
 	: t_details(tl_container{ 0, 0, nullptr }, alloc)
-	, m_block(allocate_shared<T[]>(((initialPoolSize / csp_detail::Tl_Cache_Size + ((bool)(initialPoolSize % csp_detail::Tl_Cache_Size)))* csp_detail::Tl_Cache_Size /* align value to Tl_Cache_Size */), alloc))
+	, m_block(allocate_shared<T[]>(((InitialScratchSize / csp_detail::Tl_Cache_Size + ((bool)(InitialScratchSize % csp_detail::Tl_Cache_Size)))* csp_detail::Tl_Cache_Size /* align value to Tl_Cache_Size */), alloc))
 	, m_iteration(1)
 	, m_allocator(alloc)
 {
@@ -113,7 +139,7 @@ inline T* concurrent_scratch_pool<T, Allocator>::get()
 	tl_container& tl(t_details);
 
 	if (tl.iteration < m_iteration) {
-		reset_tl(tl);
+		reset_tl_container(tl);
 
 		return &tl.localScratch[tl.localScratchIndex++];
 	}
@@ -149,7 +175,7 @@ inline void concurrent_scratch_pool<T, Allocator>::destroy_excess()
 }
 
 template<class T, class Allocator>
-inline void concurrent_scratch_pool<T, Allocator>::reset_tl(tl_container& tl)
+inline void concurrent_scratch_pool<T, Allocator>::reset_tl_container(tl_container& tl)
 {
 	tl.iteration = m_iteration;
 	reset_tl_scratch(tl);
@@ -159,14 +185,16 @@ template<class T, class Allocator>
 inline void concurrent_scratch_pool<T, Allocator>::reset_tl_scratch(tl_container& tl)
 {
 	tl.localScratchIndex = 0;
-	tl.localScratch = acquire_tl_scratch(m_indexClaim.fetch_add(csp_detail::Tl_Cache_Size));
+	tl.localScratch = acquire_tl_scratch();
 }
 
 template<class T, class Allocator>
-inline T* concurrent_scratch_pool<T, Allocator>::acquire_tl_scratch(size_type atIndex)
+inline T* concurrent_scratch_pool<T, Allocator>::acquire_tl_scratch()
 {
-	if (atIndex < m_block.item_count()) {
-		return &m_block[atIndex];
+	const size_type index(m_indexClaim.fetch_add(csp_detail::Tl_Cache_Size, std::memory_order_relaxed));
+
+	if (index < m_block.item_count()) {
+		return &m_block[index];
 	}
 
 	shared_ptr<excess_block> node(gdul::allocate_shared<excess_block>(m_allocator));
@@ -174,11 +202,11 @@ inline T* concurrent_scratch_pool<T, Allocator>::acquire_tl_scratch(size_type at
 
 	T* const ret(node->m_items.get());
 
-	shared_ptr<excess_block> expected(m_excessBlocks.load());
+	shared_ptr<excess_block> expected(m_excessBlocks.load(std::memory_order_relaxed));
 
 	do {
 		node->m_next = expected;
-	} while (!m_excessBlocks.compare_exchange_strong(expected, std::move(node)));
+	} while (!m_excessBlocks.compare_exchange_strong(expected, std::move(node), std::memory_order_relaxed));
 
 	return ret;
 }
