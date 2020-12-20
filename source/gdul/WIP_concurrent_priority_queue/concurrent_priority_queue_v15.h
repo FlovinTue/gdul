@@ -5,7 +5,7 @@
 #include <memory>
 #include <random>
 #include <gdul/WIP_concurrent_priority_queue/concurrent_scratch_pool.h>
-#include <gdul/concurrent_object_pool/guarded_pool.h>
+#include <gdul/memory/concurrent_guard_pool.h>
 
 //#define GDUL_CPQ_DEBUG
 #if defined GDUL_CPQ_DEBUG

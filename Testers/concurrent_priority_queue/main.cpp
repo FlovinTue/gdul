@@ -16,7 +16,7 @@ std::mt19937 rng(rd());
 int main()
 {
 	std::allocator<std::uint8_t> alloc;
-	gdul::concurrent_priority_queue<int, float, 8> q(alloc);
+	gdul::concurrent_priority_queue<int, float> q(alloc);
 
 	std::pair<int, float> two	(std::make_pair(2, 1.f));
 	std::pair<int, float> six	(std::make_pair(6, 1.f));

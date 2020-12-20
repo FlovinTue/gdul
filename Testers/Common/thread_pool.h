@@ -25,6 +25,8 @@ public:
 	void decommission();
 
 	bool has_unfinished_tasks() const;
+
+	std::size_t worker_count() const;
 private:
 	void idle(std::uint64_t affinityMask);
 
@@ -74,7 +76,10 @@ void thread_pool::decommission()
 
 	m_threads.clear();
 }
-
+std::size_t thread_pool::worker_count() const
+{
+	return m_threads.size();
+}
 bool thread_pool::has_unfinished_tasks() const
 {
 	return 0 < m_taskCounter.load(std::memory_order_acquire);
@@ -89,7 +94,7 @@ void thread_pool::idle(std::uint64_t affinityMask)
 	} while (!result);
 
 
-	while (m_inCommission.load(std::memory_order_relaxed) | (0 < m_taskCounter.load(std::memory_order_acquire)))
+	while (m_inCommission.load(std::memory_order_relaxed) || (0 < m_taskCounter.load(std::memory_order_acquire)))
 	{
 		std::function<void()> task;
 		if (m_taskQueue.try_pop(task))

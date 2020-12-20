@@ -18,7 +18,6 @@ template <class T>
 struct reference_comparison
 {
 	T* m_ptr;
-	uint8_t trash[sizeof(atomic_shared_ptr<int>) - 8];
 };
 
 template <class T>
@@ -84,13 +83,13 @@ struct mutexed_wrapper
 };
 
 
-template <class T, std::uint32_t ArraySize, std::uint32_t NumThreads>
-class tester
+template <class T, std::uint32_t ArraySize>
+class asp_tester
 {
 public:
 	template <class ...InitArgs>
-	tester(bool doInitArray = true, InitArgs && ...args);
-	~tester();
+	asp_tester(bool doInitArray = true, InitArgs && ...args);
+	~asp_tester();
 
 	float execute(std::uint32_t passes, bool doAssign = true, bool doReassign = true, bool doCasTest = true, bool doRefTest = true, bool testAba = true);
 
@@ -127,7 +126,7 @@ public:
 	mutexed_wrapper<T> m_testArray[ArraySize];
 #else
 	atomic_shared_ptr<T> m_testArray[ArraySize];
-	reference_comparison<T> m_referenceComparison[ArraySize];
+	reference_comparison<T> m_referenceComparison[ArraySize]{};
 #endif
 	std::atomic_bool m_workBlock;
 
@@ -136,17 +135,14 @@ public:
 	std::random_device m_rd;
 	std::mt19937 m_rng;
 };
-template <class T, std::uint32_t ArraySize, std::uint32_t NumThreads>
-thread_local std::queue<shared_ptr<typename tester<T, ArraySize, NumThreads>::aba_node>> tester<T, ArraySize, NumThreads>::m_abaStorage;
+template <class T, std::uint32_t ArraySize>
+thread_local std::queue<shared_ptr<typename asp_tester<T, ArraySize>::aba_node>> asp_tester<T, ArraySize>::m_abaStorage;
 
-template<class T, std::uint32_t ArraySize, std::uint32_t NumThreads>
+template<class T, std::uint32_t ArraySize>
 template<class ...InitArgs>
-inline tester<T, ArraySize, NumThreads>::tester(bool doInitArray, InitArgs && ...args)
-	: m_worker(NumThreads)
+inline asp_tester<T, ArraySize>::asp_tester(bool doInitArray, InitArgs && ...args)
+	: m_worker(std::numeric_limits<std::uint8_t>::max())
 	, m_rng(m_rd())
-#ifndef ASP_MUTEX_COMPARE
-	, m_referenceComparison{ nullptr }
-#endif
 {
 	if (doInitArray) {
 		for (std::uint32_t i = 0; i < ArraySize; ++i) {
@@ -160,8 +156,8 @@ inline tester<T, ArraySize, NumThreads>::tester(bool doInitArray, InitArgs && ..
 	}
 }
 
-template<class T, std::uint32_t ArraySize, std::uint32_t NumThreads>
-inline tester<T, ArraySize, NumThreads>::~tester()
+template<class T, std::uint32_t ArraySize>
+inline asp_tester<T, ArraySize>::~asp_tester()
 {
 #ifndef ASP_MUTEX_COMPARE
 	for (std::uint32_t i = 0; i < ArraySize; ++i) {
@@ -170,12 +166,12 @@ inline tester<T, ArraySize, NumThreads>::~tester()
 #endif
 }
 
-template<class T, std::uint32_t ArraySize, std::uint32_t NumThreads>
-inline float tester<T, ArraySize, NumThreads>::execute(std::uint32_t passes, bool doAssign, bool doReassign, bool doCasTest, bool doRefTest, bool testAba)
+template<class T, std::uint32_t ArraySize>
+inline float asp_tester<T, ArraySize>::execute(std::uint32_t passes, bool doAssign, bool doReassign, bool doCasTest, bool doRefTest, bool testAba)
 {
 	m_workBlock.store(false);
 
-	for (std::uint32_t thread = 0; thread < NumThreads; ++thread) {
+	for (std::uint32_t thread = 0; thread < m_worker.worker_count(); ++thread) {
 		if (doAssign) {
 			m_worker.add_task([this, passes]() { work_assign(passes); });
 		}
@@ -208,8 +204,8 @@ inline float tester<T, ArraySize, NumThreads>::execute(std::uint32_t passes, boo
 	return time.get();
 }
 
-template<class T, std::uint32_t ArraySize, std::uint32_t NumThreads>
-inline void tester<T, ArraySize, NumThreads>::work_assign(std::uint32_t passes)
+template<class T, std::uint32_t ArraySize>
+inline void asp_tester<T, ArraySize>::work_assign(std::uint32_t passes)
 {
 	while (!m_workBlock) {
 		std::this_thread::yield();
@@ -227,8 +223,8 @@ inline void tester<T, ArraySize, NumThreads>::work_assign(std::uint32_t passes)
 	}
 }
 
-template<class T, std::uint32_t ArraySize, std::uint32_t NumThreads>
-inline void tester<T, ArraySize, NumThreads>::work_reassign(std::uint32_t passes)
+template<class T, std::uint32_t ArraySize>
+inline void asp_tester<T, ArraySize>::work_reassign(std::uint32_t passes)
 {
 	while (!m_workBlock) {
 		std::this_thread::yield();
@@ -245,8 +241,8 @@ inline void tester<T, ArraySize, NumThreads>::work_reassign(std::uint32_t passes
 	}
 
 }
-template<class T, std::uint32_t ArraySize, std::uint32_t NumThreads>
-inline void tester<T, ArraySize, NumThreads>::work_reference_test(std::uint32_t passes)
+template<class T, std::uint32_t ArraySize>
+inline void asp_tester<T, ArraySize>::work_reference_test(std::uint32_t passes)
 {
 #ifndef ASP_MUTEX_COMPARE
 	while (!m_workBlock) {
@@ -267,8 +263,8 @@ inline void tester<T, ArraySize, NumThreads>::work_reference_test(std::uint32_t 
 #endif
 }
 
-template<class T, std::uint32_t ArraySize, std::uint32_t NumThreads>
-inline void tester<T, ArraySize, NumThreads>::work_cas(std::uint32_t passes)
+template<class T, std::uint32_t ArraySize>
+inline void asp_tester<T, ArraySize>::work_cas(std::uint32_t passes)
 {
 
 	while (!m_workBlock) {
@@ -307,8 +303,8 @@ inline void tester<T, ArraySize, NumThreads>::work_cas(std::uint32_t passes)
 	m_summary += localSum;
 }
 
-template<class T, std::uint32_t ArraySize, std::uint32_t NumThreads>
-inline void tester<T, ArraySize, NumThreads>::work_aba(std::uint32_t passes)
+template<class T, std::uint32_t ArraySize>
+inline void asp_tester<T, ArraySize>::work_aba(std::uint32_t passes)
 {
 	for (std::uint32_t i = 0; i < passes; ++i)
 	{
@@ -316,8 +312,8 @@ inline void tester<T, ArraySize, NumThreads>::work_aba(std::uint32_t passes)
 		aba_release();
 	}
 }
-template<class T, std::uint32_t ArraySize, std::uint32_t NumThreads>
-inline void tester<T, ArraySize, NumThreads>::aba_claim()
+template<class T, std::uint32_t ArraySize>
+inline void asp_tester<T, ArraySize>::aba_claim()
 {
 	shared_ptr<aba_node> top(m_topAba.load(std::memory_order_relaxed));
 	while (top)
@@ -336,8 +332,8 @@ inline void tester<T, ArraySize, NumThreads>::aba_claim()
 	m_abaStorage.push(gdul::allocate_shared<aba_node>(tracking_allocator<aba_node>()));
 }
 
-template<class T, std::uint32_t ArraySize, std::uint32_t NumThreads>
-inline void tester<T, ArraySize, NumThreads>::aba_release()
+template<class T, std::uint32_t ArraySize>
+inline void asp_tester<T, ArraySize>::aba_release()
 {
 	shared_ptr<aba_node> toRelease(nullptr);
 
@@ -351,8 +347,8 @@ inline void tester<T, ArraySize, NumThreads>::aba_release()
 		toRelease->m_next.store(top);
 	} while (!m_topAba.compare_exchange_strong(top, std::move(toRelease)));
 }
-template<class T, std::uint32_t ArraySize, std::uint32_t NumThreads>
-inline void tester<T, ArraySize, NumThreads>::check_pointers() const
+template<class T, std::uint32_t ArraySize>
+inline void asp_tester<T, ArraySize>::check_pointers() const
 {
 #ifndef ASP_MUTEX_COMPARE
 	//uint32_t count(0);

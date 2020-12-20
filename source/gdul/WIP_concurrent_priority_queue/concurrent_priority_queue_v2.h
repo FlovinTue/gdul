@@ -22,7 +22,7 @@
 
 #include <atomic>
 #include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
-#include <gdul/pool_allocator/pool_allocator.h>
+#include <gdul/memory/pool_allocator.h>
 #include <random>
 
 #ifndef MAKE_UNIQUE_NAME 

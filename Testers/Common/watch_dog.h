@@ -52,7 +52,7 @@ inline watch_dog_impl<T>::~watch_dog_impl()
 template<class T>
 inline void watch_dog_impl<T>::give_instruction(std::uint32_t sleepFor, std::function<void()> whenWoken)
 {
-	std::unique_lock lock(m_mtx);
+	std::unique_lock<std::mutex> lock(m_mtx);
 
 	m_whenWoken = whenWoken;
 	m_threshHold = sleepFor;
@@ -84,7 +84,7 @@ inline void watch_dog_impl<T>::guard()
 		bool continueSleep(0);
 
 		{
-			std::unique_lock lock(m_mtx);
+			std::unique_lock<std::mutex> lock(m_mtx);
 
 			if ((get_ms() - m_lastPet) < m_threshHold) {
 				continueSleep = true;

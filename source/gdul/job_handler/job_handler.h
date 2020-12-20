@@ -25,7 +25,7 @@
 #include <gdul/job_handler/batch_job_impl.h>
 #include <gdul/job_handler/batch_job.h>
 #include <gdul/delegate/delegate.h>
-#include <gdul/pool_allocator/pool_allocator.h>
+#include <gdul/memory/pool_allocator.h>
 
 #pragma once
 

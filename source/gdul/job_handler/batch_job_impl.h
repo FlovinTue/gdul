@@ -27,6 +27,7 @@
 #include <array>
 #include <cassert>
 #include <algorithm>
+#include <cmath>
 
 #if defined(GDUL_JOB_DEBUG)
 #include <gdul/job_handler/debug/job_tracker.h>
@@ -136,7 +137,7 @@ private:
 	GDUL_JOB_DEBUG_CONDTIONAL(timer m_completionTimer)
 	GDUL_JOB_DEBUG_CONDTIONAL(timer m_enqueueTimer)
 
-	std::array<std::uint32_t, Batch_Job_Max_Batches> m_batchTracker;
+	std::array<std::uint32_t, Batch_Job_Max_Slices> m_batchTracker;
 
 	process_type m_process;
 	delegate<void(std::size_t)> m_outputResizeFunc;
@@ -209,7 +210,7 @@ inline std::uint32_t batch_job_impl<InContainer, OutContainer, Process>::clamp_b
 {
 	const std::size_t resultantBatchCount(container_size(m_input) / desired + ((bool)(container_size(m_input) % desired)));
 	const float resultF((float)resultantBatchCount);
-	const float maxBatchCount((float)Batch_Job_Max_Batches);
+	const float maxBatchCount((float)Batch_Job_Max_Slices);
 
 	const float div(resultF / maxBatchCount);
 

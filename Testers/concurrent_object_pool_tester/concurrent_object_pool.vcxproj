@@ -16,6 +16,7 @@
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>gdul</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <ProjectName>memory</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
@@ -90,9 +91,10 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\source\gdul\concurrent_object_pool\concurrent_guard_pool.h" />
-    <ClInclude Include="..\..\source\gdul\concurrent_object_pool\concurrent_object_pool.h" />
-    <ClInclude Include="..\..\source\gdul\concurrent_object_pool\concurrent_scratch_pool.h" />
+    <ClInclude Include="..\..\source\gdul\memory\concurrent_guard_pool.h" />
+    <ClInclude Include="..\..\source\gdul\memory\concurrent_object_pool.h" />
+    <ClInclude Include="..\..\source\gdul\memory\concurrent_scratch_pool.h" />
+    <ClInclude Include="..\..\source\gdul\memory\pool_allocator.h" />
     <ClInclude Include="pch.h" />
   </ItemGroup>
   <ItemGroup>
