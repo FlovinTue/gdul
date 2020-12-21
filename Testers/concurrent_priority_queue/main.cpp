@@ -17,7 +17,7 @@ int main()
 {
 	std::allocator<std::uint8_t> alloc;
 	gdul::concurrent_priority_queue<int, float> q(alloc);
-
+	
 	std::pair<int, float> two	(std::make_pair(2, 1.f));
 	std::pair<int, float> six	(std::make_pair(6, 1.f));
 	std::pair<int, float> three	(std::make_pair(3, 1.f));
@@ -54,7 +54,7 @@ int main()
 	const bool result9(q.try_pop(outsix));
 	const bool result10(q.try_pop(outsix));
 
-	q.unsafe_reset_scratch_pool();
+	//q.unsafe_reset_scratch_pool();
 
 	std::pair<int, float> outFail;
 
@@ -73,6 +73,11 @@ int main()
 		1000000, 
 		gdul::tracking_allocator<std::pair<int, float>>());
 
+
+	gdul::concurrent_priority_queue<int, float, 512, gdul::cpq_allocation_strategy_scratch<std::allocator<std::uint8_t>>> compTest;
+	compTest.push(one);
+	compTest.try_pop(outone);
+	compTest.unsafe_reset();
 }
 
 // Run program: Ctrl + F5 or Debug > Start Without Debugging menu

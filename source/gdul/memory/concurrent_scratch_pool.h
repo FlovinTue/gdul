@@ -34,7 +34,7 @@ namespace gdul {
 namespace csp_detail {
 using size_type = std::size_t;
 
-inline size_type pow2_align(size_type from, size_type clamp = std::numeric_limits<size_type>::max());
+static inline size_type pow2_align(size_type from, size_type clamp = std::numeric_limits<size_type>::max());
 
 static constexpr size_type Default_Scratch_Size = 128;
 static constexpr size_type Default_Tl_Cache_Size = 32;

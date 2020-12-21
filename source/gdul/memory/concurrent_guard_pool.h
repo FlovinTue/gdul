@@ -44,12 +44,12 @@ namespace cgp_detail {
 using size_type = std::uint32_t;
 using defaul_allocator = std::allocator<std::uint8_t>;
 
-constexpr size_type Defaul_Block_Size = 16;
-constexpr size_type Defaul_Tl_Cache_Size = 4;
-constexpr size_type Max_Users = 16;
-constexpr std::uint8_t Capacity_Bits = 19;
+static constexpr size_type Defaul_Block_Size = 16;
+static constexpr size_type Defaul_Tl_Cache_Size = 4;
+static constexpr size_type Max_Users = 16;
+static constexpr std::uint8_t Capacity_Bits = 19;
 
-inline static size_type pow2_align(size_type from, size_type clamp);
+static inline size_type pow2_align(size_type from, size_type clamp);
 
 struct critical_sec;
 

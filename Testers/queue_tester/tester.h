@@ -285,7 +285,7 @@ inline double tester<T, Allocator>::ExecuteMPMC(std::uint32_t runs) {
 #endif
 
 #if defined GDUL_CPQ
-		m_queue.unsafe_reset_scratch_pool();
+		//m_queue.unsafe_reset_scratch_pool();
 #endif
 		m_waiting = 0;
 
@@ -340,7 +340,7 @@ inline double tester<T, Allocator>::ExecuteSPMC(std::uint32_t runs)
 #endif
 
 #if defined GDUL_CPQ
-		m_queue.unsafe_reset_scratch_pool();
+		//m_queue.unsafe_reset_scratch_pool();
 #endif
 		m_waiting = 0;
 
@@ -395,7 +395,7 @@ inline double tester<T, Allocator>::ExecuteMPSC(std::uint32_t runs)
 #endif
 
 #if defined GDUL_CPQ
-		m_queue.unsafe_reset_scratch_pool();
+		//m_queue.unsafe_reset_scratch_pool();
 #endif
 		m_waiting = 0;
 
@@ -449,7 +449,7 @@ inline double tester<T, Allocator>::ExecuteSingleThread(std::uint32_t runs) {
 #endif
 
 #if defined GDUL_CPQ
-		m_queue.unsafe_reset_scratch_pool();
+		//m_queue.unsafe_reset_scratch_pool();
 #endif
 
 	}
@@ -503,7 +503,7 @@ inline double tester<T, Allocator>::ExecuteSPSC(std::uint32_t runs) {
 #endif
 
 #if defined GDUL_CPQ
-		m_queue.unsafe_reset_scratch_pool();
+		//m_queue.unsafe_reset_scratch_pool();
 #endif
 
 	}
@@ -565,7 +565,7 @@ inline double tester<T, Allocator>::ExecuteMC(std::uint32_t runs) {
 #endif
 
 #if defined GDUL_CPQ
-		m_queue.unsafe_reset_scratch_pool();
+		//m_queue.unsafe_reset_scratch_pool();
 #endif
 	}
 
@@ -621,7 +621,7 @@ inline double tester<T, Allocator>::ExecuteMP(std::uint32_t runs) {
 #endif
 
 #if defined GDUL_CPQ
-		m_queue.unsafe_reset_scratch_pool();
+		//m_queue.unsafe_reset_scratch_pool();
 #endif
 	}
 
