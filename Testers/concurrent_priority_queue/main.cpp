@@ -2,8 +2,8 @@
 //
 #include <gdul/WIP_concurrent_priority_queue/concurrent_priority_queue_v16.h>
 
-#define GDUL_CPQ
-//#define MS_CPQ
+//#define GDUL_CPQ
+#define MS_CPQ
 #include "../queue_tester/tester.h"
 
 namespace gdul {
@@ -15,6 +15,7 @@ std::mt19937 rng(rd());
 
 int main()
 {
+
 	std::allocator<std::uint8_t> alloc;
 	gdul::concurrent_priority_queue<int, float> q(alloc);
 	
@@ -74,10 +75,25 @@ int main()
 		gdul::tracking_allocator<std::pair<int, float>>());
 
 
-	gdul::concurrent_priority_queue<int, float, 512, gdul::cpq_allocation_strategy_scratch<std::allocator<std::uint8_t>>> compTest;
-	compTest.push(one);
-	compTest.try_pop(outone);
-	compTest.unsafe_reset();
+	gdul::concurrent_priority_queue<int, float, 512, gdul::cpq_allocation_strategy_scratch<std::allocator<std::uint8_t>>> test;
+	test.push(one);
+	test.try_pop(outone);
+	test.unsafe_reset();
+	test.unsafe_reset_scratch_pool();
+	test.clear();
+	test.empty();
+
+	gdul::concurrent_priority_queue<int, float, 512, gdul::cpq_allocation_strategy_external> test2(1);
+	decltype(test2)::node_type n;
+	decltype(test2)::node_type* nOut(nullptr);
+	n.m_kv = one;
+
+	test2.push(&n);
+	const bool resultN(test2.try_pop(nOut));
+
+	test2.clear();
+	const bool test2Empty(test2.empty());
+	test2.unsafe_reset();
 }
 
 // Run program: Ctrl + F5 or Debug > Start Without Debugging menu

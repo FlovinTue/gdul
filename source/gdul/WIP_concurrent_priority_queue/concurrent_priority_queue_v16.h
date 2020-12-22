@@ -6,7 +6,6 @@
 #include <gdul/memory/concurrent_scratch_pool.h>
 #include <gdul/memory/concurrent_guard_pool.h>
 
-#define GDUL_CPQ_GUARD_POOL
 //#define GDUL_CPQ_DEBUG
 // ---- to delete -------------
 #if defined GDUL_CPQ_DEBUG
@@ -172,7 +171,7 @@ public:
 	/// Constructor
 	/// </summary>
 	/// <param name="alloc">Allocator passed to node pool</param>
-	concurrent_priority_queue_impl(allocator_type alloc);
+	concurrent_priority_queue_impl(allocator_type);
 
 	/// <summary>
 	/// Destructor
@@ -221,7 +220,7 @@ private:
 
 	template <class In>
 	void push_internal(In&& in);
-	bool try_pop_internal(std::pair<Key, Value>& out);
+	bool try_pop_internal(input_type& out);
 	void clear_internal();
 
 	bool try_push(node_type* node);
@@ -295,7 +294,7 @@ private:
 };
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class AllocationStrategy, class Compare>
 inline concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::concurrent_priority_queue_impl()
-	: pool_base<typename AllocationStrategy::template pool_type<Key, Value, LinkTowerHeight>::type>(LinkTowerHeight, LinkTowerHeight / std::thread::hardware_concurrency(), allocator_type())
+	: pool_base<typename AllocationStrategy::template pool_type<Key, Value, LinkTowerHeight>::type>(cpq_detail::to_expected_list_size(LinkTowerHeight), cpq_detail::to_expected_list_size(LinkTowerHeight) / std::thread::hardware_concurrency(), allocator_type())
 	, m_head()
 {
 	m_head.m_kv.first = std::numeric_limits<key_type>::max();
@@ -304,10 +303,9 @@ inline concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStr
 		m_head.m_next[i].store(&m_head, std::memory_order_relaxed);
 	}
 }
-
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class AllocationStrategy, class Compare>
 inline concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::concurrent_priority_queue_impl(typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::allocator_type alloc)
-	: pool_base<typename AllocationStrategy::template pool_type<Key, Value, LinkTowerHeight>::type>(LinkTowerHeight, LinkTowerHeight / std::thread::hardware_concurrency(), alloc)
+	: pool_base<typename AllocationStrategy::template pool_type<Key, Value, LinkTowerHeight>::type>(cpq_detail::to_expected_list_size(LinkTowerHeight), cpq_detail::to_expected_list_size(LinkTowerHeight) / std::thread::hardware_concurrency(), alloc)
 	, m_head()
 {
 	m_head.m_kv.first = std::numeric_limits<key_type>::max();
@@ -320,6 +318,7 @@ inline concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStr
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class AllocationStrategy, class Compare>
 inline concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::~concurrent_priority_queue_impl()
 {
+	unsafe_reset();
 }
 
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class AllocationStrategy, class Compare>
@@ -383,7 +382,7 @@ inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 }
 
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class AllocationStrategy, class Compare>
-inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::try_pop_internal(std::pair<Key, Value>& out)
+inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::try_pop_internal(typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::input_type& out)
 {
 
 #if defined GDUL_CPQ_DEBUG
@@ -446,7 +445,13 @@ inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 
 	} while (!(flagged && delinked));
 
-	out = std::move(mynode->m_kv);
+
+	if constexpr (!std::is_same_v<allocation_strategy_identifier, cpq_detail::allocation_strategy_identifier_external>) {
+		out = std::move(mynode->m_kv);
+	}
+	else {
+		out = mynode;
+	}
 
 	if constexpr (std::is_same_v<allocation_strategy_identifier, cpq_detail::allocation_strategy_identifier_pool>) {
 		this->m_pool.recycle(mynode);
@@ -1146,6 +1151,26 @@ protected:
 	Pool m_pool;
 };
 
+template <class T, class Allocator>
+struct pool_base<concurrent_scratch_pool<T, Allocator>>
+{
+	pool_base(size_type blockSize, size_type tlCacheSize, typename concurrent_scratch_pool<T, Allocator>::allocator_type alloc)
+		: m_pool((typename concurrent_scratch_pool<T, Allocator>::size_type)blockSize, (typename concurrent_scratch_pool<T, Allocator>::size_type)tlCacheSize, alloc)
+	{
+	}
+	/// <summary>
+	/// This must be done periodically to begin reusing scratch block. 
+	/// For ex. End of frame
+	/// </summary>
+	void unsafe_reset_scratch_pool()
+	{
+		m_pool.unsafe_reset();
+	}
+protected:
+
+	concurrent_scratch_pool<T, Allocator> m_pool;
+};
+
 template <>
 struct pool_base<void>
 {
@@ -1194,13 +1219,13 @@ struct cpq_allocation_strategy_scratch
 
 struct cpq_allocation_strategy_external
 {
-	using allocator_type = void;
+	using allocator_type = int;
 	using identifier = cpq_detail::allocation_strategy_identifier_external;
 
 	template <class Key, class Value, std::uint8_t LinkTowerHeight>
 	struct input_type
 	{
-		using type = cpq_detail::node<Key, Value, LinkTowerHeight>;
+		using type = cpq_detail::node<Key, Value, LinkTowerHeight>*;
 	};
 
 	template <class Key, class Value, std::uint8_t LinkTowerHeight>

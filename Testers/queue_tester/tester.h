@@ -205,7 +205,7 @@ private:
 #elif defined(MTX_WRAPPER)
 	queue_mutex_wrapper<T> m_queue;
 #elif defined(GDUL_CPQ)
-	concurrent_priority_queue<typename T::first_type, typename T::second_type> m_queue;
+	concurrent_priority_queue<typename T::first_type, typename T::second_type, 512, gdul::cpq_allocation_strategy_pool<std::allocator<std::uint8_t>>> m_queue;
 #elif defined(MS_CPQ)
 	concurrency::concurrent_priority_queue<T> m_queue;
 #endif

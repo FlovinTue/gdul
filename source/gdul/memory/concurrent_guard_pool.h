@@ -229,6 +229,8 @@ inline concurrent_guard_pool<T, Allocator>::concurrent_guard_pool(typename concu
 	, m_allocator()
 	, m_blocksEndIndex(0)
 {
+	assert(baseCapacity && tlCacheSize && "Cannot instantiate pool with zero sizes");
+
 	for (std::uint8_t i = 0; i < cgp_detail::Capacity_Bits; ++i)
 		m_blocks[i].m_livingItems.store((size_type)std::pow(2.f, (float)(i + 1)), std::memory_order_relaxed);
 
@@ -353,10 +355,10 @@ inline void concurrent_guard_pool<T, Allocator>::evaluate_caches_for_reclamation
 		caches.push_back(std::make_pair(accessMasks.first, std::move(tl.m_deferredReclaimCache)));
 	}
 
-	for (auto itr = caches.rbegin(); itr != caches.rend(); ++itr) {
-		if (!itr->first) {
-			m_fullCaches.push(std::move(itr->second));
-			*itr = std::move(caches.back());
+	for (std::size_t i = 0; i < caches.size(); ++i) {
+		if (!caches[i].first) {
+			m_fullCaches.push(std::move(caches[i].second));
+			caches[i] = std::move(caches.back());
 			caches.pop_back();
 		}
 	}

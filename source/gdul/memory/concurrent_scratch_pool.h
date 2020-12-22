@@ -64,17 +64,17 @@ public:
 	/// <summary>
 	/// Constructor
 	/// </summary>
-	/// <param name="InitialScratchSize">Initial size of the scratch block</param>
+	/// <param name="initialScratchSize">Initial size of the scratch block</param>
 	/// <param name="tlCacheSize">Size of the thread local caches</param>
-	concurrent_scratch_pool(size_type InitialScratchSize, size_type tlCacheSize);
+	concurrent_scratch_pool(size_type initialScratchSize, size_type tlCacheSize);
 
 	/// <summary>
 	/// Constructor
 	/// </summary>
-	/// <param name="InitialScratchSize">Initial size of the scratch block</param>
+	/// <param name="initialScratchSize">Initial size of the scratch block</param>
 	/// <param name="tlCacheSize">Size of the thread local caches</param>
 	/// <param name="alloc">Allocator to use for blocks</param>
-	concurrent_scratch_pool(size_type InitialScratchSize, size_type tlCacheSize, Allocator alloc);
+	concurrent_scratch_pool(size_type initialScratchSize, size_type tlCacheSize, Allocator alloc);
 
 	/// <summary>
 	/// Destructor
@@ -141,19 +141,20 @@ inline concurrent_scratch_pool<T, Allocator>::concurrent_scratch_pool(Allocator 
 }
 
 template<class T, class Allocator>
-inline concurrent_scratch_pool<T, Allocator>::concurrent_scratch_pool(size_type InitialScratchSize, size_type tlCacheSize)
-	: concurrent_scratch_pool(InitialScratchSize, Allocator())
+inline concurrent_scratch_pool<T, Allocator>::concurrent_scratch_pool(size_type initialScratchSize, size_type tlCacheSize)
+	: concurrent_scratch_pool(initialScratchSize, tlCacheSize, Allocator())
 {
 }
 
 template<class T, class Allocator>
-inline concurrent_scratch_pool<T, Allocator>::concurrent_scratch_pool(size_type InitialScratchSize, size_type tlCacheSize, Allocator alloc)
+inline concurrent_scratch_pool<T, Allocator>::concurrent_scratch_pool(size_type initialScratchSize, size_type tlCacheSize, Allocator alloc)
 	: t_details(tl_container{ 0, 0, nullptr }, alloc)
-	, m_block(allocate_shared<T[]>(csp_detail::pow2_align(InitialScratchSize), alloc))
+	, m_block(allocate_shared<T[]>(csp_detail::pow2_align(initialScratchSize), alloc))
 	, m_iteration(1)
-	, m_tlCacheSize(csp_detail::pow2_align(tlCacheSize, csp_detail::pow2_align(InitialScratchSize)))
+	, m_tlCacheSize(csp_detail::pow2_align(tlCacheSize, csp_detail::pow2_align(initialScratchSize)))
 	, m_allocator(alloc)
 {
+	assert(tlCacheSize && initialScratchSize && "Cannot instantiate pool with zero sizes");
 }
 
 template<class T, class Allocator>
