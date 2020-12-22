@@ -24,19 +24,16 @@
 #include <gdul/concurrent_queue/concurrent_queue.h>
 #include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
 
-#undef get_object
-
 namespace gdul {
 
 namespace cop_detail {
 static constexpr std::size_t Defaul_Block_Size = 8;
-using defaul_allocator = std::allocator<std::uint8_t>;
 }
 
 // Concurrency safe, lock free object pool. Contains an optimization where recycled objects belonging to an 'old' 
 // block will be discarded. This will make the objects retain good cache locality as the structure ages. 
 // Block capacity grows over time.
-template <class Object, class Allocator = cop_detail::defaul_allocator>
+template <class Object, class Allocator = std::allocator<std::uint8_t>>
 class concurrent_object_pool
 {
 public:
@@ -96,7 +93,7 @@ private:
 };
 template<class Object, class Allocator>
 inline concurrent_object_pool<Object, Allocator>::concurrent_object_pool()
-	: concurrent_object_pool(cop_detail::Defaul_Block_Size, cop_detail::defaul_allocator())
+	: concurrent_object_pool(cop_detail::Defaul_Block_Size, Allocator())
 {}
 template<class Object, class Allocator>
 inline concurrent_object_pool<Object, Allocator>::concurrent_object_pool(Allocator allocator)
@@ -104,7 +101,7 @@ inline concurrent_object_pool<Object, Allocator>::concurrent_object_pool(Allocat
 {}
 template<class Object, class Allocator>
 inline concurrent_object_pool<Object, Allocator>::concurrent_object_pool(std::size_t baseCapacity)
-	: concurrent_object_pool(baseCapacity, cop_detail::defaul_allocator())
+	: concurrent_object_pool(baseCapacity, Allocator())
 {}
 template<class Object, class Allocator>
 inline concurrent_object_pool<Object, Allocator>::concurrent_object_pool(std::size_t baseCapacity, Allocator allocator)
@@ -135,7 +132,11 @@ inline Object* concurrent_object_pool<Object, Allocator>::get()
 	Object* out;
 
 	while (!m_unusedObjects.try_pop(out)) {
-		try_alloc_block(m_blocksEndIndex.load(std::memory_order_relaxed));
+
+		const std::uint8_t endIndex(m_blocksEndIndex.load(std::memory_order_acquire));
+		if (!m_unusedObjects.try_pop(out)) {
+			try_alloc_block(endIndex);
+		}
 	}
 	return out;
 }
@@ -188,7 +189,7 @@ inline bool concurrent_object_pool<Object, Allocator>::is_contained_within(const
 {
 	const Object* const begin(to_begin(blockKey));
 
-	return !(obj < begin) & (obj < (begin + to_capacity(blockKey)));
+	return (!(obj < begin)) & (obj < (begin + to_capacity(blockKey)));
 }
 template<class Object, class Allocator>
 inline std::uint32_t concurrent_object_pool<Object, Allocator>::to_capacity(std::uintptr_t blockKey)
