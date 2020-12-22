@@ -1,11 +1,11 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 15
-VisualStudioVersion = 15.0.28307.902
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.30011.22
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "atomic_128", "Testers\atomic_uint128_tester\atomic_uint128.vcxproj", "{F2B36960-1C2E-402A-91BE-CD8C1539E38B}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "concurrent_object_pool", "Testers\concurrent_object_pool_tester\concurrent_object_pool.vcxproj", "{C91C184D-C939-46AB-BA9C-7A8DE363194A}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "memory", "Testers\concurrent_object_pool_tester\concurrent_object_pool.vcxproj", "{C91C184D-C939-46AB-BA9C-7A8DE363194A}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "concurrent_queue", "Testers\concurrent_queue_tester\concurrent_queue.vcxproj", "{A3FDEB2F-1384-4518-8E8B-AF0DEF18FE4E}"
 EndProject
@@ -13,17 +13,15 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "atomic_shared_ptr", "Tester
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "job_handler", "Testers\job_handler_tester\job_handler.vcxproj", "{38AC6E3A-729D-4527-83C6-3805A7274AA8}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "concurrent_priority_queue", "Testers\concurrent_priority_queue_tester\concurrent_priority_queue.vcxproj", "{5AECC0B4-DD09-443F-820D-053FFCEDF8B3}"
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "concurrent_priority_queue_unit_test", "Testers\concurrent_priority_queue_tester\Tester.vcxproj", "{45CD5B9F-FEBD-45C0-BB0C-989FC90FD09A}"
-EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "thread_local_member", "Testers\thread_local_member_tester\thread_local_member_tester.vcxproj", "{14B2FC84-037B-47A3-A99A-9F61F4F021B9}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "delegate", "Testers\delegate_tester\delegate_tester.vcxproj", "{6294E62E-CE95-40D8-A176-D30D0046235B}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "concurrent_queue_fifo", "Testers\concurrent_queue_fifo_tester\concurrent_queue_fifo\concurrent_queue_fifo.vcxproj", "{1FFC44D2-F701-4925-8987-768C3F623870}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "pool_allocator", "Testers\pool_allocator\pool_allocator\pool_allocator.vcxproj", "{A2E8798B-61E2-4AF0-95A2-8D9FAC6A57BA}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "queue_tester", "Testers\queue_tester\queue_tester.vcxproj", "{25BD05F7-C4A6-440E-8741-88D111FBA9B8}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "concurrent_priority_queue", "Testers\concurrent_priority_queue\concurrent_priority_queue.vcxproj", "{9F5FBE3A-88C5-46DE-ADCF-4F06D60676A9}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -63,14 +61,6 @@ Global
 		{38AC6E3A-729D-4527-83C6-3805A7274AA8}.Release|x64.ActiveCfg = Release|x64
 		{38AC6E3A-729D-4527-83C6-3805A7274AA8}.Release|x64.Build.0 = Release|x64
 		{38AC6E3A-729D-4527-83C6-3805A7274AA8}.Release|x86.ActiveCfg = Release|x64
-		{5AECC0B4-DD09-443F-820D-053FFCEDF8B3}.Debug|x64.ActiveCfg = Debug|x64
-		{5AECC0B4-DD09-443F-820D-053FFCEDF8B3}.Debug|x86.ActiveCfg = Debug|x64
-		{5AECC0B4-DD09-443F-820D-053FFCEDF8B3}.Release|x64.ActiveCfg = Release|x64
-		{5AECC0B4-DD09-443F-820D-053FFCEDF8B3}.Release|x86.ActiveCfg = Release|x64
-		{45CD5B9F-FEBD-45C0-BB0C-989FC90FD09A}.Debug|x64.ActiveCfg = Debug|x64
-		{45CD5B9F-FEBD-45C0-BB0C-989FC90FD09A}.Debug|x86.ActiveCfg = Debug|x64
-		{45CD5B9F-FEBD-45C0-BB0C-989FC90FD09A}.Release|x64.ActiveCfg = Release|x64
-		{45CD5B9F-FEBD-45C0-BB0C-989FC90FD09A}.Release|x86.ActiveCfg = Release|x64
 		{14B2FC84-037B-47A3-A99A-9F61F4F021B9}.Debug|x64.ActiveCfg = Debug|x64
 		{14B2FC84-037B-47A3-A99A-9F61F4F021B9}.Debug|x64.Build.0 = Debug|x64
 		{14B2FC84-037B-47A3-A99A-9F61F4F021B9}.Debug|x86.ActiveCfg = Debug|x64
@@ -89,12 +79,18 @@ Global
 		{1FFC44D2-F701-4925-8987-768C3F623870}.Release|x64.ActiveCfg = Release|x64
 		{1FFC44D2-F701-4925-8987-768C3F623870}.Release|x64.Build.0 = Release|x64
 		{1FFC44D2-F701-4925-8987-768C3F623870}.Release|x86.ActiveCfg = Release|x64
-		{A2E8798B-61E2-4AF0-95A2-8D9FAC6A57BA}.Debug|x64.ActiveCfg = Debug|x64
-		{A2E8798B-61E2-4AF0-95A2-8D9FAC6A57BA}.Debug|x64.Build.0 = Debug|x64
-		{A2E8798B-61E2-4AF0-95A2-8D9FAC6A57BA}.Debug|x86.ActiveCfg = Debug|x64
-		{A2E8798B-61E2-4AF0-95A2-8D9FAC6A57BA}.Release|x64.ActiveCfg = Release|x64
-		{A2E8798B-61E2-4AF0-95A2-8D9FAC6A57BA}.Release|x64.Build.0 = Release|x64
-		{A2E8798B-61E2-4AF0-95A2-8D9FAC6A57BA}.Release|x86.ActiveCfg = Release|x64
+		{25BD05F7-C4A6-440E-8741-88D111FBA9B8}.Debug|x64.ActiveCfg = Debug|x64
+		{25BD05F7-C4A6-440E-8741-88D111FBA9B8}.Debug|x64.Build.0 = Debug|x64
+		{25BD05F7-C4A6-440E-8741-88D111FBA9B8}.Debug|x86.ActiveCfg = Debug|x64
+		{25BD05F7-C4A6-440E-8741-88D111FBA9B8}.Release|x64.ActiveCfg = Release|x64
+		{25BD05F7-C4A6-440E-8741-88D111FBA9B8}.Release|x64.Build.0 = Release|x64
+		{25BD05F7-C4A6-440E-8741-88D111FBA9B8}.Release|x86.ActiveCfg = Release|x64
+		{9F5FBE3A-88C5-46DE-ADCF-4F06D60676A9}.Debug|x64.ActiveCfg = Debug|x64
+		{9F5FBE3A-88C5-46DE-ADCF-4F06D60676A9}.Debug|x64.Build.0 = Debug|x64
+		{9F5FBE3A-88C5-46DE-ADCF-4F06D60676A9}.Debug|x86.ActiveCfg = Debug|x64
+		{9F5FBE3A-88C5-46DE-ADCF-4F06D60676A9}.Release|x64.ActiveCfg = Release|x64
+		{9F5FBE3A-88C5-46DE-ADCF-4F06D60676A9}.Release|x64.Build.0 = Release|x64
+		{9F5FBE3A-88C5-46DE-ADCF-4F06D60676A9}.Release|x86.ActiveCfg = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

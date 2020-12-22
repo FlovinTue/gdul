@@ -94,7 +94,7 @@ bool job_impl::try_attach_child(job_impl_shared_ptr child)
 			return false;
 		}
 
-	} while (!m_firstDependee.compare_exchange_strong(rawRep, std::move(dependee), std::memory_order_relaxed, std::memory_order_relaxed));
+	} while (!m_firstDependee.compare_exchange_strong(rawRep, std::move(dependee), std::memory_order_release, std::memory_order_relaxed));
 
 	return true;
 }

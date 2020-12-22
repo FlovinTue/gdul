@@ -1,4 +1,4 @@
-// Copyright(c) 2019 Flovin Michaelsen
+// Copyright(c) 2020 Flovin Michaelsen
 // 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files(the "Software"), to deal
@@ -46,14 +46,9 @@ namespace jh_detail
 {
 constexpr job_queue Default_Job_Queue = job_queue(0);
 
-constexpr std::uint16_t Job_Handler_Max_Workers = 32;
-
-// Batch job will clamp batchSize so that this value is not exceeded
-constexpr std::uint16_t Batch_Job_Max_Batches = Job_Handler_Max_Workers * 3;
-
-// The number of chunks allocated per block
-constexpr std::size_t Job_Allocator_Block_Size = 1024;
-// The number of chunks allocated per block
-constexpr std::size_t Batch_Job_Allocator_Block_Size = 8;
+constexpr std::uint16_t Max_Workers = 32;
+constexpr std::uint16_t Job_Pool_Init_Size = 128;
+constexpr std::uint16_t Batch_Job_Pool_Init_Size = 16;
+constexpr std::uint16_t Batch_Job_Max_Slices = Max_Workers * 3;
 }
 }

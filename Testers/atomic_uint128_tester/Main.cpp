@@ -1,8 +1,7 @@
 
 #include "pch.h"
-#include <iostream>
 #include <gdul\atomic_128\atomic_128.h>
-#include <atomic>
+
 
 struct custom_struct
 {
@@ -34,10 +33,10 @@ int main()
 		two.compare_exchange_strong(valthree, valfour);
 
 		u128 valfive(0);
-		valfive = two.fetch_add_to_u64(1, 0);
+		valfive = two.fetch_add_u64(1, 0);
 
 		u128 valsix(0);
-		valsix = two.fetch_sub_to_u32(1, 0);
+		valsix = two.fetch_sub_u32(1, 0);
 
 		u128 valseven(0);
 		valseven = two.my_val();
