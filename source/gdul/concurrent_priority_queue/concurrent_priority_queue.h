@@ -6,16 +6,6 @@
 #include <gdul/memory/concurrent_scratch_pool.h>
 #include <gdul/memory/concurrent_guard_pool.h>
 
-//#define GDUL_CPQ_DEBUG
-// ---- to delete -------------
-#if defined GDUL_CPQ_DEBUG
-#include <cassert>
-#include <utility>
-#include <thread>
-#include "../Testers/Common/util.h"
-#include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
-#endif
-
 #pragma warning(push)
 // Alignment padding
 #pragma warning(disable : 4324)
@@ -251,41 +241,6 @@ private:
 
 	void counteract_version_lag(std::uint8_t aboveLayer, std::uint32_t versionBase, std::uint32_t nextVersionBase, node_view_set& expected);
 
-#if defined GDUL_CPQ_DEBUG
-	struct expanded_node_view
-	{
-		expanded_node_view() = default;
-		expanded_node_view(node_view v)
-		{
-			n = v;
-			ver = v.get_version();
-		}
-		const node_type* n;
-		std::uint32_t ver;
-	};
-	struct recent_op_info
-	{
-		expanded_node_view expected[LinkTowerHeight];
-		expanded_node_view actual[LinkTowerHeight];
-		expanded_node_view desired[LinkTowerHeight];
-
-		const node_type* opNode = nullptr;
-
-		cpq_detail::exchange_link_result result[LinkTowerHeight];
-
-		uint32_t m_sequenceIndex = 0;
-		uint8_t m_insertionCase = 0;
-		std::thread::id m_threadId;
-	};
-	inline static thread_local recent_op_info t_recentOp = recent_op_info();
-	inline static std::atomic_uint s_recentPushIx = 0;
-	inline static std::atomic_uint s_recentPopIx = 0;
-	inline static gdul::shared_ptr<recent_op_info[]> s_recentPushes = gdul::make_shared<recent_op_info[]>(1024);
-	inline static gdul::shared_ptr<recent_op_info[]> s_recentPops = gdul::make_shared<recent_op_info[]>(1024);
-
-	std::atomic<uint32_t> m_sequenceCounter = 0;
-#endif
-
 	// Also end
 	node_type m_head;
 };
@@ -345,26 +300,12 @@ inline void concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 		n = in;
 	}
 
-#if defined GDUL_CPQ_DEBUG
-	for (auto itr = std::begin(t_recentOp.result); itr != std::end(t_recentOp.result); ++itr) {
-		*itr = cpq_detail::exchange_link_null_value;
-	}
-#endif
-
 	if constexpr (std::is_same_v<allocation_strategy_identifier, cpq_detail::allocation_strategy_identifier_pool>) {
 		while (!this->m_pool.guard(&concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::try_push, this, n));
 	}
 	else {
 		while (!try_push(n));
 	}
-
-#if defined (GDUL_CPQ_DEBUG)
-	t_recentOp.opNode = node;
-	node->m_inserted = 1;
-	t_recentOp.m_sequenceIndex = m_sequenceCounter++;
-	t_recentOp.m_threadId = std::this_thread::get_id();
-	s_recentPushes[s_recentPushIx++ % s_recentPushes.item_count()] = t_recentOp;
-#endif
 }
 
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class AllocationStrategy, class Compare>
@@ -381,13 +322,6 @@ inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class AllocationStrategy, class Compare>
 inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::try_pop_internal(typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::input_type& out)
 {
-
-#if defined GDUL_CPQ_DEBUG
-	for (auto itr = std::begin(t_recentOp.result); itr != std::end(t_recentOp.result); ++itr) {
-		*itr = cpq_detail::exchange_link_null_value;
-	}
-#endif
-
 	bool flagged(false);
 	bool delinked(false);
 
@@ -412,11 +346,6 @@ inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 
 		const cpq_detail::flag_node_result flagResult(delink_flag_node(frontSet[0], nextSet[0]));
 
-#if defined GDUL_CPQ_DEBUG
-		if (flagResult == cpq_detail::flag_node_success) {
-			mynode->m_flaggedVersion = nextSet[0].get_version();
-		}
-#endif
 		if (flagResult == cpq_detail::flag_node_unexpected) {
 			continue;
 		}
@@ -432,13 +361,6 @@ inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 				delink_unflag_node(mynode, nextSet[0]);
 			}
 		}
-
-#if defined GDUL_CPQ_DEBUG
-		else if (delinked) {
-			mynode->m_delinked = 1;
-		}
-#endif
-
 	} while (!(flagged && delinked));
 
 
@@ -452,14 +374,6 @@ inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 	if constexpr (std::is_same_v<allocation_strategy_identifier, cpq_detail::allocation_strategy_identifier_pool>) {
 		this->m_pool.recycle(mynode);
 	}
-
-#if defined GDUL_CPQ_DEBUG
-	mynode->m_removed = 1;
-	t_recentOp.opNode = mynode;
-	t_recentOp.m_sequenceIndex = m_sequenceCounter++;
-	t_recentOp.m_threadId = std::this_thread::get_id();
-	s_recentPops[s_recentPopIx++ % s_recentPops.item_count()] = t_recentOp;
-#endif
 
 	return true;
 }
@@ -635,13 +549,6 @@ inline void concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 	else {
 		clear_internal();
 	}
-
-#if defined (GDUL_CPQ_DEBUG)
-	s_recentPushIx = 0;
-	s_recentPopIx = 0;
-	std::fill(s_recentPushes.get(), s_recentPushes.get() + s_recentPushes.item_count(), recent_op_info());
-	std::fill(s_recentPops.get(), s_recentPops.get() + s_recentPops.item_count(), recent_op_info());
-#endif
 }
 
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class AllocationStrategy, class Compare>
@@ -756,17 +663,11 @@ inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 
 	// Inserting at head
 	if (at_head(atSet[0])) {
-#if defined (GDUL_CPQ_DEBUG)
-		t_recentOp.m_insertionCase = 1;
-#endif
 		return link_to_head(nextSet, node);
 	}
 
 	// Inserting after unflagged node at least beyond head
 	if (!is_flagged(nextSet[0])) {
-#if defined (GDUL_CPQ_DEBUG)
-		t_recentOp.m_insertionCase = 2;
-#endif
 		return link_to_node(atSet, nextSet, node);
 	}
 
@@ -783,9 +684,6 @@ inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 			// regular link at front node in the middle of deletion!
 			atSet[0] = front;
 
-#if defined (GDUL_CPQ_DEBUG)
-			t_recentOp.m_insertionCase = 3;
-#endif
 			return link_to_front(atSet, nextSet, node);
 		}
 
@@ -794,9 +692,6 @@ inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 
 	// Inserting after flagged node that has been supplanted in the middle of deletion
 	if (exists_in_list(atSet[0], front)) {
-#if defined (GDUL_CPQ_DEBUG)
-		t_recentOp.m_insertionCase = 4;
-#endif
 		return link_to_node(atSet, nextSet, node);
 	}
 
@@ -880,10 +775,6 @@ inline void concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class AllocationStrategy, class Compare>
 inline cpq_detail::exchange_link_result concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::exchange_head_link(std::atomic<typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view>* link, typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view& expected, typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view& desired, std::uint32_t desiredVersion, [[maybe_unused]] std::uint8_t dbgLayer, [[maybe_unused]] node_view dbgNode)
 {
-#if defined GDUL_CPQ_DEBUG
-	t_recentOp.expected[dbgLayer] = expected;
-#endif
-
 	desired.set_version(desiredVersion);
 
 	cpq_detail::exchange_link_result result(cpq_detail::exchange_link_success);
@@ -902,25 +793,11 @@ inline cpq_detail::exchange_link_result concurrent_priority_queue_impl<Key, Valu
 		}
 	} while (!link->compare_exchange_strong(expected, desired, std::memory_order_seq_cst, std::memory_order_relaxed));
 
-
-#if defined GDUL_CPQ_DEBUG
-	t_recentOp.result[dbgLayer] = result;
-	t_recentOp.actual[dbgLayer] = expected;
-	t_recentOp.desired[dbgLayer] = desired;
-	if (result && expected.get_version()) {
-		dbgNode.operator node_type* ()->m_nextView[dbgLayer] = desired;
-	}
-#endif
-
 	return result;
 }
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class AllocationStrategy, class Compare>
 inline cpq_detail::exchange_link_result concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::exchange_node_link(std::atomic<typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view>* link, typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view& expected, typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view& desired, std::uint32_t desiredVersion, [[maybe_unused]] std::uint8_t dbgLayer, [[maybe_unused]] node_view dbgNode)
 {
-#if defined GDUL_CPQ_DEBUG
-	t_recentOp.expected[dbgLayer] = expected;
-#endif
-
 	desired.set_version(desiredVersion);
 
 	cpq_detail::exchange_link_result result(cpq_detail::exchange_link_outside_range);
@@ -928,15 +805,6 @@ inline cpq_detail::exchange_link_result concurrent_priority_queue_impl<Key, Valu
 	if (link->compare_exchange_strong(expected, desired, std::memory_order_seq_cst, std::memory_order_relaxed)) {
 		result = cpq_detail::exchange_link_success;
 	}
-
-#if defined GDUL_CPQ_DEBUG
-	t_recentOp.result[dbgLayer] = result;
-	t_recentOp.actual[dbgLayer] = expected;
-	t_recentOp.desired[dbgLayer] = desired;
-	if (result && expected.get_version()) {
-		dbgNode.operator node_type* ()->m_nextView[dbgLayer] = desired;
-	}
-#endif
 
 	return result;
 }
@@ -1133,14 +1001,6 @@ struct node
 	node(const std::pair<Key, Value>& item) : m_kv(item), m_next{}, m_height(LinkTowerHeight){}
 
 	std::atomic<node_view> m_next[LinkTowerHeight]{};
-#if defined (GDUL_CPQ_DEBUG)
-	const node* m_nextView[LinkTowerHeight]{};
-	std::uint32_t m_flaggedVersion = 0;
-	std::uint8_t m_delinked = 0;
-	std::uint8_t m_removed = 0;
-	std::uint8_t m_inserted = 0;
-#endif
-
 	std::pair<Key, Value> m_kv;
 	std::uint8_t m_height;
 };

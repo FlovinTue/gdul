@@ -1,29 +1,9 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="main.cpp" />
+    <ClInclude Include="..\..\source\gdul\concurrent_priority_queue\concurrent_priority_queue.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\concurrent_priority_queue_v2.h" />
-    <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\concurrent_priority_queue_v3.h" />
-    <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\concurrent_priority_queue_v4.h" />
-    <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\concurrent_priority_queue_v5.h" />
-    <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\concurrent_priority_queue_v6.h" />
-    <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\inc_dec_test.h" />
-    <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\op_test.h" />
-    <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\transactional_memory_heap.h" />
-    <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\op_test2.h" />
-    <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\concurrent_priority_queue_v7.h" />
-    <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\concurrent_priority_queue_v8.h" />
-    <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\concurrent_priority_queue_v9.h" />
-    <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\concurrent_priority_queue_v10.h" />
-    <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\concurrent_priority_queue_v11.h" />
-    <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\concurrent_priority_queue_v12.h" />
-    <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\concurrent_priority_queue_v13.h" />
-    <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\concurrent_priority_queue_v14.h" />
-    <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\memory_reclaimer.h" />
-    <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\concurrent_priority_queue_v1.h" />
-    <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\concurrent_priority_queue_v15.h" />
-    <ClInclude Include="..\..\source\gdul\WIP_concurrent_priority_queue\concurrent_priority_queue_v16.h" />
+    <ClCompile Include="main.cpp" />
   </ItemGroup>
 </Project>
