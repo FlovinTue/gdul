@@ -3,9 +3,15 @@
 
 #include "pch.h"
 #include <iostream>
-#include <gdul\concurrent_object_pool\concurrent_object_pool.h>
+#include <gdul/memory/concurrent_object_pool.h>
+#include <gdul/memory/concurrent_guard_pool.h>
 #include <vld.h>
 #include <vector>
+
+float func(int arg)
+{
+	return (float)arg;
+}
 
 int main()
 {
@@ -13,10 +19,12 @@ int main()
 	gdul::concurrent_object_pool<int, decltype(alloc)> pool(alloc);
 
 	int* second = pool.get();
+	second;
 	int* first = pool.get();
 	pool.recycle(first);
 	pool.unsafe_reset();
 	std::size_t numAvaliable = pool.avaliable();
+	numAvaliable;
 
 	std::vector<int*> out;
 	for (auto i = 0; i < 4; ++i)

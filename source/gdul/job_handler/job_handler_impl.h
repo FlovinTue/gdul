@@ -30,7 +30,7 @@
 #include <gdul/job_handler/job.h>
 #include <gdul/job_handler/job_handler_utility.h>
 #include <gdul/job_handler/job_impl.h>
-#include <gdul/pool_allocator/pool_allocator.h>
+#include <gdul/memory/pool_allocator.h>
 #include <gdul/job_handler/worker_impl.h>
 #include <gdul/job_handler/worker.h>
 #include <gdul/delegate/delegate.h>
@@ -92,7 +92,7 @@ private:
 
 	concurrent_queue<job_impl_shared_ptr, allocator_type> m_jobQueues[job_queue_count];
 
-	std::array<worker_impl, Job_Handler_Max_Workers> m_workers;
+	std::array<worker_impl, Max_Workers> m_workers;
 
 	std::atomic<std::uint16_t> m_workerCount;
 	std::atomic<std::uint16_t> m_workerIndices;

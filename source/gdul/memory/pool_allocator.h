@@ -23,11 +23,11 @@
 #pragma once
 
 #include <stdint.h>
-#include <gdul/concurrent_object_pool/concurrent_object_pool.h>
+#include <gdul/memory/concurrent_guard_pool.h>
 
 namespace gdul
 {
-namespace call_detail {
+namespace pa_detail {
 
 using size_type = std::size_t;
 
@@ -53,11 +53,11 @@ public:
 	using value_type = T;
 	using pointer = value_type*;
 	using const_pointer = const pointer;
-	using size_type = call_detail::size_type;
+	using size_type = pa_detail::size_type;
 
 	// raw_ptr and shared_ptr may be used here, based on if an allocator
 	// is allowed to outlive its pool or not
-	using pool_ptr_type = raw_ptr<call_detail::memory_pool_base>;
+	using pool_ptr_type = raw_ptr<pa_detail::memory_pool_base>;
 
 	template <typename U>
 	struct rebind
@@ -142,7 +142,7 @@ class memory_pool
 public:
 	memory_pool() = default;
 
-	using size_type = call_detail::size_type;
+	using size_type = pa_detail::size_type;
 
 	template <size_type ChunkSize, size_type ChunkAlign>
 	void init(size_type chunksPerBlock);
@@ -156,7 +156,7 @@ public:
 	pool_allocator<T> create_allocator() const;
 
 private:
-	shared_ptr<call_detail::memory_pool_base> m_impl;
+	shared_ptr<pa_detail::memory_pool_base> m_impl;
 };
 template<memory_pool::size_type ChunkSize, memory_pool::size_type ChunkAlign>
 inline void memory_pool::init(size_type chunksPerBlock)
@@ -169,11 +169,11 @@ inline void memory_pool::init(size_type chunksPerBlock, ParentAllocator allocato
 	if (m_impl)
 		return;
 
-	m_impl = gdul::allocate_shared<call_detail::memory_pool_impl<ChunkSize, ChunkAlign, ParentAllocator>>(allocator, chunksPerBlock, allocator);
+	m_impl = gdul::allocate_shared<pa_detail::memory_pool_impl<ChunkSize, ChunkAlign, ParentAllocator>>(allocator, chunksPerBlock, allocator);
 }
 inline void memory_pool::reset() 
 {
-	m_impl = shared_ptr<call_detail::memory_pool_base>();
+	m_impl = shared_ptr<pa_detail::memory_pool_base>();
 }
 template<class T>
 inline pool_allocator<T> memory_pool::create_allocator() const
@@ -181,7 +181,7 @@ inline pool_allocator<T> memory_pool::create_allocator() const
 	assert(m_impl->verify_compatibility(sizeof(T), alignof(T)) && "Memory pool stats incompatible with type");
 	return pool_allocator<T>((typename pool_allocator<T>::pool_ptr_type)m_impl);
 }
-namespace call_detail {
+namespace pa_detail {
 template <size_type ChunkSize, size_type ChunkAlign, class ParentAllocator>
 class memory_pool_impl : public memory_pool_base
 {
@@ -191,7 +191,7 @@ class memory_pool_impl : public memory_pool_base
 	};
 public:
 	memory_pool_impl(size_type chunksPerBlock, ParentAllocator allocator)
-		: m_pool(chunksPerBlock, allocator)
+		: m_pool((typename decltype(m_pool)::size_type)chunksPerBlock, (typename decltype(m_pool)::size_type)(chunksPerBlock / std::thread::hardware_concurrency()), allocator)
 	{}
 	void* get_chunk() override final {
 		return (void*)m_pool.get();
@@ -209,7 +209,7 @@ public:
 	}
 
 private:
-	concurrent_object_pool<chunk_rep, ParentAllocator> m_pool;
+	concurrent_guard_pool<chunk_rep, ParentAllocator> m_pool;
 };
 }
 
