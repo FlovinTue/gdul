@@ -147,7 +147,7 @@ public:
 namespace cpq_detail {
 
 template <class Key, class Value, std::uint8_t LinkTowerHeight, class AllocationStrategy, class Compare>
-class concurrent_priority_queue_impl : public pool_base<typename AllocationStrategy::template pool_type<Key, Value, LinkTowerHeight>::type>
+class alignas(std::hardware_destructive_interference_size) concurrent_priority_queue_impl : public pool_base<typename AllocationStrategy::template pool_type<Key, Value, LinkTowerHeight>::type>
 {
 public:
 
@@ -224,35 +224,31 @@ private:
 	void clear_internal();
 
 	bool try_push(node_type* node);
-	bool prepare_insertion_sets(node_view_set& atSet, node_view_set& nextSet, const node_type* node) const;
+
+	bool delink_front(node_view_set& expectedFront, node_view_set& desiredFront, std::uint8_t versionOffset, std::uint8_t frontHeight);
+	static cpq_detail::flag_node_result delink_flag_node(node_view at, node_view& next);
+	static void delink_unflag_node(node_type* at, node_view& expected);
+
+	bool link_prepare_insertion_sets(node_view_set& atSet, node_view_set& nextSet, const node_type* node) const;
+	bool link_to_head(node_view_set& next, node_view node);
+	void link_to_head_upper(node_view_set& next, node_view node, std::uint32_t version);
+	bool link_to_front(node_view_set& current, node_view_set& next, node_view node);
+	static bool link_to_node(node_view_set& at, node_view_set& next, node_view node);
+	static void link_to_node_upper(node_view_set& at, node_view_set& next, node_view node);
+
+	static cpq_detail::exchange_link_result exchange_head_link(std::atomic<node_view>* link, node_view& expected, node_view& desired, std::uint32_t desiredVersion, std::uint8_t dbgLayer, node_view dbgNode);
+	static cpq_detail::exchange_link_result exchange_node_link(std::atomic<node_view>* link, node_view& expected, node_view& desired, std::uint32_t desiredVersion, std::uint8_t dbgLayer, node_view dbgNode);
+
+	static void load_set(node_view_set& outSet, const node_type* at, std::uint8_t offset = 0, std::uint8_t max = LinkTowerHeight);
+
+	bool has_been_delinked_by_other(const node_type* of, node_view actual, node_view triedReplacement) const;
+	bool exists_in_list(const node_type* node, const node_type* searchStart) const;
 
 	bool at_end(const node_type* n) const;
 	bool at_head(const node_type* n) const;
 	bool is_flagged(node_view n) const;
 
-
-	bool try_delink_front(node_view_set& expectedFront, node_view_set& desiredFront, std::uint8_t versionOffset, std::uint8_t frontHeight);
-	bool try_replace_front(node_view_set& current, node_view_set& next, node_view node);
-
-	bool try_link_to_head(node_view_set& next, node_view node);
-	void try_link_to_head_upper(node_view_set& next, node_view node, std::uint32_t version);
-
-	bool has_been_delinked_by_other(const node_type* of, node_view actual, node_view triedReplacement) const;
-
-	bool exists_in_list(const node_type* node, const node_type* searchStart) const;
-
-	void perform_version_upkeep(std::uint8_t aboveLayer, std::uint32_t baseVersion, std::uint32_t nextVersion, node_view_set& next);
-
-	static void load_set(node_view_set& outSet, const node_type* at, std::uint8_t offset = 0, std::uint8_t max = LinkTowerHeight);
-	static void unflag_node(node_type* at, node_view& next);
-	static void link_to_node_upper(node_view_set& at, node_view_set& next, node_view node);
-
-	static bool try_link_to_node(node_view_set& at, node_view_set& next, node_view node);
-
-	static cpq_detail::flag_node_result flag_node(node_view at, node_view& next);
-
-	static cpq_detail::exchange_link_result exchange_head_link(std::atomic<node_view>* link, node_view& expected, node_view& desired, std::uint32_t desiredVersion, std::uint8_t dbgLayer, node_view dbgNode);
-	static cpq_detail::exchange_link_result exchange_node_link(std::atomic<node_view>* link, node_view& expected, node_view& desired, std::uint32_t desiredVersion, std::uint8_t dbgLayer, node_view dbgNode);
+	void counteract_version_lag(std::uint8_t aboveLayer, std::uint32_t versionBase, std::uint32_t nextVersionBase, node_view_set& expected);
 
 #if defined GDUL_CPQ_DEBUG
 	struct expanded_node_view
@@ -397,24 +393,23 @@ inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 	node_type* mynode(nullptr);
 
 	do {
-		node_view frontNodeView(m_head.m_next[0].load(std::memory_order_seq_cst));
-		mynode = frontNodeView;
+		node_view_set frontSet{};
+
+		frontSet[0] = m_head.m_next[0].load(std::memory_order_seq_cst);
+		mynode = frontSet[0];
 
 		if (at_end(mynode)) {
 			return false;
 		}
 
-		node_view_set frontSet{};
 		node_view_set nextSet{};
 
 		const std::uint8_t frontHeight(mynode->m_height);
 
-		frontSet[0] = frontNodeView;
-
 		load_set(frontSet, &m_head, 1, frontHeight);
 		load_set(nextSet, mynode, 0, frontHeight);
 
-		const cpq_detail::flag_node_result flagResult(flag_node(frontSet[0], nextSet[0]));
+		const cpq_detail::flag_node_result flagResult(delink_flag_node(frontSet[0], nextSet[0]));
 
 #if defined GDUL_CPQ_DEBUG
 		if (flagResult == cpq_detail::flag_node_success) {
@@ -425,15 +420,15 @@ inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 			continue;
 		}
 
-		flagged = flagResult == cpq_detail::flag_node_success;
-		delinked = try_delink_front(frontSet, nextSet, 1, frontHeight);
+		flagged = (flagResult == cpq_detail::flag_node_success);
+		delinked = delink_front(frontSet, nextSet, 1, frontHeight);
 
 		if (flagged && !delinked) {
 
 			delinked = has_been_delinked_by_other(mynode, frontSet[0], nextSet[0]);
 
 			if (!delinked) {
-				unflag_node(mynode, nextSet[0]);
+				delink_unflag_node(mynode, nextSet[0]);
 			}
 		}
 
@@ -488,7 +483,7 @@ inline void concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 
 		std::fill(std::begin(nextSet), std::end(nextSet), &m_head);
 
-	} while (!try_delink_front(frontSet, nextSet, 1, LinkTowerHeight));
+	} while (!delink_front(frontSet, nextSet, 1, LinkTowerHeight));
 
 
 	if constexpr (std::is_same_v<allocation_strategy_identifier, cpq_detail::allocation_strategy_identifier_pool>) {
@@ -512,7 +507,7 @@ inline void concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 }
 
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class AllocationStrategy, class Compare>
-inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::prepare_insertion_sets(node_view_set& atSet, node_view_set& nextSet, const node_type* node) const
+inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::link_prepare_insertion_sets(node_view_set& atSet, node_view_set& nextSet, const node_type* node) const
 {
 	constexpr comparator_type comparator;
 
@@ -565,7 +560,7 @@ inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 }
 
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class AllocationStrategy, class Compare>
-inline cpq_detail::flag_node_result concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::flag_node(typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view at, typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view& next)
+inline cpq_detail::flag_node_result concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::delink_flag_node(typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view at, typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view& next)
 {
 	const std::uint32_t expectedVersion(next.get_version());
 	const std::uint32_t nextVersion(cpq_detail::version_add_one(at.get_version()));
@@ -591,16 +586,16 @@ inline cpq_detail::flag_node_result concurrent_priority_queue_impl<Key, Value, L
 }
 
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class AllocationStrategy, class Compare>
-inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::try_delink_front(typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view_set& expectedFront, typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view_set& desiredFront, std::uint8_t versionOffset, std::uint8_t frontHeight)
+inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::delink_front(typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view_set& expectedFront, typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view_set& desiredFront, std::uint8_t versionOffset, std::uint8_t frontHeight)
 {
 	const std::uint8_t numUpperLayers(frontHeight - 1);
-	const std::uint32_t baseLayerVersion(expectedFront[0].get_version());
-	const std::uint32_t upperLayerNextVersion(cpq_detail::version_add_one(baseLayerVersion));
+	const std::uint32_t versionBase(expectedFront[0].get_version());
+	const std::uint32_t nextVersionUpper(cpq_detail::version_add_one(versionBase));
 
 	for (std::uint8_t i = 0; i < numUpperLayers; ++i) {
 		const std::uint8_t layer(frontHeight - 1 - i);
 
-		const cpq_detail::exchange_link_result result(exchange_head_link(&m_head.m_next[layer], expectedFront[layer], desiredFront[layer], upperLayerNextVersion, layer, &m_head));
+		const cpq_detail::exchange_link_result result(exchange_head_link(&m_head.m_next[layer], expectedFront[layer], desiredFront[layer], nextVersionUpper, layer, &m_head));
 
 		if (result == cpq_detail::exchange_link_outside_range) {
 			return false;
@@ -610,14 +605,15 @@ inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 		}
 	}
 
-	const std::uint32_t bottomLayerNextVersion(cpq_detail::version_step(baseLayerVersion, versionOffset));
+	const std::uint32_t nextVersionBase(cpq_detail::version_step(versionBase, versionOffset));
 
-	perform_version_upkeep(frontHeight, baseLayerVersion, bottomLayerNextVersion, expectedFront);
+	counteract_version_lag(frontHeight, versionBase, nextVersionBase, expectedFront);
 
-	if (exchange_node_link(&m_head.m_next[0], expectedFront[0], desiredFront[0], bottomLayerNextVersion, 0, &m_head) == cpq_detail::exchange_link_success) {
+	if (exchange_node_link(&m_head.m_next[0], expectedFront[0], desiredFront[0], nextVersionBase, 0, &m_head) == cpq_detail::exchange_link_success) {
 		expectedFront[0] = desiredFront[0];
 		return true;
 	}
+
 	return false;
 }
 
@@ -646,7 +642,7 @@ inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 }
 
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class AllocationStrategy, class Compare>
-inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::try_link_to_node(typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view_set& atSet, typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view_set& expectedSet, typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view node)
+inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::link_to_node(typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view_set& atSet, typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view_set& expectedSet, typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view node)
 {
 	node_type* const baseLayerNode(atSet[0]);
 
@@ -660,24 +656,24 @@ inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 }
 
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class AllocationStrategy, class Compare>
-inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::try_link_to_head(typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view_set& next, typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view node)
+inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::link_to_head(typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view_set& next, typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view node)
 {
-	const std::uint32_t baseLayerVersion(next[0].get_version());
-	const std::uint32_t baseLayerNextVersion(cpq_detail::version_add_one(baseLayerVersion));
+	const std::uint32_t versionBase(next[0].get_version());
+	const std::uint32_t nextVersionBase(cpq_detail::version_add_one(versionBase));
 
-	perform_version_upkeep(node.operator const node_type * ()->m_height, baseLayerVersion, baseLayerNextVersion, next);
+	counteract_version_lag(node.operator const node_type * ()->m_height, versionBase, nextVersionBase, next);
 
-	if (exchange_node_link(&m_head.m_next[0], next[0], node, baseLayerNextVersion, 0, &m_head) != cpq_detail::exchange_link_success) {
+	if (exchange_node_link(&m_head.m_next[0], next[0], node, nextVersionBase, 0, &m_head) != cpq_detail::exchange_link_success) {
 		return false;
 	}
 
-	try_link_to_head_upper(next, node, baseLayerNextVersion);
+	link_to_head_upper(next, node, nextVersionBase);
 
 	return true;
 }
 
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class AllocationStrategy, class Compare>
-inline void concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::try_link_to_head_upper(typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view_set& expectedSet, typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view node, std::uint32_t version)
+inline void concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::link_to_head_upper(typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view_set& expectedSet, typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view node, std::uint32_t version)
 {
 	const std::uint8_t height(node.operator node_type * ()->m_height);
 
@@ -700,7 +696,7 @@ inline void concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 }
 
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class AllocationStrategy, class Compare>
-inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::try_replace_front(typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view_set& frontSet, typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view_set& nextSet, typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view node)
+inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::link_to_front(typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view_set& frontSet, typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view_set& nextSet, typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view node)
 {
 	nextSet[0] = node;
 
@@ -715,9 +711,9 @@ inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 
 	load_set(nextSet, currentFront, 1, frontHeight);
 
-	if (try_delink_front(frontSet, nextSet, 2, frontHeight)) {
+	if (delink_front(frontSet, nextSet, 2, frontHeight)) {
 
-		try_link_to_head_upper(frontSet, node, frontSet[0].get_version());
+		link_to_head_upper(frontSet, node, frontSet[0].get_version());
 
 		return true;
 	}
@@ -741,7 +737,7 @@ inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 
 	atSet[LinkTowerHeight - 1] = &m_head;
 
-	if (!prepare_insertion_sets(atSet, nextSet, node)) {
+	if (!link_prepare_insertion_sets(atSet, nextSet, node)) {
 		return false;
 	}
 
@@ -754,7 +750,7 @@ inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 #if defined (GDUL_CPQ_DEBUG)
 		t_recentOp.m_insertionCase = 1;
 #endif
-		return try_link_to_head(nextSet, node);
+		return link_to_head(nextSet, node);
 	}
 
 	// Inserting after unflagged node at least beyond head
@@ -762,7 +758,7 @@ inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 #if defined (GDUL_CPQ_DEBUG)
 		t_recentOp.m_insertionCase = 2;
 #endif
-		return try_link_to_node(atSet, nextSet, node);
+		return link_to_node(atSet, nextSet, node);
 	}
 
 	const node_view front(m_head.m_next[0].load(std::memory_order_relaxed));
@@ -781,7 +777,7 @@ inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 #if defined (GDUL_CPQ_DEBUG)
 			t_recentOp.m_insertionCase = 3;
 #endif
-			return try_replace_front(atSet, nextSet, node);
+			return link_to_front(atSet, nextSet, node);
 		}
 
 		return false;
@@ -792,40 +788,41 @@ inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 #if defined (GDUL_CPQ_DEBUG)
 		t_recentOp.m_insertionCase = 4;
 #endif
-		return try_link_to_node(atSet, nextSet, node);
+		return link_to_node(atSet, nextSet, node);
 	}
 
 	// Cannot insert after a node that is not in list
 	return false;
 }
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class AllocationStrategy, class Compare>
-inline void concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::perform_version_upkeep(std::uint8_t aboveLayer, std::uint32_t baseVersion, std::uint32_t nextVersion, node_view_set& next)
+inline void concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::counteract_version_lag(std::uint8_t aboveLayer, std::uint32_t versionBase, std::uint32_t nextVersionBase, node_view_set& expected)
 {
-	const size_type maxEntriesMultiPre(baseVersion / to_expected_list_size(LinkTowerHeight));
-	const size_type maxEntriesMultiPost(nextVersion / to_expected_list_size(LinkTowerHeight));
+	const size_type maxEntriesMultiPre(versionBase / to_expected_list_size(LinkTowerHeight));
+	const size_type maxEntriesMultiPost(nextVersionBase / to_expected_list_size(LinkTowerHeight));
 	const bool delta(maxEntriesMultiPost - maxEntriesMultiPre);
 
 	if (delta) {
 		for (std::uint8_t i = aboveLayer; i < LinkTowerHeight; ++i) {
 
-			node_view expected(next[i]);
-			if (!expected.operator bool()) {
-				expected = m_head.m_next[i].load(std::memory_order_relaxed);
+			node_view expectedLinkValue(expected[i]);
+
+			if (!expectedLinkValue.operator bool()) {
+				expectedLinkValue = m_head.m_next[i].load(std::memory_order_relaxed);
 			}
 
-			const std::uint32_t linkVersion(expected.get_version());
+			const std::uint32_t versionLink(expectedLinkValue.get_version());
 
-			if (cpq_detail::in_range(linkVersion, baseVersion)) {
+			if (cpq_detail::in_range(versionLink, versionBase)) {
 
-				const std::uint32_t versionDelta(cpq_detail::version_delta(linkVersion, baseVersion));
+				const std::uint32_t versionDelta(cpq_detail::version_delta(versionLink, versionBase));
 
-				// If one of the upper layer links has strayed to far from the current base layer version we need to 'push' 
+				// If one of the upper layer links has strayed to far from the current base layer version we need to drag
 				// it in to range again
 				if (to_expected_list_size(LinkTowerHeight) < versionDelta) {
-					const std::uint32_t recentVersion(cpq_detail::version_sub_one(baseVersion));
-					const node_view desired(expected, recentVersion);
+					const std::uint32_t recentVersion(cpq_detail::version_sub_one(versionBase));
+					const node_view desired(expectedLinkValue, recentVersion);
 
-					m_head.m_next[i].compare_exchange_strong(expected, desired, std::memory_order_relaxed);
+					m_head.m_next[i].compare_exchange_strong(expectedLinkValue, desired, std::memory_order_relaxed);
 				}
 			}
 		}
@@ -865,10 +862,10 @@ inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 	return false;
 }
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class AllocationStrategy, class Compare>
-inline void concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::unflag_node(typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_type* at, typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view& next)
+inline void concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::delink_unflag_node(typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_type* at, typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view& expected)
 {
-	const node_view desired(next, 0);
-	at->m_next[0].compare_exchange_strong(next, desired, std::memory_order_relaxed);
+	const node_view desired(expected, 0);
+	at->m_next[0].compare_exchange_strong(expected, desired, std::memory_order_relaxed);
 }
 
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class AllocationStrategy, class Compare>
@@ -945,16 +942,16 @@ inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 	const node_type* at(searchStart);
 
 	for (;;) {
+		if (at == node) {
+			return true;
+		}
+
 		if (at_end(at)) {
 			break;
 		}
 
 		if (comparator(k, at->m_kv.first)) {
 			break;
-		}
-
-		if (at == node) {
-			return true;
 		}
 
 		at = at->m_next[0].load(std::memory_order_relaxed);
@@ -1061,7 +1058,7 @@ static bool in_range(std::uint32_t version, std::uint32_t inRangeOf)
 template <class Key, class Value, std::uint8_t LinkTowerHeight>
 struct node
 {
-	class node_view
+	union node_view
 	{
 	public:
 		node_view() = default;
@@ -1117,11 +1114,9 @@ struct node
 
 			m_value = (versionValue | pointerValue);
 		}
-		union
-		{
-			const node* m_nodeView;
-			std::uintptr_t m_value;
-		};
+
+		const node* m_nodeView;
+		std::uintptr_t m_value;
 	};
 
 	node() : m_kv(), m_next{}, m_height(LinkTowerHeight) {}
@@ -1159,8 +1154,8 @@ struct pool_base<concurrent_scratch_pool<T, Allocator>>
 	{
 	}
 	/// <summary>
-	/// This must be done periodically to begin reusing scratch block. 
-	/// For ex. End of frame
+	/// This must be done periodically to reuse the scratch block.
+	/// Ex. End of frame
 	/// </summary>
 	void unsafe_reset_scratch_pool()
 	{

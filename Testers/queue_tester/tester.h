@@ -210,11 +210,6 @@ private:
 	concurrency::concurrent_priority_queue<T> m_queue;
 #endif
 
-
-#if !defined(GDUL_CPQ)
-	static thread_local std::vector<T> t_output;
-#endif
-
 	gdul::thread_pool m_writer;
 	gdul::thread_pool m_reader;
 
@@ -672,6 +667,7 @@ inline void tester<T, Allocator>::Write(std::uint32_t writes) {
 
 #if defined(MS_CPQ)
 		T in = seed % (j + 1);
+		sum += in;
 #elif !defined(GDUL_CPQ)
 		T in;
 		in.count = seed % (j + 1);
@@ -682,7 +678,9 @@ inline void tester<T, Allocator>::Write(std::uint32_t writes) {
 #if !defined(MOODYCAMEL) && !defined(GDUL_CPQ)
 		m_queue.push(in);
 #elif defined(GDUL_CPQ)
-		m_queue.push(std::pair<typename T::first_type, typename T::second_type>(seed & (j + 1), typename T::second_type()));
+		const std::pair<typename T::first_type, typename T::second_type> in(seed % (j + 1), typename T::second_type());
+		m_queue.push(in);
+		sum += in.first;
 #else
 		m_queue.enqueue(in);
 #endif
@@ -701,11 +699,6 @@ inline void tester<T, Allocator>::Write(std::uint32_t writes) {
 template<class T, class Allocator>
 inline void tester<T, Allocator>::Read(std::uint32_t reads) {
 	++m_waiting;
-
-#if defined GDUL_CPQ_DEBUG
-	t_output.clear();
-	t_output.reserve(reads);
-#endif
 
 	while (m_waiting < (Writers + Readers)) {
 		std::this_thread::yield();
@@ -744,9 +737,11 @@ inline void tester<T, Allocator>::Read(std::uint32_t reads) {
 #endif
 #if !defined(GDUL_CPQ) && ! defined(MS_CPQ)
 				sum += out.count;
-#endif
-#if defined GDUL_CPQ_DEBUG
-				t_output.push_back(out);
+
+#elif defined (MS_CPQ)
+				sum += out;
+#elif defined (GDUL_CPQ)
+				sum += out.first;
 #endif
 				break;
 			}

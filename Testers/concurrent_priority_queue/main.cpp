@@ -2,8 +2,8 @@
 //
 #include <gdul/WIP_concurrent_priority_queue/concurrent_priority_queue_v16.h>
 
-//#define GDUL_CPQ
-#define MS_CPQ
+#define GDUL_CPQ
+//#define MS_CPQ
 #include "../queue_tester/tester.h"
 
 namespace gdul {
