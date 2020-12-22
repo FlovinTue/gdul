@@ -99,7 +99,7 @@ Concurrency safe, lock free object pool built around concurrent_queue
 
 ## concurrent_scratch_pool
 #### --new--
-Concurrency safe, lock free scratch pool
+Concurrency safe, lock free scratch pool. Usage like an object pool but requires periodic calls to unsafe_reset
 
 -------------------------------------------------------------------------------------------------------------------------------------------
 
