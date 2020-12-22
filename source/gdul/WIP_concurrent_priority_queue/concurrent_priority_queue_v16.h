@@ -229,12 +229,13 @@ private:
 	static cpq_detail::flag_node_result delink_flag_node(node_view at, node_view& next);
 	static void delink_unflag_node(node_type* at, node_view& expected);
 
-	bool link_prepare_insertion_sets(node_view_set& atSet, node_view_set& nextSet, const node_type* node) const;
 	bool link_to_head(node_view_set& next, node_view node);
 	void link_to_head_upper(node_view_set& next, node_view node, std::uint32_t version);
 	bool link_to_front(node_view_set& current, node_view_set& next, node_view node);
 	static bool link_to_node(node_view_set& at, node_view_set& next, node_view node);
 	static void link_to_node_upper(node_view_set& at, node_view_set& next, node_view node);
+	bool link_prepare_insertion_sets(node_view_set& atSet, node_view_set& nextSet, const node_type* node) const;
+	bool link_verify_head_link_versions(std::uint8_t fromLayer, std::uint8_t toLayer, node_view_set& expectedSet) const;
 
 	static cpq_detail::exchange_link_result exchange_head_link(std::atomic<node_view>* link, node_view& expected, node_view& desired, std::uint32_t desiredVersion, std::uint8_t dbgLayer, node_view dbgNode);
 	static cpq_detail::exchange_link_result exchange_node_link(std::atomic<node_view>* link, node_view& expected, node_view& desired, std::uint32_t desiredVersion, std::uint8_t dbgLayer, node_view dbgNode);
@@ -531,15 +532,11 @@ inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 				break;
 			}
 
-			// If we probe forward from HEAD node, we need to make sure the links we loaded before the link we
+			// If we probe forward from head node, we need to make sure the links we loaded before the link we
 			// started probe from is not out-of-date
 			if (!beganProbing) {
-				const std::uint32_t probeVersion(nextSet[layer].get_version());
-				for (std::uint8_t verifyIndex = layer + 1; verifyIndex < nodeHeight; ++verifyIndex) {
-
-					if (m_head.m_next[verifyIndex].load(std::memory_order_relaxed).get_version() != nextSet[verifyIndex].get_version()) {
-						return false;
-					}
+				if (!link_verify_head_link_versions(layer + 1, nodeHeight, nextSet)) {
+					return false;
 				}
 				beganProbing = true;
 			}
@@ -556,6 +553,18 @@ inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 		load_set(nextSet, &m_head, 1, nodeHeight);
 	}
 
+	return true;
+}
+
+template<class Key, class Value, std::uint8_t LinkTowerHeight, class AllocationStrategy, class Compare>
+inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::link_verify_head_link_versions(std::uint8_t fromLayer, std::uint8_t toLayer, typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view_set& expectedSet) const
+{
+	for (std::uint8_t verifyIndex = fromLayer; verifyIndex < toLayer; ++verifyIndex) {
+
+		if (m_head.m_next[verifyIndex].load(std::memory_order_relaxed).get_version() != expectedSet[verifyIndex].get_version()) {
+			return false;
+		}
+	}
 	return true;
 }
 
