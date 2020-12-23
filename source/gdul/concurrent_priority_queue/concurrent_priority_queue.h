@@ -666,7 +666,7 @@ inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 	}
 
 	for (std::uint8_t i = 0, height = node->m_height; i < height; ++i) {
-		node->m_next[i].store(node_view(nextSet[i].operator node_type * (), 0), std::memory_order_relaxed);
+		node->m_next[i].store(node_view(nextSet[i].operator node_type * ()), std::memory_order_relaxed);
 	}
 
 	// Inserting at head
@@ -1014,11 +1014,8 @@ struct node
 	node(std::pair<Key, Value>&& item) : m_kv(std::move(item)), m_next{}, m_height(LinkTowerHeight) {}
 	node(const std::pair<Key, Value>& item) : m_kv(item), m_next{}, m_height(LinkTowerHeight){}
 
-	//struct alignas(std::hardware_destructive_interference_size)
-	//{
-		std::atomic<node_view> m_next[LinkTowerHeight]{};
-		std::uint8_t m_height;
-	//};
+	std::atomic<node_view> m_next[LinkTowerHeight]{};
+	std::uint8_t m_height;
 	std::pair<Key, Value> m_kv;
 };
 template <class Pool>
