@@ -200,7 +200,7 @@ public:
 
 	/// <summary>
 	/// Reset to initial state
-	/// Assumes no concurrent inserts and an empty structure
+	/// Assumes no concurrent inserts and an empty list
 	/// </summary>
 	void unsafe_reset();
 
@@ -216,14 +216,14 @@ private:
 	bool try_push(node_type* node);
 
 	bool delink_front(node_view_set& expectedFront, node_view_set& desiredFront, std::uint8_t versionOffset, std::uint8_t frontHeight);
-	static cpq_detail::flag_node_result delink_flag_node(node_view at, node_view& next);
+	static cpq_detail::flag_node_result delink_flag_node(node_type* at, std::uint32_t version, node_view& next);
 	static void delink_unflag_node(node_type* at, node_view& expected);
 
-	bool link_to_head(node_view_set& next, node_view node);
-	void link_to_head_upper(node_view_set& next, node_view node, std::uint32_t version);
-	bool link_to_front(node_view_set& current, node_view_set& next, node_view node);
-	static bool link_to_node(node_view_set& at, node_view_set& next, node_view node);
-	static void link_to_node_upper(node_view_set& at, node_view_set& next, node_view node);
+	bool link_to_head(node_view_set& next, node_type* node);
+	void link_to_head_upper(node_view_set& next, node_type* node, std::uint32_t version);
+	bool link_to_front(node_view_set& current, node_view_set& next, node_type* node);
+	static bool link_to_node(node_view_set& at, node_view_set& next, node_type* node);
+	static void link_to_node_upper(node_view_set& at, node_view_set& next, node_type* node);
 	bool link_prepare_insertion_sets(node_view_set& atSet, node_view_set& nextSet, const node_type* node) const;
 	bool link_verify_head_link_versions(std::uint8_t fromLayer, std::uint8_t toLayer, node_view_set& expectedSet) const;
 
@@ -239,7 +239,8 @@ private:
 	bool at_head(const node_type* n) const;
 	bool is_flagged(node_view n) const;
 
-	void counteract_version_lag(std::uint8_t aboveLayer, std::uint32_t versionBase, std::uint8_t versionStep, node_view_set& expected);
+	static bool needs_version_lag_check(std::uint32_t versionBase, std::uint32_t versionStep);
+	void counteract_version_lag(std::uint8_t aboveLayer, std::uint32_t versionBase, node_view_set& expected);
 
 	// Also end
 	node_type m_head;
@@ -344,7 +345,7 @@ inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 		load_set(frontSet, &m_head, 1, frontHeight);
 		load_set(nextSet, mynode, 0, frontHeight);
 
-		const cpq_detail::flag_node_result flagResult(delink_flag_node(frontSet[0], nextSet[0]));
+		const cpq_detail::flag_node_result flagResult(delink_flag_node(mynode, frontSet[0].get_version(), nextSet[0]));
 
 		if (flagResult == cpq_detail::flag_node_unexpected) {
 			continue;
@@ -483,10 +484,10 @@ inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 }
 
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class AllocationStrategy, class Compare>
-inline cpq_detail::flag_node_result concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::delink_flag_node(typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view at, typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view& next)
+inline cpq_detail::flag_node_result concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::delink_flag_node(typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_type* at, std::uint32_t version, typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view& next)
 {
 	const std::uint32_t expectedVersion(next.get_version());
-	const std::uint32_t nextVersion(cpq_detail::version_add_one(at.get_version()));
+	const std::uint32_t nextVersion(cpq_detail::version_add_one(version));
 
 	if (expectedVersion == nextVersion) {
 		return cpq_detail::flag_node_compeditor;
@@ -496,7 +497,7 @@ inline cpq_detail::flag_node_result concurrent_priority_queue_impl<Key, Value, L
 		return cpq_detail::flag_node_unexpected;
 	}
 
-	if (at.operator node_type * ()->m_next[0].compare_exchange_strong(next, node_view(next, nextVersion), std::memory_order_relaxed)) {
+	if (at->m_next[0].compare_exchange_strong(next, node_view(next, nextVersion), std::memory_order_relaxed)) {
 		next.set_version(nextVersion);
 		return cpq_detail::flag_node_success;
 	}
@@ -530,7 +531,9 @@ inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 
 	const std::uint32_t nextVersionBase(cpq_detail::version_step(versionBase, versionOffset));
 
-	counteract_version_lag(frontHeight, versionBase, versionOffset, expectedFront);
+	if (needs_version_lag_check(versionBase, versionOffset)) {
+		counteract_version_lag(frontHeight, versionBase, expectedFront);
+	}
 
 	if (exchange_node_link(&m_head.m_next[0], expectedFront[0], desiredFront[0], nextVersionBase) == cpq_detail::exchange_link_success) {
 		expectedFront[0] = desiredFront[0];
@@ -558,11 +561,12 @@ inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 }
 
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class AllocationStrategy, class Compare>
-inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::link_to_node(typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view_set& atSet, typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view_set& expectedSet, typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view node)
+inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::link_to_node(typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view_set& atSet, typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view_set& expectedSet, typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_type* node)
 {
 	node_type* const baseLayerNode(atSet[0]);
 
-	if (exchange_node_link(&baseLayerNode->m_next[0], expectedSet[0], node, 0) != cpq_detail::exchange_link_success) {
+	node_view desired(node);
+	if (exchange_node_link(&baseLayerNode->m_next[0], expectedSet[0], desired, 0) != cpq_detail::exchange_link_success) {
 		return false;
 	}
 
@@ -572,14 +576,17 @@ inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 }
 
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class AllocationStrategy, class Compare>
-inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::link_to_head(typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view_set& next, typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view node)
+inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::link_to_head(typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view_set& next, typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_type* node)
 {
 	const std::uint32_t versionBase(next[0].get_version());
 	const std::uint32_t nextVersionBase(cpq_detail::version_add_one(versionBase));
 
-	counteract_version_lag(node.operator const node_type * ()->m_height, versionBase, 1, next);
+	if (needs_version_lag_check(versionBase, 1)) {
+		counteract_version_lag(node->m_height, versionBase, next);
+	}
 
-	if (exchange_node_link(&m_head.m_next[0], next[0], node, nextVersionBase) != cpq_detail::exchange_link_success) {
+	node_view desired(node);
+	if (exchange_node_link(&m_head.m_next[0], next[0], desired, nextVersionBase) != cpq_detail::exchange_link_success) {
 		return false;
 	}
 
@@ -589,12 +596,13 @@ inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 }
 
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class AllocationStrategy, class Compare>
-inline void concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::link_to_head_upper(typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view_set& expectedSet, typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view node, std::uint32_t version)
+inline void concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::link_to_head_upper(typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view_set& expectedSet, typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_type* node, std::uint32_t version)
 {
-	const std::uint8_t height(node.operator node_type * ()->m_height);
+	const std::uint8_t height(node->m_height);
 
+	node_view desired(node);
 	for (std::uint8_t layer = 1; layer < height; ++layer) {
-		if (exchange_head_link(&m_head.m_next[layer], expectedSet[layer], node, version) == cpq_detail::exchange_link_outside_range) {
+		if (exchange_head_link(&m_head.m_next[layer], expectedSet[layer], desired, version) == cpq_detail::exchange_link_outside_range) {
 			break;
 		}
 	}
@@ -602,26 +610,26 @@ inline void concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 
 
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class AllocationStrategy, class Compare>
-inline void concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::link_to_node_upper(typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view_set& atSet, typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view_set& expectedSet, typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view node)
+inline void concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::link_to_node_upper(typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view_set& atSet, typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view_set& expectedSet, typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_type* node)
 {
-	const std::uint8_t height(node.operator node_type * ()->m_height);
+	const std::uint8_t height(node->m_height);
 
+	node_view desired(node);
 	for (std::uint8_t layer = 1; layer < height; ++layer) {
-		exchange_node_link(&atSet[layer].operator node_type * ()->m_next[layer], expectedSet[layer], node, expectedSet[layer].get_version());
+		exchange_node_link(&atSet[layer].operator node_type * ()->m_next[layer], expectedSet[layer], desired, expectedSet[layer].get_version());
 	}
 }
 
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class AllocationStrategy, class Compare>
-inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::link_to_front(typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view_set& frontSet, typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view_set& nextSet, typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view node)
+inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::link_to_front(typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view_set& frontSet, typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view_set& nextSet, typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_type* node)
 {
 	nextSet[0] = node;
 
-	const node_type* const toInsert(node);
 	const node_type* const currentFront(frontSet[0]);
 
 	const std::uint8_t frontHeight(currentFront->m_height);
 
-	if (toInsert->m_height < frontHeight) {
+	if (node->m_height < frontHeight) {
 		load_set(frontSet, &m_head, 1, frontHeight);
 	}
 
@@ -699,34 +707,37 @@ inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 	return false;
 }
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class AllocationStrategy, class Compare>
-inline void concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::counteract_version_lag(std::uint8_t aboveLayer, std::uint32_t versionBase, std::uint8_t versionStep, node_view_set& expected)
+inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::needs_version_lag_check(std::uint32_t versionBase, std::uint32_t versionStep)
 {
 	const size_type versionPart(versionBase % to_expected_list_size(LinkTowerHeight));
 	const size_type edgeCheck(versionPart + versionStep);
 
-	if (!(edgeCheck < to_expected_list_size(LinkTowerHeight))) {
-		for (std::uint8_t i = aboveLayer; i < LinkTowerHeight; ++i) {
+	return !(edgeCheck < to_expected_list_size(LinkTowerHeight));
+}
+template<class Key, class Value, std::uint8_t LinkTowerHeight, class AllocationStrategy, class Compare>
+inline void concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::counteract_version_lag(std::uint8_t aboveLayer, std::uint32_t versionBase, node_view_set& expected)
+{
+	for (std::uint8_t i = aboveLayer; i < LinkTowerHeight; ++i) {
 
-			node_view expectedLinkValue(expected[i]);
+		node_view expectedLinkValue(expected[i]);
 
-			if (!expectedLinkValue.operator bool()) {
-				expectedLinkValue = m_head.m_next[i].load(std::memory_order_relaxed);
-			}
+		if (!expectedLinkValue.operator bool()) {
+			expectedLinkValue = m_head.m_next[i].load(std::memory_order_relaxed);
+		}
 
-			const std::uint32_t versionLink(expectedLinkValue.get_version());
+		const std::uint32_t versionLink(expectedLinkValue.get_version());
 
-			if (cpq_detail::in_range(versionLink, versionBase)) {
+		if (cpq_detail::in_range(versionLink, versionBase)) {
 
-				const std::uint32_t versionDelta(cpq_detail::version_delta(versionLink, versionBase));
+			const std::uint32_t versionDelta(cpq_detail::version_delta(versionLink, versionBase));
 
-				// If one of the upper layer links has strayed to far from the current base layer version we need to drag
-				// it in to range again
-				if (to_expected_list_size(LinkTowerHeight) < versionDelta) {
-					const std::uint32_t recentVersion(cpq_detail::version_sub_one(versionBase));
-					const node_view desired(expectedLinkValue, recentVersion);
+			// If one of the upper layer links has strayed to far from the current base layer version we need to drag
+			// it in to range again
+			if (to_expected_list_size(LinkTowerHeight) < versionDelta) {
+				const std::uint32_t recentVersion(cpq_detail::version_sub_one(versionBase));
+				const node_view desired(expectedLinkValue, recentVersion);
 
-					m_head.m_next[i].compare_exchange_strong(expectedLinkValue, desired, std::memory_order_relaxed);
-				}
+				m_head.m_next[i].compare_exchange_strong(expectedLinkValue, desired, std::memory_order_relaxed);
 			}
 		}
 	}
@@ -851,7 +862,7 @@ inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class AllocationStrategy, class Compare>
 inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::is_flagged(concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view n) const
 {
-	return n.get_version();
+	return n.has_version();
 }
 
 struct tl_container
@@ -970,6 +981,10 @@ struct node
 		operator bool() const
 		{
 			return operator const node * ();
+		}
+		bool has_version() const
+		{
+			return m_value & Version_Mask;
 		}
 		std::uint32_t get_version() const
 		{
