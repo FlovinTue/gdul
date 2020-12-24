@@ -17,7 +17,7 @@ namespace cpq_detail {
 
 using size_type = std::size_t;
 
-static constexpr size_type log2_ceil(size_type value)
+constexpr size_type log2_ceil(size_type value)
 {
 	size_type highBit(0);
 	size_type shift(value);
@@ -32,14 +32,14 @@ static constexpr size_type log2_ceil(size_type value)
 
 	return highBit + remainder;
 }
-static constexpr std::uint8_t to_tower_height(size_type expectedListSize)
+constexpr std::uint8_t to_tower_height(size_type expectedListSize)
 {
 	const std::uint8_t naturalHeight((std::uint8_t)log2_ceil(expectedListSize));
 	const std::uint8_t halfHeight(naturalHeight / 2 + bool(naturalHeight % 2));
 
 	return halfHeight;
 }
-static constexpr size_type to_expected_list_size(std::uint8_t towerHeight)
+constexpr size_type to_expected_list_size(std::uint8_t towerHeight)
 {
 	size_type base(1);
 
@@ -50,11 +50,11 @@ static constexpr size_type to_expected_list_size(std::uint8_t towerHeight)
 	return base;
 }
 
-static constexpr std::uintptr_t Bottom_Bits = ~(std::uintptr_t(std::numeric_limits<std::uintptr_t>::max()) << 3);
-static constexpr std::uintptr_t Pointer_Mask = (std::numeric_limits<std::uintptr_t>::max() >> 16) & ~Bottom_Bits;
-static constexpr std::uintptr_t Version_Mask = ~Pointer_Mask;
-static constexpr std::uint32_t Max_Version = (std::numeric_limits<std::uint32_t>::max() >> (16 - 3));
-static constexpr std::uint32_t In_Range_Delta = Max_Version / 2;
+constexpr std::uintptr_t Bottom_Bits = ~(std::uintptr_t(std::numeric_limits<std::uintptr_t>::max()) << 3);
+constexpr std::uintptr_t Pointer_Mask = (std::numeric_limits<std::uintptr_t>::max() >> 16) & ~Bottom_Bits;
+constexpr std::uintptr_t Version_Mask = ~Pointer_Mask;
+constexpr std::uint32_t Max_Version = (std::numeric_limits<std::uint32_t>::max() >> (16 - 3));
+constexpr std::uint32_t In_Range_Delta = Max_Version / 2;
 
 enum exchange_link_result : std::uint8_t
 {
@@ -71,12 +71,47 @@ enum flag_node_result : std::uint8_t
 	flag_node_success = 3,
 };
 
-static std::uint32_t version_delta(std::uint32_t from, std::uint32_t to);
-static std::uint32_t version_add_one(std::uint32_t from);
-static std::uint32_t version_sub_one(std::uint32_t from);
-static std::uint32_t version_step(std::uint32_t from, std::uint8_t step);
-static std::uint8_t random_height(std::uint8_t);
-static bool in_range(std::uint32_t version, std::uint32_t inRangeOf);
+constexpr std::uint32_t version_delta(std::uint32_t from, std::uint32_t to)
+{
+	const std::uint32_t delta(to - from);
+	return delta & Max_Version;
+}
+constexpr std::uint32_t version_add_one(std::uint32_t from)
+{
+	const std::uint32_t next(from + 1);
+	const std::uint32_t masked(next & Max_Version);
+	const std::uint32_t zeroAdjust(!(bool)masked);
+
+	return masked + zeroAdjust;
+}
+constexpr std::uint32_t version_sub_one(std::uint32_t from)
+{
+	const std::uint32_t next(from - 1);
+	const std::uint32_t zeroAdjust(!(bool)next);
+	const std::uint32_t adjusted(next - zeroAdjust);
+
+	return adjusted & Max_Version;
+}
+constexpr std::uint32_t version_step(std::uint32_t from, std::uint8_t step)
+{
+	const std::uint32_t result(version_add_one(from));
+	if (step == 1) {
+		return result;
+	}
+	return version_add_one(result);
+}
+constexpr bool in_range(std::uint32_t version, std::uint32_t inRangeOf)
+{
+	// Zero special case
+	if (version != 0) {
+		return version_delta(version, inRangeOf) < In_Range_Delta;
+	}
+
+	return true;
+}
+
+template <class Dummy = void>
+std::uint8_t random_height(std::uint8_t);
 
 template <class Key, class Value, std::uint8_t LinkTowerHeight>
 struct node;
@@ -242,6 +277,7 @@ private:
 	static bool needs_version_lag_check(std::uint32_t versionBase, std::uint32_t versionStep);
 	void counteract_version_lag(std::uint8_t aboveLayer, std::uint32_t versionBase, node_view_set& expected);
 
+
 	// Also end
 	node_type m_head;
 };
@@ -295,7 +331,7 @@ inline void concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 	if constexpr (!std::is_same_v<allocation_strategy, cpq_allocation_strategy_external>) {
 		n = this->m_pool.get();
 		n->m_kv = std::forward<In>(in);
-		n->m_height = random_height(LinkTowerHeight);
+		n->m_height = random_height<>(LinkTowerHeight);
 	}
 	else {
 		n = in;
@@ -892,7 +928,8 @@ struct tl_container
 
 }static thread_local t_rng;
 
-static std::uint8_t random_height(std::uint8_t maxHeight)
+template <class Dummy>
+std::uint8_t random_height(std::uint8_t maxHeight)
 {
 	std::uint8_t result(1);
 
@@ -904,44 +941,7 @@ static std::uint8_t random_height(std::uint8_t maxHeight)
 
 	return result;
 }
-static std::uint32_t version_delta(std::uint32_t from, std::uint32_t to)
-{
-	const std::uint32_t delta(to - from);
-	return delta & Max_Version;
-}
-static std::uint32_t version_add_one(std::uint32_t from)
-{
-	const std::uint32_t next(from + 1);
-	const std::uint32_t masked(next & Max_Version);
-	const std::uint32_t zeroAdjust(!(bool)masked);
 
-	return masked + zeroAdjust;
-}
-static std::uint32_t version_sub_one(std::uint32_t from)
-{
-	const std::uint32_t next(from - 1);
-	const std::uint32_t zeroAdjust(!(bool)next);
-	const std::uint32_t adjusted(next - zeroAdjust);
-
-	return adjusted & Max_Version;
-}
-static std::uint32_t version_step(std::uint32_t from, std::uint8_t step)
-{
-	const std::uint32_t result(version_add_one(from));
-	if (step == 1) {
-		return result;
-	}
-	return version_add_one(result);
-}
-static bool in_range(std::uint32_t version, std::uint32_t inRangeOf)
-{
-	// Zero special case
-	if (version != 0) {
-		return version_delta(version, inRangeOf) < In_Range_Delta;
-	}
-
-	return true;
-}
 template <class Key, class Value, std::uint8_t LinkTowerHeight>
 struct node
 {

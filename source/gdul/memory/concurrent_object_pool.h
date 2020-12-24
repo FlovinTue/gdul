@@ -27,7 +27,7 @@
 namespace gdul {
 
 namespace cop_detail {
-static constexpr std::size_t Defaul_Block_Size = 8;
+constexpr std::size_t Defaul_Block_Size = 8;
 }
 
 // Concurrency safe, lock free object pool. Contains an optimization where recycled objects belonging to an 'old' 
