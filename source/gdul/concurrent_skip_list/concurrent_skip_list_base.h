@@ -17,6 +17,10 @@ namespace csl_detail {
 
 using size_type = std::size_t;
 
+constexpr std::uintptr_t Bottom_Bits = ~(std::uintptr_t(std::numeric_limits<std::uintptr_t>::max()) << 3);
+constexpr std::uintptr_t Pointer_Mask = (std::numeric_limits<std::uintptr_t>::max() >> 16) & ~Bottom_Bits;
+constexpr std::uintptr_t Version_Mask = ~Pointer_Mask;
+
 constexpr size_type log2_ceil(size_type value)
 {
 	size_type highBit(0);
@@ -145,7 +149,7 @@ inline concurrent_skip_list_base<Key, Value, LinkTowerHeight, Compare>::concurre
 	m_head.m_kv.first = std::numeric_limits<key_type>::max();
 
 	for (size_type i = 0; i < LinkTowerHeight; ++i) {
-		m_head.m_next[i].store(&m_head, std::memory_order_relaxed);
+		m_head.m_linkViews[i].store(&m_head, std::memory_order_relaxed);
 	}
 }
 
@@ -166,7 +170,7 @@ inline Iterator concurrent_skip_list_base<Key, Value, LinkTowerHeight, Compare>:
 		const std::uint8_t layer(LinkTowerHeight - i - 1);
 
 		for (;;) {
-			Iterator next{ at.m_at->m_next[layer].load(std::memory_order_relaxed) };
+			Iterator next{ (node_type*)at.m_at->m_linkViews[layer].load(std::memory_order_relaxed) };
 
 			const key_type atKey((*next).first);
 
@@ -200,13 +204,13 @@ inline typename concurrent_skip_list_base<Key, Value, LinkTowerHeight, Compare>:
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class Compare>
 inline typename concurrent_skip_list_base<Key, Value, LinkTowerHeight, Compare>::iterator concurrent_skip_list_base<Key, Value, LinkTowerHeight, Compare>::begin()
 {
-	return { m_head.m_next[0].load(std::memory_order_relaxed) };
+	return { (node_type*)m_head.m_linkViews[0].load(std::memory_order_relaxed) };
 }
 
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class Compare>
 inline typename concurrent_skip_list_base<Key, Value, LinkTowerHeight, Compare>::const_iterator concurrent_skip_list_base<Key, Value, LinkTowerHeight, Compare>::begin() const
 {
-	return { m_head.m_next[0].load(std::memory_order_relaxed) };
+	return { (node_type*)m_head.m_linkViews[0].load(std::memory_order_relaxed) };
 }
 
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class Compare>
@@ -218,13 +222,13 @@ inline typename concurrent_skip_list_base<Key, Value, LinkTowerHeight, Compare>:
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class Compare>
 inline typename concurrent_skip_list_base<Key, Value, LinkTowerHeight, Compare>::const_iterator concurrent_skip_list_base<Key, Value, LinkTowerHeight, Compare>::end() const
 {
-	return const_iterator(&m_head);
+	return const_iterator((node_type*)&m_head);
 }
 
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class Compare>
 inline bool concurrent_skip_list_base<Key, Value, LinkTowerHeight, Compare>::empty() const noexcept
 {
-	return at_end(m_head.m_next[0].load(std::memory_order_relaxed));
+	return at_end((node_type*)m_head.m_linkViews[0].load(std::memory_order_relaxed));
 }
 
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class Compare>
@@ -408,7 +412,7 @@ struct forward_iterator : public iterator_base<Node>
 
 	forward_iterator operator++()
 	{
-		return { this->m_at->m_next[0].load(std::memory_order_relaxed) };
+		return { this->m_at->m_linkViews[0].load(std::memory_order_relaxed).m_node };
 	}
 
 	std::pair<iterator_base<Node>::key_type, iterator_base<Node>::value_type>& operator*()
@@ -433,7 +437,7 @@ struct const_forward_iterator : public iterator_base<Node>
 
 	const_forward_iterator operator++() const
 	{
-		return { this->m_at->m_next[0].load(std::memory_order_relaxed) };
+		return { this->m_at->m_linkViews[0].load(std::memory_order_relaxed).m_node };
 	}
 };
 }
