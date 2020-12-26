@@ -6,10 +6,6 @@
 #include <algorithm>
 #include <thread>
 
-#pragma warning(push)
-// Alignment padding
-#pragma warning(disable : 4324)
-
 #pragma region detail
 
 namespace gdul {
@@ -76,8 +72,8 @@ public:
 	using node_type = node<Key, Value, LinkTowerHeight>;
 	using size_type = typename size_type;
 	using comparator_type = Compare;
-	using iterator = csl_detail::forward_iterator<node_type>;
-	using const_iterator = csl_detail::const_forward_iterator<const node_type>;
+	using iterator = forward_iterator<node_type>;
+	using const_iterator = const_forward_iterator<const node_type>;
 
 	/// <summary>
 	/// Constructor
@@ -95,6 +91,7 @@ public:
 	/// <returns>True if no items exists in list</returns>
 	bool empty() const noexcept;
 
+protected:
 	/// <summary>
 	/// Search for key
 	/// </summary>
@@ -132,12 +129,12 @@ public:
 	/// </summary>
 	/// <returns>Iterator to end element</returns>
 	const_iterator end() const;
-protected:
 
 	template <class Iterator>
 	static Iterator find_internal(Iterator head, key_type k);
 
 	bool at_end(const node_type* n) const;
+	bool at_head(const node_type* n) const;
 
 	// Also end
 	node_type m_head;
@@ -204,25 +201,25 @@ inline typename concurrent_skip_list_base<Key, Value, LinkTowerHeight, Compare>:
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class Compare>
 inline typename concurrent_skip_list_base<Key, Value, LinkTowerHeight, Compare>::iterator concurrent_skip_list_base<Key, Value, LinkTowerHeight, Compare>::begin()
 {
-	return { (node_type*)m_head.m_linkViews[0].load(std::memory_order_relaxed) };
+	return iterator(m_head.m_linkViews[0].load(std::memory_order_relaxed).m_node);
 }
 
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class Compare>
 inline typename concurrent_skip_list_base<Key, Value, LinkTowerHeight, Compare>::const_iterator concurrent_skip_list_base<Key, Value, LinkTowerHeight, Compare>::begin() const
 {
-	return { (node_type*)m_head.m_linkViews[0].load(std::memory_order_relaxed) };
+	return const_iterator(m_head.m_linkViews[0].load(std::memory_order_relaxed).m_node);
 }
 
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class Compare>
 inline typename concurrent_skip_list_base<Key, Value, LinkTowerHeight, Compare>::iterator concurrent_skip_list_base<Key, Value, LinkTowerHeight, Compare>::end()
 {
-	return { &m_head };
+	return iterator(&m_head);
 }
 
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class Compare>
 inline typename concurrent_skip_list_base<Key, Value, LinkTowerHeight, Compare>::const_iterator concurrent_skip_list_base<Key, Value, LinkTowerHeight, Compare>::end() const
 {
-	return const_iterator((node_type*)&m_head);
+	return const_iterator(&m_head);
 }
 
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class Compare>
@@ -235,6 +232,12 @@ template<class Key, class Value, std::uint8_t LinkTowerHeight, class Compare>
 inline bool concurrent_skip_list_base<Key, Value, LinkTowerHeight, Compare>::at_end(const concurrent_skip_list_base<Key, Value, LinkTowerHeight, Compare>::node_type* n) const
 {
 	return n == &m_head;
+}
+
+template<class Key, class Value, std::uint8_t LinkTowerHeight, class Compare>
+inline bool concurrent_skip_list_base<Key, Value, LinkTowerHeight, Compare>::at_head(const concurrent_skip_list_base<Key, Value, LinkTowerHeight, Compare>::node_type* n) const
+{
+	return at_end(n);
 }
 
 struct tl_container
@@ -441,6 +444,4 @@ struct const_forward_iterator : public iterator_base<Node>
 	}
 };
 }
-
 }
-#pragma warning(pop)
