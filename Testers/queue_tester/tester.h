@@ -678,7 +678,7 @@ inline void tester<T, Allocator>::Write(std::uint32_t writes) {
 #if !defined(MOODYCAMEL) && !defined(GDUL_CPQ)
 		m_queue.push(in);
 #elif defined(GDUL_CPQ)
-		const std::pair<typename T::first_type, typename T::second_type> in(gdul::cpq_detail::t_rng(), typename T::second_type());
+		const std::pair<typename T::first_type, typename T::second_type> in(gdul::csl_detail::t_rng(), typename T::second_type());
 		m_queue.push(in);
 		sum += in.first;
 #else

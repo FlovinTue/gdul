@@ -148,7 +148,7 @@ inline void concurrent_skip_list_impl<Key, Value, LinkTowerHeight, Compare, Allo
 	assert(this->empty() && "Bad call to unsafe_reset, there are still items in the list");
 	this->m_pool.unsafe_reset();
 
-	std::for_each(std::begin(m_head.m_next), std::end(m_head.m_next), [this](std::atomic<node_type*>& link) {link.store(&m_head, std::memory_order_relaxed); });
+	std::for_each(std::begin(m_head.m_links), std::end(m_head.m_links), [this](std::atomic<node_type*>& link) {link.store(&m_head, std::memory_order_relaxed); });
 }
 
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class Compare, class Allocator>
@@ -162,7 +162,7 @@ inline bool concurrent_skip_list_impl<Key, Value, LinkTowerHeight, Compare, Allo
 		const std::uint8_t layer(LinkTowerHeight - i - 1);
 
 		for (;;) {
-			nextSet[layer] = atSet[layer]->m_next[layer].load(std::memory_order_relaxed);
+			nextSet[layer] = atSet[layer]->m_links[layer].load(std::memory_order_relaxed);
 
 			const key_type nextKey(nextSet[layer]->m_kv.first);
 
@@ -202,15 +202,15 @@ inline std::pair<typename concurrent_skip_list_impl<Key, Value, LinkTowerHeight,
 	const std::uint8_t height(node->m_height);
 
 	for (std::uint8_t i = 0; i < height; ++i) {
-		node->m_next[i].store(nextSet[i], std::memory_order_relaxed);
+		node->m_links[i].store(nextSet[i], std::memory_order_relaxed);
 	}
 
-	if (!atSet[0]->m_next[0].compare_exchange_strong(nextSet[0], node, std::memory_order_relaxed)) {
+	if (!atSet[0]->m_links[0].compare_exchange_strong(nextSet[0], node, std::memory_order_relaxed)) {
 		return std::make_pair(this->end(), false);
 	}
 
 	for (std::uint8_t layer = 1; layer < height; ++layer) {
-		atSet[layer]->m_next[layer].compare_exchange_strong(nextSet[layer], node, std::memory_order_relaxed);
+		atSet[layer]->m_links[layer].compare_exchange_strong(nextSet[layer], node, std::memory_order_relaxed);
 	}
 
 	return std::make_pair(iterator(node), true);

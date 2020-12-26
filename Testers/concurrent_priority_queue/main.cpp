@@ -15,10 +15,8 @@ std::mt19937 rng(rd());
 
 int main()
 {
-
 	std::allocator<std::uint8_t> alloc;
 	gdul::concurrent_priority_queue<int, float> q(alloc);
-	
 	std::pair<int, float> two	(std::make_pair(2, 1.f));
 	std::pair<int, float> six	(std::make_pair(6, 1.f));
 	std::pair<int, float> three	(std::make_pair(3, 1.f));
@@ -36,6 +34,12 @@ int main()
 	q.push(five);
 	q.push(five);
 	q.push(five);
+
+	decltype(q)::iterator begin(q.unsafe_begin());
+	decltype(q)::iterator end(q.unsafe_end());
+	decltype(q)::iterator findResult(q.unsafe_find(2));
+
+	assert(findResult->first == 2 && "Unexpected find value");
 	
 	std::pair<int, float> outone;
 	std::pair<int, float> outtwo;
