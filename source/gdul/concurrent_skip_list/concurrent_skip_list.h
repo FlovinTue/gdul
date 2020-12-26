@@ -23,6 +23,15 @@ class alignas(std::hardware_destructive_interference_size) concurrent_skip_list_
 }
 #pragma endregion
 
+
+/// <summary>
+/// A concurrency safe lock-free skip list with a map-style interface. It does not support concurrent deletion
+/// </summary>
+/// <typeparam name="Key">Key type</typeparam>
+/// <typeparam name="Value">Value type</typeparam>
+/// <typeparam name="ExpectedListSize">How many items is expected to be in the list at any one time. Hint to determine node tower height</typeparam>
+/// <typeparam name="Allocator">Allocator passed to the node pool</typeparam>
+/// <typeparam name="Compare">Comparator to decide node ordering</typeparam>
 template <class Key, class Value, csl_detail::size_type ExpectedListSize = 512, class Compare = std::less<Key>, class Allocator = std::allocator<std::uint8_t>>
 class concurrent_skip_list : public csl_detail::concurrent_skip_list_impl<Key, Value, csl_detail::to_tower_height(ExpectedListSize), Compare, Allocator>
 {
@@ -43,7 +52,7 @@ public:
 	using typename concurrent_skip_list_base<Key, Value, LinkTowerHeight, Compare>::const_iterator;
 	using typename concurrent_skip_list_base<Key, Value, LinkTowerHeight, Compare>::size_type;
 	using typename concurrent_skip_list_base<Key, Value, LinkTowerHeight, Compare>::node_type;
-	
+
 	using allocator_type = Allocator;
 
 	/// <summary>
@@ -74,25 +83,26 @@ public:
 	/// <param name="in">Item to be inserted using move semantics</param>
 	std::pair<iterator, bool> insert(std::pair<Key, Value>&& in);
 
+	using concurrent_skip_list_base<Key, Value, LinkTowerHeight, Compare>::begin;
+	using concurrent_skip_list_base<Key, Value, LinkTowerHeight, Compare>::end;
+	using concurrent_skip_list_base<Key, Value, LinkTowerHeight, Compare>::find;
+
 	/// <summary>
 	/// Reset to initial state
 	/// Assumes no concurrent inserts and an empty list
 	/// </summary>
 	void unsafe_reset();
 
-	using concurrent_skip_list_base<Key, Value, LinkTowerHeight, Compare>::begin;
-	using concurrent_skip_list_base<Key, Value, LinkTowerHeight, Compare>::end;
-	using concurrent_skip_list_base<Key, Value, LinkTowerHeight, Compare>::find;
-
 private:
-	using node_set = node_type * [LinkTowerHeight];
+	using node_view = typename node_type::node_view;
+	using node_view_set = node_view [LinkTowerHeight];
 	using concurrent_skip_list_base<Key, Value, LinkTowerHeight, Compare>::m_head;
 
 	template <class In>
 	std::pair<iterator, bool> insert_internal(In&& in);
 	std::pair<iterator, bool> try_insert(node_type* node);
 
-	bool find_slot(node_set& atSet, node_set& nextSet, const node_type* node) const;
+	bool find_slot(node_view_set& atSet, node_view_set& nextSet, const node_type* node) const;
 
 	concurrent_scratch_pool<node_type, Allocator> m_pool;
 };
@@ -148,11 +158,11 @@ inline void concurrent_skip_list_impl<Key, Value, LinkTowerHeight, Compare, Allo
 	assert(this->empty() && "Bad call to unsafe_reset, there are still items in the list");
 	this->m_pool.unsafe_reset();
 
-	std::for_each(std::begin(m_head.m_links), std::end(m_head.m_links), [this](std::atomic<node_type*>& link) {link.store(&m_head, std::memory_order_relaxed); });
+	std::for_each(std::begin(m_head.m_linkViews), std::end(m_head.m_linkViews), [this](std::atomic<node_type*>& link) {link.store(&m_head, std::memory_order_relaxed); });
 }
 
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class Compare, class Allocator>
-inline bool concurrent_skip_list_impl<Key, Value, LinkTowerHeight, Compare, Allocator>::find_slot(node_set& atSet, node_set& nextSet, const node_type* node) const
+inline bool concurrent_skip_list_impl<Key, Value, LinkTowerHeight, Compare, Allocator>::find_slot(node_view_set& atSet, node_view_set& nextSet, const node_type* node) const
 {
 	constexpr comparator_type comparator;
 
@@ -162,9 +172,9 @@ inline bool concurrent_skip_list_impl<Key, Value, LinkTowerHeight, Compare, Allo
 		const std::uint8_t layer(LinkTowerHeight - i - 1);
 
 		for (;;) {
-			nextSet[layer] = atSet[layer]->m_links[layer].load(std::memory_order_relaxed);
+			nextSet[layer] = atSet[layer].m_node->m_linkViews[layer].load(std::memory_order_relaxed);
 
-			const key_type nextKey(nextSet[layer]->m_kv.first);
+			const key_type nextKey(nextSet[layer].m_node->m_kv.first);
 
 			if (!comparator(nextKey, key)) {
 
@@ -190,27 +200,27 @@ inline bool concurrent_skip_list_impl<Key, Value, LinkTowerHeight, Compare, Allo
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class Compare, class Allocator>
 inline std::pair<typename concurrent_skip_list_impl<Key, Value, LinkTowerHeight, Compare, Allocator>::iterator, bool> concurrent_skip_list_impl<Key, Value, LinkTowerHeight, Compare, Allocator>::try_insert(typename concurrent_skip_list_impl<Key, Value, LinkTowerHeight, Compare, Allocator>::node_type* node)
 {
-	node_set atSet{};
-	node_set nextSet{};
+	node_view_set atSet{};
+	node_view_set nextSet{};
 
-	atSet[LinkTowerHeight - 1] = &m_head;
+	atSet[LinkTowerHeight - 1].m_node = &m_head;
 
 	if (!find_slot(atSet, nextSet, node)) {
-		return std::make_pair(iterator(atSet[0]), false);
+		return std::make_pair(iterator(atSet[0].m_node), false);
 	}
 
 	const std::uint8_t height(node->m_height);
 
 	for (std::uint8_t i = 0; i < height; ++i) {
-		node->m_links[i].store(nextSet[i], std::memory_order_relaxed);
+		node->m_linkViews[i].store(nextSet[i], std::memory_order_relaxed);
 	}
 
-	if (!atSet[0]->m_links[0].compare_exchange_strong(nextSet[0], node, std::memory_order_relaxed)) {
+	if (!atSet[0].m_node->m_linkViews[0].compare_exchange_strong(nextSet[0], node, std::memory_order_relaxed)) {
 		return std::make_pair(this->end(), false);
 	}
 
 	for (std::uint8_t layer = 1; layer < height; ++layer) {
-		atSet[layer]->m_links[layer].compare_exchange_strong(nextSet[layer], node, std::memory_order_relaxed);
+		atSet[layer].m_node->m_linkViews[layer].compare_exchange_strong(nextSet[layer], node, std::memory_order_relaxed);
 	}
 
 	return std::make_pair(iterator(node), true);
