@@ -23,6 +23,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "queue_tester", "Testers\que
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "concurrent_priority_queue", "Testers\concurrent_priority_queue\concurrent_priority_queue.vcxproj", "{9F5FBE3A-88C5-46DE-ADCF-4F06D60676A9}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "concurrent_skip_list", "Testers\concurrent_skip_list\concurrent_skip_list.vcxproj", "{9A52AFB5-3696-4CC9-9291-54A62CA43993}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -91,6 +93,12 @@ Global
 		{9F5FBE3A-88C5-46DE-ADCF-4F06D60676A9}.Release|x64.ActiveCfg = Release|x64
 		{9F5FBE3A-88C5-46DE-ADCF-4F06D60676A9}.Release|x64.Build.0 = Release|x64
 		{9F5FBE3A-88C5-46DE-ADCF-4F06D60676A9}.Release|x86.ActiveCfg = Release|x64
+		{9A52AFB5-3696-4CC9-9291-54A62CA43993}.Debug|x64.ActiveCfg = Debug|x64
+		{9A52AFB5-3696-4CC9-9291-54A62CA43993}.Debug|x64.Build.0 = Debug|x64
+		{9A52AFB5-3696-4CC9-9291-54A62CA43993}.Debug|x86.ActiveCfg = Debug|x64
+		{9A52AFB5-3696-4CC9-9291-54A62CA43993}.Release|x64.ActiveCfg = Release|x64
+		{9A52AFB5-3696-4CC9-9291-54A62CA43993}.Release|x64.Build.0 = Release|x64
+		{9A52AFB5-3696-4CC9-9291-54A62CA43993}.Release|x86.ActiveCfg = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
