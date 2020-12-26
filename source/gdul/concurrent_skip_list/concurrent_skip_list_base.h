@@ -218,7 +218,7 @@ inline typename concurrent_skip_list_base<Key, Value, LinkTowerHeight, Compare>:
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class Compare>
 inline typename concurrent_skip_list_base<Key, Value, LinkTowerHeight, Compare>::const_iterator concurrent_skip_list_base<Key, Value, LinkTowerHeight, Compare>::end() const
 {
-	return { &m_head };
+	return const_iterator(&m_head);
 }
 
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class Compare>
@@ -280,11 +280,79 @@ struct node
 	using key_type = Key;
 	using value_type = Value;
 
-	node() : m_kv(), m_next{}, m_height(LinkTowerHeight) {}
-	node(std::pair<Key, Value>&& item) : m_kv(std::move(item)), m_next{}, m_height(LinkTowerHeight) {}
-	node(const std::pair<Key, Value>& item) : m_kv(item), m_next{}, m_height(LinkTowerHeight){}
+	union node_view
+	{
+		using node_type = node;
 
-	std::atomic<node*> m_next[LinkTowerHeight]{};
+		node_view() = default;
+		node_view(node_type* n)
+			: m_value((std::uintptr_t)(n))
+		{
+		}
+		node_view(node_type* n, std::uint32_t version)
+			:node_view(n)
+		{
+			set_version(version);
+		}
+
+		operator node_type* ()
+		{
+			return (node_type*)(m_value & Pointer_Mask);
+		}
+		operator const node_type* () const
+		{
+			return (const node_type*)(m_value & Pointer_Mask);
+		}
+
+		operator std::uintptr_t() = delete;
+
+		bool operator ==(node_view other) const
+		{
+			return operator const node_type * () == other.operator const node_type * ();
+		}
+		bool operator !=(node_view other) const
+		{
+			return !operator==(other);
+		}
+		operator bool() const
+		{
+			return operator const node_type * ();
+		}
+		bool has_version() const
+		{
+			return m_value & Version_Mask;
+		}
+		std::uint32_t get_version() const
+		{
+			const std::uint64_t pointerValue(m_value & Version_Mask);
+			const std::uint64_t lower(pointerValue & Bottom_Bits);
+			const std::uint64_t upper(pointerValue >> 45);
+			const std::uint64_t conc(lower + upper);
+
+			return (std::uint32_t)conc;
+		}
+		void set_version(std::uint32_t v)
+		{
+			const std::uint64_t v64(v);
+			const std::uint64_t lower(v64 & Bottom_Bits);
+			const std::uint64_t upper((v64 << 45) & ~Pointer_Mask);
+			const std::uint64_t versionValue(upper | lower);
+			const std::uint64_t pointerValue(m_value & Pointer_Mask);
+
+			m_value = (versionValue | pointerValue);
+		}
+
+		node_type* m_node;
+		std::uintptr_t m_value;
+	};
+
+	node() : m_kv(), m_linkViews{}, m_height(LinkTowerHeight) {}
+	node(std::pair<Key, Value>&& item) : m_kv(std::move(item)), m_linkViews{}, m_height(LinkTowerHeight) {}
+	node(const std::pair<Key, Value>& item) : m_kv(item), m_linkViews{}, m_height(LinkTowerHeight){}
+
+
+
+	std::atomic<node_view> m_linkViews[LinkTowerHeight];
 	std::uint8_t m_height;
 	std::pair<Key, Value> m_kv;
 };
@@ -357,6 +425,11 @@ template <class Node>
 struct const_forward_iterator : public iterator_base<Node>
 {
 	using iterator_base<Node>::iterator_base;
+
+	const_forward_iterator(forward_iterator<std::remove_const_t<Node>> fi)
+		: iterator_base<Node>(fi.m_at)
+	{
+	}
 
 	const_forward_iterator operator++() const
 	{
