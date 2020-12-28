@@ -343,7 +343,7 @@ inline void concurrent_queue<T, Allocator>::unsafe_reset()
 template<class T, class Allocator>
 inline typename concurrent_queue<T, Allocator>::size_type concurrent_queue<T, Allocator>::size() const
 {
-	const std::uint16_t producerCount(m_producerCount.load(std::memory_order_relaxed));
+	const std::uint16_t producerCount(m_producerCount.load(std::memory_order_acquire));
 
 	shared_ptr_array_type producerArray(m_producerSlots.load(std::memory_order_relaxed));
 
@@ -378,7 +378,7 @@ inline void concurrent_queue<T, Allocator>::init_producer(typename concurrent_qu
 template<class T, class Allocator>
 inline bool concurrent_queue<T, Allocator>::relocate_consumer()
 {
-	const std::uint16_t producers(m_producerCount.load(std::memory_order_relaxed));
+	const std::uint16_t producers(m_producerCount.load(std::memory_order_acquire));
 	if (producers < 2) {
 		buffer_type* const cached(this_consumer_cached());
 		if ((cached->is_valid() && cached->is_active()) || producers == 0) {
@@ -386,21 +386,21 @@ inline bool concurrent_queue<T, Allocator>::relocate_consumer()
 		}
 	}
 
-	const std::uint16_t relocation(m_relocationIndex.fetch_add(1, std::memory_order_relaxed));
+	const std::uint16_t relocation(m_relocationIndex.fetch_add(1, std::memory_order_acq_rel));
 	const std::uint16_t maxVisited(producers - static_cast<bool>(producers) + !(producers - static_cast<bool>(producers)));
 
 	cqdetail::consumer_wrapper<shared_ptr_slot_type, shared_ptr_array_type>& consumer(t_consumer);
 
 	if (consumer.m_lastKnownArray != m_producerSlots) {
-		consumer.m_lastKnownArray = m_producerSlots.load(std::memory_order_relaxed);
+		consumer.m_lastKnownArray = m_producerSlots.load(std::memory_order_acquire);
 	}
 
 	for (std::uint16_t i = 0, j = relocation; i < maxVisited; ++i, ++j) {
 		const std::uint16_t entry(j % producers);
-		shared_ptr_slot_type producerBuffer(consumer.m_lastKnownArray[entry].load(std::memory_order_relaxed));
+		shared_ptr_slot_type producerBuffer(consumer.m_lastKnownArray[entry].load(std::memory_order_acquire));
 
 		if (!producerBuffer) {
-			consumer.m_lastKnownArray = m_producerSlots.load(std::memory_order_relaxed);
+			consumer.m_lastKnownArray = m_producerSlots.load(std::memory_order_acquire);
 			--i; --j;
 			continue;
 		}
@@ -416,7 +416,7 @@ inline bool concurrent_queue<T, Allocator>::relocate_consumer()
 			if (successor) {
 				if (producerBuffer->verify_successor(successor)) {
 					producerBuffer = std::move(successor);
-					consumer.m_lastKnownArray[entry].store(producerBuffer, std::memory_order_relaxed);
+					consumer.m_lastKnownArray[entry].store(producerBuffer, std::memory_order_release);
 				}
 			}
 		}
@@ -500,10 +500,10 @@ inline typename concurrent_queue<T, Allocator>::shared_ptr_slot_type concurrent_
 template <class T, class Allocator>
 std::uint16_t concurrent_queue<T, Allocator>::claim_producer_slot()
 {
-	std::uint16_t desiredSlot(m_producerSlotReservation.load(std::memory_order_relaxed));
+	std::uint16_t desiredSlot(m_producerSlotReservation.load(std::memory_order_acquire));
 	do{
 		ensure_producer_slots_capacity(desiredSlot + 1);
-	}while (!m_producerSlotReservation.compare_exchange_strong(desiredSlot, desiredSlot + 1, std::memory_order_relaxed));
+	}while (!m_producerSlotReservation.compare_exchange_strong(desiredSlot, desiredSlot + 1, std::memory_order_relaxed, std::memory_order_release));
 
 	return desiredSlot;
 }
@@ -555,15 +555,15 @@ inline void concurrent_queue<T, Allocator>::force_store_to_producer_slot(shared_
 	shared_ptr_array_type swapArray(nullptr);
 
 	do{
-		activeArray = m_producerSlots.load(std::memory_order_relaxed);
-		swapArray = m_producerSlotsSwap.load(std::memory_order_relaxed);
+		activeArray = m_producerSlots.load(std::memory_order_acquire);
+		swapArray = m_producerSlotsSwap.load(std::memory_order_acquire);
 
 		if (slot < swapArray.item_count() &&
 			swapArray[slot] != producer){
-			swapArray[slot].store(producer, std::memory_order_relaxed);
+			swapArray[slot].store(producer, std::memory_order_release);
 		}
 		if (activeArray[slot] != producer){
-			activeArray[slot].store(producer, std::memory_order_relaxed);
+			activeArray[slot].store(producer, std::memory_order_release);
 		}
 	} while (m_producerSlotsSwap != swapArray || m_producerSlots != activeArray);
 }
@@ -575,7 +575,7 @@ inline void concurrent_queue<T, Allocator>::push_producer_buffer(shared_ptr_slot
 	force_store_to_producer_slot(std::move(buffer), bufferSlot);
 
 	const std::uint16_t postIterator(m_producerSlotPostReservation.operator++());
-	const std::uint16_t reservedSlots(m_producerSlotReservation.load(std::memory_order_relaxed));
+	const std::uint16_t reservedSlots(m_producerSlotReservation.load(std::memory_order_acquire));
 
 	if (postIterator == reservedSlots) {
 		try_swap_producer_count(postIterator);
@@ -584,8 +584,8 @@ inline void concurrent_queue<T, Allocator>::push_producer_buffer(shared_ptr_slot
 template<class T, class Allocator>
 inline void concurrent_queue<T, Allocator>::try_swap_producer_count(std::uint16_t toValue)
 {
-	std::uint16_t exp(m_producerCount.load(std::memory_order_relaxed));
-	while (exp < toValue && !m_producerCount.compare_exchange_strong(exp, toValue, std::memory_order_relaxed));
+	std::uint16_t exp(m_producerCount.load(std::memory_order_acquire));
+	while (exp < toValue && !m_producerCount.compare_exchange_strong(exp, toValue, std::memory_order_release));
 }
 template<class T, class Allocator>
 inline typename concurrent_queue<T, Allocator>::buffer_type* concurrent_queue<T, Allocator>::this_producer_cached()
@@ -749,7 +749,7 @@ inline producer_buffer<T, Allocator>::~producer_buffer()
 template<class T, class Allocator>
 inline bool producer_buffer<T, Allocator>::is_active() const
 {
-	return (!m_next || (m_readSlot.load(std::memory_order_relaxed) != m_written.load(std::memory_order_relaxed)));
+	return (!m_next || (m_readSlot.load(std::memory_order_acquire) != m_written.load(std::memory_order_acquire)));
 }
 template<class T, class Allocator>
 inline bool producer_buffer<T, Allocator>::is_valid() const
@@ -771,11 +771,11 @@ inline typename producer_buffer<T, Allocator>::shared_ptr_slot_type producer_buf
 	producer_buffer<T, allocator_type>* inspect(this);
 
 	while (inspect) {
-		const size_type readSlot(inspect->m_readSlot.load(std::memory_order_relaxed));
+		const size_type readSlot(inspect->m_readSlot.load(std::memory_order_acquire));
 
-		const bool thisBufferEmpty(readSlot == inspect->m_written.load(std::memory_order_relaxed));
+		const bool thisBufferEmpty(readSlot == inspect->m_written.load(std::memory_order_acquire));
 #ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
-		const bool veto(inspect->m_failureCount.load(std::memory_order_relaxed) != inspect->m_failureIndex.load(std::memory_order_relaxed));
+		const bool veto(inspect->m_failureCount.load(std::memory_order_acquire) != inspect->m_failureIndex.load(std::memory_order_acquire));
 		const bool valid(!thisBufferEmpty | veto);
 #else
 		const bool valid(!thisBufferEmpty);
@@ -784,7 +784,7 @@ inline typename producer_buffer<T, Allocator>::shared_ptr_slot_type producer_buf
 			break;
 		}
 
-		back = inspect->m_next.load(std::memory_order_relaxed);
+		back = inspect->m_next.load(std::memory_order_acquire);
 		inspect = back.get();
 	}
 	return back;
@@ -826,7 +826,7 @@ inline bool producer_buffer<T, Allocator>::verify_successor(const shared_ptr_slo
 	producer_buffer<T, Allocator>* inspect(this);
 
 	do {
-		const size_type preRead(inspect->m_preReadSync.load(std::memory_order_relaxed));
+		const size_type preRead(inspect->m_preReadSync.load(std::memory_order_acquire));
 		for (size_type i = 0; i < inspect->m_capacity; ++i) {
 			const size_type index((preRead - i) % inspect->m_capacity);
 
@@ -835,7 +835,7 @@ inline bool producer_buffer<T, Allocator>::verify_successor(const shared_ptr_slo
 			}
 		}
 
-		next = inspect->m_next.load(std::memory_order_relaxed);
+		next = inspect->m_next.load(std::memory_order_acquire);
 		inspect = next.get();
 
 		if (inspect == successor.get()) {
@@ -855,14 +855,14 @@ template <class U, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) && !GDUL
 inline void producer_buffer<T, Allocator>::check_for_damage()
 {
 #ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
-	const size_type preRead(m_preReadSync.load(std::memory_order_relaxed));
+	const size_type preRead(m_preReadSync.load(std::memory_order_acquire));
 	const size_type preReadLockOffset(preRead - Buffer_Lock_Offset);
-	if (preReadLockOffset != m_read.load(std::memory_order_relaxed)) {
+	if (preReadLockOffset != m_read.load(std::memory_order_acquire)) {
 		return;
 	}
 
-	const std::uint16_t failiureIndex(m_failureIndex.load(std::memory_order_relaxed));
-	const std::uint16_t failiureCount(m_failureCount.load(std::memory_order_relaxed));
+	const std::uint16_t failiureIndex(m_failureIndex.load(std::memory_order_acquire));
+	const std::uint16_t failiureCount(m_failureCount.load(std::memory_order_acquire));
 	const std::uint16_t difference(failiureCount - failiureIndex);
 
 	const bool failCheckA(0 == difference);
@@ -875,7 +875,7 @@ inline void producer_buffer<T, Allocator>::check_for_damage()
 
 	std::uint16_t expected(failiureIndex);
 	const std::uint16_t desired(failiureCount);
-	if (m_failureIndex.compare_exchange_strong(expected, desired, std::memory_order_relaxed, std::memory_order_relaxed)) {
+	if (m_failureIndex.compare_exchange_strong(expected, desired, std::memory_order_relaxed, std::memory_order_release)) {
 		reintegrate_failed_entries(toReintegrate);
 
 		m_read.fetch_sub(toReintegrate);
@@ -893,7 +893,7 @@ inline void producer_buffer<T, Allocator>::push_front(shared_ptr_slot_type newBu
 		last = last->m_next.unsafe_get();
 	}
 
-	last->m_next.store(std::move(newBuffer), std::memory_order_relaxed);
+	last->m_next.store(std::move(newBuffer), std::memory_order_release);
 }
 template<class T, class Allocator>
 inline void producer_buffer<T, Allocator>::unsafe_clear()
@@ -1020,7 +1020,7 @@ inline void producer_buffer<T, Allocator>::post_pop_cleanup(typename producer_bu
 	m_dataBlock[readSlot].set_state(item_state::Empty);
 #ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
 	m_dataBlock[readSlot].reset_ref();
-	m_read.fetch_add(1, std::memory_order_relaxed);
+	m_read.fetch_add(1, std::memory_order_acq_rel);
 #endif
 }
 template <class T, class Allocator>
@@ -1040,11 +1040,11 @@ inline void producer_buffer<T, Allocator>::write_out(typename producer_buffer<T,
 #ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
 	}
 	catch (...) {
-		if (m_failureCount.fetch_add(1, std::memory_order_relaxed) == m_failureIndex.load(std::memory_order_relaxed)) {
-			m_preReadSync.fetch_add(Buffer_Lock_Offset, std::memory_order_relaxed);
+		if (m_failureCount.fetch_add(1, std::memory_order_acq_rel) == m_failureIndex.load(std::memory_order_acq_rel)) {
+			m_preReadSync.fetch_add(Buffer_Lock_Offset, std::memory_order_acq_rel);
 		}
 		m_dataBlock[slot].set_state(item_state::Failed);
-		m_read.fetch_add(1, std::memory_order_relaxed);
+		m_read.fetch_add(1, std::memory_order_acq_rel);
 		throw;
 	}
 #endif
@@ -1053,7 +1053,7 @@ template<class T, class Allocator>
 inline void producer_buffer<T, Allocator>::reintegrate_failed_entries(typename producer_buffer<T, Allocator>::size_type failCount)
 {
 #ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
-	const size_type readSlotTotal(m_readSlot.load(std::memory_order_relaxed));
+	const size_type readSlotTotal(m_readSlot.load(std::memory_order_acquire));
 	const size_type readSlotTotalOffset(readSlotTotal + m_capacity);
 
 	const size_type startIndex(readSlotTotalOffset - 1);
