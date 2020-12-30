@@ -12,13 +12,15 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\source\gdul\concurrent_hash_map\concurrent_hash_map.h" />
-    <ClInclude Include="main.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="main.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
     <ProjectGuid>{F087835D-BC0F-410A-A798-976737BB7739}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>concurrentskiplist</RootNamespace>
+    <RootNamespace>concurrenthashmap</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
