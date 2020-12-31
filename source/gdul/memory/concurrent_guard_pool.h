@@ -140,6 +140,10 @@ private:
 
 	struct tl_container
 	{
+		tl_container(const shared_ptr<tlm_detail::index_pool<void>>& ip)
+		{
+			m_indexPool = ip;
+		}
 		~tl_container()
 		{
 			if (m_indexPool) {
@@ -224,7 +228,7 @@ inline concurrent_guard_pool<T, Allocator>::concurrent_guard_pool(typename concu
 	, m_indices{}
 	, m_blocks{}
 	, m_indexPool(gdul::allocate_shared<tlm_detail::index_pool<void>>(allocator))
-	, t_tlContainer(allocator)
+	, t_tlContainer(m_indexPool, allocator)
 	, m_tlCacheSize(0)
 	, m_allocator()
 	, m_blocksEndIndex(0)
