@@ -106,38 +106,45 @@ Concurrency safe, lock free scratch pool. Usage like an object pool but requires
 ## concurrent_guard_pool
 #### --new--
 Concurrency safe, lock free object pool with an additional guard method for use in shared-data scenarios where object reclamation only may
-happen when all references are dead.
+happen when all references are dead. 
 
-Ex. A lock free, node based stack. 
-
+Ex usage.
 ```
 #include <gdul/memory/concurrent_guard_pool.h>
 
-struct node{};
+struct item{};
 
-class lock_free_stack
+struct some_data_structure
 {
-public:
-	void push(node*){}
-	bool try_pop(node*&){}
+
+	bool fetch_item(item& out)
+	{
+		return m_pool.guard(&some_data_structure::fetch_item_internal, this, out);
+	}
+
+private:
+	struct node
+	{
+		item m_item;
+	};
+
+	bool fetch_item_internal(item& out)
+	{
+		// Critical section, reference shared nodes
+		// ...
+	}
+
+	gdul::concurrent_guard_pool<node> m_pool;
 };
 
 int main()
 {
-	lock_free_stack stack;
+	some_data_structure ds;
+	
+	item i;
 
-	gdul::concurrent_guard_pool<node> pool;
-
-	node* in(pool.get());
-
-	pool.guard(&lock_free_stack::push, &stack, in);
-
-	node* out(nullptr);
-
-	if (pool.guard(&lock_free_stack::try_pop, &stack, out)) {
-		//do stuff with 'out'
-
-		pool.recycle(out);
+	if (ds.fetch_item(i)) {
+		// ...
 	}
 }
 ```
