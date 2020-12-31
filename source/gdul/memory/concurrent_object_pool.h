@@ -79,7 +79,7 @@ private:
 	void force_hint_update();
 	void try_alloc_block(std::uint8_t blockIndex);
 
-	std::size_t log2_align(std::size_t from, std::size_t clamp);
+	std::size_t pow2_align(std::size_t from, std::size_t clamp);
 
 	block_node m_blocks[Capacity_Bits];
 
@@ -114,7 +114,7 @@ inline concurrent_object_pool<Object, Allocator>::concurrent_object_pool(std::si
 	for (std::uint8_t i = 0; i < Capacity_Bits; ++i)
 		m_blocks[i].m_livingObjects.store((std::uint32_t)std::pow(2.f, (float)(i + 1)), std::memory_order_relaxed);
 
-	const std::size_t alignedSize(log2_align(baseCapacity, Max_Capacity));
+	const std::size_t alignedSize(pow2_align(baseCapacity, Max_Capacity));
 	const std::uint8_t blockIndex((std::uint8_t)std::log2f((float)alignedSize) - 1);
 
 	m_blocksEndIndex.store(blockIndex, std::memory_order_relaxed);
@@ -298,7 +298,7 @@ inline void concurrent_object_pool<Object, Allocator>::try_alloc_block(std::uint
 	force_hint_update();
 }
 template<class Object, class Allocator>
-inline std::size_t concurrent_object_pool<Object, Allocator>::log2_align(std::size_t from, std::size_t clamp)
+inline std::size_t concurrent_object_pool<Object, Allocator>::pow2_align(std::size_t from, std::size_t clamp)
 {
 	const std::size_t from_(from < 2 ? 2 : from);
 
