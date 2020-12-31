@@ -204,14 +204,14 @@ private:
 	inline void refresh_cached_consumer();
 	inline void refresh_cached_producer();
 
+	cqdetail::dummy_container<T, allocator_type> m_dummyContainer;
+
 	tlm<shared_ptr_slot_type, allocator_type> t_producer;
 	tlm<cqdetail::consumer_wrapper<shared_ptr_slot_type, shared_ptr_array_type>, allocator_type> t_consumer;
 
 	struct cache_container{cqdetail::accessor_cache<T, allocator_type> m_lastConsumer, m_lastProducer;};
 
 	static thread_local cache_container t_cachedAccesses;
-
-	static cqdetail::dummy_container<T, allocator_type> s_dummyContainer;
 
 	atomic_shared_ptr_array_type m_producerSlots;
 	atomic_shared_ptr_array_type m_producerSlotsSwap;
@@ -232,11 +232,12 @@ inline concurrent_queue<T, Allocator>::concurrent_queue()
 }
 template<class T, class Allocator>
 inline concurrent_queue<T, Allocator>::concurrent_queue(Allocator allocator)
-	: m_producerCount(0)
+	: m_dummyContainer()
+	, m_producerCount(0)
 	, m_producerSlotPostReservation(0)
 	, m_producerSlotReservation(0)
-	, t_producer(s_dummyContainer.m_dummyBuffer, allocator)
-	, t_consumer(cqdetail::consumer_wrapper<shared_ptr_slot_type, shared_ptr_array_type>(s_dummyContainer.m_dummyBuffer), allocator)
+	, t_producer(m_dummyContainer.m_dummyBuffer, allocator)
+	, t_consumer(cqdetail::consumer_wrapper<shared_ptr_slot_type, shared_ptr_array_type>(m_dummyContainer.m_dummyBuffer), allocator)
 	, m_producerSlots(nullptr)
 	, m_producerSlotsSwap(nullptr)
 	, m_relocationIndex(0)
@@ -1329,11 +1330,11 @@ private:
 template <class T, class Allocator>
 struct accessor_cache
 {
-	producer_buffer<T, Allocator>* m_buffer;
+	producer_buffer<T, Allocator>* m_buffer = nullptr;
 
 	union
 	{
-		void* m_addr;
+		void* m_addr = nullptr;
 		std::uint64_t m_addrBlock;
 		struct
 		{
@@ -1381,8 +1382,6 @@ inline void buffer_deleter<T, Allocator>::operator()(T* obj, Allocator&)
 }
 }
 template <class T, class Allocator>
-cqdetail::dummy_container<T, typename concurrent_queue<T, Allocator>::allocator_type> concurrent_queue<T, Allocator>::s_dummyContainer;
-template <class T, class Allocator>
-thread_local typename concurrent_queue<T, Allocator>::cache_container concurrent_queue<T, Allocator>::t_cachedAccesses{ {&concurrent_queue<T, Allocator>::s_dummyContainer.m_dummyRawBuffer, nullptr}, {&concurrent_queue<T, Allocator>::s_dummyContainer.m_dummyRawBuffer, nullptr} };
+thread_local typename concurrent_queue<T, Allocator>::cache_container concurrent_queue<T, Allocator>::t_cachedAccesses;
 }
 #pragma warning(pop)
