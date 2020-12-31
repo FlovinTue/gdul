@@ -503,7 +503,7 @@ std::uint16_t concurrent_queue<T, Allocator>::claim_producer_slot()
 	std::uint16_t desiredSlot(m_producerSlotReservation.load(std::memory_order_acquire));
 	do{
 		ensure_producer_slots_capacity(desiredSlot + 1);
-	}while (!m_producerSlotReservation.compare_exchange_strong(desiredSlot, desiredSlot + 1, std::memory_order_relaxed, std::memory_order_release));
+	}while (!m_producerSlotReservation.compare_exchange_strong(desiredSlot, desiredSlot + 1, std::memory_order_release, std::memory_order_relaxed));
 
 	return desiredSlot;
 }
@@ -875,7 +875,7 @@ inline void producer_buffer<T, Allocator>::check_for_damage()
 
 	std::uint16_t expected(failiureIndex);
 	const std::uint16_t desired(failiureCount);
-	if (m_failureIndex.compare_exchange_strong(expected, desired, std::memory_order_relaxed, std::memory_order_release)) {
+	if (m_failureIndex.compare_exchange_strong(expected, desired, std::memory_order_release, std::memory_order_relaxed)) {
 		reintegrate_failed_entries(toReintegrate);
 
 		m_read.fetch_sub(toReintegrate);
