@@ -110,7 +110,7 @@ enum class item_state : std::uint8_t
 };
 
 template <class Dummy>
-std::size_t log2_align(std::size_t from, std::size_t clamp);
+std::size_t pow2_align(std::size_t from, std::size_t clamp);
 
 template <class Dummy>
 constexpr std::size_t aligned_size(std::size_t byteSize, std::size_t align);
@@ -304,7 +304,7 @@ inline void concurrent_queue<T, Allocator>::reserve(typename concurrent_queue<T,
 		init_producer(capacity);
 	}
 	else if (producer->get_capacity() < capacity) {
-		const size_type log2Capacity(cqdetail::log2_align<void>(capacity, cqdetail::Buffer_Capacity_Max));
+		const size_type log2Capacity(cqdetail::pow2_align<void>(capacity, cqdetail::Buffer_Capacity_Max));
 		shared_ptr_slot_type buffer(create_producer_buffer(log2Capacity));
 		producer->push_front(buffer);
 		producer = std::move(buffer);
@@ -434,7 +434,7 @@ inline bool concurrent_queue<T, Allocator>::relocate_consumer()
 template<class T, class Allocator>
 inline typename concurrent_queue<T, Allocator>::shared_ptr_slot_type concurrent_queue<T, Allocator>::create_producer_buffer(std::size_t withSize)
 {
-	const std::size_t log2size(cqdetail::log2_align<void>(withSize, cqdetail::Buffer_Capacity_Max));
+	const std::size_t log2size(cqdetail::pow2_align<void>(withSize, cqdetail::Buffer_Capacity_Max));
 
 	const std::size_t alignOfData(alignof(T));
 
@@ -1237,7 +1237,7 @@ inline void item_container<T>::try_move(U& out)
 #endif
 }
 template <class Dummy>
-std::size_t log2_align(std::size_t from, std::size_t clamp)
+std::size_t pow2_align(std::size_t from, std::size_t clamp)
 {
 	const std::size_t from_(from < 2 ? 2 : from);
 
