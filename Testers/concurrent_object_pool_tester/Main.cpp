@@ -15,6 +15,8 @@ float func(int arg)
 
 int main()
 {
+	gdul::concurrent_guard_pool<int> gp;
+
 	std::allocator<std::uint8_t> alloc;
 	gdul::concurrent_object_pool<int, decltype(alloc)> pool(alloc);
 

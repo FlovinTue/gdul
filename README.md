@@ -56,16 +56,98 @@ int main()
 ## concurrent_queue
 Multi producer multi consumer unbounded lock-free queue. FIFO is respected within the context of single producers. Basic exception safety may be enabled at the price of a slight performance decrease.
 
-Depends on atomic_shared_ptr.h, thread_local_member.h
+-------------------------------------------------------------------------------------------------------------------------------------------
+
+## concurrent_priority_queue
+#### --new--
+Concurrency safe, lock free priority queue based around skip list design. Provides 3 different methods of node allocation:
+* Pool based. Fast, without need for external application support -Just works
+* Scratch based. Faster, but needs periodic resetting of internal scratch pool
+* External. Fastest (potentially), node allocation and reclamation is handled externally by the user
+
+Ex. Usage
+```
+#include <gdul/concurrent_priority_queue/concurrent_priority_queue.h>
+
+int main()
+{
+	gdul::concurrent_priority_queue<int, int> defaultPool;
+	defaultPool.push(std::make_pair(0, 0));
+
+	gdul::concurrent_priority_queue<int, int, 512, gdul::cpq_allocation_strategy_pool<std::allocator<std::uint8_t>>> poolBased;
+	poolBased.push(std::make_pair(1, 1));
+
+	gdul::concurrent_priority_queue<int, int, 512, gdul::cpq_allocation_strategy_scratch<std::allocator<std::uint8_t>>> scratchBased;
+	scratchBased.push(std::make_pair(2, 2));
+	scratchBased.unsafe_reset_scratch_pool();
+
+	gdul::concurrent_priority_queue<int, int, 512, gdul::cpq_allocation_strategy_external> external;
+
+	decltype(external)::node_type n;
+	n.m_kv = std::make_pair(3, 3);
+
+	external.push(&n);
+}
+```
 
 -------------------------------------------------------------------------------------------------------------------------------------------
 
 ## concurrent_object_pool
-Concurrency safe, lock free object pool. Contains an optimization where recycled objects belonging to an 'old' 
-block will be discarded. This will make the objects retain good cache locality as the structure ages. 
-Block capacity grows over time.
+Concurrency safe, lock free object pool built around concurrent_queue
 
-Depends on concurrent_queue.h, atomic_shared_ptr.h, thread_local_member.h
+-------------------------------------------------------------------------------------------------------------------------------------------
+
+## concurrent_scratch_pool
+#### --new--
+Concurrency safe, lock free scratch pool. Usage like an object pool but requires periodic calls to unsafe_reset
+
+-------------------------------------------------------------------------------------------------------------------------------------------
+
+## concurrent_guard_pool
+#### --new--
+Concurrency safe, lock free object pool with an additional guard method for use in shared-data scenarios where object reclamation only may
+happen when all references are dead. 
+
+Ex usage.
+```
+#include <gdul/memory/concurrent_guard_pool.h>
+
+struct item{};
+
+struct some_data_structure
+{
+
+	bool fetch_item(item& out)
+	{
+		return m_pool.guard(&some_data_structure::fetch_item_internal, this, out);
+	}
+
+private:
+	struct node
+	{
+		item m_item;
+	};
+
+	bool fetch_item_internal(item& out)
+	{
+		// Critical section, reference shared nodes
+		// ...
+	}
+
+	gdul::concurrent_guard_pool<node> m_pool;
+};
+
+int main()
+{
+	some_data_structure ds;
+	
+	item i;
+
+	if (ds.fetch_item(i)) {
+		// ...
+	}
+}
+```
 
 -------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -78,8 +160,6 @@ If the number of tlm instances of one type does not exceed gdul::tlm_detail::Sta
 For sanity's sake, use alias tlm<T> instead of thread_local_member<T>
 
 New operators may be added to the interface using the get() accessors.
-
-Depends on atomic_shared_ptr.h
 
 -------------------------------------------------------------------------------------------------------------------------------------------
 ## delegate

@@ -11,16 +11,17 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\source\gdul\concurrent_priority_queue\concurrent_priority_queue.h" />
+    <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp" />
+    <ClInclude Include="..\..\source\gdul\concurrent_skip_list\concurrent_skip_list.h" />
+    <ClInclude Include="..\..\source\gdul\concurrent_skip_list\concurrent_skip_list_base.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
-    <ProjectGuid>{9F5FBE3A-88C5-46DE-ADCF-4F06D60676A9}</ProjectGuid>
+    <ProjectGuid>{9A52AFB5-3696-4CC9-9291-54A62CA43993}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>concurrentpriorityqueue</RootNamespace>
+    <RootNamespace>concurrentskiplist</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />

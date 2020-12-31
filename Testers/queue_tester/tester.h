@@ -648,7 +648,7 @@ inline void tester<T, Allocator>::Write(std::uint32_t writes) {
 		std::this_thread::yield();
 
 	uint32_t sum(0);
-	uint32_t seed(rand());
+	const uint32_t seed(rand());
 
 #ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
 	for (std::uint32_t j = 0; j < writes; ) {
@@ -666,7 +666,7 @@ inline void tester<T, Allocator>::Write(std::uint32_t writes) {
 	for (std::uint32_t j = 0; j < writes; ++j) {
 
 #if defined(MS_CPQ)
-		T in = seed % (j + 1);
+		T in = gdul::cpq_detail::t_rng();
 		sum += in;
 #elif !defined(GDUL_CPQ)
 		T in;
@@ -678,7 +678,7 @@ inline void tester<T, Allocator>::Write(std::uint32_t writes) {
 #if !defined(MOODYCAMEL) && !defined(GDUL_CPQ)
 		m_queue.push(in);
 #elif defined(GDUL_CPQ)
-		const std::pair<typename T::first_type, typename T::second_type> in(seed % (j + 1), typename T::second_type());
+		const std::pair<typename T::first_type, typename T::second_type> in(gdul::csl_detail::t_rng(), typename T::second_type());
 		m_queue.push(in);
 		sum += in.first;
 #else

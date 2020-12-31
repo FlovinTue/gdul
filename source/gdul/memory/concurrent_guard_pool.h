@@ -44,10 +44,10 @@ namespace cgp_detail {
 using size_type = std::uint32_t;
 using defaul_allocator = std::allocator<std::uint8_t>;
 
-static constexpr size_type Defaul_Block_Size = 16;
-static constexpr size_type Defaul_Tl_Cache_Size = 4;
-static constexpr size_type Max_Users = 16;
-static constexpr std::uint8_t Capacity_Bits = 19;
+constexpr size_type Defaul_Block_Size = 16;
+constexpr size_type Defaul_Tl_Cache_Size = 4;
+constexpr size_type Max_Users = 16;
+constexpr std::uint8_t Capacity_Bits = 19;
 
 static inline size_type pow2_align(size_type from, size_type clamp);
 
@@ -140,6 +140,10 @@ private:
 
 	struct tl_container
 	{
+		tl_container(const shared_ptr<tlm_detail::index_pool<void>>& ip)
+		{
+			m_indexPool = ip;
+		}
 		~tl_container()
 		{
 			if (m_indexPool) {
@@ -224,7 +228,7 @@ inline concurrent_guard_pool<T, Allocator>::concurrent_guard_pool(typename concu
 	, m_indices{}
 	, m_blocks{}
 	, m_indexPool(gdul::allocate_shared<tlm_detail::index_pool<void>>(allocator))
-	, t_tlContainer(allocator)
+	, t_tlContainer(m_indexPool, allocator)
 	, m_tlCacheSize(0)
 	, m_allocator()
 	, m_blocksEndIndex(0)

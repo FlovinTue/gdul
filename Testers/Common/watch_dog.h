@@ -6,6 +6,8 @@
 #include <mutex>
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
+#include "timer.h"
+#include <string>
 
 namespace gdul {
 template <class T = void>
@@ -20,9 +22,10 @@ public:
 	watch_dog_impl();
 	~watch_dog_impl();
 
-	void give_instruction(std::uint32_t sleepFor, std::function<void()> whenWoken = []() {__debugbreak(); });
+	void give_instruction(std::uint32_t sleepFor, std::function<void()> whenWoken = []() { if(IsDebuggerPresent()) __debugbreak(); });
 	void pet();
 
+	bool sleepy() const;
 
 private:
 	void guard();
@@ -35,6 +38,8 @@ private:
 	std::thread m_thread;
 	std::function<void()> m_whenWoken;
 	std::chrono::high_resolution_clock m_clock;
+
+	gdul::timer<float> m_totalTime;
 };
 template<class T>
 inline watch_dog_impl<T>::watch_dog_impl()
@@ -42,6 +47,7 @@ inline watch_dog_impl<T>::watch_dog_impl()
 	, m_alive(false)
 	, m_threshHold(0)
 {
+	m_totalTime.reset();
 }
 template<class T>
 inline watch_dog_impl<T>::~watch_dog_impl()
@@ -69,12 +75,17 @@ inline void watch_dog_impl<T>::pet()
 {
 	m_lastPet = get_ms();
 }
-
+template<class T>
+inline bool watch_dog_impl<T>::sleepy() const
+{
+	return (get_ms() - m_lastPet) < m_threshHold;
+}
 template<class T>
 inline std::size_t watch_dog_impl<T>::get_ms() const
 {
 	return std::chrono::duration_cast<std::chrono::milliseconds>(m_clock.now().time_since_epoch()).count();
 }
+
 template<class T>
 inline void watch_dog_impl<T>::guard()
 {
@@ -84,14 +95,17 @@ inline void watch_dog_impl<T>::guard()
 		bool continueSleep(0);
 
 		{
-			std::unique_lock<std::mutex> lock(m_mtx);
+			const std::unique_lock<std::mutex> cs(m_mtx);
 
-			if ((get_ms() - m_lastPet) < m_threshHold) {
+			if (sleepy()) {
 				continueSleep = true;
 			}
 			else {
 				std::cout << "WOOF, WOOF" << std::endl;
 				MessageBeep(MB_ICONERROR);
+
+				std::wstring str(L"Watchdog triggered at " + std::to_wstring(m_totalTime.get()) + L" seconds");
+				MessageBox(NULL, str.c_str(), L"Watchdog alert", MB_OK);
 				m_whenWoken();
 				pet();
 			}
