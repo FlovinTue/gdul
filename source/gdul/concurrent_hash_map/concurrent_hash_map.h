@@ -7,6 +7,10 @@
 #include <gdul/thread_local_member/thread_local_member.h>
 #include <gdul/atomic_128/atomic_128.h>
 
+#pragma warning(push)
+// Anonymous struct
+#pragma warning(disable:4201)
+
 namespace gdul {
 
 namespace chm_detail {
@@ -23,12 +27,34 @@ constexpr size_type to_bucket_count(size_type desiredCapacity)
 	return desiredCapacity;
 }
 
+template <class Dummy = void>
+inline size_type pow2_align(std::size_t from, std::size_t clamp = std::numeric_limits<size_type>::max())
+{
+	const std::size_t from_(from < 2 ? 2 : from);
+
+	const float flog2(std::log2f(static_cast<float>(from_)));
+	const float nextLog2(std::ceil(flog2));
+	const float fNextVal(powf(2.f, nextLog2));
+
+	const std::size_t nextVal(static_cast<size_t>(fNextVal));
+	const std::size_t clampedNextVal((clamp < nextVal) ? clamp : nextVal);
+
+	return clampedNextVal;
+}
+
 template <class Item>
 struct iterator;
 template <class Item>
 struct const_iterator;
 
-enum bucket_flags : std::uint8_t;
+enum bucket_flag : std::uint8_t
+{
+	bucket_flag_null = 0,
+	bucket_flag_empty = 0,
+	bucket_flag_valid = 1 << 0,
+	bucket_flag_deleted = 1 << 1,
+	bucket_flag_disposed = 1 << 2,
+};
 }
 
 template <class Key, class Value, class Hash = std::hash<Key>, class Allocator = std::allocator<std::uint8_t>>
@@ -79,21 +105,21 @@ public:
 	const_iterator end() const { return const_iterator(nullptr); }
 
 private:
-	using bucket_items_type = chm_detail::bucket<key_type, value_type>>;
+	using bucket_items_type = chm_detail::bucket<key_type, value_type>;
 	using bucket_type = atomic_128<bucket_items_type>;
 	using bucket_array = shared_ptr<bucket_type[]>;
-	using packed_ptr_type = typename bucket_type::packed_ptr;
 
 	template <class In>
 	std::pair<iterator, bool> insert_internal(In&& in);
 
-	size_type find_index(const bucket_array& buckets, size_type hash) const;
 
 	bool refresh_tl() const;
 
 	void grow_bucket_array(bucket_array& expectedOld);
 
-	static bool try_insert_in_bucket_array(bucket_array& buckets, item_type& item);
+	std::pair<iterator, bool> try_insert_in_bucket_array(bucket_array& buckets, item_type* item, size_type hash);
+
+	static size_type find_index(const bucket_array& buckets, size_type hash);
 	static void help_dispose_bucket_array(bucket_array& buckets);
 	static void dispose_bucket(bucket_type& bucket);
 
@@ -121,8 +147,8 @@ inline concurrent_hash_map<Key, Value, Hash, Allocator>::concurrent_hash_map(siz
 }
 template<class Key, class Value, class Hash, class Allocator>
 inline concurrent_hash_map<Key, Value, Hash, Allocator>::concurrent_hash_map(size_type capacity, Allocator alloc)
-	: m_pool((std::uint32_t)chm_detail::to_bucket_count(capacity), (std::uint32_t)chm_detail::to_bucket_count(capacity) / std::thread::hardware_concurrency(), alloc)
-	, m_items(gdul::allocate_shared<bucket_type[]>(chm_detail::to_bucket_count(capacity), alloc))
+	: m_pool((std::uint32_t)chm_detail::to_bucket_count(chm_detail::pow2_align<>(capacity)), (std::uint32_t)chm_detail::to_bucket_count(chm_detail::pow2_align<>(capacity)) / std::thread::hardware_concurrency(), alloc)
+	, m_items(gdul::allocate_shared<bucket_type[]>(chm_detail::to_bucket_count(chm_detail::pow2_align<>(capacity)), alloc))
 	, t_items(m_items.load(), alloc)
 	, m_allocator(alloc)
 {
@@ -145,13 +171,13 @@ inline typename concurrent_hash_map<Key, Value, Hash, Allocator>::iterator concu
 
 			std::atomic_thread_fence(std::memory_order_acquire);
 
-			item_type* const item(tBuckets[index].my_val().kv);
+			bucket_items_type bucket(tBuckets[index].my_val());
 
-			if (!item) {
-				break;
+			if (bucket.packedPtr.state & chm_detail::bucket_flag_valid) {
+				bucket.packedPtr.state = chm_detail::bucket_flag_null;
+
+				return iterator(bucket.packedPtr.kv);
 			}
-
-			return iterator(item);
 		}
 
 	} while (refresh_tl());
@@ -171,12 +197,12 @@ inline const typename concurrent_hash_map<Key, Value, Hash, Allocator>::const_it
 
 			std::atomic_thread_fence(std::memory_order_acquire);
 
-			packed_ptr_type packedPtr(tBuckets[index].my_val().packedPtr);
+			bucket_items_type bucket(tBuckets[index].my_val());
 
-			if (packedPtr.state == chm_detail::bucket_flag_valid) {
-				packedPtr.state = chm_detail::bucket_flag_null;
+			if (bucket.packedPtr.state & chm_detail::bucket_flag_valid) {
+				bucket.packedPtr.state = chm_detail::bucket_flag_null;
 
-				return const_iterator(packedPtr.kv);
+				return const_iterator(bucket.packedPtr.kv);
 			}
 		}
 
@@ -188,11 +214,30 @@ template<class Key, class Value, class Hash, class Allocator>
 template<class In>
 inline std::pair<typename concurrent_hash_map<Key, Value, Hash, Allocator>::iterator, bool> concurrent_hash_map<Key, Value, Hash, Allocator>::insert_internal(In&& in)
 {
+	item_type* const item(m_pool.get());
+	*item = std::forward<In>(in);
 
+	const size_type hash(hash_type()(in.first));
+
+	for (;;) {
+		bucket_array& buckets(t_items);
+
+		std::pair<iterator, bool> result(try_insert_in_bucket_array(buckets, item, hash));
+
+		if (result.first != end()) {
+			return result;
+		}
+
+		if (refresh_tl()) {
+			continue;
+		}
+
+		grow_bucket_array(buckets);
+	}
 }
 
 template<class Key, class Value, class Hash, class Allocator>
-inline typename concurrent_hash_map<Key, Value, Hash, Allocator>::size_type concurrent_hash_map<Key, Value, Hash, Allocator>::find_index(const typename concurrent_hash_map<Key, Value, Hash, Allocator>::bucket_array& buckets, typename concurrent_hash_map<Key, Value, Hash, Allocator>::size_type hash) const
+inline typename concurrent_hash_map<Key, Value, Hash, Allocator>::size_type concurrent_hash_map<Key, Value, Hash, Allocator>::find_index(const typename concurrent_hash_map<Key, Value, Hash, Allocator>::bucket_array& buckets, typename concurrent_hash_map<Key, Value, Hash, Allocator>::size_type hash)
 {
 	const size_type bucketCount(buckets.item_count());
 	const size_type nativeIndex(hash % bucketCount);
@@ -201,7 +246,7 @@ inline typename concurrent_hash_map<Key, Value, Hash, Allocator>::size_type conc
 		const size_type index(nativeIndex + (probe * probe) % bucketCount);
 
 		const bucket_type& bucket(buckets[index]);
-		const typename bucket_type::items& bucketItems(bucket.my_val());
+		const bucket_items_type& bucketItems(bucket.my_val());
 		const size_type bucketHash(bucketItems.hash);
 
 		if (bucketHash == hash) {
@@ -229,7 +274,7 @@ inline bool concurrent_hash_map<Key, Value, Hash, Allocator>::refresh_tl() const
 template<class Key, class Value, class Hash, class Allocator>
 inline void concurrent_hash_map<Key, Value, Hash, Allocator>::grow_bucket_array(typename concurrent_hash_map<Key, Value, Hash, Allocator>::bucket_array& expectedOld)
 {
-	help_dispose_bucket_array(expectedOld));
+	help_dispose_bucket_array(expectedOld);
 
 	bucket_array currentArray(m_items.load());
 
@@ -237,6 +282,8 @@ inline void concurrent_hash_map<Key, Value, Hash, Allocator>::grow_bucket_array(
 		t_items = std::move(currentArray);
 		return;
 	}
+
+	assert(currentArray.item_count() < std::numeric_limits<typename bucket_array::size_type>::max() && "Bucket array overflow");
 
 	bucket_array newArray(gdul::allocate_shared<bucket_type[]>(currentArray.item_count() * 2, m_allocator));
 
@@ -246,13 +293,41 @@ inline void concurrent_hash_map<Key, Value, Hash, Allocator>::grow_bucket_array(
 		bucket_items_type items(currentArray[i].my_val());
 		items.packedPtr.state = chm_detail::bucket_flag_null;
 
-		try_insert_in_bucket_array(newArray, items.packedPtr.kv);
+		try_insert_in_bucket_array(newArray, items.packedPtr.kv, items.hash);
 	}
 }
 template<class Key, class Value, class Hash, class Allocator>
-inline bool concurrent_hash_map<Key, Value, Hash, Allocator>::try_insert_in_bucket_array(typename concurrent_hash_map<Key, Value, Hash, Allocator>::bucket_array& buckets, typename concurrent_hash_map<Key, Value, Hash, Allocator>::item_type& item)
+inline std::pair<typename concurrent_hash_map<Key, Value, Hash, Allocator>::iterator, bool> concurrent_hash_map<Key, Value, Hash, Allocator>::try_insert_in_bucket_array(typename concurrent_hash_map<Key, Value, Hash, Allocator>::bucket_array& buckets, typename concurrent_hash_map<Key, Value, Hash, Allocator>::item_type* item, typename concurrent_hash_map<Key, Value, Hash, Allocator>::size_type hash)
 {
-	return false;
+	const size_type index(find_index(buckets, hash));
+
+	if (index == buckets.item_count()) {
+		return std::make_pair(end(), false);
+	}
+
+	std::atomic_thread_fence(std::memory_order_acquire);
+
+	bucket_items_type items(buckets[index].my_val());
+
+	if (items.packedPtr.state & chm_detail::bucket_flag_disposed) {
+		return std::make_pair(end(), false);
+	}
+
+	if (items.packedPtr.state & chm_detail::bucket_flag_valid) {
+		items.packedPtr.state = chm_detail::bucket_flag_null;
+		return std::make_pair(items.packedPtr.kv, false);
+	}
+
+	bucket_items_type desired;
+	desired.hash = hash;
+	desired.packedPtr.kv = item;
+	desired.packedPtr.state = chm_detail::bucket_flag_valid;
+
+	if (buckets[index].compare_exchange_strong(items, desired)) {
+		return std::make_pair(iterator(item), true);
+	}
+
+	return std::make_pair(end(), false);
 }
 template<class Key, class Value, class Hash, class Allocator>
 inline void concurrent_hash_map<Key, Value, Hash, Allocator>::help_dispose_bucket_array(typename concurrent_hash_map<Key, Value, Hash, Allocator>::bucket_array& buckets)
@@ -268,7 +343,7 @@ inline void concurrent_hash_map<Key, Value, Hash, Allocator>::dispose_bucket(typ
 
 	while (!(items.packedPtr.state & chm_detail::bucket_flag_disposed)) {
 		bucket_items_type disposedItems(items);
-		disposedItems.packedPtr.state |= chm_detail::bucket_flag_disposed;
+		disposedItems.packedPtr.stateValue |= chm_detail::bucket_flag_disposed;
 
 		if (bucket.compare_exchange_strong(items, disposedItems)) {
 			break;
@@ -288,7 +363,12 @@ struct alignas(16) bucket
 		struct
 		{
 			std::uint8_t padding[6];
-			bucket_flags state;
+
+			union
+			{
+				bucket_flag state;
+				std::uint8_t stateValue;
+			};
 		};
 
 	}packedPtr;
@@ -373,13 +453,6 @@ struct const_iterator : public iterator_base<Item>
 	//	return { this->m_at->m_linkViews[0].load(std::memory_order_relaxed).m_Bucket };
 	//}
 };
-enum bucket_flags : std::uint8_t
-{
-	bucket_flag_null = 0,
-	bucket_flag_empty = 0,
-	bucket_flag_valid = 1 << 0,
-	bucket_flag_deleted = 1 << 1,
-	bucket_flag_disposed = 1 << 2,
-};
 }
 }
+#pragma warning(pop)
