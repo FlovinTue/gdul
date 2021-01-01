@@ -49,6 +49,8 @@ class alignas(alignof(T) < alignof(std::max_align_t) ? alignof(std::max_align_t)
 
 template <class T>
 struct instance_tracker;
+template <class T, class ...Args>
+struct instance_tracker_constructor;
 
 template <class Dummy>
 class index_pool
@@ -171,31 +173,52 @@ public:
 	using deref_type = std::remove_pointer_t<T>;
 	using size_type = typename tlm_detail::size_type;
 
+	/// <summary>
+	/// Constructor
+	/// </summary>
 	thread_local_member();
-	// Initialize with default T value (move)
-	thread_local_member(T&& init);
-	// Initialize with default T value
-	thread_local_member(const T& init);
-	// Initialize with allocator
+	/// <summary>
+	/// Construct with constructor args
+	/// </summary>
+	template <class ...Args>
+	thread_local_member(Args&&... constructorArgs);
+	/// <summary>
+	/// Construct with allocator
+	/// </summary>
 	thread_local_member(Allocator allocator);
-	// Initialize with allocator and default T value (move)
-	thread_local_member(T&& init, Allocator allocator);
-	// Initialize with allocator and default T value
-	thread_local_member(const T& init, Allocator allocator);
+	/// <summary>
+	/// Construct with allocator and constructor args
+	/// </summary>
+	template <class ...Args>
+	thread_local_member(Allocator allocator, Args&&... constructorArgs);
 
+	/// <summary>
+	/// Destructor
+	/// </summary>
 	~thread_local_member() noexcept;
 
+	/// <summary>
+	/// Reconstruct
+	/// </summary>
 	inline void unsafe_reset();
-	// Initialize with default T value (move)
-	inline void unsafe_reset(T&& init);
-	// Initialize with default T value
-	inline void unsafe_reset(const T& init);
-	// Initialize with allocator
+	/// <summary>
+	/// Reconstruct with new constructor args
+	/// </summary>
+	/// <param name="...constructorArgs">Arguments for type constructor</param>
+	template <class ...Args>
+	inline void unsafe_reset(Args&&... constructorArgs);
+	/// <summary>
+	/// Reconstruct with new allocator
+	/// </summary>
+	/// <param name="allocator">New allocator instance</param>
 	inline void unsafe_reset(Allocator allocator);
-	// Initialize with allocator and default T value (move)
-	inline void unsafe_reset(T&& init, Allocator allocator);
-	// Initialize with allocator and default T value
-	inline void unsafe_reset(const T& init, Allocator allocator);
+	/// <summary>
+	/// Reconstruct with new allocator and new constructor args
+	/// </summary>
+	/// <param name="allocator">New allocator instance</param>
+	/// <param name="...constructorArgs">Arguments for type constructor</param>
+	template <class ...Args>
+	inline void unsafe_reset(Allocator allocator, Args&&... constructorArgs);
 
 	inline operator T& ();
 	inline operator const T& () const;
@@ -277,29 +300,23 @@ inline thread_local_member<T, Allocator>::thread_local_member()
 	: thread_local_member<T, Allocator>::thread_local_member(T())
 {}
 template<class T, class Allocator>
-inline thread_local_member<T, Allocator>::thread_local_member(T&& init)
-	: thread_local_member<T, Allocator>::thread_local_member(std::move(init), Allocator())
-{}
-template<class T, class Allocator>
-inline thread_local_member<T, Allocator>::thread_local_member(const T& init)
-	: thread_local_member<T, Allocator>::thread_local_member(init, Allocator())
-{}
-template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::thread_local_member(Allocator allocator)
 	: thread_local_member<T, Allocator>::thread_local_member(T(), allocator)
 {}
 template<class T, class Allocator>
-inline thread_local_member<T, Allocator>::thread_local_member(T&& init, Allocator allocator)
-	: m_allocator(allocator)
-	, m_index(s_st_container.m_indexPool.get(allocator))
-	, m_iteration(initialize_instance_tracker(std::forward<T&&>(init)))
-{}
+template<class ...Args>
+inline thread_local_member<T, Allocator>::thread_local_member(Args&&... constructorArgs)
+	: thread_local_member<T, Allocator>::thread_local_member(Allocator(), std::forward<Args>(constructorArgs)...)
+{
+}
 template<class T, class Allocator>
-inline thread_local_member<T, Allocator>::thread_local_member(const T& init, Allocator allocator)
+template<class ...Args>
+inline thread_local_member<T, Allocator>::thread_local_member(Allocator allocator, Args&&... constructorArgs)
 	: m_allocator(allocator)
 	, m_index(s_st_container.m_indexPool.get(allocator))
-	, m_iteration(initialize_instance_tracker(std::forward<const T&>(init)))
-{}
+	, m_iteration(initialize_instance_tracker(std::forward<Args>(constructorArgs)...))
+{
+}
 template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::~thread_local_member() noexcept
 {
@@ -314,33 +331,23 @@ inline void thread_local_member<T, Allocator>::unsafe_reset()
 	unsafe_reset(T());
 }
 template<class T, class Allocator>
-inline void thread_local_member<T, Allocator>::unsafe_reset(T&& init)
-{
-	unsafe_reset(std::move(init), Allocator());
-}
-template<class T, class Allocator>
-inline void thread_local_member<T, Allocator>::unsafe_reset(const T& init)
-{
-	unsafe_reset(init, Allocator());
-}
-template<class T, class Allocator>
 inline void thread_local_member<T, Allocator>::unsafe_reset(Allocator allocator)
 {
-	unsafe_reset(T(), Allocator());
+	unsafe_reset(Allocator(), T());
 }
 template<class T, class Allocator>
-inline void thread_local_member<T, Allocator>::unsafe_reset(T&& init, Allocator allocator)
+template<class ...Args>
+inline void thread_local_member<T, Allocator>::unsafe_reset(Args && ...constructorArgs)
+{
+	unsafe_reset(Allocator(), std::forward<Args>(constructorArgs)...);
+}
+template<class T, class Allocator>
+template<class ...Args>
+inline void thread_local_member<T, Allocator>::unsafe_reset(Allocator allocator, Args && ...constructorArgs)
 {
 	thread_local_member* const addr(this);
 	this->~thread_local_member();
-	new (addr) thread_local_member(std::move(init), allocator);
-}
-template<class T, class Allocator>
-inline void thread_local_member<T, Allocator>::unsafe_reset(const T& init, Allocator allocator)
-{
-	thread_local_member* const addr(this);
-	this->~thread_local_member();
-	new (addr) thread_local_member(init, allocator);
+	new (addr) thread_local_member(allocator, std::forward<Args>(constructorArgs)...);
 }
 template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::operator T& ()
@@ -424,7 +431,7 @@ inline std::uint64_t thread_local_member<T, Allocator>::initialize_instance_trac
 	grow_instance_tracker_array();
 
 	allocator_instance_tracker_entry alloc(m_allocator);
-	instance_tracker_entry trackedEntry(gdul::allocate_shared<tlm_detail::instance_tracker<T>>(alloc, 0, std::forward<Args&&>(args)...));
+	instance_tracker_entry trackedEntry(gdul::allocate_shared<tlm_detail::instance_tracker_constructor<T, Args...>>(alloc, 0, std::forward<Args>(args)...));
 
 	store_instance_tracker(trackedEntry);
 
@@ -465,7 +472,8 @@ inline void thread_local_member<T, Allocator>::refresh() const
 		if (instance 
 			&& ((t_tl_container.m_iteration < instance->m_iteration) 
 			& !(m_iteration < instance->m_iteration))) {
-			t_tl_container.m_items.reconstruct(i, instance->m_init);
+
+			instance->construct_at(&t_tl_container.m_items[i]);
 		}
 	}
 
@@ -549,23 +557,16 @@ public:
 	const T& operator[](size_type index) const noexcept;
 	T& operator[](size_type index) noexcept;
 
-	template <class ...Args>
-	inline void reserve(size_type capacity, Allocator & allocator, Args && ...args);
-
-	template <class ...Args>
-	inline void reconstruct(size_type index, Args && ...args);
+	inline void reserve(size_type capacity, Allocator & allocator);
 
 	inline size_type capacity() const noexcept;
 private:
 
 	T* get_array_ref() noexcept;
 
-	template <class ...Args>
-	void grow_to_size(size_type capacity, Allocator & allocator, Args && ...args);
-	template <class ...Args>
-	void construct_static(Args && ...args);
-	template <class ...Args>
-	void construct_dynamic(size_type capacity, Allocator & allocator, Args && ...args);
+	void grow_to_size(size_type capacity, Allocator & allocator);
+	void construct_static();
+	void construct_dynamic(size_type capacity, Allocator & allocator);
 	void destroy_static() noexcept;
 	void destroy_dynamic() noexcept;
 
@@ -609,20 +610,13 @@ inline T& flexible_storage<T, Allocator>::operator[](size_type index) noexcept
 	return m_arrayRef[index];
 }
 template<class T, class Allocator>
-template <class ...Args>
-inline void flexible_storage<T, Allocator>::reserve(size_type capacity, Allocator& allocator, Args&& ...args)
+inline void flexible_storage<T, Allocator>::reserve(size_type capacity, Allocator& allocator)
 {
 	if (m_capacity < capacity) {
-		grow_to_size(capacity, allocator, std::forward<Args&&>(args)...);
+		grow_to_size(capacity, allocator);
 
 		m_arrayRef = get_array_ref();
 	}
-}
-template<class T, class Allocator>
-template <class ...Args>
-inline void flexible_storage<T, Allocator>::reconstruct(size_type index, Args&& ...args)
-{
-	m_arrayRef[index] = T(std::forward<Args&&>(args)...);
 }
 template<class T, class Allocator>
 inline size_type flexible_storage<T, Allocator>::capacity() const noexcept
@@ -639,36 +633,33 @@ inline T* flexible_storage<T, Allocator>::get_array_ref() noexcept
 	return &get_dynamic()[0];
 }
 template<class T, class Allocator>
-template<class ...Args>
-inline void flexible_storage<T, Allocator>::grow_to_size(size_type capacity, Allocator& allocator, Args&& ...args)
+inline void flexible_storage<T, Allocator>::grow_to_size(size_type capacity, Allocator& allocator)
 {
 	if (!(Static_Alloc_Size < capacity)) {
 		if (!m_capacity) {
-			construct_static(std::forward<Args&&>(args)...);
+			construct_static();
 		}
 	}
 	else {
 		if (!(Static_Alloc_Size < m_capacity)) {
-			construct_dynamic(capacity, allocator, std::forward<Args&&>(args)...);
+			construct_dynamic(capacity, allocator);
 		}
 
-		get_dynamic().resize(capacity, std::forward<Args&&>(args)...);
+		get_dynamic().resize(capacity);
 
 	}
 	m_capacity = capacity;
 }
 template<class T, class Allocator>
-template<class ...Args>
-inline void flexible_storage<T, Allocator>::construct_static(Args&& ...args)
+inline void flexible_storage<T, Allocator>::construct_static()
 {
-	new ((std::array<T, Static_Alloc_Size>*) & m_staticStorage[0]) std::array<T, Static_Alloc_Size>(make_array<T, Static_Alloc_Size>(std::forward<Args&&>(args)...));
+	new ((std::array<T, Static_Alloc_Size>*) & m_staticStorage[0]) std::array<T, Static_Alloc_Size>();
 
 }
 template<class T, class Allocator>
-template<class ...Args>
-inline void flexible_storage<T, Allocator>::construct_dynamic(size_type capacity, Allocator& allocator, Args&& ...args)
+inline void flexible_storage<T, Allocator>::construct_dynamic(size_type capacity, Allocator& allocator)
 {
-	std::vector<T, Allocator> replacement(capacity, std::forward<Args&&>(args)..., allocator);
+	std::vector<T, Allocator> replacement(capacity, allocator);
 
 	if (m_capacity) {
 		for (size_type i = 0; i < m_capacity; ++i) {
@@ -713,30 +704,46 @@ inline shared_ptr<typename index_pool<Dummy>::node> index_pool<Dummy>::get_poole
 
 	throw std::runtime_error("Pre allocated entries should be 1:1 to fetched indices");
 }
+template<class T, class Tuple, std::size_t ...IndexSeq>
+void construct_with_tuple_expansion(T* mem, Tuple&& tup, std::index_sequence<IndexSeq...>)
+{
+	new (mem) T(std::get<IndexSeq>(std::forward<Tuple>(tup))...); tup;
+}
+template<class T, class Tuple>
+void construct_with_tuple(T* mem, Tuple&& tup)
+{
+	using Indices = std::make_index_sequence<std::tuple_size<std::decay_t<Tuple>>::value>;
+	construct_with_tuple_expansion(mem, std::forward<Tuple>(tup), Indices());
+}
 template <class T>
 struct instance_tracker
 {
-	template <class ...Args>
-	instance_tracker(std::uint64_t iteration, Args&&... args)
-		: m_init(std::forward<Args&&>(args)...)
-		, m_iteration(iteration)
+	instance_tracker(std::uint64_t iteration)
+		: m_iteration(iteration)
 	{
 	}
 
-	const T m_init;
+	virtual void construct_at(T* item) = 0;
+
 	std::uint64_t m_iteration;
 };
+template <class T, class ...Args>
+struct instance_tracker_constructor : public instance_tracker<T>
+{
+	instance_tracker_constructor(std::uint64_t iteration, Args&&... args)
+		: instance_tracker<T>::instance_tracker(iteration)
+		, m_init(std::forward<Args>(args)...)
+	{
+	}
 
-template<class T, size_type ArraySize, std::size_t ...Ix, class ...Args>
-constexpr std::array<T, ArraySize> repeat(std::index_sequence<Ix...>, Args&&... args)
-{
-	return std::array<T, ArraySize>{ { ((void)Ix, T(std::forward<Args>(args)))... } };
-}
-template <class T, size_type ArraySize, class ...Args>
-constexpr std::array<T, ArraySize> make_array(Args&&... args)
-{
-	return std::array<T, ArraySize>(repeat<T, ArraySize>(std::make_index_sequence<sizeof...(Args)>(), std::forward<Args>(args)...));
-}
+	void construct_at(T* item) override final
+	{
+		item->~T();
+		construct_with_tuple(item, m_init);
+	}
+
+	std::tuple<Args...> m_init;
+};
 }
 template <class T, class Allocator>
 typename thread_local_member<T, Allocator>::st_container thread_local_member<T, Allocator>::s_st_container;
