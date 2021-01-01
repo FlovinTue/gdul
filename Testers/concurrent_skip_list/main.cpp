@@ -8,6 +8,7 @@
 #include "../Common/util.h"
 #include <gdul/concurrent_skip_list/concurrent_skip_list.h>
 #include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
+#include <gdul/concurrent_hash_map/concurrent_hash_map.h>
 #include <iostream>
 #include <concurrent_unordered_set.h>
 #include <unordered_set>
@@ -20,10 +21,11 @@ struct container
 	gdul::thread_pool tp = gdul::thread_pool(std::numeric_limits<std::uint8_t>::max());
 	gdul::concurrent_skip_list<uint32_t, uint32_t, inserts> sl;
 	std::vector<uint32_t> keys;
+	gdul::concurrent_hash_map<uint32_t, uint32_t> hm = gdul::concurrent_hash_map<uint32_t, uint32_t>(inserts);
 };
 
+//concurrency::concurrent_unordered_set<int> us;
 gdul::shared_ptr<container> c;
-concurrency::concurrent_unordered_set<int> us;
 
 std::mutex mtx;
 //std::unordered_set<int> us;
@@ -36,7 +38,8 @@ void find()
 
 	for (std::size_t i = 0; i < c->keys.size();++i) {
 		//auto itr(us.find(c->keys[i]));
-		sl.find(c->keys[i]);
+		//sl.find(c->keys[i]) != sl.end();
+		c->hm.find(c->keys[i]);
 	}
 }
 void insert()
@@ -46,7 +49,8 @@ void insert()
 		const uint32_t k(gdul::csl_detail::t_rng());
 		keys.push_back(k);
 		c->sl.insert({ k, k });
-		us.insert(k);
+		//us.insert(k);
+		c->hm.insert({ k,k });
 	}
 
 	mtx.lock();
@@ -72,7 +76,7 @@ int main()
 	}
 
 	gdul::timer<float> t;
-	for (std::size_t i = 0; i < 10000; ++i) {
+	for (std::size_t i = 0; i < 100000; ++i) {
 		c->tp.add_task([]() { find(); });
 	}
 
@@ -80,5 +84,5 @@ int main()
 		std::this_thread::yield();
 	}
 
-	std::cout << 10000 * inserts << " finds took: " << t.get() << " seconds" << std::endl;
+	std::cout << 100000 * inserts << " finds took: " << t.get() << " seconds" << std::endl;
 }

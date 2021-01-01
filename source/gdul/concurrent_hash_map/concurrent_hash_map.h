@@ -1,3 +1,23 @@
+//Copyright(c) 2020 Flovin Michaelsen
+//
+//Permission is hereby granted, free of charge, to any person obtining a copy
+//of this software and associated documentation files(the "Software"), to deal
+//in the Software without restriction, including without limitation the rights
+//to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+//copies of the Software, and to permit persons to whom the Software is
+//furnished to do so, subject to the following conditions :
+//
+//The above copyright notice and this permission notice shall be included in all
+//copies or substantial portions of the Software.
+//
+//THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+//IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+//FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.IN NO EVENT SHALL THE
+//AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+//LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+//OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+//SOFTWARE.
+
 #pragma once
 
 
@@ -149,7 +169,7 @@ template<class Key, class Value, class Hash, class Allocator>
 inline concurrent_hash_map<Key, Value, Hash, Allocator>::concurrent_hash_map(size_type capacity, Allocator alloc)
 	: m_pool((std::uint32_t)chm_detail::to_bucket_count(chm_detail::pow2_align<>(capacity)), (std::uint32_t)chm_detail::to_bucket_count(chm_detail::pow2_align<>(capacity)) / std::thread::hardware_concurrency(), alloc)
 	, m_items(gdul::allocate_shared<bucket_type[]>(chm_detail::to_bucket_count(chm_detail::pow2_align<>(capacity)), alloc))
-	, t_items(m_items.load(), alloc)
+	, t_items(alloc, m_items.load())
 	, m_allocator(alloc)
 {
 }
@@ -240,10 +260,9 @@ template<class Key, class Value, class Hash, class Allocator>
 inline typename concurrent_hash_map<Key, Value, Hash, Allocator>::size_type concurrent_hash_map<Key, Value, Hash, Allocator>::find_index(const typename concurrent_hash_map<Key, Value, Hash, Allocator>::bucket_array& buckets, typename concurrent_hash_map<Key, Value, Hash, Allocator>::size_type hash)
 {
 	const size_type bucketCount(buckets.item_count());
-	const size_type nativeIndex(hash % bucketCount);
 
 	for (size_type probe(0); probe < bucketCount; ++probe) {
-		const size_type index(nativeIndex + (probe * probe) % bucketCount);
+		const size_type index((hash + (probe * probe)) % bucketCount);
 
 		const bucket_type& bucket(buckets[index]);
 		const bucket_items_type& bucketItems(bucket.my_val());
@@ -278,7 +297,7 @@ inline void concurrent_hash_map<Key, Value, Hash, Allocator>::grow_bucket_array(
 
 	bucket_array currentArray(m_items.load());
 
-	if (!(currentArray.item_count() < expectedOld.item_count())) {
+	if (expectedOld.item_count() < currentArray.item_count()) {
 		t_items = std::move(currentArray);
 		return;
 	}
@@ -295,6 +314,8 @@ inline void concurrent_hash_map<Key, Value, Hash, Allocator>::grow_bucket_array(
 
 		try_insert_in_bucket_array(newArray, items.packedPtr.kv, items.hash);
 	}
+
+	m_items.compare_exchange_strong(currentArray, newArray);
 }
 template<class Key, class Value, class Hash, class Allocator>
 inline std::pair<typename concurrent_hash_map<Key, Value, Hash, Allocator>::iterator, bool> concurrent_hash_map<Key, Value, Hash, Allocator>::try_insert_in_bucket_array(typename concurrent_hash_map<Key, Value, Hash, Allocator>::bucket_array& buckets, typename concurrent_hash_map<Key, Value, Hash, Allocator>::item_type* item, typename concurrent_hash_map<Key, Value, Hash, Allocator>::size_type hash)

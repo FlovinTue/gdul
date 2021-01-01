@@ -141,9 +141,10 @@ private:
 	struct tl_container
 	{
 		tl_container() = default;
-		tl_container(const shared_ptr<tlm_detail::index_pool<void>>& ip)
+		tl_container(const shared_ptr<tlm_detail::index_pool<void>>& ip, Allocator alloc)
 		{
 			m_indexPool = ip;
+			m_userIndex = m_indexPool->get(alloc);
 		}
 		~tl_container()
 		{
@@ -175,7 +176,7 @@ private:
 
 	bool fetch_from_tl_cache(tl_container& tl, T*& outItem);
 
-	size_type fetch_user_index(tl_container& tl);
+	size_type fetch_user_index(const tl_container& tl) const;
 
 	std::pair<size_type, size_type> update_index_cache(tl_container& tl);
 
@@ -229,11 +230,14 @@ inline concurrent_guard_pool<T, Allocator>::concurrent_guard_pool(typename concu
 	, m_indices{}
 	, m_blocks{}
 	, m_indexPool(gdul::allocate_shared<tlm_detail::index_pool<void>>(allocator))
-	, t_tlContainer(allocator, m_indexPool)
+	, t_tlContainer(allocator, m_indexPool, allocator)
 	, m_tlCacheSize(0)
 	, m_allocator()
 	, m_blocksEndIndex(0)
 {
+	m_fullCaches.reserve(512);
+	m_emptyCaches.reserve(512);
+
 	assert(baseCapacity && tlCacheSize && "Cannot instantiate pool with zero sizes");
 
 	for (std::uint8_t i = 0; i < cgp_detail::Capacity_Bits; ++i)
@@ -408,17 +412,11 @@ inline bool concurrent_guard_pool<T, Allocator>::fetch_from_tl_cache(tl_containe
 	return true;
 }
 template<class T, class Allocator>
-inline typename concurrent_guard_pool<T, Allocator>::size_type concurrent_guard_pool<T, Allocator>::fetch_user_index(tl_container& tl)
+inline typename concurrent_guard_pool<T, Allocator>::size_type concurrent_guard_pool<T, Allocator>::fetch_user_index(const tl_container& tl) const
 {
-	size_type userIndex(tl.m_userIndex);
+	const size_type userIndex(tl.m_userIndex);
 
-	if (cgp_detail::Max_Users < userIndex) {
-		tl.m_indexPool = m_indexPool;
-		tl.m_userIndex = m_indexPool->get(m_allocator);
-		userIndex = tl.m_userIndex;
-
-		assert(userIndex < cgp_detail::Max_Users && "Too many active threads accessing this structure");
-	}
+	assert(userIndex < cgp_detail::Max_Users && "Too many active threads accessing this structure");
 
 	return userIndex;
 }

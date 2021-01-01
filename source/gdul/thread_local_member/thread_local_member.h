@@ -231,8 +231,10 @@ public:
 	inline T& operator=(T&& other);
 	inline T& operator=(const T& other);
 
-	inline bool operator==(const T& t) const;
-	inline bool operator!=(const T& t) const;
+	template <class Comp>
+	inline bool operator==(const Comp& t) const;
+	template <class Comp>
+	inline bool operator!=(const Comp& t) const;
 
 	inline bool operator==(const tlm<T>& other) const;
 	inline bool operator!=(const tlm<T>& other) const;
@@ -350,6 +352,18 @@ inline void thread_local_member<T, Allocator>::unsafe_reset(Allocator allocator,
 	new (addr) thread_local_member(allocator, std::forward<Args>(constructorArgs)...);
 }
 template<class T, class Allocator>
+template<class Comp>
+inline bool thread_local_member<T, Allocator>::operator==(const Comp& t) const
+{
+	return get() == t;
+}
+template<class T, class Allocator>
+template<class Comp>
+inline bool thread_local_member<T, Allocator>::operator!=(const Comp& t) const
+{
+	return !operator==(t);
+}
+template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::operator T& ()
 {
 	return get();
@@ -358,16 +372,6 @@ template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::operator const T& () const
 {
 	return get();
-}
-template<class T, class Allocator>
-inline bool thread_local_member<T, Allocator>::operator==(const T& t) const
-{
-	return get() == t;
-}
-template<class T, class Allocator>
-inline bool thread_local_member<T, Allocator>::operator!=(const T& t) const
-{
-	return !operator==(t);
 }
 template<class T, class Allocator>
 inline bool thread_local_member<T, Allocator>::operator==(const tlm<T>& other) const
@@ -524,7 +528,7 @@ template<class T, class Allocator>
 inline T& thread_local_member<T, Allocator>::operator=(const T& other)
 {
 	T& accessor(get());
-	get() = other;
+	accessor = other;
 	return accessor;
 }
 template<class T, class Allocator>
@@ -723,6 +727,7 @@ struct instance_tracker
 	{
 	}
 
+	virtual ~instance_tracker() = default;
 	virtual void construct_at(T* item) = 0;
 
 	std::uint64_t m_iteration;
@@ -735,6 +740,8 @@ struct instance_tracker_constructor : public instance_tracker<T>
 		, m_init(std::forward<Args>(args)...)
 	{
 	}
+
+	~instance_tracker_constructor() = default;
 
 	void construct_at(T* item) override final
 	{
