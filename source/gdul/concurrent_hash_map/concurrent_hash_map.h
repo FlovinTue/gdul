@@ -43,7 +43,7 @@ struct bucket;
 
 constexpr size_type to_bucket_count(size_type desiredCapacity)
 {
-	// Something like 1.4 times desired.. 
+	// Something like 1.4 times desired..
 	return desiredCapacity;
 }
 
@@ -84,9 +84,9 @@ public:
 	using size_type = typename chm_detail::size_type;
 	using key_type = Key;
 	using value_type = Value;
+	using item_type = std::pair<key_type, value_type>;
 	using hash_type = Hash;
 	using allocator_type = Allocator;
-	using item_type = std::pair<key_type, value_type>;
 	using iterator = chm_detail::iterator<item_type>;
 	using const_iterator = chm_detail::const_iterator<const item_type>;
 
@@ -111,15 +111,23 @@ public:
 	/// Search for key
 	/// </summary>
 	/// <param name="k">Search key</param>
-	/// <returns>At bucket with matching key on success. end on failure</returns>
+	/// <returns>Iterator to item on success. end on failure</returns>
 	iterator find(Key k);
 
 	/// <summary>
 	/// Search for key
 	/// </summary>
 	/// <param name="k">Search key</param>
-	/// <returns>At bucket with matching key on success. end on failure</returns>
+	/// <returns>Iterator to item on success. end on failure</returns>
 	const const_iterator find(Key k) const;
+
+	/// <summary>
+	/// Search for key, and if needed inserts uninitialized item
+	/// </summary>
+	/// <param name="k">Search key</param>
+	/// <returns>Iterator to item</returns>
+	iterator operator[](size_type k);
+
 
 	iterator end() { return iterator(nullptr); }
 	const_iterator end() const { return const_iterator(nullptr); }
@@ -167,11 +175,16 @@ inline concurrent_hash_map<Key, Value, Hash, Allocator>::concurrent_hash_map(siz
 }
 template<class Key, class Value, class Hash, class Allocator>
 inline concurrent_hash_map<Key, Value, Hash, Allocator>::concurrent_hash_map(size_type capacity, Allocator alloc)
-	: m_pool((std::uint32_t)chm_detail::to_bucket_count(chm_detail::pow2_align<>(capacity)), (std::uint32_t)chm_detail::to_bucket_count(chm_detail::pow2_align<>(capacity)) / std::thread::hardware_concurrency(), alloc)
+	: m_pool((std::uint32_t)chm_detail::to_bucket_count(chm_detail::pow2_align<>(capacity)), (std::uint32_t)chm_detail::to_bucket_count(chm_detail::pow2_align<>(capacity)) / 1, alloc)
 	, m_items(gdul::allocate_shared<bucket_type[]>(chm_detail::to_bucket_count(chm_detail::pow2_align<>(capacity)), alloc))
 	, t_items(alloc, m_items.load())
 	, m_allocator(alloc)
 {
+}
+template<class Key, class Value, class Hash, class Allocator>
+inline std::pair<typename concurrent_hash_map<Key, Value, Hash, Allocator>::iterator, bool> concurrent_hash_map<Key, Value, Hash, Allocator>::insert(const item_type& in)
+{
+	return insert_internal(std::move(in));
 }
 template<class Key, class Value, class Hash, class Allocator>
 inline std::pair<typename concurrent_hash_map<Key, Value, Hash, Allocator>::iterator, bool> concurrent_hash_map<Key, Value, Hash, Allocator>::insert(item_type&& in)
@@ -229,6 +242,17 @@ inline const typename concurrent_hash_map<Key, Value, Hash, Allocator>::const_it
 	} while (refresh_tl());
 
 	return end();
+}
+template<class Key, class Value, class Hash, class Allocator>
+inline typename concurrent_hash_map<Key, Value, Hash, Allocator>::iterator concurrent_hash_map<Key, Value, Hash, Allocator>::operator[](size_type k)
+{
+	iterator item(find(k));
+
+	if (item != end()) {
+		return item;
+	}
+
+	return insert(std::make_pair(Key(), Value())).first;
 }
 template<class Key, class Value, class Hash, class Allocator>
 template<class In>
@@ -315,7 +339,12 @@ inline void concurrent_hash_map<Key, Value, Hash, Allocator>::grow_bucket_array(
 		try_insert_in_bucket_array(newArray, items.packedPtr.kv, items.hash);
 	}
 
-	m_items.compare_exchange_strong(currentArray, newArray);
+	if (m_items.compare_exchange_strong(currentArray, newArray)) {
+		t_items = std::move(newArray);
+	}
+	else {
+		t_items = std::move(currentArray);
+	}
 }
 template<class Key, class Value, class Hash, class Allocator>
 inline std::pair<typename concurrent_hash_map<Key, Value, Hash, Allocator>::iterator, bool> concurrent_hash_map<Key, Value, Hash, Allocator>::try_insert_in_bucket_array(typename concurrent_hash_map<Key, Value, Hash, Allocator>::bucket_array& buckets, typename concurrent_hash_map<Key, Value, Hash, Allocator>::item_type* item, typename concurrent_hash_map<Key, Value, Hash, Allocator>::size_type hash)
