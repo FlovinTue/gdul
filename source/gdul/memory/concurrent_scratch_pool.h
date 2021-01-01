@@ -119,7 +119,7 @@ private:
 		std::atomic<size_type> m_indexClaim;
 	};
 
-	tlm<tl_container> t_details;
+	tlm<tl_container, allocator_type> t_details;
 	shared_ptr<T[]> m_block;
 	size_type m_iteration;
 	size_type m_tlCacheSize;
@@ -148,7 +148,7 @@ inline concurrent_scratch_pool<T, Allocator>::concurrent_scratch_pool(size_type 
 
 template<class T, class Allocator>
 inline concurrent_scratch_pool<T, Allocator>::concurrent_scratch_pool(size_type initialScratchSize, size_type tlCacheSize, Allocator alloc)
-	: t_details(tl_container{ 0, 0, nullptr }, alloc)
+	: t_details(alloc, tl_container{ 0, 0, nullptr })
 	, m_block(allocate_shared<T[]>(csp_detail::pow2_align(initialScratchSize), alloc))
 	, m_iteration(1)
 	, m_tlCacheSize(csp_detail::pow2_align(tlCacheSize, csp_detail::pow2_align(initialScratchSize)))
