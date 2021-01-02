@@ -743,6 +743,8 @@ inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class AllocationStrategy, class Compare>
 inline void concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::counteract_version_lag(std::uint8_t aboveLayer, std::uint32_t versionBase, node_view_set& expected)
 {
+	const std::uint32_t recentVersion(cpq_detail::version_sub_one(versionBase));
+
 	for (std::uint8_t i = aboveLayer; i < LinkTowerHeight; ++i) {
 
 		node_view expectedLinkValue(expected[i]);
@@ -751,19 +753,22 @@ inline void concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 			expectedLinkValue = m_head.m_linkViews[i].load(std::memory_order_relaxed);
 		}
 
-		const std::uint32_t versionLink(expectedLinkValue.get_version());
+		std::uint32_t versionLink(expectedLinkValue.get_version());
 
 		if (cpq_detail::in_range(versionLink, versionBase)) {
-
-			const std::uint32_t versionDelta(cpq_detail::version_delta(versionLink, versionBase));
-
+			std::uint32_t versionDelta(cpq_detail::version_delta(versionLink, versionBase));
+			
 			// If one of the upper layer links has strayed to far from the current base layer version we need to drag
 			// it in to range again
-			if (csl_detail::to_expected_list_size(LinkTowerHeight) < versionDelta) {
-				const std::uint32_t recentVersion(cpq_detail::version_sub_one(versionBase));
+			while (csl_detail::to_expected_list_size(LinkTowerHeight) < versionDelta) {
 				const node_view desired(expectedLinkValue, recentVersion);
-
-				m_head.m_linkViews[i].compare_exchange_strong(expectedLinkValue, desired, std::memory_order_relaxed);
+			
+				if (m_head.m_linkViews[i].compare_exchange_strong(expectedLinkValue, desired, std::memory_order_relaxed)) {
+					break;
+				}
+			
+				versionLink = expectedLinkValue.get_version();
+				versionDelta = cpq_detail::version_delta(versionLink, versionBase);
 			}
 		}
 	}

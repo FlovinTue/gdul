@@ -666,7 +666,7 @@ inline void tester<T, Allocator>::Write(std::uint32_t writes) {
 	for (std::uint32_t j = 0; j < writes; ++j) {
 
 #if defined(MS_CPQ)
-		T in = gdul::cpq_detail::t_rng();
+		T in = gdul::csl_detail::t_rng();
 		sum += in;
 #elif !defined(GDUL_CPQ)
 		T in;
