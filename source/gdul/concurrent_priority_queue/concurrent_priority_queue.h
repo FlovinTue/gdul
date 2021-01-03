@@ -158,6 +158,7 @@ public:
 	using typename csl_detail::concurrent_skip_list_base<Key, Value, LinkTowerHeight, Compare>::const_iterator;
 	using typename csl_detail::concurrent_skip_list_base<Key, Value, LinkTowerHeight, Compare>::size_type;
 	using typename csl_detail::concurrent_skip_list_base<Key, Value, LinkTowerHeight, Compare>::node_type;
+	using csl_detail::concurrent_skip_list_base<Key, Value, LinkTowerHeight, Compare>::empty;
 
 	using allocation_strategy = AllocationStrategy;
 	using allocator_type = typename allocation_strategy::allocator_type;

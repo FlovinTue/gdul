@@ -111,6 +111,7 @@ int main()
 	test2.clear();
 	const bool test2Empty(test2.empty());
 	test2.unsafe_reset();
+	assert(test2.empty());
 }
 
 // Run program: Ctrl + F5 or Debug > Start Without Debugging menu
