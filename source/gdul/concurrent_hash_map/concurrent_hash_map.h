@@ -37,14 +37,14 @@ namespace chm_detail {
 using size_type = std::size_t;
 
 constexpr size_type Default_Capacity = 32;
+constexpr std::uint8_t Growth_Multiple = 2;
 
 template <class Key, class Value>
 struct bucket;
 
 constexpr size_type to_bucket_count(size_type desiredCapacity)
 {
-	// Something like 1.4 times desired..
-	return desiredCapacity;
+	return desiredCapacity * Growth_Multiple;
 }
 
 template <class Dummy = void>
@@ -90,10 +90,29 @@ public:
 	using iterator = chm_detail::iterator<item_type>;
 	using const_iterator = chm_detail::const_iterator<const item_type>;
 
+	/// <summary>
+	/// Constructor
+	/// </summary>
 	concurrent_hash_map();
-	concurrent_hash_map(Allocator);
+
+	/// <summary>
+	/// Constructor with allocator
+	/// </summary>
+	/// <param name="alloc">Allocator for array and items</param>
+	concurrent_hash_map(Allocator alloc);
+
+	/// <summary>
+	/// Constructor with capacity
+	/// </summary>
+	/// <param name="capacity">Initial capacity of map</param>
 	concurrent_hash_map(size_type capacity);
-	concurrent_hash_map(size_type capacity, Allocator);
+
+	/// <summary>
+	/// Constructor with capacity and allocator
+	/// </summary>
+	/// <param name="capacity">Initial capacity of map</param>
+	/// <param name="alloc">Allocator for array and items</param>
+	concurrent_hash_map(size_type capacity, Allocator alloc);
 
 	/// <summary>
 	/// Insert an item
@@ -128,34 +147,76 @@ public:
 	/// <returns>Iterator to item</returns>
 	iterator operator[](size_type k);
 
+	/// <summary>
+	/// Query for number of items in map
+	/// </summary>
+	/// <returns>Item count</returns>
+	size_type size() const;
 
+	/// <summary>
+	/// Query for empty map
+	/// </summary>
+	/// <returns>True if no items are present</returns>
+	bool empty() const;
+
+	/// <summary>
+	/// Query for map capacity
+	/// </summary>
+	/// <returns>Item capacity</returns>
+	size_type capacity() const;
+
+	/// <summary>
+	/// Iterator to end
+	/// </summary>
+	/// <returns>Iterator</returns>
 	iterator end() { return iterator(nullptr); }
+
+	/// <summary>
+	/// Iterator to end
+	/// </summary>
+	/// <returns>Iterator</returns>
 	const_iterator end() const { return const_iterator(nullptr); }
+
+	/// <summary>
+	/// Attempt deletion of item
+	/// </summary>
+	/// <param name="k">Search key</param>
+	/// <returns>True if item was present, and deleted</returns>
+	bool unsafe_erase(Key k);
 
 private:
 	using bucket_items_type = chm_detail::bucket<key_type, value_type>;
 	using bucket_type = atomic_128<bucket_items_type>;
 	using bucket_array = shared_ptr<bucket_type[]>;
 
+	struct t_container
+	{
+		bucket_array buckets;
+		// Keep this here as a small perf opt
+		size_type bucketCount;
+	};
+
 	template <class In>
 	std::pair<iterator, bool> insert_internal(In&& in);
 
+	bool refresh_tl(t_container& tContainer) const;
 
-	bool refresh_tl() const;
-
-	void grow_bucket_array(bucket_array& expectedOld);
+	void grow_bucket_array(t_container& tContainer);
 
 	std::pair<iterator, bool> try_insert_in_bucket_array(bucket_array& buckets, item_type* item, size_type hash);
 
-	static size_type find_index(const bucket_array& buckets, size_type hash);
-	static void help_dispose_bucket_array(bucket_array& buckets);
+	static size_type find_index(const t_container& tContainer, size_type hash);
+	static void help_dispose_bucket_array(t_container& tContainer);
 	static void dispose_bucket(bucket_type& bucket);
 
 	concurrent_guard_pool<item_type, allocator_type> m_pool;
 
 	atomic_shared_ptr<bucket_type[]> m_items;
 
-	mutable tlm<bucket_array, allocator_type> t_items;
+	mutable tlm<t_container, allocator_type> t_items;
+
+	std::atomic<size_type> m_size;
+
 	allocator_type m_allocator;
 };
 template<class Key, class Value, class Hash, class Allocator>
@@ -177,7 +238,8 @@ template<class Key, class Value, class Hash, class Allocator>
 inline concurrent_hash_map<Key, Value, Hash, Allocator>::concurrent_hash_map(size_type capacity, Allocator alloc)
 	: m_pool((std::uint32_t)chm_detail::to_bucket_count(chm_detail::pow2_align<>(capacity)), (std::uint32_t)chm_detail::to_bucket_count(chm_detail::pow2_align<>(capacity)) / 1, alloc)
 	, m_items(gdul::allocate_shared<bucket_type[]>(chm_detail::to_bucket_count(chm_detail::pow2_align<>(capacity)), alloc))
-	, t_items(alloc, m_items.load())
+	, t_items(alloc, t_container{ m_items.load(), chm_detail::to_bucket_count(chm_detail::pow2_align<>(capacity)) })
+	, m_size(0)
 	, m_allocator(alloc)
 {
 }
@@ -196,15 +258,18 @@ inline typename concurrent_hash_map<Key, Value, Hash, Allocator>::iterator concu
 {
 	const std::uint64_t hash(hash_type()(k));
 
-	do {
-		bucket_array& tBuckets(t_items);
-		const size_type index(find_index(tBuckets, hash));
+	t_container& tContainer(t_items);
 
-		if (index != tBuckets.item_count()) {
+	do {
+		bucket_array& buckets(tContainer.buckets);
+
+		const size_type index(find_index(tContainer, hash));
+
+		if (index != tContainer.bucketCount) {
 
 			std::atomic_thread_fence(std::memory_order_acquire);
 
-			bucket_items_type bucket(tBuckets[index].my_val());
+			bucket_items_type bucket(buckets[index].my_val());
 
 			if (bucket.packedPtr.state & chm_detail::bucket_flag_valid) {
 				bucket.packedPtr.state = chm_detail::bucket_flag_null;
@@ -213,7 +278,7 @@ inline typename concurrent_hash_map<Key, Value, Hash, Allocator>::iterator concu
 			}
 		}
 
-	} while (refresh_tl());
+	} while (refresh_tl(tContainer));
 
 	return end();
 }
@@ -221,12 +286,13 @@ template<class Key, class Value, class Hash, class Allocator>
 inline const typename concurrent_hash_map<Key, Value, Hash, Allocator>::const_iterator concurrent_hash_map<Key, Value, Hash, Allocator>::find(Key k) const
 {
 	const std::uint64_t hash(hash_type()(k));
+	const t_container& tContainer(t_items);
 
 	do {
-		const bucket_array& tBuckets(t_items);
+		const bucket_array& tBuckets(tContainer.buckets);
 		const size_type index(find_index(tBuckets, hash));
 
-		if (index != tBuckets.item_count()) {
+		if (index != tContainer.bucketCount) {
 
 			std::atomic_thread_fence(std::memory_order_acquire);
 
@@ -239,7 +305,7 @@ inline const typename concurrent_hash_map<Key, Value, Hash, Allocator>::const_it
 			}
 		}
 
-	} while (refresh_tl());
+	} while (refresh_tl(tContainer));
 
 	return end();
 }
@@ -255,6 +321,53 @@ inline typename concurrent_hash_map<Key, Value, Hash, Allocator>::iterator concu
 	return insert(std::make_pair(Key(), Value())).first;
 }
 template<class Key, class Value, class Hash, class Allocator>
+inline typename concurrent_hash_map<Key, Value, Hash, Allocator>::size_type concurrent_hash_map<Key, Value, Hash, Allocator>::size() const
+{
+	return m_size.load(std::memory_order_relaxed);
+}
+template<class Key, class Value, class Hash, class Allocator>
+inline bool concurrent_hash_map<Key, Value, Hash, Allocator>::empty() const
+{
+	return !size();
+}
+template<class Key, class Value, class Hash, class Allocator>
+inline typename concurrent_hash_map<Key, Value, Hash, Allocator>::size_type concurrent_hash_map<Key, Value, Hash, Allocator>::capacity() const
+{
+	const t_container& tContainer(t_items);
+
+	refresh_tl(tContainer);
+
+	return tContainer.bucketCount / chm_detail::Growth_Multiple;
+}
+template<class Key, class Value, class Hash, class Allocator>
+inline bool concurrent_hash_map<Key, Value, Hash, Allocator>::unsafe_erase(Key k)
+{
+	t_container& tContainer(t_items);
+
+	refresh_tl(tContainer);
+
+	bucket_array& buckets(tContainer.buckets);
+
+	const size_type index(find_index(tContainer, hash_type()(k)));
+
+	if (index == tContainer.bucketCount) {
+		return false;
+	}
+
+	bucket_items_type& bucket(buckets[index].my_val());
+
+	if (!(bucket.packedPtr.state & chm_detail::bucket_flag_valid)) {
+		return false;
+	}
+
+	bucket.packedPtr.stateValue &= ~chm_detail::bucket_flag_valid;
+	bucket.packedPtr.stateValue |= chm_detail::bucket_flag_deleted;
+
+	std::atomic_thread_fence(std::memory_order_release);
+
+	return true;
+}
+template<class Key, class Value, class Hash, class Allocator>
 template<class In>
 inline std::pair<typename concurrent_hash_map<Key, Value, Hash, Allocator>::iterator, bool> concurrent_hash_map<Key, Value, Hash, Allocator>::insert_internal(In&& in)
 {
@@ -264,31 +377,37 @@ inline std::pair<typename concurrent_hash_map<Key, Value, Hash, Allocator>::iter
 	const size_type hash(hash_type()(in.first));
 
 	for (;;) {
-		bucket_array& buckets(t_items);
+		t_container& tContainer(t_items);
+		bucket_array& buckets(tContainer.buckets);
 
 		std::pair<iterator, bool> result(try_insert_in_bucket_array(buckets, item, hash));
 
 		if (result.first != end()) {
+
+			if (!((m_size++ * chm_detail::Growth_Multiple) < tContainer.bucketCount)) {
+				grow_bucket_array(tContainer);
+			}
+
 			return result;
 		}
 
-		if (refresh_tl()) {
+		if (refresh_tl(tContainer)) {
 			continue;
 		}
 
-		grow_bucket_array(buckets);
+		grow_bucket_array(tContainer);
 	}
 }
 
 template<class Key, class Value, class Hash, class Allocator>
-inline typename concurrent_hash_map<Key, Value, Hash, Allocator>::size_type concurrent_hash_map<Key, Value, Hash, Allocator>::find_index(const typename concurrent_hash_map<Key, Value, Hash, Allocator>::bucket_array& buckets, typename concurrent_hash_map<Key, Value, Hash, Allocator>::size_type hash)
+inline typename concurrent_hash_map<Key, Value, Hash, Allocator>::size_type concurrent_hash_map<Key, Value, Hash, Allocator>::find_index(const typename concurrent_hash_map<Key, Value, Hash, Allocator>::t_container& tContainer, typename concurrent_hash_map<Key, Value, Hash, Allocator>::size_type hash)
 {
-	const size_type bucketCount(buckets.item_count());
+	const size_type bucketCount(tContainer.bucketCount);
 
 	for (size_type probe(0); probe < bucketCount; ++probe) {
 		const size_type index((hash + (probe * probe)) % bucketCount);
 
-		const bucket_type& bucket(buckets[index]);
+		const bucket_type& bucket(tContainer.buckets[index]);
 		const bucket_items_type& bucketItems(bucket.my_val());
 		const size_type bucketHash(bucketItems.hash);
 
@@ -304,25 +423,27 @@ inline typename concurrent_hash_map<Key, Value, Hash, Allocator>::size_type conc
 	return bucketCount;
 }
 template<class Key, class Value, class Hash, class Allocator>
-inline bool concurrent_hash_map<Key, Value, Hash, Allocator>::refresh_tl() const
+inline bool concurrent_hash_map<Key, Value, Hash, Allocator>::refresh_tl(typename concurrent_hash_map<Key, Value, Hash, Allocator>::t_container& tContainer) const
 {
-	if (t_items == m_items) {
+	if (tContainer.buckets == m_items) {
 		return false;
 	}
 
-	t_items = m_items.load(std::memory_order_acquire);
+	tContainer.buckets = m_items.load(std::memory_order_acquire);
+	tContainer.bucketCount = tContainer.buckets.item_count();
 
 	return true;
 }
 template<class Key, class Value, class Hash, class Allocator>
-inline void concurrent_hash_map<Key, Value, Hash, Allocator>::grow_bucket_array(typename concurrent_hash_map<Key, Value, Hash, Allocator>::bucket_array& expectedOld)
+inline void concurrent_hash_map<Key, Value, Hash, Allocator>::grow_bucket_array(typename concurrent_hash_map<Key, Value, Hash, Allocator>::t_container& tContainer)
 {
-	help_dispose_bucket_array(expectedOld);
+	help_dispose_bucket_array(tContainer);
 
 	bucket_array currentArray(m_items.load());
 
-	if (expectedOld.item_count() < currentArray.item_count()) {
-		t_items = std::move(currentArray);
+	if (tContainer.bucketCount < currentArray.item_count()) {
+		tContainer.buckets = std::move(currentArray);
+		tContainer.bucketCount = tContainer.buckets.item_count();
 		return;
 	}
 
@@ -340,16 +461,18 @@ inline void concurrent_hash_map<Key, Value, Hash, Allocator>::grow_bucket_array(
 	}
 
 	if (m_items.compare_exchange_strong(currentArray, newArray)) {
-		t_items = std::move(newArray);
+		tContainer.buckets = std::move(newArray);
+		tContainer.bucketCount = tContainer.buckets.item_count();
 	}
 	else {
-		t_items = std::move(currentArray);
+		tContainer.buckets = std::move(currentArray);
+		tContainer.bucketCount = tContainer.buckets.item_count();
 	}
 }
 template<class Key, class Value, class Hash, class Allocator>
 inline std::pair<typename concurrent_hash_map<Key, Value, Hash, Allocator>::iterator, bool> concurrent_hash_map<Key, Value, Hash, Allocator>::try_insert_in_bucket_array(typename concurrent_hash_map<Key, Value, Hash, Allocator>::bucket_array& buckets, typename concurrent_hash_map<Key, Value, Hash, Allocator>::item_type* item, typename concurrent_hash_map<Key, Value, Hash, Allocator>::size_type hash)
 {
-	const size_type index(find_index(buckets, hash));
+	const size_type index(find_index(t_items, hash));
 
 	if (index == buckets.item_count()) {
 		return std::make_pair(end(), false);
@@ -380,10 +503,10 @@ inline std::pair<typename concurrent_hash_map<Key, Value, Hash, Allocator>::iter
 	return std::make_pair(end(), false);
 }
 template<class Key, class Value, class Hash, class Allocator>
-inline void concurrent_hash_map<Key, Value, Hash, Allocator>::help_dispose_bucket_array(typename concurrent_hash_map<Key, Value, Hash, Allocator>::bucket_array& buckets)
+inline void concurrent_hash_map<Key, Value, Hash, Allocator>::help_dispose_bucket_array(typename concurrent_hash_map<Key, Value, Hash, Allocator>::t_container& tContainer)
 {
-	for (size_type i = 0; i < buckets.item_count(); ++i) {
-		dispose_bucket(buckets[i]);
+	for (size_type i = 0; i < tContainer.bucketCount; ++i) {
+		dispose_bucket(tContainer.buckets[i]);
 	}
 }
 template<class Key, class Value, class Hash, class Allocator>
@@ -480,12 +603,12 @@ struct iterator : public iterator_base<Item>
 
 	std::pair<iterator_base<Item>::key_type, iterator_base<Item>::value_type>& operator*()
 	{
-		return this->m_at;
+		return *this->m_at;
 	}
 
 	std::pair<iterator_base<Item>::key_type, iterator_base<Item>::value_type>* operator->()
 	{
-		return &this->m_at;
+		return this->m_at;
 	}
 };
 template <class Item>
