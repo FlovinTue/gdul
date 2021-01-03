@@ -114,7 +114,7 @@ inline concurrent_skip_list_impl<Key, Value, LinkTowerHeight, Compare, Allocator
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class Compare, class Allocator>
 inline concurrent_skip_list_impl<Key, Value, LinkTowerHeight, Compare, Allocator>::concurrent_skip_list_impl(typename concurrent_skip_list_impl<Key, Value, LinkTowerHeight, Compare, Allocator>::allocator_type alloc)
 	: concurrent_skip_list_base<Key, Value, LinkTowerHeight, Compare>::concurrent_skip_list_base()
-	, m_pool(csl_detail::to_expected_list_size(LinkTowerHeight), csl_detail::to_expected_list_size(LinkTowerHeight) / std::thread::hardware_concurrency(), alloc)
+	, m_pool((typename decltype(m_pool)::size_type)csl_detail::to_expected_list_size(LinkTowerHeight), (typename decltype(m_pool)::size_type)csl_detail::to_expected_list_size(LinkTowerHeight) / std::thread::hardware_concurrency(), alloc)
 {
 }
 
