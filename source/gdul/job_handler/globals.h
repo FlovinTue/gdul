@@ -32,22 +32,10 @@
 namespace gdul
 {
 
-enum job_queue : std::uint8_t
-{
-	job_queue_1,
-	job_queue_2,
-	job_queue_3,
-
-	// Leave in place
-	job_queue_count,
-};
-
 namespace jh_detail
 {
-constexpr job_queue Default_Job_Queue = job_queue(0);
-
-constexpr std::uint16_t Max_Workers = 32;
 constexpr std::uint16_t Job_Pool_Init_Size = 128;
+constexpr std::uint16_t Max_Workers = 32;
 constexpr std::uint16_t Batch_Job_Pool_Init_Size = 16;
 constexpr std::uint16_t Batch_Job_Max_Slices = Max_Workers * 3;
 }

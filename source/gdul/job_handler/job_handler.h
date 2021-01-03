@@ -51,11 +51,7 @@ public:
 	std::size_t external_worker_count() const noexcept;
 	std::size_t active_job_count() const noexcept;
 
-	static thread_local job this_job;
-	static thread_local worker this_worker;
-
 	worker make_worker();
-	worker make_worker(delegate<void()> entryPoint);
 
 	job make_job(delegate<void()> workUnit);
 

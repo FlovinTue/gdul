@@ -29,6 +29,8 @@ namespace gdul
 template <class Signature>
 class delegate;
 
+class job_queue;
+
 namespace jh_detail
 {
 class worker_impl;
@@ -36,6 +38,8 @@ class worker_impl;
 class worker
 {
 public:
+	static thread_local worker this_worker;
+
 	worker() = default;
 	worker(jh_detail::worker_impl* impl);
 	worker(const worker&) = default;
@@ -49,14 +53,14 @@ public:
 	void set_execution_priority(std::int32_t priority);
 	void set_name(const std::string& name);
 
+	void add_queue(job_queue* queue);
+	void clear_queues();
+
 	void enable();
 	bool disable();
 
 	void set_run_on_enable(delegate<void()> toCall);
 	void set_run_on_disable(delegate<void()> toCall);
-
-	void set_queue_consume_first(job_queue firstQueue) noexcept;
-	void set_queue_consume_last(job_queue lastQueue) noexcept;
 
 	bool is_active() const;
 

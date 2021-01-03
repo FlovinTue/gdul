@@ -31,18 +31,6 @@ void batch_job::add_dependency(job & dependency)
 	if (m_impl)
 		m_impl->add_dependency(dependency);
 }
-void batch_job::set_target_queue(job_queue target) noexcept
-{
-	if (m_impl)
-		m_impl->set_target_queue(target);
-}
-job_queue batch_job::get_target_queue() const noexcept 
-{
-	if (!m_impl)
-		return jh_detail::Default_Job_Queue;
-
-	return m_impl->get_target_queue();
-}
 bool batch_job::enable() noexcept
 {
 	return m_impl && m_impl->enable(m_impl);

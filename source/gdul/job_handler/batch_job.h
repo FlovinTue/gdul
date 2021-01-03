@@ -40,8 +40,6 @@ public:
 	batch_job();
 
 	void add_dependency(job& dependency);
-	void set_target_queue(job_queue target) noexcept;
-	job_queue get_target_queue() const noexcept;
 
 	// this object may be discarded once enable() has been invoked
 	bool enable() noexcept;

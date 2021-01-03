@@ -39,6 +39,8 @@ class batch_job_impl;
 class job : public jh_detail::job_tracker_interface
 {
 public:
+	static thread_local job this_job;
+
 	job() noexcept;
 
 	job(job&& other) noexcept;
@@ -48,9 +50,6 @@ public:
 
 	void add_dependency(job& dependency);
 	void add_dependency(batch_job& dependency);
-
-	void set_target_queue(job_queue target) noexcept;
-	job_queue get_target_queue() const noexcept;
 
 	// this object may be discarded once enable() has been invoked
 	bool enable() noexcept;
@@ -69,6 +68,8 @@ public:
 	void work_until_ready(job_queue consumeFrom);
 
 	operator bool() const noexcept;
+
+	float priority() const noexcept;
 
 private:
 	friend class jh_detail::job_handler_impl;

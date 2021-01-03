@@ -64,9 +64,7 @@ public:
 
 	job make_job(delegate<void()>&& workUnit);
 
-	std::size_t internal_worker_count() const noexcept;
-	std::size_t external_worker_count() const noexcept;
-	std::size_t active_job_count() const noexcept;
+	std::size_t worker_count() const noexcept;
 
 	pool_allocator<job_node> get_job_node_allocator() const noexcept;
 	pool_allocator<dummy_batch_type> get_batch_job_allocator() const noexcept;
@@ -90,11 +88,8 @@ private:
 	memory_pool m_jobNodeMemPool;
 	memory_pool m_batchJobMemPool;
 
-	concurrent_queue<job_impl_shared_ptr, allocator_type> m_jobQueues[job_queue_count];
-
 	std::array<worker_impl, Max_Workers> m_workers;
 
-	std::atomic<std::uint16_t> m_workerCount;
 	std::atomic<std::uint16_t> m_workerIndices;
 };
 }

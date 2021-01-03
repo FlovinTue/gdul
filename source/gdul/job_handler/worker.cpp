@@ -20,9 +20,12 @@
 
 #include <gdul/job_handler/worker.h>
 #include <gdul/job_handler/worker_impl.h>
+#include <gdul/job_handler/job_handler_impl.h>
 
 namespace gdul
 {
+thread_local worker worker::this_worker(&jh_detail::job_handler_impl::t_items.m_implicitWorker);
+
 worker::worker(jh_detail::worker_impl * impl)
 	: m_impl(impl)
 {
@@ -88,22 +91,6 @@ void worker::set_run_on_disable(delegate<void()> toCall)
 		return;
 
 	m_impl->set_run_on_disable(std::move(toCall));
-}
-void worker::set_queue_consume_first(job_queue firstQueue) noexcept
-{
-	assert(m_impl && "Worker is not assigned");
-	if (!m_impl)
-		return;
-
-	m_impl->set_queue_consume_first(firstQueue);
-}
-void worker::set_queue_consume_last(job_queue lastQueue) noexcept
-{
-	assert(m_impl && "Worker is not assigned");
-	if (!m_impl)
-		return;
-
-	m_impl->set_queue_consume_last(lastQueue);
 }
 bool worker::is_active() const
 {

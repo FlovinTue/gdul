@@ -27,6 +27,8 @@
 
 namespace gdul
 {
+thread_local job job::this_job(shared_ptr<jh_detail::job_impl>(nullptr));
+
 job::job() noexcept
 {
 }
@@ -66,20 +68,7 @@ void job::add_dependency(batch_job& dependency)
 {
 	add_dependency(dependency.get_endjob());
 }
-void job::set_target_queue(job_queue target) noexcept
-{
-	if (!m_impl)
-		return;
 
-	m_impl->set_target_queue(target);
-}
-job_queue job::get_target_queue() const noexcept
-{
-	if (!m_impl)
-		return jh_detail::Default_Job_Queue;
-
-	return m_impl->get_target_queue();
-}
 bool job::enable() noexcept
 {
 	if (m_impl) {
@@ -129,27 +118,17 @@ void job::wait_until_ready() noexcept
 
 	m_impl->wait_until_ready();
 }
-void job::work_until_finished(job_queue consumeFrom)
-{
-	if (!m_impl)
-		return;
-
-	m_impl->work_until_finished(consumeFrom);
-}
 job::job(gdul::shared_ptr<jh_detail::job_impl> impl) noexcept
 	: m_impl(std::move(impl))
 {
 }
-void job::work_until_ready(job_queue consumeFrom)
-{
-	if (!m_impl)
-		return;
-
-	m_impl->work_until_ready(consumeFrom);
-}
 job::operator bool() const noexcept
 {
 	return m_impl;
+}
+float job::priority() const noexcept
+{
+	return m_impl->get_priority();
 }
 #if defined(GDUL_JOB_DEBUG)
 constexpr_id job::register_tracking_node(constexpr_id id, const char* name, const char* file, std::uint32_t line, bool batchSub)

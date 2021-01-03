@@ -31,8 +31,6 @@
 
 namespace gdul
 {
-
-#undef GetObject
 namespace jh_detail
 {
 thread_local job_handler_impl::tl_container job_handler_impl::t_items{ &job_handler_impl::t_items.m_implicitWorker };
@@ -52,9 +50,9 @@ job_handler_impl::job_handler_impl(allocator_type allocator)
 	constexpr std::size_t jobNodeAllocSize(allocate_shared_size<job_node, pool_allocator<job_node>>());
 	constexpr std::size_t batchJobAllocSize(allocate_shared_size<dummy_batch_type, pool_allocator<dummy_batch_type>>());
 
-	m_jobImplMemPool.init<jobImplAllocSize, alignof(job_impl)>(jh_detail::Job_Pool_Init_Size, m_mainAllocator);
-	m_jobNodeMemPool.init<jobNodeAllocSize, alignof(job_node)>(jh_detail::Job_Pool_Init_Size + jh_detail::Batch_Job_Pool_Init_Size, m_mainAllocator);
-	m_batchJobMemPool.init<batchJobAllocSize, alignof(dummy_batch_type)>(jh_detail::Batch_Job_Pool_Init_Size, m_mainAllocator);
+	m_jobImplMemPool.init<jobImplAllocSize, alignof(job_impl)>(Job_Pool_Init_Size, m_mainAllocator);
+	m_jobNodeMemPool.init<jobNodeAllocSize, alignof(job_node)>(Job_Pool_Init_Size + jh_detail::Batch_Job_Pool_Init_Size, m_mainAllocator);
+	m_batchJobMemPool.init<batchJobAllocSize, alignof(dummy_batch_type)>(Batch_Job_Pool_Init_Size, m_mainAllocator);
 }
 
 
@@ -73,18 +71,8 @@ void job_handler_impl::retire_workers()
 	}
 }
 
+
 worker job_handler_impl::make_worker()
-{
-	gdul::delegate<void()> entryPoint(&job_handler_impl::work, this);
-
-	worker w(make_worker(entryPoint));
-	w.set_name("worker");
-
-	m_workerCount.fetch_add(1, std::memory_order_relaxed);
-
-	return w;
-}
-worker job_handler_impl::make_worker(gdul::delegate<void()> entryPoint)
 {
 	const std::uint16_t index(m_workerIndices.fetch_add(1, std::memory_order_relaxed));
 
@@ -114,24 +102,11 @@ job job_handler_impl::make_job(delegate<void()>&& workUnit)
 	return job(jobImpl);
 }
 
-std::size_t job_handler_impl::internal_worker_count() const noexcept
+std::size_t job_handler_impl::worker_count() const noexcept
 {
-	return m_workerCount.load(std::memory_order_relaxed);
+	return m_workerIndices.load(std::memory_order_relaxed);
 }
-std::size_t job_handler_impl::external_worker_count() const noexcept
-{
-	return m_workerIndices.load(std::memory_order_relaxed) - m_workerCount.load(std::memory_order_relaxed);
-}
-std::size_t job_handler_impl::active_job_count() const noexcept
-{
-	std::size_t accum(0);
 
-	for (std::uint8_t i = 0; i < job_queue_count; ++i) {
-		accum += m_jobQueues[i].size();
-	}
-
-	return accum;
-}
 pool_allocator<job_node> job_handler_impl::get_job_node_allocator() const noexcept
 {
 	return m_jobNodeMemPool.create_allocator<job_node>();
@@ -164,7 +139,7 @@ bool job_handler_impl::try_consume_from_once(job_queue consumeFrom)
 void job_handler_impl::launch_worker(std::uint16_t index) noexcept
 {
 	t_items.this_worker_impl = &m_workers[index];
-	job_handler::this_worker = worker(t_items.this_worker_impl);
+	worker::this_worker = worker(t_items.this_worker_impl);
 
 	while (!t_items.this_worker_impl->is_enabled()) {
 		t_items.this_worker_impl->idle();

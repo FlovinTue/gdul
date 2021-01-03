@@ -34,7 +34,6 @@ job_impl::job_impl(delegate<void()>&& workUnit, job_handler_impl* handler)
 	: m_workUnit(std::forward<delegate<void()>>(workUnit))
 	, m_finished(false)
 	, m_firstDependee(nullptr)
-	, m_targetQueue(Default_Job_Queue)
 	, m_handler(handler)
 	, m_dependencies(Job_Enable_Dependencies)
 #if defined (GDUL_JOB_DEBUG)
@@ -53,10 +52,10 @@ void job_impl::operator()()
 	assert(!m_finished);
 
 #if defined (GDUL_JOB_DEBUG)
-	const constexpr_id swap(job_handler::this_job.m_physicalId);
+	const constexpr_id swap(job::this_job.m_physicalId);
 	if (m_trackingNode) {
 		m_trackingNode->m_enqueueTimeSet.log_time(m_enqueueTimer.get());
-		job_handler::this_job.m_physicalId = m_physicalId;
+		job::this_job.m_physicalId = m_physicalId;
 	}
 
 	timer completionTimer;
@@ -68,7 +67,7 @@ void job_impl::operator()()
 	if (m_trackingNode)
 		m_trackingNode->m_completionTimeSet.log_time(completionTimer.get());
 
-	job_handler::this_job.m_physicalId = swap;
+	job::this_job.m_physicalId = swap;
 #endif
 
 	m_finished.store(true, std::memory_order_seq_cst);
@@ -97,14 +96,6 @@ bool job_impl::try_attach_child(job_impl_shared_ptr child)
 	} while (!m_firstDependee.compare_exchange_strong(rawRep, std::move(dependee), std::memory_order_release, std::memory_order_relaxed));
 
 	return true;
-}
-job_queue job_impl::get_target_queue() const noexcept
-{
-	return m_targetQueue;
-}
-void job_impl::set_target_queue(job_queue target) noexcept
-{
-	m_targetQueue = target;
 }
 bool job_impl::try_add_dependencies(std::uint32_t n)
 {
@@ -204,6 +195,10 @@ void job_impl::wait_until_ready() noexcept
 		jh_detail::job_handler_impl::t_items.this_worker_impl->idle();
 	}
 	GDUL_JOB_DEBUG_CONDTIONAL(if (m_trackingNode) m_trackingNode->m_waitTimeSet.log_time(waitTimer.get()))
+}
+float job_impl::get_priority() const noexcept
+{
+	return 0.0f;
 }
 void job_impl::detach_children()
 {

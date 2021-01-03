@@ -64,9 +64,6 @@ public:
 
 	bool try_attach_child(job_impl_shared_ptr child);
 
-	job_queue get_target_queue() const noexcept;
-	void set_target_queue(job_queue target) noexcept;
-
 	bool try_add_dependencies(std::uint32_t n = 1);
 	std::uint32_t remove_dependencies(std::uint32_t n = 1);
 
@@ -87,6 +84,8 @@ public:
 	void wait_until_finished() noexcept;
 	void wait_until_ready() noexcept;
 
+	float get_priority() const noexcept;
+
 private:
 	void detach_children();
 
@@ -103,8 +102,6 @@ private:
 	std::atomic<std::uint32_t> m_dependencies;
 
 	std::atomic_bool m_finished;
-
-	job_queue m_targetQueue;
 };
 }
 }

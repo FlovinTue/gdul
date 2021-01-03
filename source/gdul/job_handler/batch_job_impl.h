@@ -66,9 +66,6 @@ public:
 
 	void add_dependency(job& dependency);
 
-	void set_target_queue(job_queue target) noexcept override final;
-	job_queue get_target_queue() const noexcept override final;
-
 	void wait_until_finished() noexcept override final;
 	void wait_until_ready() noexcept override final;
 	void work_until_finished(job_queue consumeFrom) override final;
@@ -152,8 +149,6 @@ private:
 	const std::uint32_t m_batchSize;
 	const std::uint16_t m_batchCount;
 
-	job_queue m_targetQueue;
-
 	atomic_shared_ptr<batch_job_impl_interface> m_selfRef;
 
 	job m_root;
@@ -228,19 +223,6 @@ template<class InContainer, class OutContainer, class Process>
 inline void batch_job_impl<InContainer, OutContainer, Process>::add_dependency(job& dependency)
 {
 	m_root.add_dependency(dependency);
-}
-template<class InContainer, class OutContainer, class Process>
-inline void batch_job_impl<InContainer, OutContainer, Process>::set_target_queue(job_queue target) noexcept
-{
-	m_targetQueue = target;
-
-	m_root.set_target_queue(m_targetQueue);
-	m_end.set_target_queue(m_targetQueue);
-}
-template<class InContainer, class OutContainer, class Process>
-inline job_queue batch_job_impl<InContainer, OutContainer, Process>::get_target_queue() const noexcept
-{
-	return m_targetQueue;
 }
 template<class InContainer, class OutContainer, class Process>
 inline void batch_job_impl<InContainer, OutContainer, Process>::wait_until_finished() noexcept

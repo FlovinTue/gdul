@@ -24,9 +24,6 @@
 
 namespace gdul
 {
-thread_local job job_handler::this_job(shared_ptr<jh_detail::job_impl>(nullptr));
-thread_local worker job_handler::this_worker(&jh_detail::job_handler_impl::t_items.m_implicitWorker);
-
 job_handler::job_handler()
 	: job_handler(jh_detail::allocator_type())
 {
@@ -51,10 +48,6 @@ void job_handler::retire_workers()
 worker job_handler::make_worker()
 {
 	return m_impl->make_worker();
-}
-worker job_handler::make_worker(gdul::delegate<void()> entryPoint)
-{
-	return m_impl->make_worker(std::move(entryPoint));
 }
 std::size_t job_handler::internal_worker_count() const noexcept
 {

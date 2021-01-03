@@ -51,9 +51,6 @@ public:
 	void set_sleep_threshhold(std::uint16_t ms);
 	void set_name(const std::string & name);
 
-	void set_queue_consume_first(job_queue firstQueue) noexcept;
-	void set_queue_consume_last(job_queue lastQueue) noexcept;
-
 	void enable();
 
 	bool disable();
@@ -66,16 +63,11 @@ public:
 
 	void set_run_on_enable(delegate<void()> && toCall);
 	void set_run_on_disable(delegate<void()> && toCall);
-	void set_entry_point(delegate<void()> && toCall);
 
 	void on_enable();
 	void on_disable();
-	void entry_point();
 
 	void idle();
-
-	std::uint8_t get_queue_target();
-	std::uint8_t get_fetch_retries() const;
 
 	allocator_type get_allocator() const;
 
@@ -89,10 +81,6 @@ private:
 
 	gdul::delegate<void()> m_onEnable;
 	gdul::delegate<void()> m_onDisable;
-	gdul::delegate<void()> m_entryPoint;
-
-	std::size_t m_queueDistributionIteration;
-	std::size_t m_distributionChunks;
 
 	std::chrono::high_resolution_clock::time_point m_lastJobTimepoint;
 	std::chrono::high_resolution_clock m_sleepTimer;
@@ -105,9 +93,6 @@ private:
 
 	std::atomic_bool m_isEnabled;
 	std::atomic_bool m_isActive;
-
-	job_queue m_firstQueue;
-	job_queue m_lastQueue;
 
 	std::uint8_t m_coreAffinity;
 };
