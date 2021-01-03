@@ -69,6 +69,13 @@ void insert(int ix)
 
 int main()
 {
+	gdul::concurrent_skip_list<int, int> itrTest;
+	itrTest.insert({ 1,1 });
+	auto itrA = itrTest.begin();
+	auto itrB = itrTest.begin();
+	itrA++;
+	++itrB;
+
 	c = gdul::make_shared<container>();
 
 	for (int i = 0; i < 8; ++i) {

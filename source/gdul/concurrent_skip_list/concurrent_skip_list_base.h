@@ -433,9 +433,16 @@ struct forward_iterator : public iterator_base<Node>
 {
 	using iterator_base<Node>::iterator_base;
 
-	forward_iterator operator++()
+	forward_iterator& operator++()
 	{
-		return { this->m_at->m_linkViews[0].load(std::memory_order_relaxed).m_node };
+		this->m_at = this->m_at->m_linkViews[0].load(std::memory_order_relaxed).m_node;
+		return *this;
+	}
+	forward_iterator operator++(int)
+	{
+		const forward_iterator ret(this->m_at);
+		this->m_at = this->m_at->m_linkViews[0].load(std::memory_order_relaxed).m_node;
+		return ret;
 	}
 
 	std::pair<iterator_base<Node>::key_type, iterator_base<Node>::value_type>& operator*()
