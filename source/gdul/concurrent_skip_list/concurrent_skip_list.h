@@ -5,7 +5,7 @@
 #include <memory>
 #include <algorithm>
 #include <thread>
-#include <gdul/memory/concurrent_scratch_pool.h>
+#include <gdul/memory/concurrent_guard_pool.h>
 #include <gdul/concurrent_skip_list/concurrent_skip_list_base.h>
 
 #pragma warning(push)
@@ -104,7 +104,7 @@ private:
 
 	bool find_slot(node_view_set& atSet, node_view_set& nextSet, const node_type* node) const;
 
-	concurrent_scratch_pool<node_type, Allocator> m_pool;
+	concurrent_guard_pool<node_type, Allocator> m_pool;
 };
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class Compare, class Allocator>
 inline concurrent_skip_list_impl<Key, Value, LinkTowerHeight, Compare, Allocator>::concurrent_skip_list_impl()
@@ -148,6 +148,10 @@ inline std::pair<typename concurrent_skip_list_impl<Key, Value, LinkTowerHeight,
 	do {
 		result = try_insert(n);
 	} while (result.first->first != n->m_kv.first);
+
+	if (!result.second) {
+		m_pool.recycle(n);
+	}
 
 	return result;
 }
