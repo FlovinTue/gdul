@@ -365,6 +365,11 @@ inline bool concurrent_hash_map<Key, Value, Hash, Allocator>::unsafe_erase(Key k
 
 	std::atomic_thread_fence(std::memory_order_release);
 
+	typename bucket_items_type::packed_ptr ptr(bucket.packedPtr);
+	ptr.state = chm_detail::bucket_flag_null;
+
+	m_pool.recycle(ptr.kv);
+
 	return true;
 }
 template<class Key, class Value, class Hash, class Allocator>
@@ -386,6 +391,10 @@ inline std::pair<typename concurrent_hash_map<Key, Value, Hash, Allocator>::iter
 
 			if (!((m_size++ * chm_detail::Growth_Multiple) < tContainer.bucketCount)) {
 				grow_bucket_array(tContainer);
+			}
+
+			if (!result.second) {
+				m_pool.recycle(item);
 			}
 
 			return result;
