@@ -389,11 +389,12 @@ inline std::pair<typename concurrent_hash_map<Key, Value, Hash, Allocator>::iter
 
 		if (result.first != end()) {
 
-			if (!((m_size++ * chm_detail::Growth_Multiple) < tContainer.bucketCount)) {
-				grow_bucket_array(tContainer);
+			if (result.second) {
+				if (!((m_size++ * chm_detail::Growth_Multiple) < tContainer.bucketCount)) {
+					grow_bucket_array(tContainer);
+				}
 			}
-
-			if (!result.second) {
+			else {
 				m_pool.recycle(item);
 			}
 
