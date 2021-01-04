@@ -51,7 +51,20 @@ public:
 
 	worker make_worker();
 
-	job make_job(delegate<void()> workUnit, job_queue* target);
+	/// <summary>
+	/// Creates a basic job
+	/// </summary>
+	/// <param name="workUnit">Work to be executed</param>
+	/// <param name="target">Scheduling target</param>
+	/// <param name="id">Persistent identifier</param>
+	/// <param name="dbgName">Job name</param>
+	/// <returns>New job</returns>
+	/// <summary>
+	job make_job(delegate<void()> workUnit, job_queue* target, std::size_t id = 0, const char* dbgName = "") { workUnit; target; id; dbgName; /* See macro definition */}
+
+	job _redirect_make_job(delegate<void()> workUnit, job_queue* target, std::size_t id, const char* dbgName, const char* dbgFile, std::size_t line, std::size_t extraId);
+	job _redirect_make_job(delegate<void()> workUnit, job_queue* target, std::size_t id, const char* dbgFile, std::size_t line, std::size_t extraId);
+	job _redirect_make_job(delegate<void()> workUnit, job_queue* target, const char* dbgFile, std::size_t line, std::size_t extraId);
 
 	// Invokes process for all elements
 	// Requirements on Container is ::size(), ::value_type, random access iterator
@@ -217,3 +230,20 @@ inline batch_job job_handler::make_batch_job(
 	return make_batch_job(input, output, std::move(process), approxBatchSize, [&output](std::size_t n) {output.resize(n); }, target);
 }
 }
+
+
+#if  defined(_MSC_VER) || defined(__INTEL_COMPILER)
+#if !defined (GDUL_INLINE_PRAGMA)
+#define GDUL_INLINE_PRAGMA(pragma) __pragma(pragma)
+#else
+#define GDUL_STRINGIFY_PRAGMA(pragma) #pragma
+#define GDUL_INLINE_PRAGMA(pragma) _Pragma(GDUL_STRINGIFY_PRAGMA(pragma))
+#endif
+#endif
+// Expanding a bunch of physical properties of the declaration for later use (and debug use)
+#define make_job(...) _redirect_make_job(__VA_ARGS__, __FILE__, __LINE__, \
+GDUL_INLINE_PRAGMA(warning(push)) \
+GDUL_INLINE_PRAGMA(warning(disable : 4307)) \
+constexp_str_hash(__FILE__) \
+GDUL_INLINE_PRAGMA(warning(pop)) \
++ std::size_t(__LINE__)

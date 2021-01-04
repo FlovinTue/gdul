@@ -58,7 +58,7 @@ public:
 
 	job_impl();
 
-	job_impl(delegate<void()>&& workUnit, job_handler_impl* handler, job_queue* target);
+	job_impl(delegate<void()>&& workUnit, job_handler_impl* handler, job_queue* target, std::size_t id);
 	~job_impl();
 	
 	void operator()();
@@ -80,8 +80,12 @@ public:
 	bool is_enabled() const noexcept;
 	bool is_ready() const noexcept;
 
-	GDUL_JOB_DEBUG_CONDTIONAL(constexpr_id register_tracking_node(constexpr_id id, const char* name, const char* file, std::uint32_t line, bool batchSub))
-	GDUL_JOB_DEBUG_CONDTIONAL(void on_enqueue() noexcept)
+#if defined GDUL_JOB_DEBUG
+	std::size_t register_tracking_node(std::size_t id, const char* name, const char* file, std::uint32_t line, bool batchSub);
+	void on_enqueue() noexcept;
+
+	void set_dbg_info(const char* name, const char* file, std::size_t line);
+#endif
 
 	void work_until_finished(job_queue* consumeFrom);
 	void work_until_ready(job_queue* consumeFrom);
@@ -91,12 +95,14 @@ public:
 	float get_priority() const noexcept;
 
 private:
-
 	void detach_children();
 
-	GDUL_JOB_DEBUG_CONDTIONAL(job_tracker_node* m_trackingNode)
-	GDUL_JOB_DEBUG_CONDTIONAL(constexpr_id m_physicalId)
-	GDUL_JOB_DEBUG_CONDTIONAL(timer m_enqueueTimer)
+#if defined GDUL_JOB_DEBUG
+	job_tracker_node* m_trackingNode;
+	timer m_enqueueTimer; 
+#endif
+
+	std::size_t m_persistentId;
 
 	delegate<void()> m_workUnit;
 

@@ -26,19 +26,7 @@
 
 #include <gdul/job_handler/debug/job_tracker_node.h>
 
-// https://stackoverflow.com/questions/48896142/is-it-possible-to-get-hash-values-as-compile-time-constants
-template <typename Str>
-constexpr std::size_t constexp_str_hash(const Str& toHash)
-{
-	std::size_t result = 0xcbf29ce484222325ull; 
 
-	for (char c : toHash) {
-		result ^= c;
-		result *= 1099511628211ull;
-	}
-
-	return result;
-}
 #endif
 
 namespace gdul {
@@ -48,14 +36,19 @@ class job_tracker
 {
 public:
 #if defined (GDUL_JOB_DEBUG)
-	static job_tracker_node* register_full_node(constexpr_id id, const char * name, const char* file, std::uint32_t line);
-	static job_tracker_node* register_batch_sub_node(constexpr_id id, const char* name);
+	static job_tracker_node* register_full_node(std::size_t id, const char * name, const char* file, std::uint32_t line);
+	static job_tracker_node* register_batch_sub_node(std::size_t id, const char* name);
 
-	static job_tracker_node* fetch_node(constexpr_id id);
+	static job_tracker_node* fetch_node(std::size_t id);
 
 	static void dump_job_tree(const char* location);
 	static void dump_job_time_sets(const char* location);
 #else
+	static job_tracker_node* register_full_node(std::size_t id);
+	static job_tracker_node* register_batch_sub_node(std::size_t id);
+
+	static job_tracker_node* fetch_node(std::size_t id);
+
 	static void dump_job_tree(const char*) {};
 	static void dump_job_time_sets(const char*) {};
 #endif

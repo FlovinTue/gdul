@@ -72,23 +72,23 @@ private:
 }
 }
 
-#if defined(GDUL_JOB_DEBUG)
-#if !defined (activate_job_tracking)
-#if  defined(_MSC_VER) || defined(__INTEL_COMPILER)
-#define GDUL_INLINE_PRAGMA(pragma) __pragma(pragma)
-#else
-#define GDUL_STRINGIFY_PRAGMA(pragma) #pragma
-#define GDUL_INLINE_PRAGMA(pragma) _Pragma(GDUL_STRINGIFY_PRAGMA(pragma))
-#endif
-// A little trick to squeeze in a macro. To enable compile time enumeration of declarations
-#define activate_job_tracking(name) activate_job_tracking(gdul::constexpr_id::make< \
-GDUL_INLINE_PRAGMA(warning(push)) \
-GDUL_INLINE_PRAGMA(warning(disable : 4307)) \
-constexp_str_hash(__FILE__) \
-GDUL_INLINE_PRAGMA(warning(pop)) \
-+ std::size_t(__COUNTER__)>(), \
-name, \
-__FILE__, \
-__LINE__)
-#endif
-#endif
+//#if defined(GDUL_JOB_DEBUG)
+//#if !defined (activate_job_tracking)
+//#if  defined(_MSC_VER) || defined(__INTEL_COMPILER)
+//#define GDUL_INLINE_PRAGMA(pragma) __pragma(pragma)
+//#else
+//#define GDUL_STRINGIFY_PRAGMA(pragma) #pragma
+//#define GDUL_INLINE_PRAGMA(pragma) _Pragma(GDUL_STRINGIFY_PRAGMA(pragma))
+//#endif
+//// A little trick to squeeze in a macro. To enable compile time enumeration of declarations
+//#define activate_job_tracking(name) activate_job_tracking(gdul::constexpr_id::make< \
+//GDUL_INLINE_PRAGMA(warning(push)) \
+//GDUL_INLINE_PRAGMA(warning(disable : 4307)) \
+//constexp_str_hash(__FILE__) \
+//GDUL_INLINE_PRAGMA(warning(pop)) \
+//+ std::size_t(__COUNTER__)>(), \
+//name, \
+//__FILE__, \
+//__LINE__)
+//#endif
+//#endif

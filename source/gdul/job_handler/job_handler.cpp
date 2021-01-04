@@ -49,13 +49,21 @@ worker job_handler::make_worker()
 {
 	return m_impl->make_worker();
 }
+job job_handler::_redirect_make_job(delegate<void()> workUnit, job_queue* target, std::size_t id, const char* dbgName, const char* dbgFile, std::size_t line, std::size_t extraId)
+{
+	return m_impl->make_job_internal(std::move(workUnit), target, id + extraId, dbgName, dbgFile, line);
+}
+job job_handler::_redirect_make_job(delegate<void()> workUnit, job_queue* target, std::size_t id, const char* dbgFile, std::size_t line, std::size_t extraId)
+{
+	return _redirect_make_job(std::move(workUnit), target, id, "", dbgFile, line, extraId);
+}
+job job_handler::_redirect_make_job(delegate<void()> workUnit, job_queue* target, const char* dbgFile, std::size_t line, std::size_t extraId)
+{
+	return _redirect_make_job(std::move(workUnit), target, 0, "", dbgFile, line, extraId);
+}
 std::size_t job_handler::worker_count() const noexcept
 {
 	return m_impl->worker_count();
-}
-job job_handler::make_job(gdul::delegate<void()> workUnit, job_queue* target)
-{
-	return m_impl->make_job(std::move(workUnit), target);
 }
 pool_allocator<jh_detail::dummy_batch_type> job_handler::get_batch_job_allocator() const noexcept
 {

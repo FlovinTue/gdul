@@ -60,8 +60,11 @@ public:
 
 	worker make_worker();
 
-	job make_job(delegate<void()>&& workUnit, job_queue* target);
-
+#if defined (GDUL_JOB_DEBUG)
+	job make_job_internal(delegate<void()>&& workUnit, job_queue* target, std::size_t id, const char* name, const char* file, std::size_t line);
+#else
+	job make_job_internal(delegate<void()>&& workUnit, job_queue* target, std::size_t id);
+#endif
 	std::size_t worker_count() const noexcept;
 
 	pool_allocator<job_node> get_job_node_allocator() const noexcept;

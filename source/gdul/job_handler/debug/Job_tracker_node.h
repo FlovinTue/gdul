@@ -23,10 +23,10 @@
 #include <gdul/job_handler/globals.h>
 
 #if defined(GDUL_JOB_DEBUG)
-
-#include <gdul/job_handler/debug/constexp_id.h>
 #include <gdul/job_handler/debug/time_set.h>
 #include <string>
+#endif
+
 
 namespace gdul
 {
@@ -42,9 +42,10 @@ struct job_tracker_node
 {
 	job_tracker_node();
 
-	constexpr_id id() const;
-	constexpr_id parent() const;
+	std::size_t id() const;
+	std::size_t parent() const;
 
+#if defined(GDUL_JOB_DEBUG)
 	void set_node_type(job_tracker_node_type type);
 	job_tracker_node_type get_node_type() const;
 
@@ -56,22 +57,25 @@ struct job_tracker_node
 	time_set m_completionTimeSet;
 	time_set m_waitTimeSet;
 	time_set m_enqueueTimeSet;
+#endif
 
 private:
 	friend class job_tracker;
 	friend class job_tracker_data;
 
+#if defined(GDUL_JOB_DEBUG)
 	std::string m_name;
 	std::string m_physicalLocation;
 
 	std::uint32_t m_line;
+#endif
 
-	constexpr_id m_id;
-	constexpr_id m_parent;
+	std::size_t m_id;
+	std::size_t m_parent;
 
+#if defined(GDUL_JOB_DEBUG)
 	job_tracker_node_type m_type;
+#endif
 };
 }
 }
-
-#endif

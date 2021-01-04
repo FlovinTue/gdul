@@ -90,9 +90,6 @@
     <ClInclude Include="..\..\source\gdul\job_handler\job_impl.h">
       <Filter>implementation\job</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\source\gdul\job_handler\debug\constexp_id.h">
-      <Filter>implementation</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\source\gdul\job_handler\globals.h">
       <Filter>implementation</Filter>
     </ClInclude>

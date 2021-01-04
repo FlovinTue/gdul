@@ -20,28 +20,30 @@
 
 #include <gdul/job_handler/debug/job_tracker_node.h>
 
-#if defined(GDUL_JOB_DEBUG)
 
 namespace gdul
 {
 namespace jh_detail
 {
 job_tracker_node::job_tracker_node()
-	: m_id(constexpr_id::make<0>())
-	, m_parent(constexpr_id::make<0>())
+	: m_id(0)
+	, m_parent(0)
+#if defined(GDUL_JOB_DEBUG)
 	, m_type(job_tracker_node_default)
 	, m_line(0)
+#endif
 {
 }
-constexpr_id job_tracker_node::id() const
+std::size_t job_tracker_node::id() const
 {
 	return m_id;
 }
-constexpr_id job_tracker_node::parent() const
+std::size_t job_tracker_node::parent() const
 {
 	return m_parent;
 }
 
+#if defined(GDUL_JOB_DEBUG)
 void job_tracker_node::set_node_type(job_tracker_node_type type)
 {
 	m_type = type;
@@ -66,7 +68,7 @@ std::uint32_t job_tracker_node::line() const
 {
 	return m_line;
 }
+#endif
 
 }
 }
-#endif

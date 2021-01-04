@@ -29,19 +29,20 @@ namespace gdul
 namespace jh_detail
 {
 job_impl::job_impl()
-	: job_impl(delegate<void()>([]() {}), nullptr, nullptr)
+	: job_impl(delegate<void()>([]() {}), nullptr, nullptr, 0)
 {
 }
-job_impl::job_impl(delegate<void()>&& workUnit, job_handler_impl* handler, job_queue* target)
-	: m_workUnit(std::forward<delegate<void()>>(workUnit))
+job_impl::job_impl(delegate<void()>&& workUnit, job_handler_impl* handler, job_queue* target, std::size_t id)
+	: m_persistentId(id)
+	, m_workUnit(std::forward<delegate<void()>>(workUnit))
 	, m_finished(false)
 	, m_headDependee(nullptr)
 	, m_handler(handler)
 	, m_target(target)
 	, m_dependencies(Job_Enable_Dependencies)
+
 #if defined (GDUL_JOB_DEBUG)
 	, m_trackingNode(nullptr)
-	, m_physicalId(constexpr_id::make<0>())
 #endif
 {
 }
@@ -55,10 +56,10 @@ void job_impl::operator()()
 	assert(!m_finished);
 
 #if defined (GDUL_JOB_DEBUG)
-	const constexpr_id swap(job::this_job.m_physicalId);
+	const std::size_t swap(job::this_job.m_persistentId);
 	if (m_trackingNode) {
 		m_trackingNode->m_enqueueTimeSet.log_time(m_enqueueTimer.get());
-		job::this_job.m_physicalId = m_physicalId;
+		job::this_job.m_persistentId = m_persistentId;
 	}
 
 	timer completionTimer;
@@ -70,7 +71,7 @@ void job_impl::operator()()
 	if (m_trackingNode)
 		m_trackingNode->m_completionTimeSet.log_time(completionTimer.get());
 
-	job::this_job.m_physicalId = swap;
+	job::this_job.m_persistentId = swap;
 #endif
 
 	m_finished.store(true, std::memory_order_seq_cst);
@@ -228,9 +229,9 @@ void job_impl::detach_children()
 	}
 }
 #if defined(GDUL_JOB_DEBUG)
-constexpr_id job_impl::register_tracking_node(constexpr_id id, const char* name, const char* file, std::uint32_t line, bool batchSub)
+std::size_t job_impl::register_tracking_node(std::size_t id, const char* name, const char* file, std::uint32_t line, bool batchSub)
 {
-	m_physicalId = id;
+	m_persistentId = id;
 	m_trackingNode = !batchSub ? job_tracker::register_full_node(id, name, file, line) : job_tracker::register_batch_sub_node(id, name);
 	return m_trackingNode->id();
 }

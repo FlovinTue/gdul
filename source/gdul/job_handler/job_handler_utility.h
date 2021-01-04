@@ -39,6 +39,20 @@ typedef void* thread_handle;
 namespace jh_detail
 {
 
+// https://stackoverflow.com/questions/48896142/is-it-possible-to-get-hash-values-as-compile-time-constants
+template <typename Str>
+constexpr std::size_t constexp_str_hash(const Str& toHash)
+{
+	std::size_t result = 0xcbf29ce484222325ull;
+
+	for (char c : toHash) {
+		result ^= c;
+		result *= 1099511628211ull;
+	}
+
+	return result;
+}
+
 constexpr std::uint32_t Job_Max_Dependencies = std::numeric_limits<std::uint32_t>::max() / 2;
 constexpr std::uint32_t Job_Enable_Dependencies = std::numeric_limits<std::uint32_t>::max() - Job_Max_Dependencies;
 

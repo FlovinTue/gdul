@@ -94,7 +94,6 @@
     <ClInclude Include="..\..\source\gdul\job_handler\batch_job.h" />
     <ClInclude Include="..\..\source\gdul\job_handler\batch_job_impl.h" />
     <ClInclude Include="..\..\source\gdul\job_handler\debug\time_set.h" />
-    <ClInclude Include="..\..\source\gdul\job_handler\debug\constexp_id.h" />
     <ClInclude Include="..\..\source\gdul\job_handler\debug\job_tracker.h" />
     <ClInclude Include="..\..\source\gdul\job_handler\debug\job_tracker_interface.h" />
     <ClInclude Include="..\..\source\gdul\job_handler\debug\job_tracker_node.h" />
