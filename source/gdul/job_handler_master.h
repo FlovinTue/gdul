@@ -25,4 +25,5 @@
 #include <gdul/job_handler/worker.h>
 #include <gdul/job_handler/batch_job.h>
 #include <gdul/job_handler/batch_job_impl.h>
+#include <gdul/job_handler/job_queue.h>
 #include <gdul/job_handler/globals.h>

@@ -57,13 +57,17 @@ void batch_job::wait_until_ready() noexcept
 	if (m_impl)
 		m_impl->wait_until_ready();
 }
-void batch_job::work_until_finished(job_queue consumeFrom)
+void batch_job::work_until_finished(job_queue* consumeFrom)
 {
+	assert(consumeFrom && "Null ptr");
+
 	if (m_impl)
 		m_impl->work_until_finished(consumeFrom);
 }
-void batch_job::work_until_ready(job_queue consumeFrom)
+void batch_job::work_until_ready(job_queue* consumeFrom)
 {
+	assert(consumeFrom && "Null ptr");
+
 	if (m_impl)
 		m_impl->work_until_ready(consumeFrom);
 }

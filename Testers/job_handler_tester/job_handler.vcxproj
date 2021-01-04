@@ -122,10 +122,10 @@
     <ClCompile Include="..\..\source\gdul\job_handler\debug\time_set.cpp" />
     <ClCompile Include="..\..\source\gdul\job_handler\job.cpp" />
     <ClCompile Include="..\..\source\gdul\job_handler\job_handler.cpp" />
-    <ClCompile Include="..\..\source\gdul\job_handler\job_handler_queues.cpp" />
     <ClCompile Include="..\..\source\gdul\job_handler\job_handler_utility.cpp" />
     <ClCompile Include="..\..\source\gdul\job_handler\job_handler_impl.cpp" />
     <ClCompile Include="..\..\source\gdul\job_handler\job_impl.cpp" />
+    <ClCompile Include="..\..\source\gdul\job_handler\job_queue.cpp" />
     <ClCompile Include="..\..\source\gdul\job_handler\worker.cpp" />
     <ClCompile Include="..\..\source\gdul\job_handler\worker_impl.cpp" />
     <ClCompile Include="work_tracker.cpp" />

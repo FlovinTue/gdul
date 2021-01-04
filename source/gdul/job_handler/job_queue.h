@@ -10,34 +10,56 @@ namespace gdul {
 class job;
 namespace jh_detail {
 
-struct job_queue
-{
-	virtual ~job_queue() = default;
-	virtual void submit_job(const job& jb) = 0;
-};
+using job_impl_shared_ptr = shared_ptr<job_impl>;
+class job_impl;
+
 }
 
-template <class Allocator = jh_detail::allocator_type>
-struct job_async_queue : public jh_detail::job_queue
+class job_queue
 {
+public:
+	virtual ~job_queue() = default;
+
+private:
+	friend class job;
+	friend class jh_detail::job_impl;
+	friend class jh_detail::worker_impl;
+
+	virtual jh_detail::job_impl_shared_ptr fetch_job() = 0;
+	virtual void submit_job(jh_detail::job_impl_shared_ptr jb) = 0;
+
+protected:
+	float priority(const jh_detail::job_impl_shared_ptr& of) const;
+};
+
+template <class Allocator = jh_detail::allocator_type>
+class job_async_queue : public job_queue
+{
+public:
+
 	job_async_queue() = default;
 	job_async_queue(Allocator alloc);
 
-	void submit_job(job jb) override final;
 
 private:
-	concurrent_queue<job, Allocator> m_queue;
+	void submit_job(jh_detail::job_impl_shared_ptr jb) override final;
+	jh_detail::job_impl_shared_ptr fetch_job() override final;
+
+
+	concurrent_queue<jh_detail::job_impl_shared_ptr, Allocator> m_queue;
 };
 template <class Allocator = jh_detail::allocator_type>
-struct job_sync_queue : public jh_detail::job_queue
+class job_sync_queue : public job_queue
 {
+public:
 	job_sync_queue() = default;
 	job_sync_queue(Allocator alloc);
 
-	void submit_job(job jb) override final;
-
 private:
-	concurrent_priority_queue<float, job, jh_detail::Job_Pool_Init_Size, Allocator> m_queue;
+	void submit_job(jh_detail::job_impl_shared_ptr jb) override final;
+	jh_detail::job_impl_shared_ptr fetch_job() override final;
+
+	concurrent_priority_queue<float, jh_detail::job_impl_shared_ptr, jh_detail::Job_Pool_Init_Size, Allocator> m_queue;
 };
 
 template<class Allocator>
@@ -47,9 +69,16 @@ inline job_async_queue<Allocator>::job_async_queue(Allocator alloc)
 }
 
 template<class Allocator>
-inline void job_async_queue<Allocator>::submit_job(job jb)
+inline void job_async_queue<Allocator>::submit_job(jh_detail::job_impl_shared_ptr jb)
 {
 	m_queue.push(std::move(jb));
+}
+template<class Allocator>
+inline jh_detail::job_impl_shared_ptr job_async_queue<Allocator>::fetch_job()
+{
+	jh_detail::job_impl_shared_ptr out;
+	m_queue.try_pop(out);
+	return out;
 }
 
 template<class Allocator>
@@ -59,9 +88,15 @@ inline job_sync_queue<Allocator>::job_sync_queue(Allocator alloc)
 }
 
 template<class Allocator>
-inline void job_sync_queue<Allocator>::submit_job(job jb)
+inline void job_sync_queue<Allocator>::submit_job(jh_detail::job_impl_shared_ptr jb)
 {
-	m_queue.push(std::make_pair(jb.priority(), std::move(jb)));
+	m_queue.push(std::make_pair(this->priority(jb), std::move(jb)));
 }
-
+template<class Allocator>
+inline jh_detail::job_impl_shared_ptr job_sync_queue<Allocator>::fetch_job()
+{
+	jh_detail::job_impl_shared_ptr out;
+	m_queue.try_pop(out);
+	return out;
+}
 }

@@ -21,20 +21,23 @@
 #include <gdul/job_handler/job_impl.h>
 #include <gdul/job_handler/job_handler_impl.h>
 #include <gdul/job_handler/job_handler.h>
+#include <gdul/job_handler/worker.h>
+#include <gdul/job_handler/job_queue.h>
 
 namespace gdul
 {
 namespace jh_detail
 {
 job_impl::job_impl()
-	: job_impl(delegate<void()>([]() {}), nullptr)
+	: job_impl(delegate<void()>([]() {}), nullptr, nullptr)
 {
 }
-job_impl::job_impl(delegate<void()>&& workUnit, job_handler_impl* handler)
+job_impl::job_impl(delegate<void()>&& workUnit, job_handler_impl* handler, job_queue* target)
 	: m_workUnit(std::forward<delegate<void()>>(workUnit))
 	, m_finished(false)
-	, m_firstDependee(nullptr)
+	, m_headDependee(nullptr)
 	, m_handler(handler)
+	, m_target(target)
 	, m_dependencies(Job_Enable_Dependencies)
 #if defined (GDUL_JOB_DEBUG)
 	, m_trackingNode(nullptr)
@@ -84,7 +87,7 @@ bool job_impl::try_attach_child(job_impl_shared_ptr child)
 	job_node_shared_ptr firstDependee(nullptr);
 	job_node_raw_ptr rawRep(nullptr);
 	do {
-		firstDependee = m_firstDependee.load(std::memory_order_relaxed);
+		firstDependee = m_headDependee.load(std::memory_order_relaxed);
 		rawRep = firstDependee;
 
 		dependee->m_next = std::move(firstDependee);
@@ -93,7 +96,7 @@ bool job_impl::try_attach_child(job_impl_shared_ptr child)
 			return false;
 		}
 
-	} while (!m_firstDependee.compare_exchange_strong(rawRep, std::move(dependee), std::memory_order_release, std::memory_order_relaxed));
+	} while (!m_headDependee.compare_exchange_strong(rawRep, std::move(dependee), std::memory_order_release, std::memory_order_relaxed));
 
 	return true;
 }
@@ -142,6 +145,14 @@ job_handler_impl * job_impl::get_handler() const
 {
 	return m_handler;
 }
+job_queue* job_impl::get_target()
+{
+	return m_target;
+}
+void job_impl::set_target(job_queue* target)
+{
+	m_target = target;
+}
 bool job_impl::is_finished() const noexcept
 {
 	return m_finished.load(std::memory_order_relaxed);
@@ -156,22 +167,22 @@ bool job_impl::is_ready() const noexcept
 
 	return dependencies == Job_Enable_Dependencies;
 }
-void job_impl::work_until_finished(job_queue consumeFrom)
+void job_impl::work_until_finished(job_queue* consumeFrom)
 {
 	GDUL_JOB_DEBUG_CONDTIONAL(timer waitTimer)
 	while (!is_finished()) {
-		if (!m_handler->try_consume_from_once(consumeFrom)) {
+		if (!worker::this_worker.m_impl->try_consume_from_once(consumeFrom)) {
 			jh_detail::job_handler_impl::t_items.this_worker_impl->refresh_sleep_timer();
 			jh_detail::job_handler_impl::t_items.this_worker_impl->idle();
 		}
 	}
 	GDUL_JOB_DEBUG_CONDTIONAL(if (m_trackingNode) m_trackingNode->m_waitTimeSet.log_time(waitTimer.get()))
 }
-void job_impl::work_until_ready(job_queue consumeFrom)
+void job_impl::work_until_ready(job_queue* consumeFrom)
 {
 	GDUL_JOB_DEBUG_CONDTIONAL(timer waitTimer)
 	while (!is_ready() && !is_enabled()){
-		if (!m_handler->try_consume_from_once(consumeFrom)){
+		if (!worker::this_worker.m_impl->try_consume_from_once(consumeFrom)){
 			jh_detail::job_handler_impl::t_items.this_worker_impl->refresh_sleep_timer();
 			jh_detail::job_handler_impl::t_items.this_worker_impl->idle();
 		}
@@ -202,14 +213,15 @@ float job_impl::get_priority() const noexcept
 }
 void job_impl::detach_children()
 {
-	job_node_shared_ptr dependee(m_firstDependee.exchange(job_node_shared_ptr(nullptr), std::memory_order_relaxed));
+	job_node_shared_ptr dependee(m_headDependee.exchange(job_node_shared_ptr(nullptr), std::memory_order_relaxed));
 
 	while (dependee) {
 		job_node_shared_ptr next(std::move(dependee->m_next));
 
 		if (!dependee->m_job->remove_dependencies(1)) {
-			job_handler_impl* const nativeHandler(dependee->m_job->get_handler());
-			nativeHandler->enqueue_job(std::move(dependee->m_job));
+			job_queue* const target(dependee->m_job->get_target());
+
+			target->submit_job(std::move(dependee->m_job));
 		}
 
 		dependee = std::move(next);

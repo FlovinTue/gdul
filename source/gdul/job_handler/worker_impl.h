@@ -40,6 +40,8 @@ class job_handler_impl;
 class alignas(64) worker_impl
 {
 public:
+	using job_impl_shared_ptr = shared_ptr<job_impl>;
+
 	worker_impl();
 	worker_impl(std::thread&& thrd, allocator_type allocator);
 	~worker_impl();
@@ -49,6 +51,7 @@ public:
 	void set_core_affinity(std::uint8_t core);
 	void set_execution_priority(std::uint32_t priority);
 	void set_sleep_threshhold(std::uint16_t ms);
+
 	void set_name(const std::string & name);
 
 	void enable();
@@ -64,14 +67,23 @@ public:
 	void set_run_on_enable(delegate<void()> && toCall);
 	void set_run_on_disable(delegate<void()> && toCall);
 
+	void add_assignment(job_queue* queue);
+	void clear_assignments();
+
 	void on_enable();
 	void on_disable();
 
+	void work();
 	void idle();
 
 	allocator_type get_allocator() const;
 
+	bool try_consume_from_once(job_queue* consumeFrom);
+
 private:
+	void consume_job(job_impl_shared_ptr&& jb);
+	typename job_impl_shared_ptr fetch_job();
+
 #ifdef GDUL_JOB_DEBUG
 	std::string m_name;
 #endif
@@ -85,6 +97,8 @@ private:
 	std::chrono::high_resolution_clock::time_point m_lastJobTimepoint;
 	std::chrono::high_resolution_clock m_sleepTimer;
 
+	job_queue* m_targets[Max_Worker_Targets];
+
 	std::int32_t m_executionPriority;
 
 	std::uint16_t m_sleepThreshhold;
@@ -93,8 +107,11 @@ private:
 
 	std::atomic_bool m_isEnabled;
 	std::atomic_bool m_isActive;
+	std::atomic_uint8_t m_queuePushSync;
+	std::atomic_uint8_t m_queueCount;
 
 	std::uint8_t m_coreAffinity;
+	std::uint8_t m_queueIndex;
 };
 }
 }

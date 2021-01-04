@@ -49,21 +49,13 @@ worker job_handler::make_worker()
 {
 	return m_impl->make_worker();
 }
-std::size_t job_handler::internal_worker_count() const noexcept
+std::size_t job_handler::worker_count() const noexcept
 {
-	return m_impl->internal_worker_count();
+	return m_impl->worker_count();
 }
-std::size_t job_handler::external_worker_count() const noexcept
+job job_handler::make_job(gdul::delegate<void()> workUnit, job_queue* target)
 {
-	return m_impl->external_worker_count();
-}
-std::size_t job_handler::active_job_count() const noexcept
-{
-	return m_impl->active_job_count();
-}
-job job_handler::make_job(gdul::delegate<void()> workUnit)
-{
-	return m_impl->make_job(std::move(workUnit));
+	return m_impl->make_job(std::move(workUnit), target);
 }
 pool_allocator<jh_detail::dummy_batch_type> job_handler::get_batch_job_allocator() const noexcept
 {

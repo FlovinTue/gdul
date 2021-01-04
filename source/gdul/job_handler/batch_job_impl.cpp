@@ -28,9 +28,9 @@ namespace gdul
 {
 namespace jh_detail
 {
-gdul::job _redirect_make_job(job_handler * handler, gdul::delegate<void()>&& workUnit)
+gdul::job _redirect_make_job(job_handler * handler, gdul::delegate<void()>&& workUnit, job_queue* target)
 {
-	return handler->make_job(std::move(workUnit));
+	return handler->make_job(std::move(workUnit), target);
 }
 bool _redirect_enable_if_ready(gdul::shared_ptr<job_impl>& jb)
 {

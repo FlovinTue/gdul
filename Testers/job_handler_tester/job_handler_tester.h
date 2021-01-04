@@ -45,6 +45,7 @@ public:
 	std::vector<int*> m_scatterInput;
 	std::vector<int*> m_scatterOutput;
 
+	gdul::job_async_queue<> m_jobQueue;
 };
 
 }

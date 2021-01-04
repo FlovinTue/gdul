@@ -34,6 +34,7 @@ class job_queue;
 namespace jh_detail
 {
 class worker_impl;
+class job_impl;
 }
 class worker
 {
@@ -53,8 +54,12 @@ public:
 	void set_execution_priority(std::int32_t priority);
 	void set_name(const std::string& name);
 
-	void add_queue(job_queue* queue);
-	void clear_queues();
+	/// <summary>
+	/// Add queue from which to consume work. May be called multiple times
+	/// </summary>
+	/// <param name="queue">Source queue</param>
+	void add_assignment(job_queue* queue);
+	void clear_assignments();
 
 	void enable();
 	bool disable();
@@ -65,7 +70,7 @@ public:
 	bool is_active() const;
 
 private:
-	friend class job_handler_impl;
+	friend class jh_detail::job_impl;
 
 	jh_detail::worker_impl* m_impl;
 };

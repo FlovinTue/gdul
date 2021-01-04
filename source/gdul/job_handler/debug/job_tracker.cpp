@@ -73,7 +73,7 @@ job_tracker_node* job_tracker::register_full_node(constexpr_id id, const char * 
 
 	const constexpr_id variation(std::hash<std::string>{}(t_bufferString));
 
-	const constexpr_id groupParent(job_handler::this_job.m_physicalId);
+	const constexpr_id groupParent(job::this_job.m_physicalId);
 	const constexpr_id groupMatriarch(id.merge(groupParent));
 	const constexpr_id localId(variation.merge(groupMatriarch));
 

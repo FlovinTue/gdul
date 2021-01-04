@@ -24,6 +24,7 @@
 #include <gdul/job_handler/job_impl.h>
 #include <gdul/job_handler/batch_job.h>
 #include <gdul/job_handler/globals.h>
+#include <gdul/job_handler/job_queue.h>
 
 namespace gdul
 {
@@ -58,7 +59,7 @@ void job::add_dependency(job& dependency)
 	if (m_impl->try_add_dependencies(1)) {
 		if (!dependency.m_impl->try_attach_child(m_impl)) {
 			if (!m_impl->remove_dependencies(1)) {
-				m_impl->get_handler()->enqueue_job(m_impl);
+				m_impl->get_target()->submit_job(m_impl);
 			}
 		}
 	}
@@ -74,8 +75,9 @@ bool job::enable() noexcept
 	if (m_impl) {
 		const jh_detail::enable_result result(m_impl->enable());
 
-		if (result & jh_detail::enable_result_enqueue)
-			m_impl->get_handler()->enqueue_job(m_impl);
+		if (result & jh_detail::enable_result_enqueue) {
+			m_impl->get_target()->submit_job(m_impl);
+		}
 
 		return result & jh_detail::enable_result_enabled;
 	}
@@ -117,6 +119,20 @@ void job::wait_until_ready() noexcept
 		return;
 
 	m_impl->wait_until_ready();
+}
+void job::work_until_finished(job_queue* consumeFrom)
+{
+	assert(consumeFrom && "Null ptr");
+
+	if (m_impl)
+		m_impl->work_until_finished(consumeFrom);
+}
+void job::work_until_ready(job_queue* consumeFrom)
+{
+	assert(consumeFrom && "Null ptr");
+
+	if (m_impl)
+		m_impl->work_until_ready(consumeFrom);
 }
 job::job(gdul::shared_ptr<jh_detail::job_impl> impl) noexcept
 	: m_impl(std::move(impl))

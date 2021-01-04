@@ -34,6 +34,7 @@
 #endif
 
 namespace gdul{
+class job_queue;
 
 namespace jh_detail {
 
@@ -57,7 +58,7 @@ public:
 
 	job_impl();
 
-	job_impl(delegate<void()>&& workUnit, job_handler_impl* handler);
+	job_impl(delegate<void()>&& workUnit, job_handler_impl* handler, job_queue* target);
 	~job_impl();
 	
 	void operator()();
@@ -72,6 +73,9 @@ public:
 
 	job_handler_impl* get_handler() const;
 
+	job_queue* get_target();
+	void set_target(job_queue* target);
+
 	bool is_finished() const noexcept;
 	bool is_enabled() const noexcept;
 	bool is_ready() const noexcept;
@@ -79,14 +83,15 @@ public:
 	GDUL_JOB_DEBUG_CONDTIONAL(constexpr_id register_tracking_node(constexpr_id id, const char* name, const char* file, std::uint32_t line, bool batchSub))
 	GDUL_JOB_DEBUG_CONDTIONAL(void on_enqueue() noexcept)
 
-	void work_until_finished(job_queue consumeFrom);
-	void work_until_ready(job_queue consumeFrom);
+	void work_until_finished(job_queue* consumeFrom);
+	void work_until_ready(job_queue* consumeFrom);
 	void wait_until_finished() noexcept;
 	void wait_until_ready() noexcept;
 
 	float get_priority() const noexcept;
 
 private:
+
 	void detach_children();
 
 	GDUL_JOB_DEBUG_CONDTIONAL(job_tracker_node* m_trackingNode)
@@ -96,8 +101,9 @@ private:
 	delegate<void()> m_workUnit;
 
 	job_handler_impl* const m_handler;
+	job_queue* m_target;
 
-	atomic_shared_ptr<job_node> m_firstDependee;
+	atomic_shared_ptr<job_node> m_headDependee;
 
 	std::atomic<std::uint32_t> m_dependencies;
 

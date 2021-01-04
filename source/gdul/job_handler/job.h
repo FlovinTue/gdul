@@ -28,11 +28,14 @@ namespace gdul {
 
 class job_handler;
 class batch_job;
+class job_queue;
 
 namespace jh_detail {
 
 class job_handler_impl;
 class job_impl;
+class worker_impl;
+
 template <class InContainer, class OutContainer, class Process>
 class batch_job_impl;
 }
@@ -62,20 +65,21 @@ public:
 	void wait_until_ready() noexcept;
 
 	// Consume jobs until finished. Beware of recursive calls (stack overflow, stalls etc..)
-	void work_until_finished(job_queue consumeFrom);
+	void work_until_finished(job_queue* consumeFrom);
 
 	// Consume jobs until ready. Beware of recursive calls (stack overflow, stalls etc..)
-	void work_until_ready(job_queue consumeFrom);
+	void work_until_ready(job_queue* consumeFrom);
 
 	operator bool() const noexcept;
 
 	float priority() const noexcept;
 
 private:
-	friend class jh_detail::job_handler_impl;
 	friend class job_handler;
+	friend class jh_detail::worker_impl;
 	template <class InContainer, class OutContainer, class Process>
 	friend class jh_detail::batch_job_impl;
+	friend class jh_detail::job_handler_impl;
 
 #if defined(GDUL_JOB_DEBUG)
 	friend class jh_detail::job_tracker;

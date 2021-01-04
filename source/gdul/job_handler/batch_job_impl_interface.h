@@ -27,6 +27,7 @@
 #endif
 
 namespace gdul {
+class job_queue;
 template <class T>
 class shared_ptr;
 class job;
@@ -41,9 +42,9 @@ public:
 	virtual bool is_ready() const noexcept = 0;
 	virtual bool is_enabled() const noexcept = 0;
 	virtual void wait_until_finished() noexcept = 0;
-	virtual void work_until_finished(job_queue) = 0;
+	virtual void work_until_finished(job_queue*) = 0;
 	virtual void wait_until_ready() noexcept = 0;
-	virtual void work_until_ready(job_queue) = 0;
+	virtual void work_until_ready(job_queue*) = 0;
 
 	virtual job& get_endjob() noexcept = 0;
 	virtual std::size_t get_output_size() const noexcept = 0;

@@ -27,6 +27,7 @@
 
 namespace gdul {
 class job;
+class job_queue;
 
 namespace jh_detail
 {
@@ -52,10 +53,10 @@ public:
 	void wait_until_ready() noexcept;
 
 	// Consume jobs until finished. Beware of recursive calls (stack overflow, stalls etc..)
-	void work_until_finished(job_queue consumeFrom);
+	void work_until_finished(job_queue* consumeFrom);
 
 	// Consume jobs until ready. Beware of recursive calls (stack overflow, stalls etc..)
-	void work_until_ready(job_queue consumeFrom);
+	void work_until_ready(job_queue* consumeFrom);
 
 	operator bool() const noexcept;
 

@@ -47,67 +47,71 @@ public:
 
 	void retire_workers();
 
-	std::size_t internal_worker_count() const noexcept;
-	std::size_t external_worker_count() const noexcept;
-	std::size_t active_job_count() const noexcept;
+	std::size_t worker_count() const noexcept;
 
 	worker make_worker();
 
-	job make_job(delegate<void()> workUnit);
+	job make_job(delegate<void()> workUnit, job_queue* target);
 
 	// Invokes process for all elements
-	// Requirements on Container is ::size(), ::begin(), ::end(), ::value_type
+	// Requirements on Container is ::size(), ::value_type, random access iterator
 	// Will not modify container
 	template <class InContainer>
 	batch_job make_batch_job(
 		InContainer& input,
 		delegate<void(typename InContainer::value_type&)> process,
-		std::size_t batchSize);
+		std::size_t batchSize,
+		job_queue* target);
 
 	// Invokes process for all elements. Boolean returnvalue signals inclusion in the processed collection
-	// Requirements on Container is ::size(), ::begin(), ::end(), ::value_type
+	// Requirements on Container is ::size(), ::value_type, random access iterator
 	// Will modify container
 	template <class InOutContainer>
 	batch_job make_batch_job(
 		InOutContainer& inputOutput,
 		delegate<bool(typename InOutContainer::value_type&)> process,
 		std::size_t batchSize,
-		delegate<void(std::size_t)> outputResizeFunc);
+		delegate<void(std::size_t)> outputResizeFunc,
+		job_queue* target);
 
 	// Invokes process for all elements. Boolean returnvalue signals inclusion in the output collection
-	// Requirements on Container is ::size(), ::begin(), ::end(), ::value_type. Input container size must not exceed that of output.
+	// Requirements on Container is ::size(), ::value_type, random access iterator. Input container size must not exceed that of output.
 	// Will modify output container
 	template <class InContainer, class OutContainer>
 	batch_job make_batch_job(InContainer& input,
 		OutContainer& output,
 		delegate<bool(typename InContainer::value_type&, typename OutContainer::value_type&)> process,
 		std::size_t batchSize,
-		delegate<void(std::size_t)> outputResizeFunc);
+		delegate<void(std::size_t)> outputResizeFunc,
+		job_queue* target);
 
 	// Invokes process for all elements
-	// Requirements on Container is ::size(), ::begin(), ::end(), ::value_type
+	// Requirements on Container is ::size(), ::value_type, random access iterator
 	// Will not modify container
 	template <class InContainer>
 	batch_job make_batch_job(
 		InContainer& input,
-		delegate<void(typename InContainer::value_type&)> process);
+		delegate<void(typename InContainer::value_type&)> process,
+		job_queue* target);
 
 	// Invokes process for all elements. Boolean returnvalue signals inclusion in the processed collection
-	// Requirements on Container is ::size(), ::begin(), ::end(), ::value_type, ::resize(std::size_t)
+	// Requirements on Container is ::size(), ::value_type, random access iterator, ::resize(std::size_t)
 	// Will modify container
 	template <class InOutContainer>
 	batch_job make_batch_job(
 		InOutContainer& inputOutput,
-		delegate<bool(typename InOutContainer::value_type&)> process);
+		delegate<bool(typename InOutContainer::value_type&)> process,
+		job_queue* target);
 
 	// Invokes process for all elements. Boolean returnvalue signals inclusion in the output collection
-	// Requirements on Container is ::size(), ::begin(), ::end(), ::value_type, ::resize(std::size_t) (only output)
+	// Requirements on Container is ::size(), ::value_type, random access iterator, ::resize(std::size_t) (only output)
 	// Will modify output container
 	template <class InContainer, class OutContainer>
 	batch_job make_batch_job(
 		InContainer& input,
 		OutContainer& output,
-		delegate<bool(typename InContainer::value_type&, typename OutContainer::value_type&)> process);
+		delegate<bool(typename InContainer::value_type&, typename OutContainer::value_type&)> process,
+		job_queue* target);
 private:
 	pool_allocator<jh_detail::dummy_batch_type> get_batch_job_allocator() const noexcept;
 
@@ -116,42 +120,44 @@ private:
 	jh_detail::allocator_type m_allocator;
 };
 // Invokes process for all elements
-// Requirements on Container is ::size(), ::begin(), ::end(), ::value_type
+// Requirements on Container is ::size(), ::value_type, random access iterator
 // Will not modify container
 template<class InContainer>
 inline batch_job job_handler::make_batch_job(
 	InContainer& input, 
 	delegate<void(typename InContainer::value_type&)> process, 
-	std::size_t batchSize)
+	std::size_t batchSize,
+	job_queue* target)
 {
 	using batch_type = jh_detail::batch_job_impl<InContainer, InContainer, delegate<void(typename InContainer::value_type&)>>;
 
 	pool_allocator<batch_type> alloc(get_batch_job_allocator());
 
-	shared_ptr<batch_type> sp = gdul::allocate_shared<batch_type>(alloc, input, input, std::move(process), batchSize, delegate<void(std::size_t)>([](std::size_t) {}), this);
+	shared_ptr<batch_type> sp = gdul::allocate_shared<batch_type>(alloc, input, input, std::move(process), batchSize, delegate<void(std::size_t)>([](std::size_t) {}), this, target);
 
 	return batch_job(std::move(sp));
 }
 // Invokes process for all elements. Boolean returnvalue signals inclusion in the processed collection
-// Requirements on Container is ::size(), ::begin(), ::end(), ::value_type
+// Requirements on Container is ::size(), ::value_type, random access iterator
 // Will modify container
 template<class InOutContainer>
 inline batch_job job_handler::make_batch_job(
 	InOutContainer& inputOutput, 
 	delegate<bool(typename InOutContainer::value_type&)> process, 
 	std::size_t batchSize, 
-	delegate<void(std::size_t)> outputResizeFunc)
+	delegate<void(std::size_t)> outputResizeFunc,
+	job_queue* target)
 {
 	using batch_type = jh_detail::batch_job_impl<InOutContainer, InOutContainer, delegate<bool(typename InOutContainer::value_type&)>>;
 
 	pool_allocator<batch_type> alloc(get_batch_job_allocator());
 
-	shared_ptr<batch_type> sp = gdul::allocate_shared<batch_type>(alloc, inputOutput, inputOutput, std::move(process), batchSize, std::move(outputResizeFunc), this);
+	shared_ptr<batch_type> sp = gdul::allocate_shared<batch_type>(alloc, inputOutput, inputOutput, std::move(process), batchSize, std::move(outputResizeFunc), this, target);
 
 	return batch_job(std::move(sp));
 }
 // Invokes process for all elements. Boolean returnvalue signals inclusion in the output collection
-// Requirements on Container is ::size(), ::begin(), ::end(), ::value_type. Input container size must not exceed that of output.
+// Requirements on Container is ::size(), ::value_type, random access iterator. Input container size must not exceed that of output.
 // Will modify output container
 template<class InContainer, class OutContainer>
 inline batch_job job_handler::make_batch_job(
@@ -159,51 +165,55 @@ inline batch_job job_handler::make_batch_job(
 	OutContainer& output, 
 	delegate<bool(typename InContainer::value_type&, typename OutContainer::value_type&)> process, 
 	std::size_t batchSize, 
-	delegate<void(std::size_t)> outputResizeFunc)
+	delegate<void(std::size_t)> outputResizeFunc,
+	job_queue* target)
 {
 	using batch_type = jh_detail::batch_job_impl<InContainer, OutContainer, delegate<bool(typename InContainer::value_type&, typename OutContainer::value_type&)>>;
 
 	pool_allocator<batch_type> alloc(get_batch_job_allocator());
 
-	shared_ptr<batch_type> sp = gdul::allocate_shared<batch_type>(alloc, input, output, std::move(process), batchSize, std::move(outputResizeFunc), this);
+	shared_ptr<batch_type> sp = gdul::allocate_shared<batch_type>(alloc, input, output, std::move(process), batchSize, std::move(outputResizeFunc), this, target);
 
 	return batch_job(std::move(sp));
 }
 // Invokes process for all elements
-// Requirements on Container is ::size(), ::begin(), ::end(), ::value_type
+// Requirements on Container is ::size(), ::value_type, random access iterator
 // Will not modify container
 template<class InContainer>
 inline batch_job job_handler::make_batch_job(
 	InContainer& input,
-	delegate<void(typename InContainer::value_type&)> process)
+	delegate<void(typename InContainer::value_type&)> process,
+	job_queue* target)
 {
 	const std::size_t containerSize((input.end() - input.begin()));
-	const std::size_t approxBatchSize(containerSize / (internal_worker_count() * 3));
-	return make_batch_job(input, std::move(process), approxBatchSize);
+	const std::size_t approxBatchSize(containerSize / (worker_count() * 3));
+	return make_batch_job(input, std::move(process), approxBatchSize, target);
 }
 // Invokes process for all elements. Boolean returnvalue signals inclusion in the processed collection
-// Requirements on Container is ::size(), ::begin(), ::end(), ::value_type, ::resize(std::size_t)
+// Requirements on Container is ::size(), ::value_type, random access iterator, ::resize(std::size_t)
 // Will modify container
 template<class InOutContainer>
 inline batch_job job_handler::make_batch_job(
 	InOutContainer& inputOutput,
-	delegate<bool(typename InOutContainer::value_type&)> process)
+	delegate<bool(typename InOutContainer::value_type&)> process,
+	job_queue* target)
 {
 	const std::size_t containerSize((inputOutput.end() - inputOutput.begin()));
-	const std::size_t approxBatchSize(containerSize / (internal_worker_count() * 3));
-	return make_batch_job(inputOutput, std::move(process), approxBatchSize, [&inputOutput](std::size_t n) {inputOutput.resize(n); });
+	const std::size_t approxBatchSize(containerSize / (worker_count() * 3));
+	return make_batch_job(inputOutput, std::move(process), approxBatchSize, [&inputOutput](std::size_t n) {inputOutput.resize(n); }, target);
 }
 // Invokes process for all elements. Boolean returnvalue signals inclusion in the output collection
-// Requirements on Container is ::size(), ::begin(), ::end(), ::value_type, ::resize(std::size_t) (only output)
+// Requirements on Container is ::size(), ::value_type, random access iterator, ::resize(std::size_t) (only output)
 // Will modify output container
 template<class InContainer, class OutContainer>
 inline batch_job job_handler::make_batch_job(
 	InContainer& input,
 	OutContainer& output,
-	delegate<bool(typename InContainer::value_type&, typename OutContainer::value_type&)> process)
+	delegate<bool(typename InContainer::value_type&, typename OutContainer::value_type&)> process,
+	job_queue* target)
 {
 	const std::size_t containerSize((input.end() - input.begin()));
-	const std::size_t approxBatchSize(containerSize / (internal_worker_count() * 3));
-	return make_batch_job(input, output, std::move(process), approxBatchSize, [&output](std::size_t n) {output.resize(n); });
+	const std::size_t approxBatchSize(containerSize / (worker_count() * 3));
+	return make_batch_job(input, output, std::move(process), approxBatchSize, [&output](std::size_t n) {output.resize(n); }, target);
 }
 }

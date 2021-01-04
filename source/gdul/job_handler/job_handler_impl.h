@@ -25,8 +25,6 @@
 
 #include <array>
 
-#include <gdul/concurrent_queue/concurrent_queue.h>
-
 #include <gdul/job_handler/job.h>
 #include <gdul/job_handler/job_handler_utility.h>
 #include <gdul/job_handler/job_impl.h>
@@ -38,6 +36,7 @@
 
 namespace gdul {
 
+class job_queue;
 namespace  jh_detail{
 
 class job_impl;
@@ -60,27 +59,19 @@ public:
  	void retire_workers();
 
 	worker make_worker();
-	worker make_worker(gdul::delegate<void()> entryPoint);
 
-	job make_job(delegate<void()>&& workUnit);
+	job make_job(delegate<void()>&& workUnit, job_queue* target);
 
 	std::size_t worker_count() const noexcept;
 
 	pool_allocator<job_node> get_job_node_allocator() const noexcept;
 	pool_allocator<dummy_batch_type> get_batch_job_allocator() const noexcept;
 
-	void enqueue_job(job_impl_shared_ptr job);
-
-	bool try_consume_from_once(job_queue consumeFrom);
-
 private:
 
 	void launch_worker(std::uint16_t index) noexcept;
 
 	void work();
-	void consume_job(job&& jb);
-
-	job_impl_shared_ptr fetch_job();
 
 	allocator_type m_mainAllocator;
 
