@@ -20,17 +20,17 @@
 
 #pragma once
 
-#include <gdul/delegate/delegate.h>
 #include <gdul/job_handler/job_handler_utility.h>
-#include <gdul/job_handler/job/job.h>
-#include <gdul/job_handler/job/batch_job_impl_interface.h>
+#include <gdul/job_handler/job.h>
+#include <gdul/delegate/delegate.h>
+#include <gdul/job_handler/batch_job_impl_interface.h>
 #include <array>
 #include <cassert>
 #include <algorithm>
 #include <cmath>
 
 #if defined(GDUL_JOB_DEBUG)
-#include <gdul/job_handler/tracking/job_graph.h>
+#include <gdul/job_handler/debug/job_tracker.h>
 #endif
 
 namespace gdul {
@@ -130,11 +130,11 @@ private:
 
 	void work_pack(std::size_t batchIndex);
 
-	GDUL_JOB_DEBUG_CONDTIONAL(job_info* m_info)
-	GDUL_JOB_DEBUG_CONDTIONAL(timer m_completionTimer)
-	GDUL_JOB_DEBUG_CONDTIONAL(timer m_enqueueTimer)
+	GDUL_JOB_DEBUG_CONDTIONAL(job_info* m_trackingNode)
+		GDUL_JOB_DEBUG_CONDTIONAL(timer m_completionTimer)
+		GDUL_JOB_DEBUG_CONDTIONAL(timer m_enqueueTimer)
 
-	std::array<std::uint32_t, Batch_Job_Max_Slices> m_batchTracker;
+		std::array<std::uint32_t, Batch_Job_Max_Slices> m_batchTracker;
 
 	process_type m_process;
 	delegate<void(std::size_t)> m_outputResizeFunc;
@@ -171,7 +171,7 @@ inline batch_job_impl<InContainer, OutContainer, Process>::batch_job_impl(InCont
 	, m_root(m_batchCount ? _redirect_make_job(handler, delegate<void()>(&batch_job_impl::initialize, this), target) : _redirect_make_job(m_handler, delegate<void()>([]() {}), target))
 	, m_end(m_batchCount ? _redirect_make_job(handler, delegate<void()>(&batch_job_impl::finalize<>, this), target) : m_root)
 #if defined(GDUL_JOB_DEBUG)
-	, m_info(nullptr)
+	, m_trackingNode(nullptr)
 #endif
 {}
 template<class InContainer, class OutContainer, class Process>
@@ -222,28 +222,28 @@ inline void batch_job_impl<InContainer, OutContainer, Process>::wait_until_finis
 {
 	GDUL_JOB_DEBUG_CONDTIONAL(timer waitTimer)
 		m_end.wait_until_finished();
-	GDUL_JOB_DEBUG_CONDTIONAL(if (m_info) m_info->m_waitTimeSet.log_time(waitTimer.get()))
+	GDUL_JOB_DEBUG_CONDTIONAL(if (m_trackingNode) m_trackingNode->m_waitTimeSet.log_time(waitTimer.get()))
 }
 template<class InContainer, class OutContainer, class Process>
 inline void batch_job_impl<InContainer, OutContainer, Process>::wait_until_ready() noexcept
 {
 	GDUL_JOB_DEBUG_CONDTIONAL(timer waitTimer)
 		m_root.wait_until_ready();
-	GDUL_JOB_DEBUG_CONDTIONAL(if (m_info) m_info->m_waitTimeSet.log_time(waitTimer.get()))
+	GDUL_JOB_DEBUG_CONDTIONAL(if (m_trackingNode) m_trackingNode->m_waitTimeSet.log_time(waitTimer.get()))
 }
 template<class InContainer, class OutContainer, class Process>
 inline void batch_job_impl<InContainer, OutContainer, Process>::work_until_finished(job_queue* consumeFrom)
 {
 	GDUL_JOB_DEBUG_CONDTIONAL(timer waitTimer)
 		m_end.work_until_finished(consumeFrom);
-	GDUL_JOB_DEBUG_CONDTIONAL(if (m_info) m_info->m_waitTimeSet.log_time(waitTimer.get()))
+	GDUL_JOB_DEBUG_CONDTIONAL(if (m_trackingNode) m_trackingNode->m_waitTimeSet.log_time(waitTimer.get()))
 }
 template<class InContainer, class OutContainer, class Process>
 inline void batch_job_impl<InContainer, OutContainer, Process>::work_until_ready(job_queue* consumeFrom)
 {
 	GDUL_JOB_DEBUG_CONDTIONAL(timer waitTimer)
 		m_root.work_until_ready(consumeFrom);
-	GDUL_JOB_DEBUG_CONDTIONAL(if (m_info) m_info->m_waitTimeSet.log_time(waitTimer.get()))
+	GDUL_JOB_DEBUG_CONDTIONAL(if (m_trackingNode) m_trackingNode->m_waitTimeSet.log_time(waitTimer.get()))
 }
 template<class InContainer, class OutContainer, class Process>
 inline bool batch_job_impl<InContainer, OutContainer, Process>::enable(const shared_ptr<batch_job_impl_interface>& selfRef) noexcept
@@ -420,7 +420,7 @@ template<class InContainer, class OutContainer, class Process>
 inline void batch_job_impl<InContainer, OutContainer, Process>::initialize()
 {
 	GDUL_JOB_DEBUG_CONDTIONAL(m_completionTimer.reset())
-		GDUL_JOB_DEBUG_CONDTIONAL(if (m_info)m_info->m_enqueueTimeSet.log_time(m_enqueueTimer.get()))
+		GDUL_JOB_DEBUG_CONDTIONAL(if (m_trackingNode)m_trackingNode->m_enqueueTimeSet.log_time(m_enqueueTimer.get()))
 
 		m_outputResizeFunc(container_size(m_input));
 
@@ -459,7 +459,7 @@ inline void batch_job_impl<InContainer, OutContainer, Process>::finalize()
 
 	m_outputResizeFunc(get_output_size());
 
-	GDUL_JOB_DEBUG_CONDTIONAL(if (m_info)m_info->m_completionTimeSet.log_time(m_completionTimer.get()))
+	GDUL_JOB_DEBUG_CONDTIONAL(if (m_trackingNode)m_trackingNode->m_completionTimeSet.log_time(m_completionTimer.get()))
 
 		m_selfRef.store(shared_ptr<batch_job_impl_interface>(), std::memory_order_relaxed);
 }
@@ -467,7 +467,7 @@ template<class InContainer, class OutContainer, class Process>
 template <class U, std::enable_if_t<U::Specialize_Update>*>
 inline void batch_job_impl<InContainer, OutContainer, Process>::finalize()
 {
-	GDUL_JOB_DEBUG_CONDTIONAL(if (m_info)m_info->m_completionTimeSet.log_time(m_completionTimer.get()))
+	GDUL_JOB_DEBUG_CONDTIONAL(if (m_trackingNode)m_trackingNode->m_completionTimeSet.log_time(m_completionTimer.get()))
 
 		m_selfRef.store(shared_ptr<batch_job_impl_interface>(), std::memory_order_relaxed);
 }
@@ -476,15 +476,15 @@ template<class InContainer, class OutContainer, class Process>
 inline constexpr_id batch_job_impl<InContainer, OutContainer, Process>::register_tracking_node(constexpr_id id, const char* name, const char* file, std::uint32_t line)
 {
 	const constexpr_id batchJobNodeId(((job_tracker_interface*)(&m_root))->register_tracking_node(id, name, file, line));
-	m_info = job_tracker::fetch_node(batchJobNodeId);
-	m_info->set_node_type(job_info_batch);
+	m_trackingNode = job_tracker::fetch_node(batchJobNodeId);
+	m_trackingNode->set_node_type(job_info_batch);
 	return batchJobNodeId;
 }
 template<class InContainer, class OutContainer, class Process>
 inline void batch_job_impl<InContainer, OutContainer, Process>::track_sub_job(job& job, const char* name)
 {
-	if (m_info)
-		((job_tracker_interface*)(&job))->register_tracking_node(m_info->id(), name, "", 0, true);
+	if (m_trackingNode)
+		((job_tracker_interface*)(&job))->register_tracking_node(m_trackingNode->id(), name, "", 0, true);
 }
 #endif
 }

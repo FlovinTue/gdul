@@ -18,55 +18,85 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <gdul/job_handler/debug/job_tracker_node.h>
+#include <gdul/job_handler/tracking/job_info.h>
 
 
 namespace gdul
 {
 namespace jh_detail
 {
-job_tracker_node::job_tracker_node()
+job_info::job_info()
 	: m_id(0)
+	, m_lastPriorityAccum(0.f)
+	, m_priorityAccum(0.f)
+#if !defined (GDUL_JOB_DEBUG)
+	, m_lastCompletionTime(0.f)
+#else
 	, m_parent(0)
-#if defined(GDUL_JOB_DEBUG)
-	, m_type(job_tracker_node_default)
+	, m_type(job_info_default)
 	, m_line(0)
 #endif
 {
 }
-std::size_t job_tracker_node::id() const
+void job_info::accumulate_priority(job_info* from)
+{
+	if (!from)
+		return;
+
+	const float prio(from->get_priority());
+
+	if (m_priorityAccum < prio)
+		m_priorityAccum = prio;
+}
+
+void job_info::store_accumulated_priority(float lastCompletionTime)
+{
+	m_lastCompletionTime = lastCompletionTime;
+	m_lastPriorityAccum = m_priorityAccum;
+	m_priorityAccum = 0.f;
+}
+std::size_t job_info::id() const
 {
 	return m_id;
 }
-std::size_t job_tracker_node::parent() const
+
+#if defined(GDUL_JOB_DEBUG)
+float job_info::get_priority() const
+{
+	return m_lastPriorityAccum + m_completionTimeSet.get_avg();
+}
+std::size_t job_info::parent() const
 {
 	return m_parent;
 }
-
-#if defined(GDUL_JOB_DEBUG)
-void job_tracker_node::set_node_type(job_tracker_node_type type)
+void job_info::set_node_type(job_info_type type)
 {
 	m_type = type;
 }
 
-job_tracker_node_type job_tracker_node::get_node_type() const
+job_info_type job_info::get_node_type() const
 {
 	return m_type;
 }
 
-const std::string & job_tracker_node::name() const
+const std::string & job_info::name() const
 {
 	return m_name;
 }
 
-const std::string& job_tracker_node::physical_location() const
+const std::string& job_info::physical_location() const
 {
 	return m_physicalLocation;
 }
 
-std::uint32_t job_tracker_node::line() const
+std::uint32_t job_info::line() const
 {
 	return m_line;
+}
+#else
+float job_info::get_priority() const
+{
+	return m_lastPriorityAccum + m_lastCompletionTime;
 }
 #endif
 

@@ -19,7 +19,7 @@
 // SOFTWARE.
 
 #include "batch_job.h"
-#include <gdul/job_handler/job/batch_job_impl.h>
+#include <gdul/job_handler/batch_job_impl.h>
 
 namespace gdul {
 

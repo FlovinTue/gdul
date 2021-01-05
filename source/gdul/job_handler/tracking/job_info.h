@@ -22,35 +22,69 @@
 
 #include <gdul/job_handler/globals.h>
 
-#if defined (GDUL_JOB_DEBUG)
-
-#include <gdul/job_handler/debug/job_tracker_node.h>
-
-
+#if defined(GDUL_JOB_DEBUG)
+#include <gdul/job_handler/tracking/time_set.h>
+#include <string>
 #endif
 
-namespace gdul {
-namespace jh_detail {
 
-class job_tracker
+namespace gdul
 {
-public:
-#if defined (GDUL_JOB_DEBUG)
-	static job_tracker_node* register_full_node(std::size_t id, const char * name, const char* file, std::uint32_t line);
-	static job_tracker_node* register_batch_sub_node(std::size_t id, const char* name);
+namespace jh_detail
+{
+enum job_info_type : std::uint8_t
+{
+	job_info_default,
+	job_info_batch,
+	job_info_matriarch,
+};
+struct job_info
+{
+	job_info();
 
-	static job_tracker_node* fetch_node(std::size_t id);
+	void accumulate_priority(job_info* from);
+	float get_priority() const;
+	void store_accumulated_priority(float lastCompletionTime);
 
-	static void dump_job_tree(const char* location);
-	static void dump_job_time_sets(const char* location);
-#else
-	static job_tracker_node* register_full_node(std::size_t id);
-	static job_tracker_node* register_batch_sub_node(std::size_t id);
+	std::size_t id() const;
 
-	static job_tracker_node* fetch_node(std::size_t id);
+#if defined(GDUL_JOB_DEBUG)
+	std::size_t parent() const;
 
-	static void dump_job_tree(const char*) {};
-	static void dump_job_time_sets(const char*) {};
+	void set_node_type(job_info_type type);
+	job_info_type get_node_type() const;
+
+	const std::string& name() const;
+	const std::string& physical_location() const;
+
+	std::uint32_t line() const;
+
+	time_set m_completionTimeSet;
+	time_set m_waitTimeSet;
+	time_set m_enqueueTimeSet;
+#endif
+
+private:
+	friend class job_tracker;
+	friend class job_tracker_data;
+
+#if defined(GDUL_JOB_DEBUG)
+	std::string m_name;
+	std::string m_physicalLocation;
+
+	std::uint32_t m_line;
+#endif
+
+	std::size_t m_id;
+
+	float m_lastPriorityAccum;
+	float m_priorityAccum;
+	float m_lastCompletionTime;
+
+#if defined(GDUL_JOB_DEBUG)
+	std::size_t m_parent;
+
+	job_info_type m_type;
 #endif
 };
 }

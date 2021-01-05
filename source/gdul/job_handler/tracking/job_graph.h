@@ -22,45 +22,36 @@
 
 #include <gdul/job_handler/globals.h>
 
-#if defined(GDUL_JOB_DEBUG)
-#include <gdul/job_handler/debug/timer.h>
-#include <atomic>
+#if defined (GDUL_JOB_DEBUG)
+
+#include <gdul/job_handler/tracking/job_info.h>
+
+
+#endif
 
 namespace gdul {
 namespace jh_detail {
 
-class time_set
+class job_tracker
 {
 public:
-	time_set();
-	time_set(const time_set& other);
-	time_set(time_set&& other);
-	time_set& operator=(time_set&& other);
-	time_set& operator=(const time_set& other);
+#if defined (GDUL_JOB_DEBUG)
+	static job_info* register_full_node(std::size_t id, const char * name, const char* file, std::uint32_t line);
+	static job_info* register_batch_sub_node(std::size_t id, const char* name);
 
-	void log_time(float completionTime);
+	static job_info* fetch_node(std::size_t id);
 
-	float get_avg() const;
-	float get_max() const;
-	float get_min() const;
-	float get_minTimepoint() const;
-	float get_maxTimepoint() const;
+	static void dump_job_tree(const char* location);
+	static void dump_job_time_sets(const char* location);
+#else
+	static job_info* register_full_node(std::size_t id);
+	static job_info* register_batch_sub_node(std::size_t id);
 
-	std::size_t get_completion_count() const;
+	static job_info* fetch_node(std::size_t id);
 
-private:
-	static timer s_globalTimer;
-
-	std::atomic_flag m_lock;
-
-	std::size_t m_completionCount;
-
-	float m_totalTime;
-	float m_minTime;
-	float m_maxTime;
-	float m_minTimepoint;
-	float m_maxTimepoint;
+	static void dump_job_tree(const char*) {};
+	static void dump_job_time_sets(const char*) {};
+#endif
 };
 }
 }
-#endif

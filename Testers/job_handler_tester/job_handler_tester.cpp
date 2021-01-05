@@ -7,7 +7,7 @@
 #include <gdul/delegate/delegate.h>
 #include <array>
 #include "../Common/util.h"
-#include <gdul/job_handler/debug/job_tracker.h>
+#include <gdul/job_handler/tracking/job_graph.h>
 
 namespace gdul
 {

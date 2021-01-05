@@ -18,12 +18,32 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#pragma once
-
-#include <gdul/job_handler/job/job.h>
+#include "batch_job_impl.h"
+#include <gdul/delegate/delegate.h>
 #include <gdul/job_handler/job_handler.h>
-#include <gdul/job_handler/worker/worker.h>
-#include <gdul/job_handler/job/batch_job.h>
-#include <gdul/job_handler/job/batch_job_impl.h>
-#include <gdul/job_handler/job_queue.h>
-#include <gdul/job_handler/globals.h>
+#include <gdul/job_handler/job.h>
+#include <gdul/job_handler/job_impl.h>
+
+namespace gdul
+{
+namespace jh_detail
+{
+gdul::job _redirect_make_job(job_handler * handler, gdul::delegate<void()>&& workUnit, job_queue* target)
+{
+	return handler->make_job(std::move(workUnit), target);
+}
+bool _redirect_enable_if_ready(gdul::shared_ptr<job_impl>& jb)
+{
+	return jb->enable_if_ready();
+}
+void _redirect_invoke_job(gdul::shared_ptr<job_impl>& jb)
+{
+	GDUL_JOB_DEBUG_CONDTIONAL(jb->on_enqueue())
+	jb->operator()();
+}
+bool _redirect_is_enabled(const gdul::shared_ptr<job_impl>& jb)
+{
+	return jb->is_enabled();
+}
+}
+}

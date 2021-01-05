@@ -18,10 +18,10 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <gdul/job_handler/job/job_impl.h>
+#include <gdul/job_handler/job_impl.h>
 #include <gdul/job_handler/job_handler_impl.h>
 #include <gdul/job_handler/job_handler.h>
-#include <gdul/job_handler/worker/worker.h>
+#include <gdul/job_handler/worker.h>
 #include <gdul/job_handler/job_queue.h>
 
 namespace gdul
@@ -42,7 +42,7 @@ job_impl::job_impl(delegate<void()>&& workUnit, job_handler_impl* handler, job_q
 	, m_dependencies(Job_Enable_Dependencies)
 
 #if defined (GDUL_JOB_DEBUG)
-	, m_info(nullptr)
+	, m_trackingNode(nullptr)
 #endif
 {
 }
@@ -57,8 +57,8 @@ void job_impl::operator()()
 
 #if defined (GDUL_JOB_DEBUG)
 	const std::size_t swap(job::this_job.m_persistentId);
-	if (m_info) {
-		m_info->m_enqueueTimeSet.log_time(m_enqueueTimer.get());
+	if (m_trackingNode) {
+		m_trackingNode->m_enqueueTimeSet.log_time(m_enqueueTimer.get());
 		job::this_job.m_persistentId = m_persistentId;
 	}
 
@@ -68,8 +68,8 @@ void job_impl::operator()()
 	m_workUnit();
 
 #if defined(GDUL_JOB_DEBUG)
-	if (m_info)
-		m_info->m_completionTimeSet.log_time(completionTimer.get());
+	if (m_trackingNode)
+		m_trackingNode->m_completionTimeSet.log_time(completionTimer.get());
 
 	job::this_job.m_persistentId = swap;
 #endif
@@ -177,7 +177,7 @@ void job_impl::work_until_finished(job_queue* consumeFrom)
 			jh_detail::job_handler_impl::t_items.this_worker_impl->idle();
 		}
 	}
-	GDUL_JOB_DEBUG_CONDTIONAL(if (m_info) m_info->m_waitTimeSet.log_time(waitTimer.get()))
+	GDUL_JOB_DEBUG_CONDTIONAL(if (m_trackingNode) m_trackingNode->m_waitTimeSet.log_time(waitTimer.get()))
 }
 void job_impl::work_until_ready(job_queue* consumeFrom)
 {
@@ -188,7 +188,7 @@ void job_impl::work_until_ready(job_queue* consumeFrom)
 			jh_detail::job_handler_impl::t_items.this_worker_impl->idle();
 		}
 	}
-	GDUL_JOB_DEBUG_CONDTIONAL(if (m_info) m_info->m_waitTimeSet.log_time(waitTimer.get()))
+	GDUL_JOB_DEBUG_CONDTIONAL(if (m_trackingNode) m_trackingNode->m_waitTimeSet.log_time(waitTimer.get()))
 }
 void job_impl::wait_until_finished() noexcept
 {
@@ -197,7 +197,7 @@ void job_impl::wait_until_finished() noexcept
 		jh_detail::job_handler_impl::t_items.this_worker_impl->refresh_sleep_timer();
 		jh_detail::job_handler_impl::t_items.this_worker_impl->idle();
 	}
-	GDUL_JOB_DEBUG_CONDTIONAL(if (m_info) m_info->m_waitTimeSet.log_time(waitTimer.get()))
+	GDUL_JOB_DEBUG_CONDTIONAL(if (m_trackingNode) m_trackingNode->m_waitTimeSet.log_time(waitTimer.get()))
 }
 void job_impl::wait_until_ready() noexcept
 {
@@ -206,7 +206,7 @@ void job_impl::wait_until_ready() noexcept
 		jh_detail::job_handler_impl::t_items.this_worker_impl->refresh_sleep_timer();
 		jh_detail::job_handler_impl::t_items.this_worker_impl->idle();
 	}
-	GDUL_JOB_DEBUG_CONDTIONAL(if (m_info) m_info->m_waitTimeSet.log_time(waitTimer.get()))
+	GDUL_JOB_DEBUG_CONDTIONAL(if (m_trackingNode) m_trackingNode->m_waitTimeSet.log_time(waitTimer.get()))
 }
 float job_impl::get_priority() const noexcept
 {
@@ -232,8 +232,8 @@ void job_impl::detach_children()
 std::size_t job_impl::register_tracking_node(std::size_t id, const char* name, const char* file, std::uint32_t line, bool batchSub)
 {
 	m_persistentId = id;
-	m_info = !batchSub ? job_tracker::register_full_node(id, name, file, line) : job_tracker::register_batch_sub_node(id, name);
-	return m_info->id();
+	m_trackingNode = !batchSub ? job_tracker::register_full_node(id, name, file, line) : job_tracker::register_batch_sub_node(id, name);
+	return m_trackingNode->id();
 }
 void job_impl::on_enqueue() noexcept 
 {

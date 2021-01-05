@@ -18,64 +18,17 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#pragma once
+#include <gdul/job_handler/tracking/timer.h>
 
-#include <gdul/job_handler/globals.h>
-
-#if defined(GDUL_JOB_DEBUG)
-#include <gdul/job_handler/debug/time_set.h>
-#include <string>
-#endif
-
-
-namespace gdul
+namespace gdul {
+namespace jh_detail {
+timer::timer()
+	: m_clock()
+	, m_fromTime(m_clock.now())
+{}
+float timer::get() const
 {
-namespace jh_detail
-{
-enum job_tracker_node_type : std::uint8_t
-{
-	job_tracker_node_default,
-	job_tracker_node_batch,
-	job_tracker_node_matriarch,
-};
-struct job_tracker_node
-{
-	job_tracker_node();
-
-	std::size_t id() const;
-	std::size_t parent() const;
-
-#if defined(GDUL_JOB_DEBUG)
-	void set_node_type(job_tracker_node_type type);
-	job_tracker_node_type get_node_type() const;
-
-	const std::string& name() const;
-	const std::string& physical_location() const;
-
-	std::uint32_t line() const;
-
-	time_set m_completionTimeSet;
-	time_set m_waitTimeSet;
-	time_set m_enqueueTimeSet;
-#endif
-
-private:
-	friend class job_tracker;
-	friend class job_tracker_data;
-
-#if defined(GDUL_JOB_DEBUG)
-	std::string m_name;
-	std::string m_physicalLocation;
-
-	std::uint32_t m_line;
-#endif
-
-	std::size_t m_id;
-	std::size_t m_parent;
-
-#if defined(GDUL_JOB_DEBUG)
-	job_tracker_node_type m_type;
-#endif
-};
+	return std::chrono::duration_cast<std::chrono::duration<float>>(m_clock.now() - m_fromTime).count();
+}
 }
 }

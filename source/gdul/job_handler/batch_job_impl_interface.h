@@ -23,7 +23,7 @@
 #include <gdul/job_handler/job_handler_utility.h>
 
 #if defined(GDUL_JOB_DEBUG)
-#include <gdul/job_handler/debug/job_tracker.h>
+#include <gdul/job_handler/tracking/job_graph.h>
 #endif
 
 namespace gdul {

@@ -6,7 +6,7 @@
 #include <functional>
 #include <vld.h>
 #include "../Common/tracking_allocator.h"
-#include <gdul/job_handler/debug/job_tracker.h>
+#include <gdul/job_handler/tracking/job_graph.h>
 
 int main()
 {	

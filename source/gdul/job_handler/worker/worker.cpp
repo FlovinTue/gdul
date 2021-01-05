@@ -18,8 +18,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <gdul/job_handler/worker.h>
-#include <gdul/job_handler/worker_impl.h>
+#include <gdul/job_handler/worker/worker.h>
+#include <gdul/job_handler/worker/worker_impl.h>
 #include <gdul/job_handler/job_handler_impl.h>
 
 namespace gdul

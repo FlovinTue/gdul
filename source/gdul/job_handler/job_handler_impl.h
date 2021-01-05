@@ -25,14 +25,14 @@
 
 #include <array>
 
-#include <gdul/job_handler/job.h>
-#include <gdul/job_handler/job_handler_utility.h>
-#include <gdul/job_handler/job_impl.h>
 #include <gdul/memory/pool_allocator.h>
-#include <gdul/job_handler/worker_impl.h>
-#include <gdul/job_handler/worker.h>
 #include <gdul/delegate/delegate.h>
-#include <gdul/job_handler/batch_job_impl.h>
+#include <gdul/job_handler/job/job.h>
+#include <gdul/job_handler/job/job_impl.h>
+#include <gdul/job_handler/job/batch_job_impl.h>
+#include <gdul/job_handler/worker/worker_impl.h>
+#include <gdul/job_handler/worker/worker.h>
+#include <gdul/job_handler/job_handler_utility.h>
 
 namespace gdul {
 

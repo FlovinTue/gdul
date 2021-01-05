@@ -20,45 +20,34 @@
 
 #pragma once
 
-#include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
 #include <gdul/job_handler/job_handler_utility.h>
+#include <gdul/job_handler/batch_job_impl_interface.h>
+#include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
+#include <gdul/job_handler/debug/job_tracker_interface.h>
 
 namespace gdul {
-
-class job_handler;
-class batch_job;
+class job;
 class job_queue;
 
-namespace jh_detail {
-
-class job_handler_impl;
-class job_impl;
-class worker_impl;
-
+namespace jh_detail
+{
 template <class InContainer, class OutContainer, class Process>
 class batch_job_impl;
 }
-class job
+
+class batch_job : public jh_detail::job_tracker_interface
 {
 public:
-	static thread_local job this_job;
-
-	job() noexcept;
-
-	job(job&& other) noexcept;
-	job(const job& other) noexcept;
-	job& operator=(job&& other) noexcept;
-	job& operator=(const job& other) noexcept;
+	batch_job();
 
 	void add_dependency(job& dependency);
-	void add_dependency(batch_job& dependency);
 
 	// this object may be discarded once enable() has been invoked
 	bool enable() noexcept;
-	bool enable_locally_if_ready() noexcept;
+	bool enable_locally_if_ready();
 
-	bool is_ready() const noexcept;
 	bool is_finished() const noexcept;
+	bool is_ready() const noexcept;
 
 	void wait_until_finished() noexcept;
 	void wait_until_ready() noexcept;
@@ -71,23 +60,24 @@ public:
 
 	operator bool() const noexcept;
 
-	float priority() const noexcept;
-
+	// Get the number of items written to the output container
+	std::size_t get_output_size() const noexcept;
 private:
 	friend class job_handler;
-	friend class jh_detail::worker_impl;
-	template <class InContainer, class OutContainer, class Process>
-	friend class jh_detail::batch_job_impl;
-	friend class jh_detail::job_handler_impl;
+	friend class job;
 
 #if defined(GDUL_JOB_DEBUG)
 	friend class jh_detail::job_tracker;
-
-	constexpr_id register_tracking_node(constexpr_id id, const char* name, const char* file, std::uint32_t line, bool batchSub) override final;
+	constexpr_id register_tracking_node(constexpr_id id, const char* name, const char* file, std::uint32_t line, bool /*batchSub*/) override final;
 #endif
 
-	job(gdul::shared_ptr<jh_detail::job_impl> impl) noexcept;
+	job& get_endjob() noexcept;
 
-	gdul::shared_ptr<jh_detail::job_impl> m_impl;
+	template <class InContainer, class OutContainer, class Process>
+	batch_job(shared_ptr<jh_detail::batch_job_impl<InContainer, OutContainer, Process>>&& job)
+	: m_impl(std::move(job))
+	{}
+
+	shared_ptr<jh_detail::batch_job_impl_interface> m_impl;
 };
 }

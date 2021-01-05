@@ -29,8 +29,8 @@
 
 #include <gdul/job_handler/job_handler_utility.h>
 #include <gdul/delegate/delegate.h>
-#include <gdul/job_handler/worker.h>
-#include <gdul/job_handler/job.h>
+#include <gdul/job_handler/worker/worker.h>
+#include <gdul/job_handler/job/job.h>
 
 namespace gdul {
 namespace jh_detail

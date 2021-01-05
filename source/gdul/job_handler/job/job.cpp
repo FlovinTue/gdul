@@ -21,8 +21,8 @@
 #include <cassert>
 #include <gdul/job_handler/Job.h>
 #include <gdul/job_handler/job_handler_impl.h>
-#include <gdul/job_handler/job/job_impl.h>
-#include <gdul/job_handler/job/batch_job.h>
+#include <gdul/job_handler/job_impl.h>
+#include <gdul/job_handler/batch_job.h>
 #include <gdul/job_handler/globals.h>
 #include <gdul/job_handler/job_queue.h>
 

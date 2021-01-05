@@ -20,10 +20,9 @@
 
 #pragma once
 
-#include <gdul/job_handler/job_handler_utility.h>
-#include <gdul/job_handler/batch_job_impl_interface.h>
 #include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
-#include <gdul/job_handler/debug/job_tracker_interface.h>
+#include <gdul/job_handler/job_handler_utility.h>
+#include <gdul/job_handler/job/batch_job_impl_interface.h>
 
 namespace gdul {
 class job;
@@ -35,7 +34,7 @@ template <class InContainer, class OutContainer, class Process>
 class batch_job_impl;
 }
 
-class batch_job : public jh_detail::job_tracker_interface
+class batch_job
 {
 public:
 	batch_job();

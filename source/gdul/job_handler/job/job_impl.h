@@ -29,8 +29,8 @@
 #include <gdul/delegate/delegate.h>
 
 #if defined(GDUL_JOB_DEBUG)
-#include <gdul/job_handler/tracking/job_graph.h>
-#include <gdul/job_handler/tracking/timer.h>
+#include <gdul/job_handler/debug/job_tracker.h>
+#include <gdul/job_handler/debug/timer.h>
 #endif
 
 namespace gdul{
@@ -98,7 +98,7 @@ private:
 	void detach_children();
 
 #if defined GDUL_JOB_DEBUG
-	job_info* m_info;
+	job_tracker_node* m_trackingNode;
 	timer m_enqueueTimer; 
 #endif
 

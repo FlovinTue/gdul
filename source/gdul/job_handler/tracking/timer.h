@@ -21,8 +21,6 @@
 #pragma once
 
 #include <gdul/job_handler/globals.h>
-
-#if defined(GDUL_JOB_DEBUG)
 #include <chrono>
 namespace gdul
 {
@@ -31,24 +29,12 @@ namespace jh_detail
 class timer
 {
 public:
-	timer()
-		: m_fromTime(m_clock.now())
-	{}
-	float get() const
-	{
-		return std::chrono::duration_cast<std::chrono::duration<float>>(m_clock.now() - m_fromTime).count();
-	}
-	void reset()
-	{
-		m_fromTime = m_clock.now();
-	}
+	inline timer();
+	inline float get() const;
 
 private:
-	std::chrono::high_resolution_clock m_clock;
-	std::chrono::high_resolution_clock::time_point m_fromTime;
+	const std::chrono::high_resolution_clock m_clock;
+	const std::chrono::high_resolution_clock::time_point m_fromTime;
 };
 }
 }
-
-
-#endif
