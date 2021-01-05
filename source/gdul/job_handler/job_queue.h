@@ -33,6 +33,9 @@ class job_impl;
 using job_impl_shared_ptr = shared_ptr<job_impl>;
 }
 
+/// <summary>
+/// Job queue interface
+/// </summary>
 class job_queue
 {
 public:
@@ -47,6 +50,10 @@ private:
 	virtual void submit_job(jh_detail::job_impl_shared_ptr jb) = 0;
 };
 
+/// <summary>
+/// Basic queue intended for asynchronous jobs. The underlying queue is a relaxed FIFO variant
+/// which does not preserve ordering between producers
+/// </summary>
 class job_async_queue : public job_queue
 {
 public:
@@ -62,6 +69,11 @@ private:
 
 	concurrent_queue<jh_detail::job_impl_shared_ptr, jh_detail::allocator_type> m_queue;
 };
+
+/// <summary>
+/// Priority queue for use with jobs occuring within the span of one frame. Jobs will be reordered to promote
+/// the maximum amount of parallelism
+/// </summary>
 class job_sync_queue : public job_queue
 {
 public:

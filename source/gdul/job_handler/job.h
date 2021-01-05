@@ -33,6 +33,8 @@ namespace jh_detail {
 
 class job_handler_impl;
 class job_impl;
+struct job_info;
+class job_graph;
 class worker_impl;
 
 template <class InContainer, class OutContainer, class Process>
@@ -79,11 +81,12 @@ private:
 	template <class InContainer, class OutContainer, class Process>
 	friend class jh_detail::batch_job_impl;
 	friend class jh_detail::job_handler_impl;
+	friend class jh_detail::job_graph;
 
 #if defined(GDUL_JOB_DEBUG)
-	friend class jh_detail::job_tracker;
+	friend class jh_detail::job_graph;
 
-	constexpr_id register_tracking_node(constexpr_id id, const char* name, const char* file, std::uint32_t line, bool batchSub) override final;
+	job_info* get_job_info(std::size_t id, const char* name, const char* file, std::uint32_t line, bool batchSub) override final;
 #endif
 
 	job(gdul::shared_ptr<jh_detail::job_impl> impl) noexcept;

@@ -23,6 +23,7 @@
 #include <gdul/job_handler/job_handler.h>
 #include <gdul/job_handler/worker/worker.h>
 #include <gdul/job_handler/job_queue.h>
+#include <gdul/job_handler/job/job_node.h>
 
 namespace gdul
 {
@@ -32,20 +33,31 @@ job_impl::job_impl()
 	: job_impl(delegate<void()>([]() {}), nullptr, nullptr, 0)
 {
 }
+#if !defined(GDUL_JOB_DEBUG)
 job_impl::job_impl(delegate<void()>&& workUnit, job_handler_impl* handler, job_queue* target, std::size_t id)
-	: m_persistentId(id)
+	: m_info(job_graph::get_job_info(id))
+	, m_persistentId(id)
 	, m_workUnit(std::forward<delegate<void()>>(workUnit))
 	, m_finished(false)
 	, m_headDependee(nullptr)
 	, m_handler(handler)
 	, m_target(target)
 	, m_dependencies(Job_Enable_Dependencies)
-
-#if defined (GDUL_JOB_DEBUG)
-	, m_info(nullptr)
-#endif
 {
 }
+#else
+job_impl::job_impl(delegate<void()>&& workUnit, job_handler_impl* handler, job_queue* target, std::size_t id, const char* name, const char* file, std::size_t line)
+	: m_info(job_graph::get_job_info(id, name, file, line))
+	, m_persistentId(id)
+	, m_workUnit(std::forward<delegate<void()>>(workUnit))
+	, m_finished(false)
+	, m_headDependee(nullptr)
+	, m_handler(handler)
+	, m_target(target)
+	, m_dependencies(Job_Enable_Dependencies)
+{
+}
+#endif
 job_impl::~job_impl()
 {
 	assert(is_enabled() && "Job destructor ran before enable was called");
@@ -142,17 +154,9 @@ bool job_impl::enable_if_ready() noexcept
 
 	return false;
 }
-job_handler_impl * job_impl::get_handler() const
-{
-	return m_handler;
-}
-job_queue* job_impl::get_target()
+job_queue* job_impl::get_target() const noexcept
 {
 	return m_target;
-}
-void job_impl::set_target(job_queue* target)
-{
-	m_target = target;
 }
 bool job_impl::is_finished() const noexcept
 {
@@ -229,10 +233,10 @@ void job_impl::detach_children()
 	}
 }
 #if defined(GDUL_JOB_DEBUG)
-std::size_t job_impl::register_tracking_node(std::size_t id, const char* name, const char* file, std::uint32_t line, bool batchSub)
+std::size_t job_impl::get_job_info(std::size_t id, const char* name, const char* file, std::uint32_t line, bool batchSub)
 {
 	m_persistentId = id;
-	m_info = !batchSub ? job_tracker::register_full_node(id, name, file, line) : job_tracker::register_batch_sub_node(id, name);
+	m_info = !batchSub ? job_graph::get_job_info(id, name, file, line) : job_graph::get_job_info_sub(id, name);
 	return m_info->id();
 }
 void job_impl::on_enqueue() noexcept 

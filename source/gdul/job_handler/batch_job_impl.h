@@ -82,7 +82,7 @@ public:
 	std::size_t get_output_size() const noexcept override final;
 
 #if defined(GDUL_JOB_DEBUG)
-	constexpr_id register_tracking_node(constexpr_id id, const char* name, const char* file, std::uint32_t line) override final;
+	std::size_t get_job_info(std::size_t id, const char* name, const char* file, std::uint32_t line) override final;
 	void track_sub_job(job& job, const char* name);
 #else
 	void track_sub_job(job&, const char*) {};
@@ -473,10 +473,10 @@ inline void batch_job_impl<InContainer, OutContainer, Process>::finalize()
 }
 #if defined(GDUL_JOB_DEBUG)
 template<class InContainer, class OutContainer, class Process>
-inline constexpr_id batch_job_impl<InContainer, OutContainer, Process>::register_tracking_node(constexpr_id id, const char* name, const char* file, std::uint32_t line)
+inline std::size_t batch_job_impl<InContainer, OutContainer, Process>::get_job_info(std::size_t id, const char* name, const char* file, std::uint32_t line)
 {
-	const constexpr_id batchJobNodeId(((job_tracker_interface*)(&m_root))->register_tracking_node(id, name, file, line));
-	m_info = job_tracker::fetch_node(batchJobNodeId);
+	const std::size_t batchJobNodeId(((job_info*)(&m_root))->get_job_info(id, name, file, line));
+	m_info = job_graph::fetch_node(batchJobNodeId);
 	m_info->set_node_type(job_info_batch);
 	return batchJobNodeId;
 }
@@ -484,7 +484,7 @@ template<class InContainer, class OutContainer, class Process>
 inline void batch_job_impl<InContainer, OutContainer, Process>::track_sub_job(job& job, const char* name)
 {
 	if (m_info)
-		((job_tracker_interface*)(&job))->register_tracking_node(m_info->id(), name, "", 0, true);
+		((job_info*)(&job))->get_job_info(m_info->id(), name, "", 0, true);
 }
 #endif
 }

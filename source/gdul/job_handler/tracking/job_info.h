@@ -32,12 +32,14 @@ namespace gdul
 {
 namespace jh_detail
 {
+#if defined (GDUL_JOB_DEBUG)
 enum job_info_type : std::uint8_t
 {
 	job_info_default,
 	job_info_batch,
 	job_info_matriarch,
 };
+#endif
 struct job_info
 {
 	job_info();
@@ -65,8 +67,8 @@ struct job_info
 #endif
 
 private:
-	friend class job_tracker;
-	friend class job_tracker_data;
+	friend class job_graph;
+	friend class job_graph_data;
 
 #if defined(GDUL_JOB_DEBUG)
 	std::string m_name;

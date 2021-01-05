@@ -21,31 +21,25 @@
 #pragma once
 
 #include <gdul/job_handler/globals.h>
-
-#if defined (GDUL_JOB_DEBUG)
-
 #include <gdul/job_handler/tracking/job_info.h>
-
-
-#endif
 
 namespace gdul {
 namespace jh_detail {
 
-class job_tracker
+class job_graph
 {
 public:
 #if defined (GDUL_JOB_DEBUG)
-	static job_info* register_full_node(std::size_t id, const char * name, const char* file, std::uint32_t line);
-	static job_info* register_batch_sub_node(std::size_t id, const char* name);
+	static job_info* get_job_info(std::size_t id, const char * name, const char* file, std::uint32_t line);
+	static job_info* get_job_info_sub(std::size_t id, const char* name);
 
 	static job_info* fetch_node(std::size_t id);
 
 	static void dump_job_tree(const char* location);
 	static void dump_job_time_sets(const char* location);
 #else
-	static job_info* register_full_node(std::size_t id);
-	static job_info* register_batch_sub_node(std::size_t id);
+	static job_info* get_job_info(std::size_t id);
+	static job_info* get_job_info_sub(std::size_t id);
 
 	static job_info* fetch_node(std::size_t id);
 

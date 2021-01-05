@@ -57,10 +57,10 @@ job_handler_impl::job_handler_impl(allocator_type allocator)
 
 job_handler_impl::~job_handler_impl()
 {
-	retire_workers();
+	shutdown();
 }
 
-void job_handler_impl::retire_workers()
+void job_handler_impl::shutdown()
 {
 	const std::uint16_t workers(m_workerIndices.exchange(0, std::memory_order_seq_cst));
 
@@ -85,6 +85,7 @@ worker job_handler_impl::make_worker()
 
 	return worker(&m_workers[index]);
 }
+#if defined (GDUL_JOB_DEBUG)
 job job_handler_impl::make_job_internal(delegate<void()>&& workUnit, job_queue* target, std::size_t id, const char* name, const char* file, std::size_t line)
 {
 	pool_allocator<job_impl> alloc(m_jobImplMemPool.create_allocator<job_impl>());
@@ -94,16 +95,28 @@ job job_handler_impl::make_job_internal(delegate<void()>&& workUnit, job_queue* 
 			alloc,
 			std::forward<delegate<void()>>(workUnit),
 			this,
-			target
-			id));
-
-	jobImpl->set_dbg_info(name, file, line);
+			target,
+			id,
+			name,
+			file,
+			line));
 
 	return job(jobImpl);
 }
-job job_handler_impl::make_job(delegate<void()>&& workUnit, job_queue* target)
+#endif
+job job_handler_impl::make_job_internal(delegate<void()>&& workUnit, job_queue* target, std::size_t id)
 {
+	pool_allocator<job_impl> alloc(m_jobImplMemPool.create_allocator<job_impl>());
 
+	job_impl_shared_ptr jobImpl(gdul::allocate_shared<job_impl>
+		(
+			alloc,
+			std::forward<delegate<void()>>(workUnit),
+			this,
+			target,
+			id));
+
+	return job(jobImpl);
 }
 
 std::size_t job_handler_impl::worker_count() const noexcept

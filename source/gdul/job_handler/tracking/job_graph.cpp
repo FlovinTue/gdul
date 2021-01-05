@@ -19,10 +19,12 @@
 // SOFTWARE.
 
 #include <gdul/job_handler/tracking/job_graph.h>
+#include <gdul/concurrent_skip_list/concurrent_skip_list.h>
+#include <gdul/job_handler/job/job.h>
+#include <gdul/job_handler/job_impl.h>
 
 #if defined (GDUL_JOB_DEBUG)
 #include <Windows.h>
-#include <concurrent_unordered_map.h>
 #include <gdul/job_handler/job_handler.h>
 #include <unordered_map>
 #include <fstream>
@@ -45,25 +47,33 @@ std::string executable_name() {
 	return std::string("Unnamed");
 }
 
+#endif
 namespace gdul {
 namespace jh_detail {
-void write_dgml_node(const job_info& node, const std::unordered_map<std::uint64_t, std::size_t>& childCounter, std::string& outNodes, std::string& outLinks);
 
-class job_tracker_data
+#if defined (GDUL_JOB_DEBUG)
+void write_dgml_node(const job_info& node, const std::unordered_map<std::uint64_t, std::size_t>& childCounter, std::string& outNodes, std::string& outLinks);
+thread_local std::string t_bufferString;
+#endif 
+
+class job_graph_data
 {
 public:
-	job_tracker_data()
+	job_graph_data()
 	{
 		auto itr = m_nodeMap.insert(std::make_pair( 0, job_info() ));
+
+#if defined(GDUL_JOB_DEBUG)
 		itr.first->second.m_name = "Undeclared_Root_Node";
 		itr.first->second.m_type = job_info_default;
+#endif
 	}
-	concurrency::concurrent_unordered_map<std::uint64_t, job_info> m_nodeMap;
+	concurrent_skip_list<std::uint64_t, job_info> m_nodeMap;
 }g_trackerData;
 
-thread_local std::string t_bufferString;
 
-job_info* job_tracker::register_full_node(constexpr_id id, const char * name, const char* file, std::uint32_t line)
+
+job_info* job_graph::get_job_info(std::size_t id, const char * name, const char* file, std::uint32_t line)
 {
 	t_bufferString = name;
 
@@ -71,21 +81,23 @@ job_info* job_tracker::register_full_node(constexpr_id id, const char * name, co
 		t_bufferString = "Unnamed";
 	}
 
-	const constexpr_id variation(std::hash<std::string>{}(t_bufferString));
+	const std::size_t variation(std::hash<std::string>{}(t_bufferString));
 
-	const constexpr_id groupParent(job::this_job.m_physicalId);
-	const constexpr_id groupMatriarch(id.merge(groupParent));
-	const constexpr_id localId(variation.merge(groupMatriarch));
+	const std::size_t groupParent(job::this_job.m_impl->get_id());
+	const std::size_t groupMatriarch(id + groupParent);
+	const std::size_t localId(variation + groupMatriarch);
 
-	auto itr = g_trackerData.m_nodeMap.insert(std::make_pair(localId.value(), job_info()));
+	auto itr = g_trackerData.m_nodeMap.insert(std::make_pair(localId, job_info()));
 	if (itr.second){
 		itr.first->second.m_id = localId;
+#if defined (GDUL_JOB_DEBUG)
 		itr.first->second.m_parent = groupMatriarch;
 		itr.first->second.m_name = std::move(t_bufferString);
 		itr.first->second.m_physicalLocation = GDUL_FS_PATH(file).filename().string();
 		itr.first->second.m_line = line;
+#endif
 
-		auto matriarchItr = g_trackerData.m_nodeMap.insert(std::make_pair(groupMatriarch.value(), job_info()));
+		auto matriarchItr = g_trackerData.m_nodeMap.insert(std::make_pair(groupMatriarch, job_info()));
 		if (matriarchItr.second){
 			matriarchItr.first->second.m_id = groupMatriarch;
 			matriarchItr.first->second.m_parent = groupParent;
@@ -107,7 +119,7 @@ job_info* job_tracker::register_full_node(constexpr_id id, const char * name, co
 
 			matriarchItr.first->second.m_name = std::move(matriarchName);
 
-			auto groupParentItr = g_trackerData.m_nodeMap.insert(std::make_pair(groupParent.value(), job_info()));
+			auto groupParentItr = g_trackerData.m_nodeMap.insert(std::make_pair(groupParent, job_info()));
 			if (groupParentItr.second){
 				groupParentItr.first->second.m_id = groupParent;
 				groupParentItr.first->second.set_node_type(job_info_matriarch);
@@ -117,7 +129,7 @@ job_info* job_tracker::register_full_node(constexpr_id id, const char * name, co
 	}
 	return &itr.first->second;
 }
-job_info* job_tracker::register_batch_sub_node(constexpr_id id, const char * name)
+job_info* job_graph::get_job_info_sub(std::size_t id, const char * name)
 {
 	t_bufferString = name;
 
@@ -126,13 +138,13 @@ job_info* job_tracker::register_batch_sub_node(constexpr_id id, const char * nam
 		t_bufferString = "Unnamed";
 	}
 
-	const constexpr_id variation(std::hash<std::string>{}(t_bufferString));
-	const constexpr_id localId(variation.merge(id));
+	const std::size_t variation(std::hash<std::string>{}(t_bufferString));
+	const std::size_t localId(variation + id);
 
-	auto itr = g_trackerData.m_nodeMap.insert(std::make_pair(localId.value(), job_info()));
+	auto itr = g_trackerData.m_nodeMap.insert(std::make_pair(localId, job_info()));
 	if (itr.second)
 	{
-		auto parent = g_trackerData.m_nodeMap.find(id.value());
+		auto parent = g_trackerData.m_nodeMap.find(id);
 
 		itr.first->second.m_id = localId;
 		itr.first->second.m_parent = id;
@@ -142,15 +154,16 @@ job_info* job_tracker::register_batch_sub_node(constexpr_id id, const char * nam
 	}
 	return &itr.first->second;
 }
-job_info * job_tracker::fetch_node(constexpr_id id)
+job_info * job_graph::fetch_node(std::size_t id)
 {
-	auto itr = g_trackerData.m_nodeMap.find(id.value());
+	auto itr = g_trackerData.m_nodeMap.find(id);
 	if (itr != g_trackerData.m_nodeMap.end())
 		return &itr->second;
 
 	return nullptr;
 }
-void job_tracker::dump_job_tree(const char* location)
+#if defined (GDUL_JOB_DEBUG)
+void job_graph::dump_job_tree(const char* location)
 {
 	const std::string folder(location);
 	const std::string programName(executable_name());
@@ -167,7 +180,7 @@ void job_tracker::dump_job_tree(const char* location)
 	for (auto& node : nodes){
 		if (node.get_node_type() == job_info_default || 
 			node.get_node_type() == job_info_batch){
-			++childCounter[node.parent().value()];
+			++childCounter[node.parent()];
 		}
 	}
 	
@@ -201,7 +214,7 @@ void write_dgml_node(const job_info& node, const std::unordered_map<std::uint64_
 	t_bufferString.clear();
 
 	t_bufferString.append("<Node Id=\"");
-	t_bufferString.append(std::to_string(node.id().value()));
+	t_bufferString.append(std::to_string(node.id()));
 	t_bufferString.append("\"");
 	t_bufferString.append(" Label=\"");
 	t_bufferString.append(node.name());
@@ -211,7 +224,7 @@ void write_dgml_node(const job_info& node, const std::unordered_map<std::uint64_
 
 	if (nodeType == job_info_matriarch ||
 		nodeType == job_info_batch){
-		auto itr = childCounter.find(node.id().value());
+		auto itr = childCounter.find(node.id());
 		if (itr != childCounter.end() && itr->second < 30)
 			t_bufferString.append(" Group=\"Expanded\"");
 		else
@@ -231,11 +244,11 @@ void write_dgml_node(const job_info& node, const std::unordered_map<std::uint64_
 		t_bufferString.append(" Category=\"Contains\"");
 	}
 
-	if (node.id().value() != 0){
+	if (node.id() != 0){
 		t_bufferString.append(" Source=\"");
-		t_bufferString.append(std::to_string(node.parent().value()));
+		t_bufferString.append(std::to_string(node.parent()));
 		t_bufferString.append("\" Target = \"");
-		t_bufferString.append(std::to_string(node.id().value()));
+		t_bufferString.append(std::to_string(node.id()));
 		t_bufferString.append("\"");
 
 		t_bufferString.append("  />");
@@ -255,7 +268,7 @@ void write_job_time_set(const time_set& timeSet, std::ofstream& toStream, const 
 	toStream << "<completion_count>" << timeSet.get_completion_count() << "</completion_count>\n";
 	toStream << "</time_set>\n";
 }
-void job_tracker::dump_job_time_sets(const char* location)
+void job_graph::dump_job_time_sets(const char* location)
 {
 	const std::string folder(location);
 	const std::string programName(executable_name());
@@ -274,7 +287,7 @@ void job_tracker::dump_job_time_sets(const char* location)
 			continue;
 
 		outStream << "<job id=\"";
-		outStream << itr.second.id().value();
+		outStream << itr.second.id();
 		outStream << "\">\n";
 
 		outStream << "<job_name>" << itr.second.name() << "</job_name>\n";

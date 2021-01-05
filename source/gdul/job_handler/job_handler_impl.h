@@ -56,7 +56,7 @@ public:
 	job_handler_impl(allocator_type allocator);
 	~job_handler_impl();
 
- 	void retire_workers();
+ 	void shutdown();
 
 	worker make_worker();
 

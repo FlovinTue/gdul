@@ -43,8 +43,8 @@ int main()
 		}
 	}
 
-	gdul::jh_detail::job_tracker::dump_job_tree("");
-	gdul::jh_detail::job_tracker::dump_job_time_sets("");
+	gdul::jh_detail::job_graph::dump_job_tree("");
+	gdul::jh_detail::job_graph::dump_job_time_sets("");
 
 	std::cout << "Final allocated: " << gdul::s_allocated << std::endl;
 	

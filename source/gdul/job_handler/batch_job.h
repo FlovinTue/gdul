@@ -66,8 +66,8 @@ private:
 	friend class job;
 
 #if defined(GDUL_JOB_DEBUG)
-	friend class jh_detail::job_tracker;
-	constexpr_id register_tracking_node(constexpr_id id, const char* name, const char* file, std::uint32_t line, bool /*batchSub*/) override final;
+	friend class jh_detail::job_graph;
+	std::size_t get_job_info(std::size_t id, const char* name, const char* file, std::uint32_t line, bool /*batchSub*/) override final;
 #endif
 
 	job& get_endjob() noexcept;

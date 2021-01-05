@@ -21,7 +21,7 @@ job_handler_tester::job_handler_tester()
 
 job_handler_tester::~job_handler_tester()
 {
-	m_handler.retire_workers();
+	m_handler.shutdown();
 }
 
 void job_handler_tester::init(const job_handler_tester_info& info)

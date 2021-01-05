@@ -39,11 +39,11 @@ void job_handler::init() {
 }
 job_handler::~job_handler()
 {
-	retire_workers();
+	shutdown();
 }
-void job_handler::retire_workers()
+void job_handler::shutdown()
 {
-	m_impl->retire_workers();
+	m_impl->shutdown();
 }
 worker job_handler::make_worker()
 {

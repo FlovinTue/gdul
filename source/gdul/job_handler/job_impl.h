@@ -22,21 +22,18 @@
 #pragma warning(push)
 #pragma warning(disable : 4324)
 
-
 #include <gdul/job_handler/job_handler_utility.h>
 #include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
-#include <gdul/job_handler/job_node.h>
 #include <gdul/delegate/delegate.h>
-
-#if defined(GDUL_JOB_DEBUG)
 #include <gdul/job_handler/tracking/job_graph.h>
 #include <gdul/job_handler/tracking/timer.h>
-#endif
 
 namespace gdul{
 class job_queue;
 
 namespace jh_detail {
+
+struct job_node;
 
 enum enable_result : std::uint8_t
 {
@@ -58,7 +55,11 @@ public:
 
 	job_impl();
 
+#if !defined(GDUL_JOB_DEBUG)
 	job_impl(delegate<void()>&& workUnit, job_handler_impl* handler, job_queue* target, std::size_t id);
+#else
+	job_impl::job_impl(delegate<void()>&& workUnit, job_handler_impl* handler, job_queue* target, std::size_t id, const char* name, const char* file, std::size_t line);
+#endif
 	~job_impl();
 	
 	void operator()();
@@ -71,20 +72,15 @@ public:
 	enable_result enable() noexcept;
 	bool enable_if_ready() noexcept;
 
-	job_handler_impl* get_handler() const;
-
-	job_queue* get_target();
-	void set_target(job_queue* target);
+	job_queue* get_target() const noexcept;
 
 	bool is_finished() const noexcept;
 	bool is_enabled() const noexcept;
 	bool is_ready() const noexcept;
 
 #if defined GDUL_JOB_DEBUG
-	std::size_t register_tracking_node(std::size_t id, const char* name, const char* file, std::uint32_t line, bool batchSub);
+	std::size_t get_job_info(std::size_t id, const char* name, const char* file, std::uint32_t line, bool batchSub);
 	void on_enqueue() noexcept;
-
-	void set_dbg_info(const char* name, const char* file, std::size_t line);
 #endif
 
 	void work_until_finished(job_queue* consumeFrom);
@@ -94,20 +90,21 @@ public:
 
 	float get_priority() const noexcept;
 
+	std::size_t get_id() const noexcept;
+
 private:
 	void detach_children();
 
+	job_info* const m_info;
+
 #if defined GDUL_JOB_DEBUG
-	job_info* m_info;
 	timer m_enqueueTimer; 
 #endif
-
-	std::size_t m_persistentId;
 
 	delegate<void()> m_workUnit;
 
 	job_handler_impl* const m_handler;
-	job_queue* m_target;
+	job_queue* const m_target;
 
 	atomic_shared_ptr<job_node> m_headDependee;
 
