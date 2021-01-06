@@ -146,13 +146,11 @@ float job::priority() const noexcept
 {
 	return m_impl->get_priority();
 }
-#if defined(GDUL_JOB_DEBUG)
-job_info* job::get_job_info(std::size_t id, const char* name, const char* file, std::uint32_t line, bool batchSub)
+jh_detail::job_info* job::get_job_info(std::size_t id)
 {
 	if (!m_impl)
-		return 0;
+		return nullptr;
 
-	return m_impl->get_job_info(id, name, file, line, batchSub);
+	return m_impl->get_job_info(id);
 }
-#endif
 }

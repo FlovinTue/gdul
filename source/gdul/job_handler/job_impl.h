@@ -34,6 +34,7 @@ class job_queue;
 namespace jh_detail {
 
 struct job_node;
+struct job_info;
 
 enum enable_result : std::uint8_t
 {

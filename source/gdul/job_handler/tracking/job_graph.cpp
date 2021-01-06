@@ -29,13 +29,8 @@
 #include <unordered_map>
 #include <fstream>
 #include <atomic>
-#if (_HAS_CXX17)
 #include <filesystem>
-#define GDUL_FS_PATH(arg) std::filesystem::path(arg)
-#else
-#include <experimental/filesystem>
-#define GDUL_FS_PATH(arg) std::experimental::filesystem::path(arg)
-#endif
+
 
 std::string executable_name() {
 	char buffer[256];
@@ -61,45 +56,49 @@ class job_graph_data
 public:
 	job_graph_data()
 	{
-		auto itr = m_nodeMap.insert(std::make_pair( 0, job_info() ));
+		auto itr = m_map.insert(std::make_pair( 0, job_info() ));
 
 #if defined(GDUL_JOB_DEBUG)
 		itr.first->second.m_name = "Undeclared_Root_Node";
 		itr.first->second.m_type = job_info_default;
 #endif
 	}
-	concurrent_skip_list<std::uint64_t, job_info> m_nodeMap;
-}g_trackerData;
+	concurrent_skip_list<std::uint64_t, job_info> m_map;
+}g_container;
 
 
-
+#if defined (GDUL_JOB_DEBUG)
 job_info* job_graph::get_job_info(std::size_t id, const char * name, const char* file, std::uint32_t line)
+#else
+job_info* job_graph::get_job_info(std::size_t id)
+#endif
 {
-	t_bufferString = name;
-
-	if (t_bufferString.empty()){
-		t_bufferString = "Unnamed";
-	}
-
 	const std::size_t variation(std::hash<std::string>{}(t_bufferString));
 
 	const std::size_t groupParent(job::this_job.m_impl->get_id());
-	const std::size_t groupMatriarch(id + groupParent);
-	const std::size_t localId(variation + groupMatriarch);
+	const std::size_t physicalJob(id + groupParent);
+	const std::size_t physicalJobVariation(variation + physicalJob);
 
-	auto itr = g_trackerData.m_nodeMap.insert(std::make_pair(localId, job_info()));
+
+	decltype(g_container.m_map)::const_iterator itr(g_container.m_map.find(physicalJobVariation));
+
+	if (itr == g_container.m_map.end()) {
+
+	}
+
+	auto itr = g_container.m_map.insert(std::make_pair(physicalJobVariation, job_info()));
 	if (itr.second){
-		itr.first->second.m_id = localId;
+		itr.first->second.m_id = physicalJobVariation;
 #if defined (GDUL_JOB_DEBUG)
-		itr.first->second.m_parent = groupMatriarch;
+		itr.first->second.m_parent = physicalJob;
 		itr.first->second.m_name = std::move(t_bufferString);
 		itr.first->second.m_physicalLocation = GDUL_FS_PATH(file).filename().string();
 		itr.first->second.m_line = line;
 #endif
 
-		auto matriarchItr = g_trackerData.m_nodeMap.insert(std::make_pair(groupMatriarch, job_info()));
+		auto matriarchItr = g_container.m_map.insert(std::make_pair(physicalJob, job_info()));
 		if (matriarchItr.second){
-			matriarchItr.first->second.m_id = groupMatriarch;
+			matriarchItr.first->second.m_id = physicalJob;
 			matriarchItr.first->second.m_parent = groupParent;
 			matriarchItr.first->second.set_node_type(job_info_matriarch);
 			matriarchItr.first->second.m_physicalLocation = GDUL_FS_PATH(file).filename().string();
@@ -119,7 +118,7 @@ job_info* job_graph::get_job_info(std::size_t id, const char * name, const char*
 
 			matriarchItr.first->second.m_name = std::move(matriarchName);
 
-			auto groupParentItr = g_trackerData.m_nodeMap.insert(std::make_pair(groupParent, job_info()));
+			auto groupParentItr = g_container.m_map.insert(std::make_pair(groupParent, job_info()));
 			if (groupParentItr.second){
 				groupParentItr.first->second.m_id = groupParent;
 				groupParentItr.first->second.set_node_type(job_info_matriarch);
@@ -139,25 +138,27 @@ job_info* job_graph::get_job_info_sub(std::size_t id, const char * name)
 	}
 
 	const std::size_t variation(std::hash<std::string>{}(t_bufferString));
-	const std::size_t localId(variation + id);
+	const std::size_t physicalJobVariation(variation + id);
 
-	auto itr = g_trackerData.m_nodeMap.insert(std::make_pair(localId, job_info()));
+	auto itr = g_container.m_map.insert(std::make_pair(physicalJobVariation, job_info()));
 	if (itr.second)
 	{
-		auto parent = g_trackerData.m_nodeMap.find(id);
+		auto parent = g_container.m_map.find(id);
 
-		itr.first->second.m_id = localId;
+		itr.first->second.m_id = physicalJobVariation;
+#if defined (GDUL_JOB_DEBUG)
 		itr.first->second.m_parent = id;
 		itr.first->second.m_name = std::move(t_bufferString);
 		itr.first->second.m_physicalLocation = parent->second.physical_location();
 		itr.first->second.m_line = parent->second.line();
+#endif
 	}
 	return &itr.first->second;
 }
 job_info * job_graph::fetch_node(std::size_t id)
 {
-	auto itr = g_trackerData.m_nodeMap.find(id);
-	if (itr != g_trackerData.m_nodeMap.end())
+	auto itr = g_container.m_map.find(id);
+	if (itr != g_container.m_map.end())
 		return &itr->second;
 
 	return nullptr;
@@ -171,7 +172,7 @@ void job_graph::dump_job_tree(const char* location)
 
 	std::vector<job_info> nodes;
 
-	for (auto& node : g_trackerData.m_nodeMap){
+	for (auto& node : g_container.m_map){
 		nodes.push_back(node.second);
 	}
 
@@ -280,7 +281,7 @@ void job_graph::dump_job_time_sets(const char* location)
 	outStream << "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n";
 	outStream << "<jobs>\n";
 	
-	for (auto& itr : g_trackerData.m_nodeMap) {
+	for (auto& itr : g_container.m_map) {
 		if (!itr.second.m_completionTimeSet.get_completion_count() &&
 			!itr.second.m_enqueueTimeSet.get_completion_count() &&
 			!itr.second.m_waitTimeSet.get_completion_count())

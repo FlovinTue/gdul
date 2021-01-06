@@ -85,9 +85,9 @@ private:
 
 #if defined(GDUL_JOB_DEBUG)
 	friend class jh_detail::job_graph;
-
-	job_info* get_job_info(std::size_t id, const char* name, const char* file, std::uint32_t line, bool batchSub) override final;
 #endif
+	
+	jh_detail::job_info* get_job_info(std::size_t id);
 
 	job(gdul::shared_ptr<jh_detail::job_impl> impl) noexcept;
 

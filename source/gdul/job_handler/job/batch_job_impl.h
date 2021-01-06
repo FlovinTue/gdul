@@ -22,16 +22,16 @@
 
 #include <gdul/job_handler/job_handler_utility.h>
 #include <gdul/job_handler/job.h>
+#include <gdul/job_handler/job/batch_job_impl_interface.h>
+#include <gdul/job_handler/tracking/job_graph.h>
+
 #include <gdul/delegate/delegate.h>
-#include <gdul/job_handler/batch_job_impl_interface.h>
+
 #include <array>
 #include <cassert>
 #include <algorithm>
 #include <cmath>
 
-#if defined(GDUL_JOB_DEBUG)
-#include <gdul/job_handler/debug/job_tracker.h>
-#endif
 
 namespace gdul {
 class job_handler;
