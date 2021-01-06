@@ -63,7 +63,7 @@ public:
 	worker make_worker();
 
 #if defined (GDUL_JOB_DEBUG)
-	job make_job_internal(delegate<void()>&& workUnit, job_queue* target, std::size_t physicalId, std::size_t variationId, const char* name, const char* file, std::size_t line);
+	job make_job_internal(delegate<void()>&& workUnit, job_queue* target, std::size_t physicalId, std::size_t variationId, const char* name, const char* file, std::uint32_t line);
 #else
 	job make_job_internal(delegate<void()>&& workUnit, job_queue* target, std::size_t physicalId, std::size_t variationId);
 #endif

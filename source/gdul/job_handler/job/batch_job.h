@@ -67,13 +67,6 @@ private:
 	friend class job_handler;
 	friend class job;
 
-#if defined(GDUL_JOB_DEBUG)
-	friend class jh_detail::job_graph;
-	jh_detail::job_info* get_job_info(std::size_t id, const char* name, const char* file, std::uint32_t line, bool /*batchSub*/);
-#else
-	jh_detail::job_info* get_job_info(std::size_t id);
-#endif
-
 	job& get_endjob() noexcept;
 
 	template <class InContainer, class OutContainer, class Process>

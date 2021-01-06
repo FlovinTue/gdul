@@ -84,12 +84,6 @@ private:
 	friend class jh_detail::batch_job_impl;
 	friend class jh_detail::job_handler_impl;
 
-#if defined(GDUL_JOB_DEBUG)
-	friend class jh_detail::job_graph;
-#endif
-
-	jh_detail::job_info* get_job_info(std::size_t id);
-
 	job(gdul::shared_ptr<jh_detail::job_impl> impl) noexcept;
 
 	gdul::shared_ptr<jh_detail::job_impl> m_impl;

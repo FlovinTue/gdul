@@ -30,5 +30,9 @@ float timer::get() const
 {
 	return std::chrono::duration_cast<std::chrono::duration<float>>(m_clock.now() - m_fromTime).count();
 }
+void timer::reset()
+{
+	m_fromTime = m_clock.now();
+}
 }
 }

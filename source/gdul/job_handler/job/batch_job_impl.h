@@ -20,18 +20,17 @@
 
 #pragma once
 
-#include <gdul/delegate/delegate.h>
 #include <gdul/job_handler/job_handler_utility.h>
 #include <gdul/job_handler/job/job.h>
+#include <gdul/job_handler/tracking/job_graph.h>
 #include <gdul/job_handler/job/batch_job_impl_interface.h>
+
+#include <gdul/delegate/delegate.h>
+
 #include <array>
 #include <cassert>
 #include <algorithm>
 #include <cmath>
-
-#if defined(GDUL_JOB_DEBUG)
-#include <gdul/job_handler/tracking/job_graph.h>
-#endif
 
 namespace gdul {
 class job_handler;
@@ -47,6 +46,7 @@ gdul::job _redirect_make_job(job_handler* handler, gdul::delegate<void()>&& work
 bool _redirect_enable_if_ready(gdul::shared_ptr<job_impl>& jb);
 void _redirect_invoke_job(gdul::shared_ptr<job_impl>& jb);
 bool _redirect_is_enabled(const gdul::shared_ptr<job_impl>& jb);
+void _redirect_set_info(shared_ptr<job_handler_impl>& handler, gdul::shared_ptr<job_impl>& jb, std::size_t physicalId, std::size_t variationId, const char* name);
 
 template <class InContainer, class OutContainer, class Process>
 class batch_job_impl : public batch_job_impl_interface
@@ -82,8 +82,7 @@ public:
 	std::size_t get_output_size() const noexcept override final;
 
 #if defined(GDUL_JOB_DEBUG)
-	job_info* get_job_info(std::size_t id, const char* name, const char* file, std::uint32_t line) override final;
-	void track_sub_job(job& job, const char* name);
+	void track_sub_job(job& job, std::size_t variationId, const char* name);
 #else
 	void track_sub_job(job&, const char*) {};
 #endif
@@ -368,7 +367,7 @@ template <class U, std::enable_if_t<!U::Specialize_Update>*>
 inline void batch_job_impl<InContainer, OutContainer, Process>::make_jobs()
 {
 	job currentProcessJob = make_work_slice(&batch_job_impl::work_process<>, 0);
-	track_sub_job(currentProcessJob, "batch_job_process");
+	track_sub_job(currentProcessJob, 1, "batch_job_process");
 
 	std::invoke(m_enableFunc, &currentProcessJob);
 
@@ -376,12 +375,12 @@ inline void batch_job_impl<InContainer, OutContainer, Process>::make_jobs()
 
 	for (std::size_t i = 1; i < m_batchCount; ++i) {
 		job nextProcessJob(make_work_slice(&batch_job_impl::work_process<>, i));
-		track_sub_job(nextProcessJob, "batch_job_process");
+		track_sub_job(nextProcessJob, 2, "batch_job_process");
 		std::invoke(m_enableFunc, &nextProcessJob);
 
 		if (i < (m_batchCount - 1)) {
 			job nextPackJob(make_work_slice(&batch_job_impl::work_pack, i));
-			track_sub_job(nextPackJob, "batch_job_pack");
+			track_sub_job(nextPackJob, 3, "batch_job_pack");
 			nextPackJob.depends_on(currentPackJob);
 			nextPackJob.depends_on(nextProcessJob);
 			std::invoke(m_enableFunc, &nextPackJob);
@@ -396,7 +395,7 @@ inline void batch_job_impl<InContainer, OutContainer, Process>::make_jobs()
 		m_end.depends_on(currentPackJob);
 	}
 
-	track_sub_job(m_end, "batch_job_finalize");
+	track_sub_job(m_end, 4, "batch_job_finalize");
 
 	m_end.depends_on(currentProcessJob);
 	std::invoke(m_enableFunc, &m_end);
@@ -407,13 +406,13 @@ inline void batch_job_impl<InContainer, OutContainer, Process>::make_jobs()
 {
 	for (std::size_t i = 0; i < m_batchCount; ++i) {
 		job processJob(make_work_slice(&batch_job_impl::work_process<>, i));
-		track_sub_job(processJob, "batch_job_process");
+		track_sub_job(processJob, 5, "batch_job_process");
 		std::invoke(m_enableFunc, &processJob);
 
 		m_end.depends_on(processJob);
 	}
 
-	track_sub_job(m_end, "batch_job_finalize");
+	track_sub_job(m_end, 6, "batch_job_finalize");
 	std::invoke(m_enableFunc, &m_end);
 }
 template<class InContainer, class OutContainer, class Process>
@@ -473,18 +472,9 @@ inline void batch_job_impl<InContainer, OutContainer, Process>::finalize()
 }
 #if defined(GDUL_JOB_DEBUG)
 template<class InContainer, class OutContainer, class Process>
-inline std::size_t batch_job_impl<InContainer, OutContainer, Process>::get_job_info(std::size_t id, const char* name, const char* file, std::uint32_t line)
+inline void batch_job_impl<InContainer, OutContainer, Process>::track_sub_job(job& job, std::size_t variationId, const char* name)
 {
-	const std::size_t batchJobNodeId(((job_info*)(&m_root))->get_job_info(id, name, file, line));
-	m_info = job_graph::fetch_node(batchJobNodeId);
-	m_info->set_node_type(job_info_batch);
-	return batchJobNodeId;
-}
-template<class InContainer, class OutContainer, class Process>
-inline void batch_job_impl<InContainer, OutContainer, Process>::track_sub_job(job& job, const char* name)
-{
-	if (m_info)
-		((job_info*)(&job))->get_job_info(m_info->id(), name, "", 0, true);
+	_redirect_set_info(m_handler->m_impl, job.m_impl, m_info->id(), variationId, name);
 }
 #endif
 }

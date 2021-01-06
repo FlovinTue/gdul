@@ -82,24 +82,6 @@ std::size_t batch_job::get_output_size() const noexcept
 
 	return m_impl->get_output_size();
 }
-#if defined(GDUL_JOB_DEBUG)
-jh_detail::job_info* batch_job::get_job_info(std::size_t id, const char * name, const char* file, std::uint32_t line, bool)
-{
-	if (!m_impl)
-		return nullptr;
-
-	return m_impl->get_job_info(id, name, file, line);
-}
-#else
-jh_detail::job_info* batch_job::get_job_info(std::size_t id)
-{
-	//if (!m_impl)
-		return nullptr;
-		id;
-	//return m_impl->get_job_info(id);
-}
-
-#endif
 job & batch_job::get_endjob() noexcept
 {
 	return m_impl->get_endjob();

@@ -55,12 +55,8 @@ public:
 	using job_impl_raw_ptr = raw_ptr<job_impl>;
 
 	job_impl();
-
-#if !defined(GDUL_JOB_DEBUG)
 	job_impl(delegate<void()>&& workUnit, job_handler_impl* handler, job_queue* target, job_info* info);
-#else
-	job_impl::job_impl(delegate<void()>&& workUnit, job_handler_impl* handler, job_queue* target, job_info* info, const char* name, const char* file, std::size_t line);
-#endif
+
 	~job_impl();
 
 	void operator()();
@@ -80,7 +76,6 @@ public:
 	bool is_ready() const noexcept;
 
 #if defined GDUL_JOB_DEBUG
-	job_info* get_job_info(std::size_t id, const char* name, const char* file, std::uint32_t line, bool batchSub);
 	void on_enqueue() noexcept;
 #endif
 
@@ -93,10 +88,12 @@ public:
 
 	std::size_t get_id() const noexcept;
 
+	void set_info(job_info* info);
+
 private:
 	void detach_children();
 
-	job_info* const m_info;
+	job_info* m_info;
 
 #if defined GDUL_JOB_DEBUG
 	timer m_enqueueTimer;

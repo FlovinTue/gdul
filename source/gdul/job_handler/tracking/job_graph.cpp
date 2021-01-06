@@ -133,10 +133,13 @@ job_info* job_graph::get_job_info_sub(std::size_t batchId, std::size_t variation
 		batchSubJobToInsert.m_id = batchSubJobVariation;
 
 #if defined (GDUL_JOB_DEBUG)
+
+		decltype(m_map)::const_iterator parentItr(m_map.find(batchId));
+
 		batchSubJobToInsert.m_parent = batchSubJobVariation;
 		batchSubJobToInsert.m_name = name;
-		batchSubJobToInsert.m_physicalLocation = parent->second.physical_location();
-		batchSubJobToInsert.m_line = parent->second.line();
+		batchSubJobToInsert.m_physicalLocation = parentItr->second.physical_location();
+		batchSubJobToInsert.m_line = parentItr->second.line();
 #endif
 
 		itr = m_map.insert(std::make_pair(batchSubJobVariation, std::move(batchSubJobToInsert))).first;
@@ -200,14 +203,16 @@ void job_graph::dump_job_graph(const char* location)
 
 void write_dgml_node(const job_info& node, const std::unordered_map<std::uint64_t, std::size_t>& childCounter, std::string& outNodes, std::string& outLinks)
 {
-	t_bufferString.clear();
+	static std::string bufferString;
 
-	t_bufferString.append("<Node Id=\"");
-	t_bufferString.append(std::to_string(node.id()));
-	t_bufferString.append("\"");
-	t_bufferString.append(" Label=\"");
-	t_bufferString.append(node.name());
-	t_bufferString.append("\"");
+	bufferString.clear();
+
+	bufferString.append("<Node Id=\"");
+	bufferString.append(std::to_string(node.id()));
+	bufferString.append("\"");
+	bufferString.append(" Label=\"");
+	bufferString.append(node.name());
+	bufferString.append("\"");
 
 	auto nodeType = node.get_node_type();
 
@@ -215,35 +220,35 @@ void write_dgml_node(const job_info& node, const std::unordered_map<std::uint64_
 		nodeType == job_info_batch) {
 		auto itr = childCounter.find(node.id());
 		if (itr != childCounter.end() && itr->second < 30)
-			t_bufferString.append(" Group=\"Expanded\"");
+			bufferString.append(" Group=\"Expanded\"");
 		else
-			t_bufferString.append(" Group=\"Collapsed\"");
+			bufferString.append(" Group=\"Collapsed\"");
 	}
 
-	t_bufferString.append("  />");
-	t_bufferString.append("\n");
+	bufferString.append("  />");
+	bufferString.append("\n");
 
-	outNodes.append(t_bufferString);
+	outNodes.append(bufferString);
 
-	t_bufferString.clear();
-	t_bufferString.append("<Link");
+	bufferString.clear();
+	bufferString.append("<Link");
 
 	if (nodeType == job_info_default ||
 		nodeType == job_info_batch) {
-		t_bufferString.append(" Category=\"Contains\"");
+		bufferString.append(" Category=\"Contains\"");
 	}
 
 	if (node.id() != 0) {
-		t_bufferString.append(" Source=\"");
-		t_bufferString.append(std::to_string(node.parent()));
-		t_bufferString.append("\" Target = \"");
-		t_bufferString.append(std::to_string(node.id()));
-		t_bufferString.append("\"");
+		bufferString.append(" Source=\"");
+		bufferString.append(std::to_string(node.parent()));
+		bufferString.append("\" Target = \"");
+		bufferString.append(std::to_string(node.id()));
+		bufferString.append("\"");
 
-		t_bufferString.append("  />");
-		t_bufferString.append("\n");
+		bufferString.append("  />");
+		bufferString.append("\n");
 
-		outLinks.append(t_bufferString);
+		outLinks.append(bufferString);
 	}
 }
 void write_job_time_set(const time_set& timeSet, std::ofstream& toStream, const char* withName)

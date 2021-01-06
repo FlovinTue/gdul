@@ -242,14 +242,17 @@ public:
 #endif
 
 	// Not for direct use
-	job _redirect_make_job(delegate<void()> workUnit, job_queue* target, std::size_t variationId, const char* dbgName, std::size_t physicalId, const char* dbgFile, std::size_t line);
+	job _redirect_make_job(delegate<void()> workUnit, job_queue* target, std::size_t variationId, const char* dbgName, std::size_t physicalId, const char* dbgFile, std::uint32_t line);
 	// Not for direct use
-	job _redirect_make_job(delegate<void()> workUnit, job_queue* target, std::size_t variationId, std::size_t physicalId, const char* dbgFile, std::size_t line);
+	job _redirect_make_job(delegate<void()> workUnit, job_queue* target, std::size_t variationId, std::size_t physicalId, const char* dbgFile, std::uint32_t line);
 	// Not for direct use
-	job _redirect_make_job(delegate<void()> workUnit, job_queue* target, const char* dbgName, std::size_t physicalId, const char* dbgFile, std::size_t line);
+	job _redirect_make_job(delegate<void()> workUnit, job_queue* target, const char* dbgName, std::size_t physicalId, const char* dbgFile, std::uint32_t line);
 	// Not for direct use
-	job _redirect_make_job(delegate<void()> workUnit, job_queue* target, std::size_t physicalId, const char* dbgFile, std::size_t line);
+	job _redirect_make_job(delegate<void()> workUnit, job_queue* target, std::size_t physicalId, const char* dbgFile, std::uint32_t line);
 private:
+	template <class InContainer, class OutContainer, class Process>
+	friend class jh_detail::batch_job_impl;
+
 	pool_allocator<jh_detail::dummy_batch_type> get_batch_job_allocator() const noexcept;
 
 	gdul::shared_ptr<jh_detail::job_handler_impl> m_impl;

@@ -153,12 +153,4 @@ std::size_t job::get_id() const noexcept
 
 	return 0ull;
 }
-jh_detail::job_info* job::get_job_info(std::size_t id)
-{
-	id;
-	//if (!m_impl)
-		return nullptr;
-
-	//return m_impl->get_job_info(id);
-}
 }

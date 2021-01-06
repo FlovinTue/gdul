@@ -48,9 +48,6 @@ public:
 
 	virtual job& get_endjob() noexcept = 0;
 	virtual std::size_t get_output_size() const noexcept = 0;
-#if defined(GDUL_JOB_DEBUG)
-	virtual job_info* get_job_info(std::size_t, const char* name, const char* file, std::uint32_t line) = 0;
-#endif
 };
 }
 }

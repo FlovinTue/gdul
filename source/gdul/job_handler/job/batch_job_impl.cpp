@@ -21,6 +21,7 @@
 #include "batch_job_impl.h"
 #include <gdul/delegate/delegate.h>
 #include <gdul/job_handler/job_handler.h>
+#include <gdul/job_handler/job_handler_impl.h>
 #include <gdul/job_handler/job/job.h>
 #include <gdul/job_handler/job/job_impl.h>
 
@@ -44,6 +45,10 @@ void _redirect_invoke_job(gdul::shared_ptr<job_impl>& jb)
 bool _redirect_is_enabled(const gdul::shared_ptr<job_impl>& jb)
 {
 	return jb->is_enabled();
+}
+void _redirect_set_info(shared_ptr<job_handler_impl>& handler, gdul::shared_ptr<job_impl>& jb, std::size_t physicalId, std::size_t variationId, const char* name)
+{
+	jb->set_info(handler->get_job_graph().get_job_info_sub(physicalId, variationId, name));
 }
 }
 }

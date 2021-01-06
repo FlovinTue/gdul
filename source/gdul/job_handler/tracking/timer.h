@@ -32,9 +32,11 @@ public:
 	timer();
 	float get() const;
 
+	void reset();
+
 private:
 	const std::chrono::high_resolution_clock m_clock;
-	const std::chrono::high_resolution_clock::time_point m_fromTime;
+	std::chrono::high_resolution_clock::time_point m_fromTime;
 };
 }
 }
