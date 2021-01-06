@@ -395,12 +395,14 @@ struct iterator_base
 		return &m_at->m_kv;
 	}
 
-	bool operator==(const iterator_base& other) const
+	template <class OtherNd>
+	bool operator==(const iterator_base<OtherNd>& other) const
 	{
 		return other.m_at == m_at;
 	}
 
-	bool operator!=(const iterator_base& other) const
+	template <class OtherNd>
+	bool operator!=(const iterator_base<OtherNd>& other) const
 	{
 		return !operator==(other);
 	}

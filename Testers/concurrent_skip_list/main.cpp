@@ -87,5 +87,11 @@ int main()
 		std::this_thread::yield();
 	}
 
+	decltype(itrTest)::iterator itr;
+	decltype(itrTest)::const_iterator citr;
+
+	itr.operator==(citr);
+	itr.operator!=(citr);
+
 	std::cout << 10000 * inserts << " finds took: " << t.get() << " seconds" << std::endl;
 }
