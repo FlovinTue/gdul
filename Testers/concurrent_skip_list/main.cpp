@@ -100,12 +100,11 @@ int main()
 		std::this_thread::yield();
 	}
 
-	for (auto& itr : c->keys) {
-		GDUL_ASSERT(c->hm.unsafe_erase(itr) == true);
-		GDUL_ASSERT(c->hm.find(itr) == c->hm.end());
-	}
+	decltype(itrTest)::iterator itr;
+	decltype(itrTest)::const_iterator citr;
 
+	itr.operator==(citr);
+	itr.operator!=(citr);
 
-	std::cout << iterations * inserts << " finds took: " << t.get() << " seconds" << std::endl;
-	std::cout << global << std::endl;
+	std::cout << 10000 * inserts << " finds took: " << t.get() << " seconds" << std::endl;
 }
