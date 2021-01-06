@@ -32,7 +32,8 @@
 #include <filesystem>
 
 
-std::string executable_name() {
+std::string executable_name()
+{
 	char buffer[256];
 	if (GetModuleFileNameA(NULL, buffer, 256)) {
 		const char* cstr(buffer);
@@ -48,7 +49,6 @@ namespace jh_detail {
 
 #if defined (GDUL_JOB_DEBUG)
 void write_dgml_node(const job_info& node, const std::unordered_map<std::uint64_t, std::size_t>& childCounter, std::string& outNodes, std::string& outLinks);
-thread_local std::string t_bufferString;
 #endif 
 
 class job_graph_data
@@ -56,7 +56,8 @@ class job_graph_data
 public:
 	job_graph_data()
 	{
-		auto itr = m_map.insert(std::make_pair( 0, job_info() ));
+		auto itr = m_map.insert(std::make_pair(0, job_info()));
+		itr.first->second.m_id = 0;
 
 #if defined(GDUL_JOB_DEBUG)
 		itr.first->second.m_name = "Undeclared_Root_Node";
@@ -68,94 +69,87 @@ public:
 
 
 #if defined (GDUL_JOB_DEBUG)
-job_info* job_graph::get_job_info(std::size_t id, const char * name, const char* file, std::uint32_t line)
+job_info* job_graph::get_job_info(std::size_t physicalId, std::size_t variationId, const char* name, const char* file, std::uint32_t line)
 #else
-job_info* job_graph::get_job_info(std::size_t id)
+job_info* job_graph::get_job_info(std::size_t physicalId, std::size_t variationId)
 #endif
 {
-	const std::size_t variation(std::hash<std::string>{}(t_bufferString));
+	const std::size_t physicalJobParent(job::this_job.m_impl->get_id());
+	const std::size_t physicalJob(physicalId + physicalJobParent);
+	const std::size_t physicalJobVariation(variationId + physicalJob);
 
-	const std::size_t groupParent(job::this_job.m_impl->get_id());
-	const std::size_t physicalJob(id + groupParent);
-	const std::size_t physicalJobVariation(variation + physicalJob);
-
-
-	decltype(g_container.m_map)::const_iterator itr(g_container.m_map.find(physicalJobVariation));
+	decltype(g_container.m_map)::iterator itr(g_container.m_map.find(physicalJobVariation));
 
 	if (itr == g_container.m_map.end()) {
-
-	}
-
-	auto itr = g_container.m_map.insert(std::make_pair(physicalJobVariation, job_info()));
-	if (itr.second){
-		itr.first->second.m_id = physicalJobVariation;
+		job_info physicalJobVariationToInsert;
+		physicalJobVariationToInsert.m_id = physicalJobVariation;
 #if defined (GDUL_JOB_DEBUG)
-		itr.first->second.m_parent = physicalJob;
-		itr.first->second.m_name = std::move(t_bufferString);
-		itr.first->second.m_physicalLocation = GDUL_FS_PATH(file).filename().string();
-		itr.first->second.m_line = line;
+		physicalJobVariationToInsert.m_parent = physicalJob;
+		physicalJobVariationToInsert.m_name = std::move(t_bufferString);
+		physicalJobVariationToInsert.m_physicalLocation = GDUL_FS_PATH(file).filename().string();
+		physicalJobVariationToInsert.m_line = line;
 #endif
+		const std::pair<decltype(g_container.m_map)::iterator, bool> physicalJobVariationItr(g_container.m_map.insert(std::make_pair(physicalJobVariation, std::move(physicalJobVariationToInsert))));
 
-		auto matriarchItr = g_container.m_map.insert(std::make_pair(physicalJob, job_info()));
-		if (matriarchItr.second){
-			matriarchItr.first->second.m_id = physicalJob;
-			matriarchItr.first->second.m_parent = groupParent;
-			matriarchItr.first->second.set_node_type(job_info_matriarch);
-			matriarchItr.first->second.m_physicalLocation = GDUL_FS_PATH(file).filename().string();
-			matriarchItr.first->second.m_line = line;
-			std::string matriarchName;
-			matriarchName.append(matriarchItr.first->second.m_physicalLocation);
-			matriarchName.append("__L:_");
-			matriarchName.append(std::to_string(line));
-			matriarchName.append("__");
+		if (physicalJobVariationItr.second) {
+
+			job_info physicalJobToInsert;
+			physicalJobToInsert.m_id = physicalJob;
+#if defined (GDUL_JOB_DEBUG)
+			physicalJobToInsert.m_parent = physicalJobParent;
+			physicalJobToInsert.set_node_type(job_info_physical);
+			physicalJobToInsert.m_physicalLocation = GDUL_FS_PATH(file).filename().string();
+			physicalJobToInsert.m_line = line;
+			std::string physicalJobName;
+			physicalJobName.append(physicalJobItr.first->second.m_physicalLocation);
+			physicalJobName.append("__L:_");
+			physicalJobName.append(std::to_string(line));
+			physicalJobName.append("__");
 
 			std::string containsHint(name);
-			if (10 < containsHint.size()){
+			if (10 < containsHint.size()) {
 				containsHint.resize(10);
 				containsHint.append("..");
 			}
-			matriarchName.append(containsHint);
-
-			matriarchItr.first->second.m_name = std::move(matriarchName);
-
-			auto groupParentItr = g_container.m_map.insert(std::make_pair(groupParent, job_info()));
-			if (groupParentItr.second){
-				groupParentItr.first->second.m_id = groupParent;
-				groupParentItr.first->second.set_node_type(job_info_matriarch);
-				groupParentItr.first->second.m_name = "Unknown_Group_Parent";
-			}
-		}
-	}
-	return &itr.first->second;
-}
-job_info* job_graph::get_job_info_sub(std::size_t id, const char * name)
-{
-	t_bufferString = name;
-
-	if (t_bufferString.empty())
-	{
-		t_bufferString = "Unnamed";
-	}
-
-	const std::size_t variation(std::hash<std::string>{}(t_bufferString));
-	const std::size_t physicalJobVariation(variation + id);
-
-	auto itr = g_container.m_map.insert(std::make_pair(physicalJobVariation, job_info()));
-	if (itr.second)
-	{
-		auto parent = g_container.m_map.find(id);
-
-		itr.first->second.m_id = physicalJobVariation;
-#if defined (GDUL_JOB_DEBUG)
-		itr.first->second.m_parent = id;
-		itr.first->second.m_name = std::move(t_bufferString);
-		itr.first->second.m_physicalLocation = parent->second.physical_location();
-		itr.first->second.m_line = parent->second.line();
+			physicalJobName.append(containsHint);
+			physicalJobToInsert.m_name = std::move(physicalJobName);
 #endif
+
+			g_container.m_map.insert(std::make_pair(physicalJob, std::move(physicalJobToInsert)));
+		}
+
+		itr = physicalJobVariationItr.first;
 	}
-	return &itr.first->second;
+
+	return &itr->second;
 }
-job_info * job_graph::fetch_node(std::size_t id)
+#if defined (GDUL_JOB_DEBUG)
+job_info* job_graph::get_job_info_sub(std::size_t batchId, std::size_t variationId, const char* name)
+#else
+job_info* job_graph::get_job_info_sub(std::size_t batchId, std::size_t variationId)
+#endif
+{
+	const std::size_t batchSubJobVariation(batchId + variationId);
+
+	decltype(g_container.m_map)::iterator itr(g_container.m_map.find(batchSubJobVariation));
+
+	if (itr == g_container.m_map.end()) {
+
+		job_info batchSubJobToInsert;
+		batchSubJobToInsert.m_id = batchSubJobVariation;
+
+#if defined (GDUL_JOB_DEBUG)
+		batchSubJobToInsert.m_parent = id;
+		batchSubJobToInsert.m_name = std::move(t_bufferString);
+		batchSubJobToInsert.m_physicalLocation = parent->second.physical_location();
+		batchSubJobToInsert.m_line = parent->second.line();
+#endif
+
+		itr = g_container.m_map.insert(std::make_pair(batchSubJobVariation, std::move(batchSubJobToInsert))).first;
+	}
+	return &itr->second;
+}
+job_info* job_graph::fetch_job_info(std::size_t id)
 {
 	auto itr = g_container.m_map.find(id);
 	if (itr != g_container.m_map.end())
@@ -172,29 +166,29 @@ void job_graph::dump_job_tree(const char* location)
 
 	std::vector<job_info> nodes;
 
-	for (auto& node : g_container.m_map){
+	for (auto& node : g_container.m_map) {
 		nodes.push_back(node.second);
 	}
 
 	std::unordered_map<std::uint64_t, std::size_t> childCounter;
 
-	for (auto& node : nodes){
-		if (node.get_node_type() == job_info_default || 
-			node.get_node_type() == job_info_batch){
+	for (auto& node : nodes) {
+		if (node.get_node_type() == job_info_default ||
+			node.get_node_type() == job_info_batch) {
 			++childCounter[node.parent()];
 		}
 	}
-	
+
 	std::string nodesOutput;
 	std::string linksOutput;
 
-	for (auto& node : nodes){
+	for (auto& node : nodes) {
 		write_dgml_node(node, childCounter, nodesOutput, linksOutput);
 	}
 
 	std::ofstream outStream;
-	outStream.open(outputFile,std::ofstream::out);
-	
+	outStream.open(outputFile, std::ofstream::out);
+
 	outStream << "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n";
 	outStream << "<DirectedGraph Title=\"DrivingTest\" Background=\"Grey\" xmlns=\"http://schemas.microsoft.com/vs/2009/dgml\">\n";
 
@@ -223,8 +217,8 @@ void write_dgml_node(const job_info& node, const std::unordered_map<std::uint64_
 
 	auto nodeType = node.get_node_type();
 
-	if (nodeType == job_info_matriarch ||
-		nodeType == job_info_batch){
+	if (nodeType == job_info_physical ||
+		nodeType == job_info_batch) {
 		auto itr = childCounter.find(node.id());
 		if (itr != childCounter.end() && itr->second < 30)
 			t_bufferString.append(" Group=\"Expanded\"");
@@ -241,11 +235,11 @@ void write_dgml_node(const job_info& node, const std::unordered_map<std::uint64_
 	t_bufferString.append("<Link");
 
 	if (nodeType == job_info_default ||
-		nodeType == job_info_batch){
+		nodeType == job_info_batch) {
 		t_bufferString.append(" Category=\"Contains\"");
 	}
 
-	if (node.id() != 0){
+	if (node.id() != 0) {
 		t_bufferString.append(" Source=\"");
 		t_bufferString.append(std::to_string(node.parent()));
 		t_bufferString.append("\" Target = \"");
@@ -280,7 +274,7 @@ void job_graph::dump_job_time_sets(const char* location)
 
 	outStream << "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n";
 	outStream << "<jobs>\n";
-	
+
 	for (auto& itr : g_container.m_map) {
 		if (!itr.second.m_completionTimeSet.get_completion_count() &&
 			!itr.second.m_enqueueTimeSet.get_completion_count() &&
@@ -293,7 +287,7 @@ void job_graph::dump_job_time_sets(const char* location)
 
 		outStream << "<job_name>" << itr.second.name() << "</job_name>\n";
 		outStream << "<physical_job>" << itr.second.physical_location() + "__L:_" + std::to_string(itr.second.line()) << "</physical_job>\n";
-		
+
 		if (itr.second.m_completionTimeSet.get_completion_count())
 			write_job_time_set(itr.second.m_completionTimeSet, outStream, "completion_time");
 		if (itr.second.m_enqueueTimeSet.get_completion_count())

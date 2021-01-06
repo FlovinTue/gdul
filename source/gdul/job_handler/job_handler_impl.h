@@ -33,6 +33,7 @@
 #include <gdul/job_handler/worker/worker_impl.h>
 #include <gdul/job_handler/worker/worker.h>
 #include <gdul/job_handler/job_handler_utility.h>
+#include <gdul/job_handler/job/job_node.h>
 
 namespace gdul {
 
@@ -61,9 +62,9 @@ public:
 	worker make_worker();
 
 #if defined (GDUL_JOB_DEBUG)
-	job make_job_internal(delegate<void()>&& workUnit, job_queue* target, std::size_t id, const char* name, const char* file, std::size_t line);
+	job make_job_internal(delegate<void()>&& workUnit, job_queue* target, job_info* info, const char* name, const char* file, std::size_t line);
 #else
-	job make_job_internal(delegate<void()>&& workUnit, job_queue* target, std::size_t id);
+	job make_job_internal(delegate<void()>&& workUnit, job_queue* target, job_info* info);
 #endif
 	std::size_t worker_count() const noexcept;
 

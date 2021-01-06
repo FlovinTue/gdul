@@ -20,6 +20,7 @@
 
 #include <gdul/job_handler/job_handler.h>
 #include <gdul/job_handler/job_handler_impl.h>
+#include <gdul/job_handler/tracking/job_graph.h>
 #include <cassert>
 
 namespace gdul
@@ -49,17 +50,21 @@ worker job_handler::make_worker()
 {
 	return m_impl->make_worker();
 }
-job job_handler::_redirect_make_job(delegate<void()> workUnit, job_queue* target, std::size_t id, const char* dbgName, const char* dbgFile, std::size_t line, std::size_t extraId)
+job job_handler::_redirect_make_job(delegate<void()> workUnit, job_queue* target, std::size_t variationId, std::size_t physicalId, const char* dbgName, const char* dbgFile, std::size_t line)
 {
-	return m_impl->make_job_internal(std::move(workUnit), target, id + extraId, dbgName, dbgFile, line);
+#if defined (GDUL_JOB_DEBUG)
+	return m_impl->make_job_internal(std::move(workUnit), target, jh_detail::job_graph::get_job_info(physicalId, variationId), dbgName, dbgFile, line);
+#else
+	return m_impl->make_job_internal(std::move(workUnit), target, jh_detail::job_graph::get_job_info(physicalId, variationId));
+#endif
 }
-job job_handler::_redirect_make_job(delegate<void()> workUnit, job_queue* target, std::size_t id, const char* dbgFile, std::size_t line, std::size_t extraId)
+job job_handler::_redirect_make_job(delegate<void()> workUnit, job_queue* target, std::size_t variationId, std::size_t physicalId, const char* dbgFile, std::size_t line)
 {
-	return _redirect_make_job(std::move(workUnit), target, id, "", dbgFile, line, extraId);
+	return _redirect_make_job(std::move(workUnit), target, variationId, physicalId, "", dbgFile, line);
 }
-job job_handler::_redirect_make_job(delegate<void()> workUnit, job_queue* target, const char* dbgFile, std::size_t line, std::size_t extraId)
+job job_handler::_redirect_make_job(delegate<void()> workUnit, job_queue* target, std::size_t physicalId, const char* dbgFile, std::size_t line)
 {
-	return _redirect_make_job(std::move(workUnit), target, 0, "", dbgFile, line, extraId);
+	return _redirect_make_job(std::move(workUnit), target, 0, physicalId, "", dbgFile, line);
 }
 std::size_t job_handler::worker_count() const noexcept
 {

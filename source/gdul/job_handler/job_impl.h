@@ -57,9 +57,9 @@ public:
 	job_impl();
 
 #if !defined(GDUL_JOB_DEBUG)
-	job_impl(delegate<void()>&& workUnit, job_handler_impl* handler, job_queue* target, std::size_t id);
+	job_impl(delegate<void()>&& workUnit, job_handler_impl* handler, job_queue* target, job_info* info);
 #else
-	job_impl::job_impl(delegate<void()>&& workUnit, job_handler_impl* handler, job_queue* target, std::size_t id, const char* name, const char* file, std::size_t line);
+	job_impl::job_impl(delegate<void()>&& workUnit, job_handler_impl* handler, job_queue* target, job_info* info, const char* name, const char* file, std::size_t line);
 #endif
 	~job_impl();
 	
@@ -80,7 +80,7 @@ public:
 	bool is_ready() const noexcept;
 
 #if defined GDUL_JOB_DEBUG
-	std::size_t get_job_info(std::size_t id, const char* name, const char* file, std::uint32_t line, bool batchSub);
+	job_info* get_job_info(std::size_t id, const char* name, const char* file, std::uint32_t line, bool batchSub);
 	void on_enqueue() noexcept;
 #endif
 

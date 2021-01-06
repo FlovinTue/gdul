@@ -37,7 +37,7 @@ enum job_info_type : std::uint8_t
 {
 	job_info_default,
 	job_info_batch,
-	job_info_matriarch,
+	job_info_physical,
 };
 #endif
 struct job_info

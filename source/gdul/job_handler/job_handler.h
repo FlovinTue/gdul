@@ -90,7 +90,7 @@ public:
 	/// <param name="id">Persistent identifier</param>
 	/// <param name="dbgName">Job name</param>
 	/// <returns>New job</returns>
-	job make_job(delegate<void()> workUnit, job_queue* target, std::size_t id = 0, const char* dbgName = "") { workUnit; target; id; dbgName; /* See make_job macro definition */}
+	job make_job(delegate<void()> workUnit, job_queue* target, std::size_t variationId = 0, const char* dbgName = "") { workUnit; target; variationId; dbgName; /* See make_job macro definition */}
 
 	/// <summary>
 	/// Creates a batch job for splitting up processing of container elements
@@ -193,11 +193,11 @@ public:
 
 
 	// Not for direct use
-	job _redirect_make_job(delegate<void()> workUnit, job_queue* target, std::size_t id, const char* dbgName, const char* dbgFile, std::size_t line, std::size_t extraId);
+	job _redirect_make_job(delegate<void()> workUnit, job_queue* target, std::size_t variationId, std::size_t physicalId, const char* dbgName, const char* dbgFile, std::size_t line);
 	// Not for direct use
-	job _redirect_make_job(delegate<void()> workUnit, job_queue* target, std::size_t id, const char* dbgFile, std::size_t line, std::size_t extraId);
+	job _redirect_make_job(delegate<void()> workUnit, job_queue* target, std::size_t variationId, std::size_t physicalId, const char* dbgFile, std::size_t line);
 	// Not for direct use
-	job _redirect_make_job(delegate<void()> workUnit, job_queue* target, const char* dbgFile, std::size_t line, std::size_t extraId);
+	job _redirect_make_job(delegate<void()> workUnit, job_queue* target, std::size_t physicalId, const char* dbgFile, std::size_t line);
 private:
 	pool_allocator<jh_detail::dummy_batch_type> get_batch_job_allocator() const noexcept;
 
@@ -300,10 +300,11 @@ inline batch_job job_handler::make_batch_job(
 #define GDUL_INLINE_PRAGMA(pragma) _Pragma(GDUL_STRINGIFY_PRAGMA(pragma))
 #endif
 #endif
-// Args: delegate<void()> workUnit, job_queue* target, (opt)std::size_t id, (opt)const char* dbgName 
-#define make_job(...) _redirect_make_job(__VA_ARGS__, __FILE__, __LINE__, \
+// Args: delegate<void()> workUnit, job_queue* target, (opt)std::size_t variationId, (opt)const char* dbgName 
+#define make_job(...) _redirect_make_job(__VA_ARGS__, \
 GDUL_INLINE_PRAGMA(warning(push)) \
 GDUL_INLINE_PRAGMA(warning(disable : 4307)) \
 constexp_str_hash(__FILE__) \
 GDUL_INLINE_PRAGMA(warning(pop)) \
-+ std::size_t(__LINE__)
++ std::size_t(__LINE__) \
+, __FILE__, __LINE__,

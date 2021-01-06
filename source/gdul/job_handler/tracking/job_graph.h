@@ -29,19 +29,17 @@ namespace jh_detail {
 class job_graph
 {
 public:
-#if defined (GDUL_JOB_DEBUG)
-	static job_info* get_job_info(std::size_t id, const char * name, const char* file, std::uint32_t line);
-	static job_info* get_job_info_sub(std::size_t id, const char* name);
+	static job_info* fetch_job_info(std::size_t id);
 
-	static job_info* fetch_node(std::size_t id);
+#if defined (GDUL_JOB_DEBUG)
+	static job_info* get_job_info(std::size_t physicalId, std::size_t variationId, const char * name, const char* file, std::uint32_t line);
+	static job_info* get_job_info_sub(std::size_t batchId, std::size_t variationId, const char* name);
 
 	static void dump_job_tree(const char* location);
 	static void dump_job_time_sets(const char* location);
 #else
-	static job_info* get_job_info(std::size_t id);
-	static job_info* get_job_info_sub(std::size_t id);
-
-	static job_info* fetch_node(std::size_t id);
+	static job_info* get_job_info(std::size_t physicalId, std::size_t variationId);
+	static job_info* get_job_info_sub(std::size_t batchId, std::size_t variationId);
 
 	static void dump_job_tree(const char*) {};
 	static void dump_job_time_sets(const char*) {};

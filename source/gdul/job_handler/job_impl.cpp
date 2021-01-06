@@ -24,6 +24,7 @@
 #include <gdul/job_handler/worker/worker.h>
 #include <gdul/job_handler/job_queue.h>
 #include <gdul/job_handler/job/job_node.h>
+#include "job_impl.h"
 
 namespace gdul
 {
@@ -34,9 +35,8 @@ job_impl::job_impl()
 {
 }
 #if !defined(GDUL_JOB_DEBUG)
-job_impl::job_impl(delegate<void()>&& workUnit, job_handler_impl* handler, job_queue* target, std::size_t id)
-	: m_info(job_graph::get_job_info(id))
-	, m_persistentId(id)
+job_impl::job_impl(delegate<void()>&& workUnit, job_handler_impl* handler, job_queue* target, job_info* info)
+	: m_info(info)
 	, m_workUnit(std::forward<delegate<void()>>(workUnit))
 	, m_finished(false)
 	, m_headDependee(nullptr)
@@ -46,9 +46,8 @@ job_impl::job_impl(delegate<void()>&& workUnit, job_handler_impl* handler, job_q
 {
 }
 #else
-job_impl::job_impl(delegate<void()>&& workUnit, job_handler_impl* handler, job_queue* target, std::size_t id, const char* name, const char* file, std::size_t line)
-	: m_info(job_graph::get_job_info(id, name, file, line))
-	, m_persistentId(id)
+job_impl::job_impl(delegate<void()>&& workUnit, job_handler_impl* handler, job_queue* target, job_info* info, const char* name, const char* file, std::size_t line)
+	: m_info(info)
 	, m_workUnit(std::forward<delegate<void()>>(workUnit))
 	, m_finished(false)
 	, m_headDependee(nullptr)
@@ -73,13 +72,15 @@ void job_impl::operator()()
 		m_info->m_enqueueTimeSet.log_time(m_enqueueTimer.get());
 		job::this_job.m_persistentId = m_persistentId;
 	}
-
-	timer completionTimer;
 #endif
 
+	timer completionTimer;
+	
 	m_workUnit();
 
-#if defined(GDUL_JOB_DEBUG)
+#if !defined(GDUL_JOB_DEBUG)
+	m_info->store_accumulated_priority(completionTimer.get());
+#else
 	if (m_info)
 		m_info->m_completionTimeSet.log_time(completionTimer.get());
 
@@ -216,6 +217,10 @@ float job_impl::get_priority() const noexcept
 {
 	return 0.0f;
 }
+std::size_t job_impl::get_id() const noexcept
+{
+	return m_info->id();
+}
 void job_impl::detach_children()
 {
 	job_node_shared_ptr dependee(m_headDependee.exchange(job_node_shared_ptr(nullptr), std::memory_order_relaxed));
@@ -233,7 +238,7 @@ void job_impl::detach_children()
 	}
 }
 #if defined(GDUL_JOB_DEBUG)
-std::size_t job_impl::get_job_info(std::size_t id, const char* name, const char* file, std::uint32_t line, bool batchSub)
+job_info* job_impl::get_job_info(std::size_t id, const char* name, const char* file, std::uint32_t line, bool batchSub)
 {
 	m_persistentId = id;
 	m_info = !batchSub ? job_graph::get_job_info(id, name, file, line) : job_graph::get_job_info_sub(id, name);

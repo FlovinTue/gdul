@@ -86,7 +86,7 @@ worker job_handler_impl::make_worker()
 	return worker(&m_workers[index]);
 }
 #if defined (GDUL_JOB_DEBUG)
-job job_handler_impl::make_job_internal(delegate<void()>&& workUnit, job_queue* target, std::size_t id, const char* name, const char* file, std::size_t line)
+job job_handler_impl::make_job_internal(delegate<void()>&& workUnit, job_queue* target, job_info* info, const char* name, const char* file, std::size_t line)
 {
 	pool_allocator<job_impl> alloc(m_jobImplMemPool.create_allocator<job_impl>());
 
@@ -96,7 +96,7 @@ job job_handler_impl::make_job_internal(delegate<void()>&& workUnit, job_queue* 
 			std::forward<delegate<void()>>(workUnit),
 			this,
 			target,
-			id,
+			info,
 			name,
 			file,
 			line));
@@ -104,7 +104,7 @@ job job_handler_impl::make_job_internal(delegate<void()>&& workUnit, job_queue* 
 	return job(jobImpl);
 }
 #endif
-job job_handler_impl::make_job_internal(delegate<void()>&& workUnit, job_queue* target, std::size_t id)
+job job_handler_impl::make_job_internal(delegate<void()>&& workUnit, job_queue* target, job_info* info)
 {
 	pool_allocator<job_impl> alloc(m_jobImplMemPool.create_allocator<job_impl>());
 
@@ -114,7 +114,7 @@ job job_handler_impl::make_job_internal(delegate<void()>&& workUnit, job_queue* 
 			std::forward<delegate<void()>>(workUnit),
 			this,
 			target,
-			id));
+			info));
 
 	return job(jobImpl);
 }
