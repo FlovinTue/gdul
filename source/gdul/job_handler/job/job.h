@@ -22,7 +22,6 @@
 
 #include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
 #include <gdul/job_handler/job_handler_utility.h>
-#include <gdul/job_handler/debug/job_tracker_interface.h>
 
 namespace gdul {
 
@@ -39,7 +38,7 @@ class worker_impl;
 template <class InContainer, class OutContainer, class Process>
 class batch_job_impl;
 }
-class job : public jh_detail::job_tracker_interface
+class job
 {
 public:
 	static thread_local job this_job;
@@ -80,10 +79,9 @@ private:
 	template <class InContainer, class OutContainer, class Process>
 	friend class jh_detail::batch_job_impl;
 	friend class jh_detail::job_handler_impl;
+	friend class jh_detail::job_graph;
 
 #if defined(GDUL_JOB_DEBUG)
-	friend class jh_detail::job_tracker;
-
 	constexpr_id register_tracking_node(constexpr_id id, const char* name, const char* file, std::uint32_t line, bool batchSub) override final;
 #endif
 
