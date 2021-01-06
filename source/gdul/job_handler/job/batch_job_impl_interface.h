@@ -23,7 +23,7 @@
 #include <gdul/job_handler/job_handler_utility.h>
 
 #if defined(GDUL_JOB_DEBUG)
-#include <gdul/job_handler/debug/job_tracker.h>
+#include <gdul/job_handler/tracking/job_graph.h>
 #endif
 
 namespace gdul {
@@ -35,7 +35,7 @@ namespace jh_detail {
 class batch_job_impl_interface
 {
 public:
-	virtual void add_dependency(job&) = 0;
+	virtual void depends_on(job&) = 0;
 	virtual bool enable(const shared_ptr<batch_job_impl_interface>&) noexcept = 0;
 	virtual bool enable_locally_if_ready() = 0;
 	virtual bool is_finished() const noexcept = 0;
@@ -49,7 +49,7 @@ public:
 	virtual job& get_endjob() noexcept = 0;
 	virtual std::size_t get_output_size() const noexcept = 0;
 #if defined(GDUL_JOB_DEBUG)
-	virtual constexpr_id register_tracking_node(constexpr_id, const char* name, const char* file, std::uint32_t line)  = 0;
+	virtual job_info* get_job_info(std::size_t, const char* name, const char* file, std::uint32_t line) = 0;
 #endif
 };
 }

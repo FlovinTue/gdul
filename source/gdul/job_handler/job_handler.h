@@ -87,10 +87,36 @@ public:
 	/// </summary>
 	/// <param name="workUnit">Work to be executed</param>
 	/// <param name="target">Scheduling target</param>
-	/// <param name="id">Persistent identifier</param>
+	/// <returns>New job</returns>
+	job make_job(delegate<void()> workUnit, job_queue* target) { workUnit; target; /* See make_job macro definition */}
+
+	/// <summary>
+	/// Creates a basic job
+	/// </summary>
+	/// <param name="workUnit">Work to be executed</param>
+	/// <param name="target">Scheduling target</param>
+	/// <param name="id">Persistent identifier. Used to keep track of this physical job instantiation</param>
+	/// <returns>New job</returns>
+	job make_job(delegate<void()> workUnit, job_queue* target, std::size_t variationId) { workUnit; target; variationId; /* See make_job macro definition */}
+
+	/// <summary>
+	/// Creates a basic job
+	/// </summary>
+	/// <param name="workUnit">Work to be executed</param>
+	/// <param name="target">Scheduling target</param>
 	/// <param name="dbgName">Job name</param>
 	/// <returns>New job</returns>
-	job make_job(delegate<void()> workUnit, job_queue* target, std::size_t variationId = 0, const char* dbgName = "") { workUnit; target; variationId; dbgName; /* See make_job macro definition */}
+	job make_job(delegate<void()> workUnit, job_queue* target, const char* dbgName) { workUnit; target; dbgName; /* See make_job macro definition */}
+
+	/// <summary>
+	/// Creates a basic job
+	/// </summary>
+	/// <param name="workUnit">Work to be executed</param>
+	/// <param name="target">Scheduling target</param>
+	/// <param name="id">Persistent identifier. Used to keep track of this physical job instantiation</param>
+	/// <param name="dbgName">Job name</param>
+	/// <returns>New job</returns>
+	job make_job(delegate<void()> workUnit, job_queue* target, std::size_t variationId, const char* dbgName) { workUnit; target; variationId; dbgName; /* See make_job macro definition */}
 
 	/// <summary>
 	/// Creates a batch job for splitting up processing of container elements
@@ -191,11 +217,36 @@ public:
 		delegate<bool(typename InContainer::value_type&, typename OutContainer::value_type&)> process,
 		job_queue* target);
 
+#if defined (GDUL_JOB_DEBUG)
+	/// <summary>
+	/// Write the current job graph to a dgml file
+	/// </summary>
+	void dump_job_graph();
+
+	/// <summary>
+	/// Write the current job graph to a dgml file
+	/// </summary>
+	void dump_job_time_sets();
+
+	/// <summary>
+	/// Write the current job graph to a dgml file
+	/// </summary>
+	/// <param name="location">Output file location</param>
+	void dump_job_graph(const char* location);
+
+	/// <summary>
+	/// Write job timing sets to file
+	/// </summary>
+	/// <param name="location">Output file location</param>
+	void dump_job_time_sets(const char* location);
+#endif
 
 	// Not for direct use
-	job _redirect_make_job(delegate<void()> workUnit, job_queue* target, std::size_t variationId, std::size_t physicalId, const char* dbgName, const char* dbgFile, std::size_t line);
+	job _redirect_make_job(delegate<void()> workUnit, job_queue* target, std::size_t variationId, const char* dbgName, std::size_t physicalId, const char* dbgFile, std::size_t line);
 	// Not for direct use
 	job _redirect_make_job(delegate<void()> workUnit, job_queue* target, std::size_t variationId, std::size_t physicalId, const char* dbgFile, std::size_t line);
+	// Not for direct use
+	job _redirect_make_job(delegate<void()> workUnit, job_queue* target, const char* dbgName, std::size_t physicalId, const char* dbgFile, std::size_t line);
 	// Not for direct use
 	job _redirect_make_job(delegate<void()> workUnit, job_queue* target, std::size_t physicalId, const char* dbgFile, std::size_t line);
 private:
@@ -300,11 +351,14 @@ inline batch_job job_handler::make_batch_job(
 #define GDUL_INLINE_PRAGMA(pragma) _Pragma(GDUL_STRINGIFY_PRAGMA(pragma))
 #endif
 #endif
-// Args: delegate<void()> workUnit, job_queue* target, (opt)std::size_t variationId, (opt)const char* dbgName 
+// Signature 1:  gdul::job (delegate<void()> workUnit, job_queue* target)														
+// Signature 2:  gdul::job (delegate<void()> workUnit, job_queue* target, const char* dbgName)
+// Signature 3:  gdul::job (delegate<void()> workUnit, job_queue* target, std::size_t variationId)
+// Signature 4:  gdul::job (delegate<void()> workUnit, job_queue* target, std::size_t variationId, const char* dbgName)
 #define make_job(...) _redirect_make_job(__VA_ARGS__, \
 GDUL_INLINE_PRAGMA(warning(push)) \
 GDUL_INLINE_PRAGMA(warning(disable : 4307)) \
-constexp_str_hash(__FILE__) \
+gdul::jh_detail::constexp_str_hash(__FILE__) \
 GDUL_INLINE_PRAGMA(warning(pop)) \
 + std::size_t(__LINE__) \
-, __FILE__, __LINE__,
+, __FILE__, __LINE__)

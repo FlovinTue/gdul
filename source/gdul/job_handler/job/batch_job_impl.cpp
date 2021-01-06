@@ -21,8 +21,8 @@
 #include "batch_job_impl.h"
 #include <gdul/delegate/delegate.h>
 #include <gdul/job_handler/job_handler.h>
-#include <gdul/job_handler/job.h>
-#include <gdul/job_handler/job_impl.h>
+#include <gdul/job_handler/job/job.h>
+#include <gdul/job_handler/job/job_impl.h>
 
 namespace gdul
 {

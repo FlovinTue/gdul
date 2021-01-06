@@ -20,18 +20,18 @@
 
 #pragma once
 
-#include <gdul/job_handler/job_handler_utility.h>
-#include <gdul/job_handler/job.h>
-#include <gdul/job_handler/job/batch_job_impl_interface.h>
-#include <gdul/job_handler/tracking/job_graph.h>
-
 #include <gdul/delegate/delegate.h>
-
+#include <gdul/job_handler/job_handler_utility.h>
+#include <gdul/job_handler/job/job.h>
+#include <gdul/job_handler/job/batch_job_impl_interface.h>
 #include <array>
 #include <cassert>
 #include <algorithm>
 #include <cmath>
 
+#if defined(GDUL_JOB_DEBUG)
+#include <gdul/job_handler/tracking/job_graph.h>
+#endif
 
 namespace gdul {
 class job_handler;
@@ -63,7 +63,7 @@ public:
 
 	batch_job_impl(InContainer& input, OutContainer& output, Process&& process, std::size_t batchSize, gdul::delegate<void(std::size_t)> outputResizeFunc, job_handler* handler, job_queue* target);
 
-	void add_dependency(job& dependency);
+	void depends_on(job& dependency) override final;
 
 	void wait_until_finished() noexcept override final;
 	void wait_until_ready() noexcept override final;
@@ -82,7 +82,7 @@ public:
 	std::size_t get_output_size() const noexcept override final;
 
 #if defined(GDUL_JOB_DEBUG)
-	constexpr_id register_tracking_node(constexpr_id id, const char* name, const char* file, std::uint32_t line) override final;
+	job_info* get_job_info(std::size_t id, const char* name, const char* file, std::uint32_t line) override final;
 	void track_sub_job(job& job, const char* name);
 #else
 	void track_sub_job(job&, const char*) {};
@@ -130,11 +130,11 @@ private:
 
 	void work_pack(std::size_t batchIndex);
 
-	GDUL_JOB_DEBUG_CONDTIONAL(job_info* m_trackingNode)
-		GDUL_JOB_DEBUG_CONDTIONAL(timer m_completionTimer)
-		GDUL_JOB_DEBUG_CONDTIONAL(timer m_enqueueTimer)
+	GDUL_JOB_DEBUG_CONDTIONAL(job_info* m_info)
+	GDUL_JOB_DEBUG_CONDTIONAL(timer m_completionTimer)
+	GDUL_JOB_DEBUG_CONDTIONAL(timer m_enqueueTimer)
 
-		std::array<std::uint32_t, Batch_Job_Max_Slices> m_batchTracker;
+	std::array<std::uint32_t, Batch_Job_Max_Slices> m_batchTracker;
 
 	process_type m_process;
 	delegate<void(std::size_t)> m_outputResizeFunc;
@@ -171,7 +171,7 @@ inline batch_job_impl<InContainer, OutContainer, Process>::batch_job_impl(InCont
 	, m_root(m_batchCount ? _redirect_make_job(handler, delegate<void()>(&batch_job_impl::initialize, this), target) : _redirect_make_job(m_handler, delegate<void()>([]() {}), target))
 	, m_end(m_batchCount ? _redirect_make_job(handler, delegate<void()>(&batch_job_impl::finalize<>, this), target) : m_root)
 #if defined(GDUL_JOB_DEBUG)
-	, m_trackingNode(nullptr)
+	, m_info(nullptr)
 #endif
 {}
 template<class InContainer, class OutContainer, class Process>
@@ -213,37 +213,37 @@ inline std::uint32_t batch_job_impl<InContainer, OutContainer, Process>::clamp_b
 	return returnValue;
 }
 template<class InContainer, class OutContainer, class Process>
-inline void batch_job_impl<InContainer, OutContainer, Process>::add_dependency(job& dependency)
+inline void batch_job_impl<InContainer, OutContainer, Process>::depends_on(job& dependency)
 {
-	m_root.add_dependency(dependency);
+	m_root.depends_on(dependency);
 }
 template<class InContainer, class OutContainer, class Process>
 inline void batch_job_impl<InContainer, OutContainer, Process>::wait_until_finished() noexcept
 {
 	GDUL_JOB_DEBUG_CONDTIONAL(timer waitTimer)
 		m_end.wait_until_finished();
-	GDUL_JOB_DEBUG_CONDTIONAL(if (m_trackingNode) m_trackingNode->m_waitTimeSet.log_time(waitTimer.get()))
+	GDUL_JOB_DEBUG_CONDTIONAL(if (m_info) m_info->m_waitTimeSet.log_time(waitTimer.get()))
 }
 template<class InContainer, class OutContainer, class Process>
 inline void batch_job_impl<InContainer, OutContainer, Process>::wait_until_ready() noexcept
 {
 	GDUL_JOB_DEBUG_CONDTIONAL(timer waitTimer)
 		m_root.wait_until_ready();
-	GDUL_JOB_DEBUG_CONDTIONAL(if (m_trackingNode) m_trackingNode->m_waitTimeSet.log_time(waitTimer.get()))
+	GDUL_JOB_DEBUG_CONDTIONAL(if (m_info) m_info->m_waitTimeSet.log_time(waitTimer.get()))
 }
 template<class InContainer, class OutContainer, class Process>
 inline void batch_job_impl<InContainer, OutContainer, Process>::work_until_finished(job_queue* consumeFrom)
 {
 	GDUL_JOB_DEBUG_CONDTIONAL(timer waitTimer)
 		m_end.work_until_finished(consumeFrom);
-	GDUL_JOB_DEBUG_CONDTIONAL(if (m_trackingNode) m_trackingNode->m_waitTimeSet.log_time(waitTimer.get()))
+	GDUL_JOB_DEBUG_CONDTIONAL(if (m_info) m_info->m_waitTimeSet.log_time(waitTimer.get()))
 }
 template<class InContainer, class OutContainer, class Process>
 inline void batch_job_impl<InContainer, OutContainer, Process>::work_until_ready(job_queue* consumeFrom)
 {
 	GDUL_JOB_DEBUG_CONDTIONAL(timer waitTimer)
 		m_root.work_until_ready(consumeFrom);
-	GDUL_JOB_DEBUG_CONDTIONAL(if (m_trackingNode) m_trackingNode->m_waitTimeSet.log_time(waitTimer.get()))
+	GDUL_JOB_DEBUG_CONDTIONAL(if (m_info) m_info->m_waitTimeSet.log_time(waitTimer.get()))
 }
 template<class InContainer, class OutContainer, class Process>
 inline bool batch_job_impl<InContainer, OutContainer, Process>::enable(const shared_ptr<batch_job_impl_interface>& selfRef) noexcept
@@ -382,8 +382,8 @@ inline void batch_job_impl<InContainer, OutContainer, Process>::make_jobs()
 		if (i < (m_batchCount - 1)) {
 			job nextPackJob(make_work_slice(&batch_job_impl::work_pack, i));
 			track_sub_job(nextPackJob, "batch_job_pack");
-			nextPackJob.add_dependency(currentPackJob);
-			nextPackJob.add_dependency(nextProcessJob);
+			nextPackJob.depends_on(currentPackJob);
+			nextPackJob.depends_on(nextProcessJob);
 			std::invoke(m_enableFunc, &nextPackJob);
 
 			currentPackJob = std::move(nextPackJob);
@@ -393,12 +393,12 @@ inline void batch_job_impl<InContainer, OutContainer, Process>::make_jobs()
 	}
 
 	if (1 < m_batchCount) {
-		m_end.add_dependency(currentPackJob);
+		m_end.depends_on(currentPackJob);
 	}
 
 	track_sub_job(m_end, "batch_job_finalize");
 
-	m_end.add_dependency(currentProcessJob);
+	m_end.depends_on(currentProcessJob);
 	std::invoke(m_enableFunc, &m_end);
 }
 template<class InContainer, class OutContainer, class Process>
@@ -410,7 +410,7 @@ inline void batch_job_impl<InContainer, OutContainer, Process>::make_jobs()
 		track_sub_job(processJob, "batch_job_process");
 		std::invoke(m_enableFunc, &processJob);
 
-		m_end.add_dependency(processJob);
+		m_end.depends_on(processJob);
 	}
 
 	track_sub_job(m_end, "batch_job_finalize");
@@ -420,7 +420,7 @@ template<class InContainer, class OutContainer, class Process>
 inline void batch_job_impl<InContainer, OutContainer, Process>::initialize()
 {
 	GDUL_JOB_DEBUG_CONDTIONAL(m_completionTimer.reset())
-		GDUL_JOB_DEBUG_CONDTIONAL(if (m_trackingNode)m_trackingNode->m_enqueueTimeSet.log_time(m_enqueueTimer.get()))
+		GDUL_JOB_DEBUG_CONDTIONAL(if (m_info)m_info->m_enqueueTimeSet.log_time(m_enqueueTimer.get()))
 
 		m_outputResizeFunc(container_size(m_input));
 
@@ -459,7 +459,7 @@ inline void batch_job_impl<InContainer, OutContainer, Process>::finalize()
 
 	m_outputResizeFunc(get_output_size());
 
-	GDUL_JOB_DEBUG_CONDTIONAL(if (m_trackingNode)m_trackingNode->m_completionTimeSet.log_time(m_completionTimer.get()))
+	GDUL_JOB_DEBUG_CONDTIONAL(if (m_info)m_info->m_completionTimeSet.log_time(m_completionTimer.get()))
 
 		m_selfRef.store(shared_ptr<batch_job_impl_interface>(), std::memory_order_relaxed);
 }
@@ -467,24 +467,24 @@ template<class InContainer, class OutContainer, class Process>
 template <class U, std::enable_if_t<U::Specialize_Update>*>
 inline void batch_job_impl<InContainer, OutContainer, Process>::finalize()
 {
-	GDUL_JOB_DEBUG_CONDTIONAL(if (m_trackingNode)m_trackingNode->m_completionTimeSet.log_time(m_completionTimer.get()))
+	GDUL_JOB_DEBUG_CONDTIONAL(if (m_info)m_info->m_completionTimeSet.log_time(m_completionTimer.get()))
 
 		m_selfRef.store(shared_ptr<batch_job_impl_interface>(), std::memory_order_relaxed);
 }
 #if defined(GDUL_JOB_DEBUG)
 template<class InContainer, class OutContainer, class Process>
-inline constexpr_id batch_job_impl<InContainer, OutContainer, Process>::register_tracking_node(constexpr_id id, const char* name, const char* file, std::uint32_t line)
+inline std::size_t batch_job_impl<InContainer, OutContainer, Process>::get_job_info(std::size_t id, const char* name, const char* file, std::uint32_t line)
 {
-	const constexpr_id batchJobNodeId(((job_tracker_interface*)(&m_root))->register_tracking_node(id, name, file, line));
-	m_trackingNode = job_tracker::fetch_node(batchJobNodeId);
-	m_trackingNode->set_node_type(job_info_batch);
+	const std::size_t batchJobNodeId(((job_info*)(&m_root))->get_job_info(id, name, file, line));
+	m_info = job_graph::fetch_node(batchJobNodeId);
+	m_info->set_node_type(job_info_batch);
 	return batchJobNodeId;
 }
 template<class InContainer, class OutContainer, class Process>
 inline void batch_job_impl<InContainer, OutContainer, Process>::track_sub_job(job& job, const char* name)
 {
-	if (m_trackingNode)
-		((job_tracker_interface*)(&job))->register_tracking_node(m_trackingNode->id(), name, "", 0, true);
+	if (m_info)
+		((job_info*)(&job))->get_job_info(m_info->id(), name, "", 0, true);
 }
 #endif
 }

@@ -33,6 +33,8 @@ namespace jh_detail {
 
 class job_handler_impl;
 class job_impl;
+struct job_info;
+class job_graph;
 class worker_impl;
 
 template <class InContainer, class OutContainer, class Process>
@@ -50,8 +52,8 @@ public:
 	job& operator=(job&& other) noexcept;
 	job& operator=(const job& other) noexcept;
 
-	void add_dependency(job& dependency);
-	void add_dependency(batch_job& dependency);
+	void depends_on(job& dependency);
+	void depends_on(batch_job& dependency);
 
 	// this object may be discarded once enable() has been invoked
 	bool enable() noexcept;
@@ -73,17 +75,20 @@ public:
 
 	float priority() const noexcept;
 
+	std::size_t get_id() const noexcept;
+
 private:
 	friend class job_handler;
 	friend class jh_detail::worker_impl;
 	template <class InContainer, class OutContainer, class Process>
 	friend class jh_detail::batch_job_impl;
 	friend class jh_detail::job_handler_impl;
-	friend class jh_detail::job_graph;
 
 #if defined(GDUL_JOB_DEBUG)
-	constexpr_id register_tracking_node(constexpr_id id, const char* name, const char* file, std::uint32_t line, bool batchSub) override final;
+	friend class jh_detail::job_graph;
 #endif
+
+	jh_detail::job_info* get_job_info(std::size_t id);
 
 	job(gdul::shared_ptr<jh_detail::job_impl> impl) noexcept;
 

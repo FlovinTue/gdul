@@ -19,17 +19,17 @@
 // SOFTWARE.
 
 #include "batch_job.h"
-#include <gdul/job_handler/batch_job_impl.h>
+#include <gdul/job_handler/job/batch_job_impl.h>
 
 namespace gdul {
 
 batch_job::batch_job()
 	: m_impl(nullptr)
 {}
-void batch_job::add_dependency(job & dependency)
+void batch_job::depends_on(job & dependency)
 {
 	if (m_impl)
-		m_impl->add_dependency(dependency);
+		m_impl->depends_on(dependency);
 }
 bool batch_job::enable() noexcept
 {
@@ -83,13 +83,22 @@ std::size_t batch_job::get_output_size() const noexcept
 	return m_impl->get_output_size();
 }
 #if defined(GDUL_JOB_DEBUG)
-constexpr_id batch_job::register_tracking_node(constexpr_id id, const char * name, const char* file, std::uint32_t line, bool)
+jh_detail::job_info* batch_job::get_job_info(std::size_t id, const char * name, const char* file, std::uint32_t line, bool)
 {
 	if (!m_impl)
-		return constexpr_id::make<0>();
+		return nullptr;
 
-	return m_impl->register_tracking_node(id, name, file, line);
+	return m_impl->get_job_info(id, name, file, line);
 }
+#else
+jh_detail::job_info* batch_job::get_job_info(std::size_t id)
+{
+	//if (!m_impl)
+		return nullptr;
+		id;
+	//return m_impl->get_job_info(id);
+}
+
 #endif
 job & batch_job::get_endjob() noexcept
 {

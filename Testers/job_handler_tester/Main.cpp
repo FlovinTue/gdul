@@ -9,14 +9,14 @@
 #include <gdul/job_handler/tracking/job_graph.h>
 
 int main()
-{	
+{
 	{
 		gdul::job_handler_tester tester;
 
-		
+
 		gdul::job_handler_tester_info info;
 		info.affinity = gdul::JOB_HANDLER_TESTER_WORKER_AFFINITY_DYNAMIC;
-		
+
 		tester.init(info);
 
 		tester.basic_tests();
@@ -25,8 +25,7 @@ int main()
 		float scatterTimeAccum(0.f);
 		std::size_t scatterBatchAccum(0);
 
-		for (uint32_t i = 0; i < scatterRuns; ++i)
-		{
+		for (uint32_t i = 0; i < scatterRuns; ++i) {
 			std::size_t arraySize(1500), batchSize(10);
 			std::size_t bestBatchSize(0);
 			float bestBatchTime(0.f);
@@ -34,20 +33,21 @@ int main()
 			scatterTimeAccum += bestBatchTime;
 			scatterBatchAccum += bestBatchSize;
 		}
-		
+
 		std::cout << "Best time / batchsize average: " << scatterTimeAccum / scatterRuns << ", " << scatterBatchAccum / scatterRuns << std::endl;
-	
-		for (uint32_t i = 0; i < 5; ++i)
-		{
+
+		for (uint32_t i = 0; i < 5; ++i) {
 			tester.run_consumption_strand_parallel_test(1500, 1.0f);
 		}
+
+#if defined (GDUL_JOB_DEBUG)
+		tester.m_handler.dump_job_graph("");
+		tester.m_handler.dump_job_time_sets("");
+#endif
 	}
 
-	gdul::jh_detail::job_graph::dump_job_tree("");
-	gdul::jh_detail::job_graph::dump_job_time_sets("");
-
 	std::cout << "Final allocated: " << gdul::s_allocated << std::endl;
-	
+
 	std::cout << "Hello World!\n";
 
 

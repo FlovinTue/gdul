@@ -50,21 +50,43 @@ worker job_handler::make_worker()
 {
 	return m_impl->make_worker();
 }
-job job_handler::_redirect_make_job(delegate<void()> workUnit, job_queue* target, std::size_t variationId, std::size_t physicalId, const char* dbgName, const char* dbgFile, std::size_t line)
+#if defined (GDUL_JOB_DEBUG)
+void job_handler::dump_job_graph()
+{
+	dump_job_graph("");
+}
+void job_handler::dump_job_time_sets()
+{
+	dump_job_time_sets("");
+}
+void job_handler::dump_job_graph(const char* location)
+{
+	m_impl->dump_job_graph(location);
+}
+void job_handler::dump_job_time_sets(const char* location)
+{
+	m_impl->dump_job_time_sets(location);
+}
+#endif
+job job_handler::_redirect_make_job(delegate<void()> workUnit, job_queue* target, std::size_t variationId, [[maybe_unused]] const char* dbgName, std::size_t physicalId, [[maybe_unused]] const char* dbgFile, [[maybe_unused]] std::size_t line)
 {
 #if defined (GDUL_JOB_DEBUG)
-	return m_impl->make_job_internal(std::move(workUnit), target, jh_detail::job_graph::get_job_info(physicalId, variationId), dbgName, dbgFile, line);
+	return m_impl->make_job_internal(std::move(workUnit), target, physicalId, variationId, dbgName, dbgFile, line);
 #else
-	return m_impl->make_job_internal(std::move(workUnit), target, jh_detail::job_graph::get_job_info(physicalId, variationId));
+	return m_impl->make_job_internal(std::move(workUnit), target, physicalId, variationId);
 #endif
 }
 job job_handler::_redirect_make_job(delegate<void()> workUnit, job_queue* target, std::size_t variationId, std::size_t physicalId, const char* dbgFile, std::size_t line)
 {
-	return _redirect_make_job(std::move(workUnit), target, variationId, physicalId, "", dbgFile, line);
+	return _redirect_make_job(std::move(workUnit), target, variationId, "", physicalId, dbgFile, line);
+}
+job job_handler::_redirect_make_job(delegate<void()> workUnit, job_queue* target, const char* dbgName, std::size_t physicalId, const char* dbgFile, std::size_t line)
+{
+	return _redirect_make_job(std::move(workUnit), target, 0, dbgName, physicalId, dbgFile, line);
 }
 job job_handler::_redirect_make_job(delegate<void()> workUnit, job_queue* target, std::size_t physicalId, const char* dbgFile, std::size_t line)
 {
-	return _redirect_make_job(std::move(workUnit), target, 0, physicalId, "", dbgFile, line);
+	return _redirect_make_job(std::move(workUnit), target, 0, "", physicalId, dbgFile, line);
 }
 std::size_t job_handler::worker_count() const noexcept
 {

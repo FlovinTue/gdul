@@ -91,17 +91,17 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\source\gdul\job_handler\batch_job.h" />
-    <ClInclude Include="..\..\source\gdul\job_handler\batch_job_impl.h" />
     <ClInclude Include="..\..\source\gdul\job_handler\globals.h" />
-    <ClInclude Include="..\..\source\gdul\job_handler\job.h" />
+    <ClInclude Include="..\..\source\gdul\job_handler\job\batch_job.h" />
+    <ClInclude Include="..\..\source\gdul\job_handler\job\batch_job_impl.h" />
+    <ClInclude Include="..\..\source\gdul\job_handler\job\batch_job_impl_interface.h" />
+    <ClInclude Include="..\..\source\gdul\job_handler\job\job.h" />
     <ClInclude Include="..\..\source\gdul\job_handler\job\job_node.h" />
     <ClInclude Include="..\..\source\gdul\job_handler\job_handler.h" />
     <ClInclude Include="..\..\source\gdul\job_handler\job_queue.h" />
     <ClInclude Include="..\..\source\gdul\job_handler\job_handler_utility.h" />
     <ClInclude Include="..\..\source\gdul\job_handler\job_handler_impl.h" />
-    <ClInclude Include="..\..\source\gdul\job_handler\job_impl.h" />
-    <ClInclude Include="..\..\source\gdul\job_handler\batch_job_impl_interface.h" />
+    <ClInclude Include="..\..\source\gdul\job_handler\job\job_impl.h" />
     <ClInclude Include="..\..\source\gdul\job_handler\tracking\job_graph.h" />
     <ClInclude Include="..\..\source\gdul\job_handler\tracking\job_info.h" />
     <ClInclude Include="..\..\source\gdul\job_handler\tracking\timer.h" />
@@ -113,13 +113,13 @@
     <ClInclude Include="job_handler_tester.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\source\gdul\job_handler\batch_job.cpp" />
-    <ClCompile Include="..\..\source\gdul\job_handler\batch_job_impl.cpp" />
-    <ClCompile Include="..\..\source\gdul\job_handler\job.cpp" />
+    <ClCompile Include="..\..\source\gdul\job_handler\job\batch_job.cpp" />
+    <ClCompile Include="..\..\source\gdul\job_handler\job\batch_job_impl.cpp" />
+    <ClCompile Include="..\..\source\gdul\job_handler\job\job.cpp" />
     <ClCompile Include="..\..\source\gdul\job_handler\job_handler.cpp" />
     <ClCompile Include="..\..\source\gdul\job_handler\job_handler_utility.cpp" />
     <ClCompile Include="..\..\source\gdul\job_handler\job_handler_impl.cpp" />
-    <ClCompile Include="..\..\source\gdul\job_handler\job_impl.cpp" />
+    <ClCompile Include="..\..\source\gdul\job_handler\job\job_impl.cpp" />
     <ClCompile Include="..\..\source\gdul\job_handler\job_queue.cpp" />
     <ClCompile Include="..\..\source\gdul\job_handler\tracking\job_graph.cpp" />
     <ClCompile Include="..\..\source\gdul\job_handler\tracking\job_info.cpp" />

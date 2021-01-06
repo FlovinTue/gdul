@@ -10,18 +10,6 @@
     <ClCompile Include="work_tracker.cpp">
       <Filter>other</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\source\gdul\job_handler\batch_job.cpp">
-      <Filter>implementation\job</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\source\gdul\job_handler\batch_job_impl.cpp">
-      <Filter>implementation\job</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\source\gdul\job_handler\job.cpp">
-      <Filter>implementation\job</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\source\gdul\job_handler\job_impl.cpp">
-      <Filter>implementation\job</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\source\gdul\job_handler\job_handler.cpp">
       <Filter>implementation</Filter>
     </ClCompile>
@@ -52,6 +40,18 @@
     <ClCompile Include="..\..\source\gdul\job_handler\tracking\timer.cpp">
       <Filter>implementation\tracking</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\source\gdul\job_handler\job\job.cpp">
+      <Filter>implementation\job</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\source\gdul\job_handler\job\batch_job_impl.cpp">
+      <Filter>implementation\job</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\source\gdul\job_handler\job\batch_job.cpp">
+      <Filter>implementation\job</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\source\gdul\job_handler\job\job_impl.cpp">
+      <Filter>implementation\job</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="job_handler_tester.h">
@@ -59,21 +59,6 @@
     </ClInclude>
     <ClInclude Include="work_tracker.h">
       <Filter>other</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\source\gdul\job_handler\batch_job.h">
-      <Filter>implementation\job</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\source\gdul\job_handler\batch_job_impl.h">
-      <Filter>implementation\job</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\source\gdul\job_handler\batch_job_impl_interface.h">
-      <Filter>implementation\job</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\source\gdul\job_handler\job.h">
-      <Filter>implementation\job</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\source\gdul\job_handler\job_impl.h">
-      <Filter>implementation\job</Filter>
     </ClInclude>
     <ClInclude Include="..\..\source\gdul\job_handler\globals.h">
       <Filter>implementation</Filter>
@@ -112,6 +97,21 @@
       <Filter>implementation\tracking</Filter>
     </ClInclude>
     <ClInclude Include="..\..\source\gdul\job_handler\job\job_node.h">
+      <Filter>implementation\job</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\source\gdul\job_handler\job\batch_job_impl_interface.h">
+      <Filter>implementation\job</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\source\gdul\job_handler\job\job.h">
+      <Filter>implementation\job</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\source\gdul\job_handler\job\batch_job_impl.h">
+      <Filter>implementation\job</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\source\gdul\job_handler\job\batch_job.h">
+      <Filter>implementation\job</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\source\gdul\job_handler\job\job_impl.h">
       <Filter>implementation\job</Filter>
     </ClInclude>
   </ItemGroup>

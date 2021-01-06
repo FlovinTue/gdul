@@ -1,15 +1,15 @@
 // Copyright(c) 2020 Flovin Michaelsen
-// 
+//
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files(the "Software"), to deal
 // in the Software without restriction, including without limitation the rights
 // to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 // copies of the Software, and to permit persons to whom the Software is
 // furnished to do so, subject to the following conditions :
-// 
+//
 // The above copyright notice and this permission notice shall be included in all
 // copies or substantial portions of the Software.
-// 
+//
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 // IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 // FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.IN NO EVENT SHALL THE
@@ -20,10 +20,9 @@
 
 #pragma once
 
-#include <gdul/job_handler/job_handler_utility.h>
-#include <gdul/job_handler/batch_job_impl_interface.h>
 #include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
-#include <gdul/job_handler/debug/job_tracker_interface.h>
+#include <gdul/job_handler/job_handler_utility.h>
+#include <gdul/job_handler/job/batch_job_impl_interface.h>
 
 namespace gdul {
 class job;
@@ -31,16 +30,18 @@ class job_queue;
 
 namespace jh_detail
 {
+struct job_info;
+
 template <class InContainer, class OutContainer, class Process>
 class batch_job_impl;
 }
 
-class batch_job : public jh_detail::job_tracker_interface
+class batch_job
 {
 public:
 	batch_job();
 
-	void add_dependency(job& dependency);
+	void depends_on(job& dependency);
 
 	// this object may be discarded once enable() has been invoked
 	bool enable() noexcept;
@@ -67,8 +68,10 @@ private:
 	friend class job;
 
 #if defined(GDUL_JOB_DEBUG)
-	friend class jh_detail::job_tracker;
-	constexpr_id register_tracking_node(constexpr_id id, const char* name, const char* file, std::uint32_t line, bool /*batchSub*/) override final;
+	friend class jh_detail::job_graph;
+	jh_detail::job_info* get_job_info(std::size_t id, const char* name, const char* file, std::uint32_t line, bool /*batchSub*/);
+#else
+	jh_detail::job_info* get_job_info(std::size_t id);
 #endif
 
 	job& get_endjob() noexcept;

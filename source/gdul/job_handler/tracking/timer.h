@@ -29,8 +29,8 @@ namespace jh_detail
 class timer
 {
 public:
-	inline timer();
-	inline float get() const;
+	timer();
+	float get() const;
 
 private:
 	const std::chrono::high_resolution_clock m_clock;

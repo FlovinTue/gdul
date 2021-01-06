@@ -34,6 +34,7 @@
 #include <gdul/job_handler/worker/worker.h>
 #include <gdul/job_handler/job_handler_utility.h>
 #include <gdul/job_handler/job/job_node.h>
+#include <gdul/job_handler/tracking/job_graph.h>
 
 namespace gdul {
 
@@ -62,30 +63,36 @@ public:
 	worker make_worker();
 
 #if defined (GDUL_JOB_DEBUG)
-	job make_job_internal(delegate<void()>&& workUnit, job_queue* target, job_info* info, const char* name, const char* file, std::size_t line);
+	job make_job_internal(delegate<void()>&& workUnit, job_queue* target, std::size_t physicalId, std::size_t variationId, const char* name, const char* file, std::size_t line);
 #else
-	job make_job_internal(delegate<void()>&& workUnit, job_queue* target, job_info* info);
+	job make_job_internal(delegate<void()>&& workUnit, job_queue* target, std::size_t physicalId, std::size_t variationId);
 #endif
 	std::size_t worker_count() const noexcept;
+
+	job_graph& get_job_graph();
 
 	pool_allocator<job_node> get_job_node_allocator() const noexcept;
 	pool_allocator<dummy_batch_type> get_batch_job_allocator() const noexcept;
 
+#if defined(GDUL_JOB_DEBUG)
+	void dump_job_graph(const char* location);
+	void dump_job_time_sets(const char* location);
+#endif
+
 private:
-
 	void launch_worker(std::uint16_t index) noexcept;
-
-	void work();
-
-	allocator_type m_mainAllocator;
 
 	memory_pool m_jobImplMemPool;
 	memory_pool m_jobNodeMemPool;
 	memory_pool m_batchJobMemPool;
 
+	job_graph m_jobGraph;
+
 	std::array<worker_impl, Max_Workers> m_workers;
 
 	std::atomic<std::uint16_t> m_workerIndices;
+
+	allocator_type m_mainAllocator;
 };
 }
 }

@@ -52,8 +52,13 @@ void job_info::accumulate_priority(job_info* from)
 void job_info::store_accumulated_priority(float lastCompletionTime)
 {
 	m_lastCompletionTime = lastCompletionTime;
-	m_lastPriorityAccum = m_priorityAccum;
-	m_priorityAccum = 0.f;
+
+	const float priorityAccumulation(m_priorityAccum);
+
+	if (priorityAccumulation != 0.f) {
+		m_lastPriorityAccum = priorityAccumulation;
+		m_priorityAccum = 0.f;
+	}
 }
 std::size_t job_info::id() const
 {
