@@ -52,7 +52,7 @@ job& job::operator=(const job& other) noexcept
 }
 void job::depends_on(job& dependency)
 {
-	if (!m_impl)
+	if (!m_impl || !dependency)
 		return;
 
 	if (m_impl->try_add_dependencies(1)) {
@@ -143,7 +143,10 @@ job::operator bool() const noexcept
 }
 float job::priority() const noexcept
 {
-	return m_impl->get_priority();
+	if (m_impl) {
+		return m_impl->get_priority();
+	}
+	return 0.f;
 }
 std::size_t job::get_id() const noexcept
 {

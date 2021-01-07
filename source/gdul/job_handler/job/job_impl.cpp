@@ -75,6 +75,8 @@ void job_impl::operator()()
 }
 bool job_impl::try_attach_child(job_impl_shared_ptr child)
 {
+	m_info->accumulate_priority(child->get_priority());
+
 	pool_allocator<job_node> alloc(m_handler->get_job_node_allocator());
 
 	job_node_shared_ptr dependee(gdul::allocate_shared<job_node>(alloc));
@@ -157,6 +159,8 @@ bool job_impl::is_ready() const noexcept
 }
 void job_impl::work_until_finished(job_queue* consumeFrom)
 {
+	m_info->accumulate_priority(job::this_job.priority());
+
 	GDUL_JOB_DEBUG_CONDTIONAL(timer waitTimer)
 		while (!is_finished()) {
 			if (!worker::this_worker.m_impl->try_consume_from_once(consumeFrom)) {
@@ -179,6 +183,8 @@ void job_impl::work_until_ready(job_queue* consumeFrom)
 }
 void job_impl::wait_until_finished() noexcept
 {
+	m_info->accumulate_priority(job::this_job.priority());
+
 	GDUL_JOB_DEBUG_CONDTIONAL(timer waitTimer)
 		while (!is_finished()) {
 			jh_detail::job_handler_impl::t_items.this_worker_impl->refresh_sleep_timer();
@@ -197,7 +203,7 @@ void job_impl::wait_until_ready() noexcept
 }
 float job_impl::get_priority() const noexcept
 {
-	return 0.0f;
+	return m_info->get_priority();
 }
 std::size_t job_impl::get_id() const noexcept
 {

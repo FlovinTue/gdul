@@ -38,15 +38,10 @@ job_info::job_info()
 #endif
 {
 }
-void job_info::accumulate_priority(job_info* from)
+void job_info::accumulate_priority(float priority)
 {
-	if (!from)
-		return;
-
-	const float prio(from->get_priority());
-
-	if (m_priorityAccum < prio)
-		m_priorityAccum = prio;
+	if (m_priorityAccum < priority)
+		m_priorityAccum = priority;
 }
 
 void job_info::store_accumulated_priority(float lastCompletionTime)

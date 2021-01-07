@@ -225,22 +225,20 @@ public:
 	void dump_job_time_sets(const char* location);
 #endif
 
-	// Not for direct use
-	job _redirect_make_job(delegate<void()> workUnit, job_queue* target, std::size_t variationId, const char* dbgName, std::size_t physicalId, const char* dbgFile, std::uint32_t line);
-	// Not for direct use
-	job _redirect_make_job(delegate<void()> workUnit, job_queue* target, std::size_t variationId, std::size_t physicalId, const char* dbgFile, std::uint32_t line);
-	// Not for direct use
-	job _redirect_make_job(delegate<void()> workUnit, job_queue* target, const char* dbgName, std::size_t physicalId, const char* dbgFile, std::uint32_t line);
-	// Not for direct use
-	job _redirect_make_job(delegate<void()> workUnit, job_queue* target, std::size_t physicalId, const char* dbgFile, std::uint32_t line);
+	//// Not for direct use
+	//job _redirect_make_job(delegate<void()> workUnit, job_queue* target, std::size_t variationId, const char* dbgName, std::size_t physicalId, const char* dbgFile, std::uint32_t line);
+	//// Not for direct use
+	//job _redirect_make_job(delegate<void()> workUnit, job_queue* target, std::size_t variationId, std::size_t physicalId, const char* dbgFile, std::uint32_t line);
+	//// Not for direct use
+	//job _redirect_make_job(delegate<void()> workUnit, job_queue* target, const char* dbgName, std::size_t physicalId, const char* dbgFile, std::uint32_t line);
+	//// Not for direct use
+	//job _redirect_make_job(delegate<void()> workUnit, job_queue* target, std::size_t physicalId, const char* dbgFile, std::uint32_t line);
 
 
-	//// Not for direct use
-	//job _redirect_make_job(std::size_t physicalId, const char* dbgFile, std::uint32_t line, delegate<void()> workUnit, job_queue* target, std::size_t variationId, const char* dbgName);
-	//// Not for direct use
-	//job _redirect_make_job(std::size_t physicalId, const char* dbgFile, std::uint32_t line, delegate<void()> workUnit, job_queue* target, std::size_t variationId);
-	//// Not for direct use
-	//job _redirect_make_job(std::size_t physicalId, const char* dbgFile, std::uint32_t line, delegate<void()> workUnit, job_queue* target, const char* dbgName = "");
+	// Not for direct use
+	job _redirect_make_job(std::size_t physicalId, const char* dbgFile, std::uint32_t line, delegate<void()> workUnit, job_queue* target, std::size_t variationId, const char* dbgName = "");
+	// Not for direct use
+	job _redirect_make_job(std::size_t physicalId, const char* dbgFile, std::uint32_t line, delegate<void()> workUnit, job_queue* target, const char* dbgName = "");
 
 
 	// Not for direct use
@@ -355,13 +353,13 @@ inline batch_job job_handler::_redirect_make_batch_job(std::size_t physicalId, c
 
 // Signature 1:  gdul::job (delegate<void()> workUnit, job_queue* target, (opt) const char* dbgName)
 // Signature 2:  gdul::job (delegate<void()> workUnit, job_queue* target, std::size_t variationId, (opt) const char* dbgName)
-#define make_job(...) _redirect_make_job(__VA_ARGS__, \
+#define make_job(...) _redirect_make_job( \
 GDUL_INLINE_PRAGMA(warning(push)) \
 GDUL_INLINE_PRAGMA(warning(disable : 4307)) \
 gdul::jh_detail::constexp_str_hash(__FILE__) \
 GDUL_INLINE_PRAGMA(warning(pop)) \
 * std::size_t(__LINE__) \
-, __FILE__, __LINE__)
+, __FILE__, __LINE__, __VA_ARGS__)
 
 
 // Signature 1:  gdul::batch_job (InContainer& input, delegate<void(typename InContainer::value_type&)> process, job_queue* target, (opt) const char* dbgName)

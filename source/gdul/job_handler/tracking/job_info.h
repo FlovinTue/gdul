@@ -44,7 +44,7 @@ struct job_info
 {
 	job_info();
 
-	void accumulate_priority(job_info* from);
+	void accumulate_priority(float priority);
 	float get_priority() const;
 	void store_accumulated_priority(float lastCompletionTime);
 

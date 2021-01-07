@@ -132,6 +132,7 @@ void job_handler_tester::setup_workers()
 		wrk.set_core_affinity((std::uint8_t)i);
 		wrk.set_execution_priority(5);
 		wrk.add_assignment(&m_asyncQueue);
+		wrk.add_assignment(&m_syncQueue);
 		wrk.set_name(std::string(std::string("DynamicWorker#") + std::to_string(i + 1)));
 		wrk.enable();
 	}
@@ -246,8 +247,66 @@ float job_handler_tester::run_consumption_strand_test(std::size_t jobs, float /*
 	return time.get();
 }
 
-void job_handler_tester::run_predictive_scheduling_test()
+float job_handler_tester::run_predictive_scheduling_test()
 {
+	job root(m_handler.make_job([]() {}, &m_syncQueue, "Predictive Scheduling Root"));
+	job dependant(m_handler.make_job([]() {}, &m_syncQueue, "Predictive Scheduling End"));
+
+	auto spinFor = [](float ms) {
+		timer<float> t;
+		const float sec(0.001f * ms);
+		while (t.get() < sec)
+			std::this_thread::yield();
+	};
+
+	// The optimal execution should be parallelSplit * serialExecutionTime,
+	// However, since the forked jobs are added first, in a normal scenario
+	// the execution time should end up being (parallelSplit * serialexecutionTime) + serialExecutionTime
+	// As read now, that would be 8 * 5 seconds vs (8 * 5 seconds) + 5 seconds
+
+	const float serialExecutionTime(5.f);
+	const std::size_t parallelSplit(std::thread::hardware_concurrency());
+
+	timer<float> time;
+
+	float parallelPriority(0.f);
+	float serialPriority(0.f);
+
+	job previous;
+	for (std::size_t i = 0; i < parallelSplit; ++i) {
+		job jb(m_handler.make_job(make_delegate<void()>(spinFor, serialExecutionTime), &m_syncQueue, std::string("Predictive Scheduling Serial# " + std::to_string(i)).c_str()));
+		jb.depends_on(previous);
+		jb.depends_on(root);
+		dependant.depends_on(jb);
+
+		if (i == 0)
+			serialPriority = jb.priority();
+
+		previous = std::move(jb);
+		previous.enable();
+	}
+	for (std::size_t i = 0; i < parallelSplit; ++i) {
+		job jb(m_handler.make_job(make_delegate<void()>(spinFor, serialExecutionTime), &m_syncQueue, "Predictive Scheduling Parallel"));
+		jb.depends_on(root);
+		jb.enable();
+		dependant.depends_on(jb);
+
+		if (i == 0)
+			parallelPriority = jb.priority();
+	}
+
+	dependant.enable();
+	root.enable();
+	dependant.wait_until_finished();
+
+	const float result = time.get();
+
+	std::cout << "Finished predictive scheduling test with " << result * 1000.f << " ms execution time using " << std::endl;
+	std::cout << "...The optimal execution time should be " << (float)parallelSplit * serialExecutionTime << " ms" << std::endl;
+	std::cout << "...Suboptimal execution time should be " << (float)parallelSplit * serialExecutionTime + serialExecutionTime << " ms" << std::endl;
+	std::cout << "ParallelPrio " << parallelPriority << " SerialPrio: " << serialPriority << std::endl;
+
+	return result;
 }
 
 void job_handler_tester::run_scatter_test_input_output(std::size_t arraySize, std::size_t stepSize, float& outBestBatchTime)

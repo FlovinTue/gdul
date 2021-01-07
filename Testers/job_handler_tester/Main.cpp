@@ -21,7 +21,7 @@ int main()
 
 		tester.basic_tests();
 
-		const uint32_t scatterRuns(100);
+		const uint32_t scatterRuns(20);
 		float scatterTimeAccum(0.f);
 
 		for (uint32_t i = 0; i < scatterRuns; ++i) {
@@ -36,6 +36,22 @@ int main()
 		for (uint32_t i = 0; i < 5; ++i) {
 			tester.run_consumption_strand_parallel_test(1500, 1.0f);
 		}
+
+		{
+			float predictiveMin(FLT_MAX);
+			float predictiveMax(-FLT_MAX);
+			float predictiveAccum(0.f);
+			const uint32_t predictiveIter(500);
+			for (auto i = 0; i < predictiveIter; ++i) {
+				const float result = tester.run_predictive_scheduling_test();
+				predictiveAccum += result;
+				predictiveMin = std::min(result, predictiveMin);
+				predictiveMax = std::max(result, predictiveMax);
+			}
+
+			std::cout << "\n\nFinished predictive testing batch.\nAverage: " << predictiveAccum / (float)predictiveIter << "\nMin: " << predictiveMin << "\nMax: " << predictiveMax << "\n\n" << std::endl;
+		}
+
 
 #if defined (GDUL_JOB_DEBUG)
 		tester.m_handler.dump_job_graph("");
