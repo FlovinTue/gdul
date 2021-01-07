@@ -70,14 +70,6 @@ void worker::add_assignment(job_queue* queue)
 
 	m_impl->add_assignment(queue);
 }
-void worker::clear_assignments()
-{
-	assert(m_impl && "Worker is not assigned");
-	if (!m_impl)
-		return;
-
-	m_impl->clear_assignments();
-}
 void worker::enable()
 {
 	assert(m_impl && "Worker is not assigned");

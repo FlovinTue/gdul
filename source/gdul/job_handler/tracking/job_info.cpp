@@ -33,7 +33,7 @@ job_info::job_info()
 	, m_lastCompletionTime(0.f)
 #else
 	, m_parent(0)
-	, m_type(job_info_default)
+	, m_type(job_default)
 	, m_line(0)
 #endif
 {
@@ -74,12 +74,12 @@ std::size_t job_info::parent() const
 {
 	return m_parent;
 }
-void job_info::set_node_type(job_info_type type)
+void job_info::set_job_type(job_type type)
 {
 	m_type = type;
 }
 
-job_info_type job_info::get_node_type() const
+job_type job_info::get_node_type() const
 {
 	return m_type;
 }

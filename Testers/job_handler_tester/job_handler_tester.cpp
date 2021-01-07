@@ -41,28 +41,46 @@ void job_handler_tester::basic_tests()
 	gdul::job d(m_handler.make_job([]() {}, &m_asyncQueue, 2, "name2"));
 
 	a.enable();
-	b.enable();
-	c.enable();
-	d.enable();
 	a.wait_until_finished();
+	b.enable();
 	b.wait_until_finished();
+	c.enable();
 	c.wait_until_finished();
+	d.enable();
 	d.wait_until_finished();
 
 	std::vector<int> firstCollection;
 	firstCollection.resize(10);
-	gdul::batch_job first(m_handler.make_batch_job(firstCollection, gdul::delegate<void(int&)>([](int& elem) {elem = 10; }), &m_asyncQueue));
-	first.enable();
-	first.wait_until_finished();
+	gdul::batch_job first1(m_handler.make_batch_job(firstCollection, gdul::delegate<void(int&)>([](int& elem) {elem = 10; }), &m_asyncQueue));
+	first1.enable();
+	first1.wait_until_finished();
+	gdul::batch_job first2(m_handler.make_batch_job(firstCollection, gdul::delegate<void(int&)>([](int& elem) {elem = 10; }), &m_asyncQueue, "first2"));
+	first2.enable();
+	first2.wait_until_finished();
+	gdul::batch_job first3(m_handler.make_batch_job(firstCollection, gdul::delegate<void(int&)>([](int& elem) {elem = 10; }), &m_asyncQueue, 3));
+	first3.enable();
+	first3.wait_until_finished();
+	gdul::batch_job first4(m_handler.make_batch_job(firstCollection, gdul::delegate<void(int&)>([](int& elem) {elem = 10; }), &m_asyncQueue, 4, "first4"));
+	first4.enable();
+	first4.wait_until_finished();
 
 	for ([[maybe_unused]] auto itr : firstCollection)
 		assert(itr == 10);
 
 	std::vector<int> secondCollection;
 	secondCollection.resize(100);
-	gdul::batch_job second(m_handler.make_batch_job(secondCollection, gdul::delegate<bool(int&)>([](int& elem) {elem = 10; return rand() % 2; }), &m_asyncQueue));
-	second.enable();
-	second.wait_until_finished();
+	gdul::batch_job second1(m_handler.make_batch_job(secondCollection, gdul::delegate<bool(int&)>([](int& elem) {elem = 10; return rand() % 2; }), &m_asyncQueue));
+	second1.enable();
+	second1.wait_until_finished();
+	gdul::batch_job second2(m_handler.make_batch_job(secondCollection, gdul::delegate<bool(int&)>([](int& elem) {elem = 10; return rand() % 2; }), &m_asyncQueue, "second2"));
+	second2.enable();
+	second2.wait_until_finished();
+	gdul::batch_job second3(m_handler.make_batch_job(secondCollection, gdul::delegate<bool(int&)>([](int& elem) {elem = 10; return rand() % 2; }), &m_asyncQueue, 3));
+	second3.enable();
+	second3.wait_until_finished();
+	gdul::batch_job second4(m_handler.make_batch_job(secondCollection, gdul::delegate<bool(int&)>([](int& elem) {elem = 10; return rand() % 2; }), &m_asyncQueue, 4, "second4"));
+	second4.enable();
+	second4.wait_until_finished();
 
 	assert(secondCollection.size() != 0 && secondCollection.size() != 100 && "Size should *probably* be somewhere inbetween");
 
@@ -73,9 +91,18 @@ void job_handler_tester::basic_tests()
 	for (auto i = 0; i < thirdCollection.size(); ++i)
 		thirdCollection[i] = i;
 
-	gdul::batch_job third(m_handler.make_batch_job(thirdCollection, thirdOutCollection, gdul::delegate<bool(int&, int&)>([](int& in, int& out) { out = in; return true; }), &m_asyncQueue));
-	third.enable();
-	third.wait_until_finished();
+	gdul::batch_job third1(m_handler.make_batch_job(thirdCollection, thirdOutCollection, gdul::delegate<bool(int&, int&)>([](int& in, int& out) { out = in; return true; }), &m_asyncQueue));
+	third1.enable();
+	third1.wait_until_finished();
+	gdul::batch_job third2(m_handler.make_batch_job(thirdCollection, thirdOutCollection, gdul::delegate<bool(int&, int&)>([](int& in, int& out) { out = in; return true; }), &m_asyncQueue, "third2"));
+	third2.enable();
+	third2.wait_until_finished();
+	gdul::batch_job third3(m_handler.make_batch_job(thirdCollection, thirdOutCollection, gdul::delegate<bool(int&, int&)>([](int& in, int& out) { out = in; return true; }), &m_asyncQueue, 3));
+	third3.enable();
+	third3.wait_until_finished();
+	gdul::batch_job third4(m_handler.make_batch_job(thirdCollection, thirdOutCollection, gdul::delegate<bool(int&, int&)>([](int& in, int& out) { out = in; return true; }), &m_asyncQueue, 4, "third4"));
+	third4.enable();
+	third4.wait_until_finished();
 
 	for (auto i = 0; i < thirdOutCollection.size(); ++i)
 		assert(thirdOutCollection[i] == i);
@@ -189,45 +216,6 @@ float job_handler_tester::run_consumption_strand_parallel_test(std::size_t jobs,
 	return time.get();
 }
 
-float job_handler_tester::run_construction_parallel_test(std::size_t jobs, float overDuration)
-{
-	jobs; overDuration;
-
-	// Hmm still something about concurrency when depending on other job during possible moving operation... Argh. Needs ASP ?
-	// Reset
-	// Init ( 1 threads )
-
-	// Create root
-
-	// 2 threads building trees
-	// 6 threads building jobs depending on latest in each tree
-	// Create end
-
-	// Enable root
-	// Wait for end
-	return 0.0f;
-}
-
-float job_handler_tester::run_mixed_parallel_test(std::size_t jobs, float overDuration)
-{
-	jobs; overDuration;
-
-	// Reset
-	// Init ( max threads )
-
-	// Create root
-	// Enable root
-
-	// 2 threads building trees
-	// 6 threads building jobs depending on latest in each tree
-
-	// Create end
-
-	// Wait for end
-
-	return 0.0f;
-}
-
 float job_handler_tester::run_consumption_strand_test(std::size_t jobs, float /*overDuration*/)
 {
 	auto last = [this]() {m_work.end_work();  std::cout << "Finished run_consumption_strand_test." << std::endl;};
@@ -258,9 +246,13 @@ float job_handler_tester::run_consumption_strand_test(std::size_t jobs, float /*
 	return time.get();
 }
 
-void job_handler_tester::run_scatter_test_input_output(std::size_t arraySize, std::size_t stepSize, float& outBestBatchTime, std::size_t& outBestBatchSize)
+void job_handler_tester::run_predictive_scheduling_test()
 {
-	arraySize; stepSize; outBestBatchSize; outBestBatchTime;
+}
+
+void job_handler_tester::run_scatter_test_input_output(std::size_t arraySize, std::size_t stepSize, float& outBestBatchTime)
+{
+	arraySize; stepSize; outBestBatchTime;
 	std::uninitialized_fill(m_scatterOutput.begin(), m_scatterOutput.end(), nullptr);
 	
 	const std::size_t passes((arraySize / stepSize) / 5);
@@ -282,8 +274,6 @@ void job_handler_tester::run_scatter_test_input_output(std::size_t arraySize, st
 		delegate<bool(int*&, int*&)> process(&work_tracker::scatter_process, &m_work);	
 		gdul::batch_job scatter(m_handler.make_batch_job(m_scatterInput, m_scatterOutput, std::move(process), &m_asyncQueue));
 	
-		//scatter.activate_job_tracking("batch job test");
-
 		float result(0.f);
 		job endJob(m_handler.make_job([&time, &result, this]() { result = time.get(); }, &m_asyncQueue, "batch post job"));
 		endJob.depends_on(scatter);
@@ -304,10 +294,9 @@ void job_handler_tester::run_scatter_test_input_output(std::size_t arraySize, st
 	
 	const std::size_t batches(m_scatterInput.size() / batchSize + ((bool)(m_scatterInput.size() % batchSize)));
 	
-	std::cout << "Completed scatter testing. Top time/batchSize are: " << minTimes[0].first << ", " << minTimes[0].second << " -------------- " << arraySize << " array size" << std::endl;
+	std::cout << "Completed scatter testing. Top time: " << minTimes[0].first << ", " << minTimes[0].second << " -------------- " << arraySize << " array size" << std::endl;
 	
 	outBestBatchTime = minTimes[0].first;
-	outBestBatchSize = minTimes[0].second;
 }
 
 }

@@ -22,6 +22,7 @@
 #include <gdul/job_handler/job/job.h>
 #include <gdul/job_handler/job/job_impl.h>
 
+
 #if defined (GDUL_JOB_DEBUG)
 #include <Windows.h>
 #include <unordered_map>
@@ -32,12 +33,14 @@
 
 std::string executable_name()
 {
+#if defined _WIN32
 	char buffer[256];
 	if (GetModuleFileNameA(NULL, buffer, 256)) {
 		const char* cstr(buffer);
 
 		return std::filesystem::path(cstr).replace_extension().string();
 	}
+#endif
 	return std::string("Unnamed");
 }
 
@@ -58,7 +61,7 @@ job_graph::job_graph()
 
 #if defined(GDUL_JOB_DEBUG)
 	itr.first->second.m_name = "Undeclared_Root_Node";
-	itr.first->second.m_type = job_info_default;
+	itr.first->second.m_type = job_default;
 #endif
 }
 
@@ -91,7 +94,7 @@ job_info* job_graph::get_job_info(std::size_t physicalId, std::size_t variationI
 			physicalJobToInsert.m_id = physicalJob;
 #if defined (GDUL_JOB_DEBUG)
 			physicalJobToInsert.m_parent = physicalJobParent;
-			physicalJobToInsert.set_node_type(job_info_physical);
+			physicalJobToInsert.set_job_type(job_physical);
 			physicalJobToInsert.m_physicalLocation = std::filesystem::path(file).filename().string();
 			physicalJobToInsert.m_line = line;
 			std::string physicalJobName;
@@ -118,9 +121,9 @@ job_info* job_graph::get_job_info(std::size_t physicalId, std::size_t variationI
 	return &itr->second;
 }
 #if defined (GDUL_JOB_DEBUG)
-job_info* job_graph::get_job_info_sub(std::size_t batchId, std::size_t variationId, const char* name)
+job_info* job_graph::get_sub_job_info(std::size_t batchId, std::size_t variationId, const char* name)
 #else
-job_info* job_graph::get_job_info_sub(std::size_t batchId, std::size_t variationId)
+job_info* job_graph::get_sub_job_info(std::size_t batchId, std::size_t variationId)
 #endif
 {
 	const std::size_t batchSubJobVariation(batchId + Variation_Offset + variationId);
@@ -133,10 +136,9 @@ job_info* job_graph::get_job_info_sub(std::size_t batchId, std::size_t variation
 		batchSubJobToInsert.m_id = batchSubJobVariation;
 
 #if defined (GDUL_JOB_DEBUG)
-
 		decltype(m_map)::const_iterator parentItr(m_map.find(batchId));
 
-		batchSubJobToInsert.m_parent = batchSubJobVariation;
+		batchSubJobToInsert.m_parent = batchId;
 		batchSubJobToInsert.m_name = name;
 		batchSubJobToInsert.m_physicalLocation = parentItr->second.physical_location();
 		batchSubJobToInsert.m_line = parentItr->second.line();
@@ -170,8 +172,8 @@ void job_graph::dump_job_graph(const char* location)
 	std::unordered_map<std::uint64_t, std::size_t> childCounter;
 
 	for (auto& node : nodes) {
-		if (node.get_node_type() == job_info_default ||
-			node.get_node_type() == job_info_batch) {
+		if (node.get_node_type() == job_default ||
+			node.get_node_type() == job_batch) {
 			++childCounter[node.parent()];
 		}
 	}
@@ -216,8 +218,8 @@ void write_dgml_node(const job_info& node, const std::unordered_map<std::uint64_
 
 	auto nodeType = node.get_node_type();
 
-	if (nodeType == job_info_physical ||
-		nodeType == job_info_batch) {
+	if (nodeType == job_physical ||
+		nodeType == job_batch) {
 		auto itr = childCounter.find(node.id());
 		if (itr != childCounter.end() && itr->second < 30)
 			bufferString.append(" Group=\"Expanded\"");
@@ -233,8 +235,8 @@ void write_dgml_node(const job_info& node, const std::unordered_map<std::uint64_
 	bufferString.clear();
 	bufferString.append("<Link");
 
-	if (nodeType == job_info_default ||
-		nodeType == job_info_batch) {
+	if (nodeType == job_default ||
+		nodeType == job_batch) {
 		bufferString.append(" Category=\"Contains\"");
 	}
 

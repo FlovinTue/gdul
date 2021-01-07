@@ -29,9 +29,13 @@ namespace gdul
 {
 namespace jh_detail
 {
-gdul::job _redirect_make_job(job_handler * handler, gdul::delegate<void()>&& workUnit, job_queue* target)
+gdul::job _redirect_make_job(job_handler_impl* handler, gdul::delegate<void()>&& workUnit, job_queue* target, std::size_t batchId, std::size_t variationId, [[maybe_unused]] const char* name)
 {
-	return handler->make_job(std::move(workUnit), target);
+#if defined (GDUL_JOB_DEBUG)
+	return handler->make_sub_job_internal(std::move(workUnit), target, batchId, variationId, name);
+#else
+	return handler->make_sub_job_internal(std::move(workUnit), target, batchId, variationId);
+#endif
 }
 bool _redirect_enable_if_ready(gdul::shared_ptr<job_impl>& jb)
 {
@@ -46,9 +50,13 @@ bool _redirect_is_enabled(const gdul::shared_ptr<job_impl>& jb)
 {
 	return jb->is_enabled();
 }
-void _redirect_set_info(shared_ptr<job_handler_impl>& handler, gdul::shared_ptr<job_impl>& jb, std::size_t physicalId, std::size_t variationId, const char* name)
+void _redirect_set_info(shared_ptr<job_handler_impl>& handler, gdul::shared_ptr<job_impl>& jb, std::size_t physicalId, std::size_t variationId, [[maybe_unused]] const char* name)
 {
-	jb->set_info(handler->get_job_graph().get_job_info_sub(physicalId, variationId, name));
+#if defined (GDUL_JOB_DEBUG)
+	jb->set_info(handler->get_job_graph().get_sub_job_info(physicalId, variationId, name));
+#else
+	jb->set_info(handler->get_job_graph().get_sub_job_info(physicalId, variationId));
+#endif
 }
 }
 }

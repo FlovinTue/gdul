@@ -21,6 +21,7 @@
 #include <thread>
 
 #include <gdul/job_handler/job_handler_utility.h>
+#include <gdul/job_handler/job_queue.h>
 
 #if defined(_WIN64) | defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
@@ -87,6 +88,16 @@ thread_handle create_thread_handle()
 void close_thread_handle(thread_handle handle)
 {
 	CloseHandle(handle);
+}
+std::size_t to_batch_size(std::size_t inputSize, job_queue* target)
+{
+	const std::uint8_t queueAssignees(target->m_assignees.load(std::memory_order_relaxed));
+	const std::uint8_t div(queueAssignees ? queueAssignees : 1);
+	const std::uint8_t offset(div * 2);
+
+	const std::size_t desiredSize(inputSize / offset);
+
+	return desiredSize ? desiredSize : 1;
 }
 #else
 void set_thread_name(const char*)

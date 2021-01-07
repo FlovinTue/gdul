@@ -30,11 +30,10 @@ public:
 
 	float run_consumption_parallel_test(std::size_t jobs, float overDuration);
 	float run_consumption_strand_parallel_test(std::size_t jobs, float overDuration);
-	float run_construction_parallel_test(std::size_t jobs, float overDuration);
-	float run_mixed_parallel_test(std::size_t jobs, float overDuration);
 	float run_consumption_strand_test(std::size_t jobs, float overDuration);
 
-	void run_scatter_test_input_output(std::size_t arraySize, std::size_t stepSize, float& outBestBatchTime, std::size_t& bestBatchSize);
+	void run_predictive_scheduling_test();
+	void run_scatter_test_input_output(std::size_t arraySize, std::size_t stepSize, float& outBestBatchTime);
 
 	job_handler_tester_info m_info;
 

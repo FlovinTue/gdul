@@ -23,18 +23,15 @@ int main()
 
 		const uint32_t scatterRuns(100);
 		float scatterTimeAccum(0.f);
-		std::size_t scatterBatchAccum(0);
 
 		for (uint32_t i = 0; i < scatterRuns; ++i) {
 			std::size_t arraySize(1500), batchSize(10);
-			std::size_t bestBatchSize(0);
 			float bestBatchTime(0.f);
-			tester.run_scatter_test_input_output(arraySize, batchSize, bestBatchTime, bestBatchSize);
+			tester.run_scatter_test_input_output(arraySize, batchSize, bestBatchTime);
 			scatterTimeAccum += bestBatchTime;
-			scatterBatchAccum += bestBatchSize;
 		}
 
-		std::cout << "Best time / batchsize average: " << scatterTimeAccum / scatterRuns << ", " << scatterBatchAccum / scatterRuns << std::endl;
+		std::cout << "Best time: " << scatterTimeAccum / scatterRuns << std::endl;
 
 		for (uint32_t i = 0; i < 5; ++i) {
 			tester.run_consumption_strand_parallel_test(1500, 1.0f);

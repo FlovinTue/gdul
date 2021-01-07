@@ -33,11 +33,11 @@ namespace gdul
 namespace jh_detail
 {
 #if defined (GDUL_JOB_DEBUG)
-enum job_info_type : std::uint8_t
+enum job_type : std::uint8_t
 {
-	job_info_default,
-	job_info_batch,
-	job_info_physical,
+	job_default,
+	job_batch,
+	job_physical,
 };
 #endif
 struct job_info
@@ -53,8 +53,8 @@ struct job_info
 #if defined(GDUL_JOB_DEBUG)
 	std::size_t parent() const;
 
-	void set_node_type(job_info_type type);
-	job_info_type get_node_type() const;
+	void set_job_type(job_type type);
+	job_type get_node_type() const;
 
 	const std::string& name() const;
 	const std::string& physical_location() const;
@@ -86,7 +86,7 @@ private:
 #if defined(GDUL_JOB_DEBUG)
 	std::size_t m_parent;
 
-	job_info_type m_type;
+	job_type m_type;
 #endif
 };
 }

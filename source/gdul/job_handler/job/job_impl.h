@@ -75,10 +75,6 @@ public:
 	bool is_enabled() const noexcept;
 	bool is_ready() const noexcept;
 
-#if defined GDUL_JOB_DEBUG
-	void on_enqueue() noexcept;
-#endif
-
 	void work_until_finished(job_queue* consumeFrom);
 	void work_until_ready(job_queue* consumeFrom);
 	void wait_until_finished() noexcept;
@@ -89,6 +85,10 @@ public:
 	std::size_t get_id() const noexcept;
 
 	void set_info(job_info* info);
+
+#if defined GDUL_JOB_DEBUG
+	void on_enqueue() noexcept;
+#endif
 
 private:
 	void detach_children();

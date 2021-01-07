@@ -68,7 +68,6 @@ public:
 	void set_run_on_disable(delegate<void()> && toCall);
 
 	void add_assignment(job_queue* queue);
-	void clear_assignments();
 
 	void on_enable();
 	void on_disable();

@@ -59,7 +59,6 @@ public:
 	/// </summary>
 	/// <param name="queue">Source queue</param>
 	void add_assignment(job_queue* queue);
-	void clear_assignments();
 
 	void enable();
 	bool disable();

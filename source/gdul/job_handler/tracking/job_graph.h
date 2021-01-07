@@ -37,13 +37,13 @@ public:
 
 #if defined (GDUL_JOB_DEBUG)
 	job_info* get_job_info(std::size_t physicalId, std::size_t variationId, const char * name, const char* file, std::uint32_t line);
-	job_info* get_job_info_sub(std::size_t batchId, std::size_t variationId, const char* name);
+	job_info* get_sub_job_info(std::size_t batchId, std::size_t variationId, const char* name);
 
 	void dump_job_graph(const char* location);
 	void dump_job_time_sets(const char* location);
 #else
 	job_info* get_job_info(std::size_t physicalId, std::size_t variationId);
-	job_info* get_job_info_sub(std::size_t batchId, std::size_t variationId);
+	job_info* get_sub_job_info(std::size_t batchId, std::size_t variationId);
 #endif
 
 private:

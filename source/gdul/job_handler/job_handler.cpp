@@ -96,4 +96,12 @@ pool_allocator<jh_detail::dummy_batch_type> job_handler::get_batch_job_allocator
 {
 	return m_impl->get_batch_job_allocator();
 }
+jh_detail::job_info* job_handler::get_job_info(std::size_t physicalId, std::size_t variationId, [[maybe_unused]] const char* dbgName, [[maybe_unused]] const char* dbgFile, [[maybe_unused]] std::uint32_t line)
+{
+#if defined (GDUL_JOB_DEBUG)
+	return m_impl->get_job_graph().get_job_info(physicalId, variationId, dbgName, dbgFile, line);
+#else
+	return m_impl->get_job_graph().get_job_info(physicalId, variationId);
+#endif
+}
 }

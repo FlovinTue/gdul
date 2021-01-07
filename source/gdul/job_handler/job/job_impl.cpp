@@ -53,14 +53,12 @@ void job_impl::operator()()
 	assert(!m_finished);
 
 #if defined (GDUL_JOB_DEBUG)
-	//const std::size_t swap(job::this_job.m_persistentId);
 	if (m_info) {
 		m_info->m_enqueueTimeSet.log_time(m_enqueueTimer.get());
-		//job::this_job.m_persistentId = m_persistentId;
 	}
 #endif
 
-	timer completionTimer;
+	const timer completionTimer;
 
 	m_workUnit();
 
@@ -69,8 +67,6 @@ void job_impl::operator()()
 #if defined(GDUL_JOB_DEBUG)
 	if (m_info)
 		m_info->m_completionTimeSet.log_time(completionTimer.get());
-
-	//job::this_job.m_persistentId = swap;
 #endif
 
 	m_finished.store(true, std::memory_order_seq_cst);

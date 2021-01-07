@@ -104,6 +104,20 @@ job job_handler_impl::make_job_internal(delegate<void()>&& workUnit, job_queue* 
 
 	return job(jobImpl);
 }
+job job_handler_impl::make_sub_job_internal(delegate<void()>&& workUnit, job_queue* target, std::size_t batchId, std::size_t variationId, const char* name)
+{
+	pool_allocator<job_impl> alloc(m_jobImplMemPool.create_allocator<job_impl>());
+
+	job_impl_shared_ptr jobImpl(gdul::allocate_shared<job_impl>
+		(
+			alloc,
+			std::forward<delegate<void()>>(workUnit),
+			this,
+			target,
+			m_jobGraph.get_sub_job_info(batchId, variationId, name)));
+
+	return job(jobImpl);
+}
 #else
 job job_handler_impl::make_job_internal(delegate<void()>&& workUnit, job_queue* target, std::size_t physicalId, std::size_t variationId)
 {
@@ -116,6 +130,20 @@ job job_handler_impl::make_job_internal(delegate<void()>&& workUnit, job_queue* 
 			this,
 			target,
 			m_jobGraph.get_job_info(physicalId, variationId)));
+
+	return job(jobImpl);
+}
+job job_handler_impl::make_sub_job_internal(delegate<void()>&& workUnit, job_queue* target, std::size_t batchId, std::size_t variationId)
+{
+	pool_allocator<job_impl> alloc(m_jobImplMemPool.create_allocator<job_impl>());
+
+	job_impl_shared_ptr jobImpl(gdul::allocate_shared<job_impl>
+		(
+			alloc,
+			std::forward<delegate<void()>>(workUnit),
+			this,
+			target,
+			m_jobGraph.get_sub_job_info(batchId, variationId)));
 
 	return job(jobImpl);
 }

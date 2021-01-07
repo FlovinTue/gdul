@@ -33,6 +33,7 @@
 
 namespace gdul
 {
+class job_queue;
 
 typedef void* thread_handle;
 
@@ -62,5 +63,6 @@ void set_thread_priority(std::int32_t priority, thread_handle handle);
 void set_thread_core_affinity(std::uint8_t core, thread_handle handle);
 thread_handle create_thread_handle();
 void close_thread_handle(thread_handle handle);
+std::size_t to_batch_size(std::size_t inputSize, job_queue* target);
 }
 }

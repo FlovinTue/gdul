@@ -174,9 +174,8 @@ void worker_impl::add_assignment(job_queue* queue)
 	m_targets[ix] = queue;
 
 	m_queueCount++;
-}
-void worker_impl::clear_assignments()
-{
+
+	queue->m_assignees.fetch_add(1, std::memory_order_relaxed);
 }
 void worker_impl::on_enable()
 {
