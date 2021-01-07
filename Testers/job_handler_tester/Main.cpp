@@ -61,7 +61,5 @@ int main()
 
 	std::cout << "Final allocated: " << gdul::s_allocated << std::endl;
 
-	std::cout << "Hello World!\n";
-
-
+	std::cin.get();
 }

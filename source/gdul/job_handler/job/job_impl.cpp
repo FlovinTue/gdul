@@ -23,7 +23,6 @@
 #include <gdul/job_handler/job_handler.h>
 #include <gdul/job_handler/worker/worker.h>
 #include <gdul/job_handler/job_queue.h>
-#include <gdul/job_handler/job/job_node.h>
 #include "job_impl.h"
 
 namespace gdul {
@@ -215,18 +214,22 @@ void job_impl::set_info(job_info* info)
 }
 void job_impl::detach_children()
 {
-	job_node_shared_ptr dependee(m_headDependee.exchange(job_node_shared_ptr(nullptr), std::memory_order_relaxed));
+	detach_next(m_headDependee.exchange(job_node_shared_ptr(nullptr), std::memory_order_relaxed));
+}
+void job_impl::detach_next(job_node_shared_ptr from)
+{
+	if (!from) {
+		return;
+	}
 
-	while (dependee) {
-		job_node_shared_ptr next(std::move(dependee->m_next));
+	job_impl_shared_ptr dependant(std::move(from->m_job));
 
-		if (!dependee->m_job->remove_dependencies(1)) {
-			job_queue* const target(dependee->m_job->get_target());
+	detach_next(std::move(from->m_next));
 
-			target->submit_job(std::move(dependee->m_job));
-		}
+	if (!dependant->remove_dependencies(1)) {
+		job_queue* const target(dependant->get_target());
 
-		dependee = std::move(next);
+		target->submit_job(std::move(dependant));
 	}
 }
 #if defined(GDUL_JOB_DEBUG)

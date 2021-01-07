@@ -23,10 +23,12 @@
 #pragma warning(disable : 4324)
 
 #include <gdul/job_handler/job_handler_utility.h>
-#include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
-#include <gdul/delegate/delegate.h>
 #include <gdul/job_handler/tracking/job_graph.h>
 #include <gdul/job_handler/tracking/timer.h>
+#include <gdul/job_handler/job/job_node.h>
+
+#include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
+#include <gdul/delegate/delegate.h>
 
 namespace gdul {
 class job_queue;
@@ -92,6 +94,7 @@ public:
 
 private:
 	void detach_children();
+	void detach_next(job_node_shared_ptr from);
 
 	job_info* m_info;
 

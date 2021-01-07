@@ -37,15 +37,15 @@ public:
 
 	job_handler_tester_info m_info;
 
+	gdul::job_async_queue m_asyncQueue;
+	gdul::job_sync_queue m_syncQueue;
+
 	gdul::job_handler m_handler;
 
 	gdul::work_tracker m_work;
 
 	std::vector<int*> m_scatterInput;
 	std::vector<int*> m_scatterOutput;
-
-	gdul::job_async_queue m_asyncQueue;
-	gdul::job_sync_queue m_syncQueue;
 };
 
 }
