@@ -169,25 +169,26 @@ Supports (partial or full) binding of arguments in its constructor. The amount o
 
 -------------------------------------------------------------------------------------------------------------------------------------------
 ## job_handler
-A job system
 
-Main features would be:
+* Features a built in mechanism to take advantage of the finite nature of frame-bound jobs, continusly promoting parallelism.
 * Supports (multiple) job dependencies. (if job 'first' depends on job 'second' then 'first' will not be enqueued for consumption until 'second' has completed) 
-* Keeps multiple internal job queues (number defined by gdul::job_queue_count enum value), with workers consuming from the further-back queues less frequently (range of consumption is definable).
+* Workers are flexibly assigned to user-declared job queues
 * Has three types of batch_job (splits an array of items combined with a processing delegate over multiple jobs). 
 * Job relationship graph may be dumped to file for viewing
 * Job profiling info may be dumped for viewing
 
 Job tracking instructions: 
 - make sure GDUL_JOB_DEBUG is defined in globals.h
-- for each job taking part in the tracking, call activate_job_tracking(name)
 
-- dump job graph using job_tracker::dump_job_tree(location)
-- dump job time sets using job_tracker::dump_job_time_sets(location) 
+- dump job graph using job_handler::dump_job_graph(location)
+- dump job time sets using job_handler::dump_job_time_sets(location) 
 
 - graph may be viewed using the Visual Studio dgml extension. 
 - job time sets may be viewed in the small C# app job_time_set_view located in the source folder
 
+To take advantage of predictive scheduling:
+There are two kinds of job queues job_async_queue and job_sync_queue. To allow for job reordering, simply use job_sync_queue. Do note that this is not intended for asynchronous jobs like file loading etc, and if used for such undesired reordering may occur.
+This will help promote parallelism in scenarios where complex dependency graps exist with multiple jobs waiting for execution.
 
 A quick usage example for job:
 ```
