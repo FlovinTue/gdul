@@ -33,8 +33,6 @@ namespace jh_detail {
 
 class job_handler_impl;
 class job_impl;
-struct job_info;
-class job_graph;
 class worker_impl;
 
 template <class InContainer, class OutContainer, class Process>
@@ -55,7 +53,7 @@ public:
 	void depends_on(job& dependency);
 	void depends_on(batch_job& dependency);
 
-	// this object may be discarded once enable() has been invoked
+	// this object may be discarded once enable has been invoked
 	bool enable() noexcept;
 	bool enable_locally_if_ready() noexcept;
 
@@ -82,6 +80,7 @@ private:
 	friend class jh_detail::worker_impl;
 	template <class InContainer, class OutContainer, class Process>
 	friend class jh_detail::batch_job_impl;
+	friend class jh_detail::job_impl;
 	friend class jh_detail::job_handler_impl;
 
 	job(gdul::shared_ptr<jh_detail::job_impl> impl) noexcept;

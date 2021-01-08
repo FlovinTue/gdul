@@ -33,8 +33,13 @@ job_impl::job_impl()
 {
 }
 job_impl::job_impl(delegate<void()>&& workUnit, job_handler_impl* handler, job_queue* target, job_info* info)
-	: m_info(info)
-	, m_workUnit(std::forward<delegate<void()>>(workUnit))
+	: m_workUnit(std::forward<delegate<void()>>(workUnit))
+	, m_info(info)
+	, m_completionTimer()
+	, m_dependantTimer()
+#if defined (GDUL_JOB_DEBUG)
+	, m_enqueueTimer()
+#endif
 	, m_finished(false)
 	, m_headDependee(nullptr)
 	, m_handler(handler)
@@ -53,19 +58,19 @@ void job_impl::operator()()
 
 #if defined (GDUL_JOB_DEBUG)
 	if (m_info) {
-		m_info->m_enqueueTimeSet.log_time(m_enqueueTimer.get());
+		m_info->m_enqueueTimeSet.log_time(m_enqueueTimer.elapsed());
 	}
 #endif
 
-	const timer completionTimer;
+	m_completionTimer.start();
 
 	m_workUnit();
 
-	m_info->store_accumulated_priority(completionTimer.get());
+	m_info->store_runtime(m_completionTimer.elapsed());
 
 #if defined(GDUL_JOB_DEBUG)
 	if (m_info)
-		m_info->m_completionTimeSet.log_time(completionTimer.get());
+		m_info->m_completionTimeSet.log_time(m_completionTimer.elapsed());
 #endif
 
 	m_finished.store(true, std::memory_order_seq_cst);
@@ -74,7 +79,7 @@ void job_impl::operator()()
 }
 bool job_impl::try_attach_child(job_impl_shared_ptr child)
 {
-	m_info->accumulate_priority(child->get_priority());
+	m_info->accumulate_runtime(child->get_remaining_accumulated_runtime());
 
 	pool_allocator<job_node> alloc(m_handler->get_job_node_allocator());
 
@@ -121,6 +126,8 @@ enable_result job_impl::enable() noexcept
 
 	while (!(exp < Job_Enable_Dependencies)) {
 		if (m_dependencies.compare_exchange_weak(exp, exp - Job_Enable_Dependencies, std::memory_order_relaxed)) {
+			m_dependantTimer.start();
+
 			std::uint8_t result(enable_result_enabled);
 			result |= enable_result_enqueue * !(exp - Job_Enable_Dependencies);
 			return (enable_result)result;
@@ -158,7 +165,9 @@ bool job_impl::is_ready() const noexcept
 }
 void job_impl::work_until_finished(job_queue* consumeFrom)
 {
-	m_info->accumulate_priority(job::this_job.priority());
+	if (job::this_job) {
+		m_info->accumulate_runtime(job::this_job.m_impl->get_remaining_accumulated_runtime());
+	}
 
 	GDUL_JOB_DEBUG_CONDTIONAL(timer waitTimer)
 		while (!is_finished()) {
@@ -167,10 +176,13 @@ void job_impl::work_until_finished(job_queue* consumeFrom)
 				jh_detail::job_handler_impl::t_items.this_worker_impl->idle();
 			}
 		}
-	GDUL_JOB_DEBUG_CONDTIONAL(if (m_info) m_info->m_waitTimeSet.log_time(waitTimer.get()))
+	GDUL_JOB_DEBUG_CONDTIONAL(if (m_info) m_info->m_waitTimeSet.log_time(waitTimer.elapsed()))
 }
 void job_impl::work_until_ready(job_queue* consumeFrom)
 {
+	if (job::this_job) {
+		m_info->accumulate_runtime(job::this_job.m_impl->get_remaining_dependant_runtime());
+	}
 	GDUL_JOB_DEBUG_CONDTIONAL(timer waitTimer)
 		while (!is_ready() && !is_enabled()) {
 			if (!worker::this_worker.m_impl->try_consume_from_once(consumeFrom)) {
@@ -178,31 +190,41 @@ void job_impl::work_until_ready(job_queue* consumeFrom)
 				jh_detail::job_handler_impl::t_items.this_worker_impl->idle();
 			}
 		}
-	GDUL_JOB_DEBUG_CONDTIONAL(if (m_info) m_info->m_waitTimeSet.log_time(waitTimer.get()))
+	GDUL_JOB_DEBUG_CONDTIONAL(if (m_info) m_info->m_waitTimeSet.log_time(waitTimer.elapsed()))
 }
 void job_impl::wait_until_finished() noexcept
 {
-	m_info->accumulate_priority(job::this_job.priority());
+	if (job::this_job) {
+		m_info->accumulate_runtime(job::this_job.m_impl->get_remaining_accumulated_runtime());
+	}
 
 	GDUL_JOB_DEBUG_CONDTIONAL(timer waitTimer)
 		while (!is_finished()) {
 			jh_detail::job_handler_impl::t_items.this_worker_impl->refresh_sleep_timer();
 			jh_detail::job_handler_impl::t_items.this_worker_impl->idle();
 		}
-	GDUL_JOB_DEBUG_CONDTIONAL(if (m_info) m_info->m_waitTimeSet.log_time(waitTimer.get()))
+	GDUL_JOB_DEBUG_CONDTIONAL(if (m_info) m_info->m_waitTimeSet.log_time(waitTimer.elapsed()))
 }
 void job_impl::wait_until_ready() noexcept
 {
+	if (job::this_job) {
+		m_info->accumulate_runtime(job::this_job.m_impl->get_remaining_dependant_runtime());
+	}
+
 	GDUL_JOB_DEBUG_CONDTIONAL(timer waitTimer)
 		while (!is_ready() && !is_enabled()) {
 			jh_detail::job_handler_impl::t_items.this_worker_impl->refresh_sleep_timer();
 			jh_detail::job_handler_impl::t_items.this_worker_impl->idle();
 		}
-	GDUL_JOB_DEBUG_CONDTIONAL(if (m_info) m_info->m_waitTimeSet.log_time(waitTimer.get()))
+	GDUL_JOB_DEBUG_CONDTIONAL(if (m_info) m_info->m_waitTimeSet.log_time(waitTimer.elapsed()))
 }
-float job_impl::get_priority() const noexcept
+float job_impl::get_remaining_accumulated_runtime() const noexcept
 {
-	return m_info->get_priority();
+	return m_info->get_dependant_runtime() + m_info->get_runtime() - m_completionTimer.elapsed();
+}
+float job_impl::get_remaining_dependant_runtime() const noexcept
+{
+	return m_info->get_dependant_runtime() - m_dependantTimer.elapsed();
 }
 std::size_t job_impl::get_id() const noexcept
 {
@@ -232,7 +254,7 @@ void job_impl::detach_next(job_node_shared_ptr from)
 		target->submit_job(std::move(dependant));
 	}
 }
-#if defined(GDUL_JOB_DEBUG)
+#if defined (GDUL_JOB_DEBUG)
 void job_impl::on_enqueue() noexcept
 {
 	m_enqueueTimer.reset();

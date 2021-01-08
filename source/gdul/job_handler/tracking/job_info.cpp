@@ -19,7 +19,7 @@
 // SOFTWARE.
 
 #include <gdul/job_handler/tracking/job_info.h>
-
+#include <memory>
 
 namespace gdul
 {
@@ -27,33 +27,63 @@ namespace jh_detail
 {
 job_info::job_info()
 	: m_id(0)
-	, m_lastPriorityAccum(0.f)
-	, m_priorityAccum(0.f)
-#if !defined (GDUL_JOB_DEBUG)
-	, m_lastCompletionTime(0.f)
-#else
+	, m_lastAccumulatedRuntime(0.f)
+	, m_accumulatedRuntime(0.f)
+	, m_runtime(0.f)
+
+#if defined(GDUL_JOB_DEBUG)
 	, m_parent(0)
 	, m_type(job_default)
 	, m_line(0)
 #endif
 {
 }
-void job_info::accumulate_priority(float priority)
+job_info::job_info(job_info&& other)
 {
-	if (m_priorityAccum < priority)
-		m_priorityAccum = priority;
+	operator=(other);
+}
+job_info::job_info(const job_info& other)
+{
+	operator=(other);
+}
+job_info& job_info::operator=(job_info&& other)
+{
+	operator=(other);
+	return *this;
+}
+job_info& job_info::operator=(const job_info& other)
+{
+	std::memcpy(this, &other, sizeof(job_info));
+	return *this;
+}
+void job_info::accumulate_runtime(float priority)
+{
+	float priorityAccumulation(m_accumulatedRuntime.load(std::memory_order_relaxed));
+	if (priorityAccumulation < priority) {
+		m_accumulatedRuntime.compare_exchange_strong(priorityAccumulation, priority, std::memory_order_relaxed);
+	}
 }
 
-void job_info::store_accumulated_priority(float lastCompletionTime)
+void job_info::store_runtime(float runtime)
 {
-	m_lastCompletionTime = lastCompletionTime;
+	m_runtime = runtime;
 
-	const float priorityAccumulation(m_priorityAccum);
+	constexpr float min(std::numeric_limits<float>::min());
 
-	if (priorityAccumulation != 0.f) {
-		m_lastPriorityAccum = priorityAccumulation;
-		m_priorityAccum = 0.f;
+	float priorityAccumulation(m_accumulatedRuntime.exchange(min, std::memory_order_relaxed));
+
+	if (priorityAccumulation != min) {
+		m_lastAccumulatedRuntime.store(priorityAccumulation, std::memory_order_relaxed);
+		m_accumulatedRuntime.compare_exchange_strong(priorityAccumulation, min, std::memory_order_relaxed);
 	}
+}
+float job_info::get_dependant_runtime() const
+{
+	return m_lastAccumulatedRuntime.load(std::memory_order_relaxed);
+}
+float job_info::get_runtime() const
+{
+	return m_runtime;
 }
 std::size_t job_info::id() const
 {
@@ -61,10 +91,6 @@ std::size_t job_info::id() const
 }
 
 #if defined(GDUL_JOB_DEBUG)
-float job_info::get_priority() const
-{
-	return m_lastPriorityAccum + m_completionTimeSet.get_avg();
-}
 std::size_t job_info::parent() const
 {
 	return m_parent;
@@ -92,11 +118,6 @@ const std::string& job_info::physical_location() const
 std::uint32_t job_info::line() const
 {
 	return m_line;
-}
-#else
-float job_info::get_priority() const
-{
-	return m_lastPriorityAccum + m_lastCompletionTime;
 }
 #endif
 

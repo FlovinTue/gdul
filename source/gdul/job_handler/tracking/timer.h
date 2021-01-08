@@ -30,13 +30,16 @@ class timer
 {
 public:
 	timer();
-	float get() const;
+	float elapsed() const;
 
 	void reset();
+	void start();
+
+	static const std::chrono::high_resolution_clock s_clock;
 
 private:
-	const std::chrono::high_resolution_clock m_clock;
 	std::chrono::high_resolution_clock::time_point m_fromTime;
+	bool m_running;
 };
 }
 }

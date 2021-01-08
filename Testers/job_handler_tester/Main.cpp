@@ -19,29 +19,29 @@ int main()
 
 		tester.init(info);
 
-		tester.basic_tests();
+		//tester.basic_tests();
 
-		const uint32_t scatterRuns(20);
-		float scatterTimeAccum(0.f);
+		//const uint32_t scatterRuns(20);
+		//float scatterTimeAccum(0.f);
 
-		for (uint32_t i = 0; i < scatterRuns; ++i) {
-			std::size_t arraySize(1500), batchSize(10);
-			float bestBatchTime(0.f);
-			tester.run_scatter_test_input_output(arraySize, batchSize, bestBatchTime);
-			scatterTimeAccum += bestBatchTime;
-		}
+		//for (uint32_t i = 0; i < scatterRuns; ++i) {
+		//	std::size_t arraySize(1500), batchSize(10);
+		//	float bestBatchTime(0.f);
+		//	tester.run_scatter_test_input_output(arraySize, batchSize, bestBatchTime);
+		//	scatterTimeAccum += bestBatchTime;
+		//}
 
-		std::cout << "Best time: " << scatterTimeAccum / scatterRuns << std::endl;
+		//std::cout << "Best time: " << scatterTimeAccum / scatterRuns << std::endl;
 
-		for (uint32_t i = 0; i < 5; ++i) {
-			tester.run_consumption_strand_parallel_test(1500, 1.0f);
-		}
+		//for (uint32_t i = 0; i < 5; ++i) {
+		//	tester.run_consumption_strand_parallel_test(1500, 1.0f);
+		//}
 
 		{
 			float predictiveMin(FLT_MAX);
 			float predictiveMax(-FLT_MAX);
 			float predictiveAccum(0.f);
-			const uint32_t predictiveIter(500);
+			const uint32_t predictiveIter(1000);
 			for (auto i = 0; i < predictiveIter; ++i) {
 				const float result = tester.run_predictive_scheduling_test();
 				predictiveAccum += result;

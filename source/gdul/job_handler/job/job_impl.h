@@ -82,7 +82,8 @@ public:
 	void wait_until_finished() noexcept;
 	void wait_until_ready() noexcept;
 
-	float get_priority() const noexcept;
+	float get_remaining_accumulated_runtime() const noexcept;
+	float get_remaining_dependant_runtime() const noexcept;
 
 	std::size_t get_id() const noexcept;
 
@@ -94,15 +95,18 @@ public:
 
 private:
 	void detach_children();
-	void detach_next(job_node_shared_ptr from);
+	static void detach_next(job_node_shared_ptr from);
+
+	delegate<void()> m_workUnit;
 
 	job_info* m_info;
+
+	timer m_completionTimer;
+	timer m_dependantTimer;
 
 #if defined GDUL_JOB_DEBUG
 	timer m_enqueueTimer;
 #endif
-
-	delegate<void()> m_workUnit;
 
 	job_handler_impl* const m_handler;
 	job_queue* const m_target;

@@ -43,7 +43,7 @@ public:
 
 	void depends_on(job& dependency);
 
-	// this object may be discarded once enable() has been invoked
+	// this object may be discarded once enable has been invoked
 	bool enable() noexcept;
 	bool enable_locally_if_ready();
 

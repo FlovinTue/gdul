@@ -249,9 +249,9 @@ float job_handler_tester::run_predictive_scheduling_test()
 	// The optimal execution should be parallelSplit * serialExecutionTime,
 	// However, since the forked jobs are added first, in a normal scenario
 	// the execution time should end up being (parallelSplit * serialexecutionTime) + serialExecutionTime
-	// As read now, that would be 8 * 5 seconds vs (8 * 5 seconds) + 5 seconds
+	// As read now, that would be 8 * 0.8 ms vs (8 * 0.8 ms) + 0.8 ms
 
-	const float serialExecutionTime(5.f);
+	const float serialExecutionTime(0.8f);
 	const std::size_t parallelSplit(std::thread::hardware_concurrency());
 
 	timer<float> time;
@@ -271,7 +271,7 @@ float job_handler_tester::run_predictive_scheduling_test()
 
 	job previous;
 	for (std::size_t i = 0; i < parallelSplit; ++i) {
-		job jb(m_handler.make_job(make_delegate<void()>(spinFor, serialExecutionTime), &m_syncQueue, i, std::string("Predictive Scheduling Serial# " + std::to_string(i)).c_str()));
+		job jb(m_handler.make_job(make_delegate<void()>(spinFor, serialExecutionTime), &m_syncQueue, i/*, std::string("Predictive Scheduling Serial# " + std::to_string(i)).c_str()*/));
 		jb.depends_on(previous);
 		//jb.depends_on(root);
 		dependant.depends_on(jb);

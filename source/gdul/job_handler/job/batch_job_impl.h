@@ -208,36 +208,36 @@ template<class InContainer, class OutContainer, class Process>
 inline void batch_job_impl<InContainer, OutContainer, Process>::wait_until_finished() noexcept
 {
 	GDUL_JOB_DEBUG_CONDTIONAL(timer waitTimer)
-		m_end.wait_until_finished();
-	GDUL_JOB_DEBUG_CONDTIONAL(if (m_info) m_info->m_waitTimeSet.log_time(waitTimer.get()))
+	m_end.wait_until_finished();
+	GDUL_JOB_DEBUG_CONDTIONAL(if (m_info) m_info->m_waitTimeSet.log_time(waitTimer.elapsed()))
 }
 template<class InContainer, class OutContainer, class Process>
 inline void batch_job_impl<InContainer, OutContainer, Process>::wait_until_ready() noexcept
 {
 	GDUL_JOB_DEBUG_CONDTIONAL(timer waitTimer)
-		m_root.wait_until_ready();
-	GDUL_JOB_DEBUG_CONDTIONAL(if (m_info) m_info->m_waitTimeSet.log_time(waitTimer.get()))
+	m_root.wait_until_ready();
+	GDUL_JOB_DEBUG_CONDTIONAL(if (m_info) m_info->m_waitTimeSet.log_time(waitTimer.elapsed()))
 }
 template<class InContainer, class OutContainer, class Process>
 inline void batch_job_impl<InContainer, OutContainer, Process>::work_until_finished(job_queue* consumeFrom)
 {
 	GDUL_JOB_DEBUG_CONDTIONAL(timer waitTimer)
-		m_end.work_until_finished(consumeFrom);
-	GDUL_JOB_DEBUG_CONDTIONAL(if (m_info) m_info->m_waitTimeSet.log_time(waitTimer.get()))
+	m_end.work_until_finished(consumeFrom);
+	GDUL_JOB_DEBUG_CONDTIONAL(if (m_info) m_info->m_waitTimeSet.log_time(waitTimer.elapsed()))
 }
 template<class InContainer, class OutContainer, class Process>
 inline void batch_job_impl<InContainer, OutContainer, Process>::work_until_ready(job_queue* consumeFrom)
 {
 	GDUL_JOB_DEBUG_CONDTIONAL(timer waitTimer)
-		m_root.work_until_ready(consumeFrom);
-	GDUL_JOB_DEBUG_CONDTIONAL(if (m_info) m_info->m_waitTimeSet.log_time(waitTimer.get()))
+	m_root.work_until_ready(consumeFrom);
+	GDUL_JOB_DEBUG_CONDTIONAL(if (m_info) m_info->m_waitTimeSet.log_time(waitTimer.elapsed()))
 }
 template<class InContainer, class OutContainer, class Process>
 inline bool batch_job_impl<InContainer, OutContainer, Process>::enable(const shared_ptr<batch_job_impl_interface>& selfRef) noexcept
 {
 	GDUL_JOB_DEBUG_CONDTIONAL(m_enqueueTimer.reset())
 
-		const bool result(m_root.enable());
+	const bool result(m_root.enable());
 	if (result) {
 		raw_ptr<batch_job_impl_interface> expected(nullptr);
 		m_selfRef.compare_exchange_strong(expected, selfRef, std::memory_order_relaxed);
@@ -406,7 +406,7 @@ template<class InContainer, class OutContainer, class Process>
 inline void batch_job_impl<InContainer, OutContainer, Process>::initialize()
 {
 	GDUL_JOB_DEBUG_CONDTIONAL(m_completionTimer.reset())
-		GDUL_JOB_DEBUG_CONDTIONAL(if (m_info)m_info->m_enqueueTimeSet.log_time(m_enqueueTimer.get()))
+	GDUL_JOB_DEBUG_CONDTIONAL(if (m_info)m_info->m_enqueueTimeSet.log_time(m_enqueueTimer.elapsed()))
 
 	m_output.resize(m_input.size());
 
@@ -445,17 +445,17 @@ inline void batch_job_impl<InContainer, OutContainer, Process>::finalize()
 
 	m_output.resize(get_output_size());
 
-	GDUL_JOB_DEBUG_CONDTIONAL(if (m_info)m_info->m_completionTimeSet.log_time(m_completionTimer.get()))
+	GDUL_JOB_DEBUG_CONDTIONAL(if (m_info)m_info->m_completionTimeSet.log_time(m_completionTimer.elapsed()))
 
-	m_selfRef.store(shared_ptr<batch_job_impl_interface>(), std::memory_order_relaxed);
+	const shared_ptr<batch_job_impl_interface> selfRef(m_selfRef.unsafe_exchange(shared_ptr<batch_job_impl_interface>(nullptr), std::memory_order_relaxed));
 }
 template<class InContainer, class OutContainer, class Process>
 template <class U, std::enable_if_t<U::Specialize_Update>*>
 inline void batch_job_impl<InContainer, OutContainer, Process>::finalize()
 {
-	GDUL_JOB_DEBUG_CONDTIONAL(if (m_info)m_info->m_completionTimeSet.log_time(m_completionTimer.get()))
+	GDUL_JOB_DEBUG_CONDTIONAL(if (m_info)m_info->m_completionTimeSet.log_time(m_completionTimer.elapsed()))
 
-	m_selfRef.store(shared_ptr<batch_job_impl_interface>(), std::memory_order_relaxed);
+	const shared_ptr<batch_job_impl_interface> selfRef(m_selfRef.unsafe_exchange(shared_ptr<batch_job_impl_interface>(nullptr), std::memory_order_relaxed));
 }
 }
 }

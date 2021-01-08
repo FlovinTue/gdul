@@ -23,16 +23,24 @@
 namespace gdul {
 namespace jh_detail {
 timer::timer()
-	: m_clock()
-	, m_fromTime(m_clock.now())
+	: m_fromTime()
+	, m_running(false)
 {}
-float timer::get() const
+float timer::elapsed() const
 {
-	return std::chrono::duration_cast<std::chrono::duration<float>>(m_clock.now() - m_fromTime).count();
+	if (m_running) {
+		return std::chrono::duration_cast<std::chrono::duration<float>>(s_clock.now() - m_fromTime).count();
+	}
+	return 0.f;
 }
 void timer::reset()
 {
-	m_fromTime = m_clock.now();
+	m_running = false;
+}
+void timer::start()
+{
+	m_fromTime = s_clock.now();
+	m_running = true;
 }
 }
 }

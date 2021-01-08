@@ -21,6 +21,7 @@
 #pragma once
 
 #include <gdul/job_handler/globals.h>
+#include <atomic>
 
 #if defined(GDUL_JOB_DEBUG)
 #include <gdul/job_handler/tracking/time_set.h>
@@ -43,10 +44,16 @@ enum job_type : std::uint8_t
 struct job_info
 {
 	job_info();
+	job_info(job_info&& other);
+	job_info(const job_info& other);
+	job_info& operator=(job_info&& other);
+	job_info& operator=(const job_info& other);
 
-	void accumulate_priority(float priority);
-	float get_priority() const;
-	void store_accumulated_priority(float lastCompletionTime);
+
+	void accumulate_runtime(float priority);
+	float get_dependant_runtime() const;
+	float get_runtime() const;
+	void store_runtime(float runtime);
 
 	std::size_t id() const;
 
@@ -79,9 +86,10 @@ private:
 
 	std::size_t m_id;
 
-	float m_lastPriorityAccum;
-	float m_priorityAccum;
-	float m_lastCompletionTime;
+	std::atomic<float> m_lastAccumulatedRuntime;
+	std::atomic<float> m_accumulatedRuntime;
+
+	float m_runtime;
 
 #if defined(GDUL_JOB_DEBUG)
 	std::size_t m_parent;
