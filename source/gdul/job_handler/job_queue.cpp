@@ -51,4 +51,8 @@ jh_detail::job_impl_shared_ptr job_sync_queue::fetch_job()
 	m_queue.try_pop(out);
 	return out.second;
 }
+std::uint8_t job_queue::assigned_workers() const
+{
+	return m_assignees.load(std::memory_order_relaxed);
+}
 }

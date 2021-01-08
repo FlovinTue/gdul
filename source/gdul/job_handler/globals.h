@@ -24,8 +24,8 @@
 #include <cstddef>
 #include <type_traits>
 
+#if !defined(GDUL_JOB_DEBUG) && defined (_DEBUG)
 // Define to enable some debug features
-#if !defined(GDUL_JOB_DEBUG)
 #define GDUL_JOB_DEBUG
 #endif
 
