@@ -187,6 +187,7 @@ Job tracking instructions:
 - job time sets may be viewed in the small C# app job_time_set_view located in the source folder
 
 To take advantage of predictive scheduling:
+
 Users may declare job queues of two types: job_async_queue and job_sync_queue. To allow for job reordering, simply post jobs to an instance of job_sync_queue. Do note that this should not be used for asynchronous jobs like file loading etc, as this may cause undesired reordering. 
 This will help promote parallelism in scenarios where complex dependency graps exist with multiple jobs waiting for execution.
 
