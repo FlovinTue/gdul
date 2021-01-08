@@ -77,13 +77,6 @@ private:
 	friend class job_graph;
 	friend class job_graph_data;
 
-#if defined(GDUL_JOB_DEBUG)
-	std::string m_name;
-	std::string m_physicalLocation;
-
-	std::uint32_t m_line;
-#endif
-
 	std::size_t m_id;
 
 	std::atomic<float> m_lastAccumulatedRuntime;
@@ -92,6 +85,11 @@ private:
 	float m_runtime;
 
 #if defined(GDUL_JOB_DEBUG)
+	std::string m_name;
+	std::string m_physicalLocation;
+
+	std::uint32_t m_line;
+
 	std::size_t m_parent;
 
 	job_type m_type;

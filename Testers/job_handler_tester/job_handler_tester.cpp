@@ -239,9 +239,9 @@ float job_handler_tester::run_predictive_scheduling_test()
 	job root(m_handler.make_job([]() {}, &m_syncQueue, "Predictive Scheduling Root"));
 	job dependant(m_handler.make_job([]() {}, &m_syncQueue, "Predictive Scheduling End"));
 
-	auto spinFor = [](float ms) {
-		timer<float> t;
-		const float sec(0.001f * ms);
+	auto spinFor = [](double ms) {
+		timer<double> t;
+		const double sec(0.001 * ms);
 		while (t.get() < sec)
 			std::this_thread::yield();
 	};
@@ -249,9 +249,9 @@ float job_handler_tester::run_predictive_scheduling_test()
 	// The optimal execution should be parallelSplit * serialExecutionTime,
 	// However, since the forked jobs are added first, in a normal scenario
 	// the execution time should end up being (parallelSplit * serialexecutionTime) + serialExecutionTime
-	// As read now, that would be 8 * 0.8 ms vs (8 * 0.8 ms) + 0.8 ms
+	// As read now, that would be 8 * 1.0 ms vs (8 * 1.0 ms) + 1.0 ms
 
-	const float serialExecutionTime(0.8f);
+	const double serialExecutionTime(1.0);
 	const std::size_t parallelSplit(std::thread::hardware_concurrency());
 
 	timer<float> time;
@@ -271,7 +271,7 @@ float job_handler_tester::run_predictive_scheduling_test()
 
 	job previous;
 	for (std::size_t i = 0; i < parallelSplit; ++i) {
-		job jb(m_handler.make_job(make_delegate<void()>(spinFor, serialExecutionTime), &m_syncQueue, i/*, std::string("Predictive Scheduling Serial# " + std::to_string(i)).c_str()*/));
+		job jb(m_handler.make_job(make_delegate<void()>(spinFor, serialExecutionTime), &m_syncQueue, i, std::string("Predictive Scheduling Serial# " + std::to_string(i)).c_str()));
 		jb.depends_on(previous);
 		//jb.depends_on(root);
 		dependant.depends_on(jb);
@@ -284,14 +284,14 @@ float job_handler_tester::run_predictive_scheduling_test()
 	}
 
 	dependant.enable();
-	root.enable();
 	dependant.wait_until_finished();
+	root.enable();
 
 	const float result = time.get();
 
 	std::cout << "Finished predictive scheduling test with " << result * 1000.f << " ms execution time using " << std::endl;
-	std::cout << "...The optimal execution time should be " << (float)parallelSplit * serialExecutionTime << " ms" << std::endl;
-	std::cout << "...Suboptimal execution time should be " << (float)parallelSplit * serialExecutionTime + serialExecutionTime << " ms" << std::endl;
+	std::cout << "...The optimal execution time should be " << (double)parallelSplit * serialExecutionTime << " ms" << std::endl;
+	std::cout << "...Suboptimal execution time should be " << (double)parallelSplit * serialExecutionTime + serialExecutionTime << " ms" << std::endl;
 	std::cout << "ParallelPrio " << parallelPriority << " SerialPrio: " << serialPriority << std::endl;
 
 	return result;
