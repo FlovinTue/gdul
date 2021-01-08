@@ -196,24 +196,27 @@ A quick usage example for job:
 #include <gdul/job_handler_master.h>
 
 int main()
-{	
+{
 	gdul::job_handler jh;
+	gdul::job_async_queue q;
+
 	jh.init();
 
 	for (std::size_t i = 0; i < std::thread::hardware_concurrency(); ++i) {
 		gdul::worker wrk(jh.make_worker());
+		wrk.add_assignment(&q);
 		wrk.enable();
 	}
 
-	gdul::job jbA(jh.make_job([]() {std::cout << "Ran A" << std::endl; }));
-	gdul::job jbB(jh.make_job([]() {std::cout << "...then B" << std::endl; }));
-	jbB.add_dependency(jbA);
+	gdul::job jbA(jh.make_job([]() {std::cout << "Ran A" << std::endl; }, &q));
+	gdul::job jbB(jh.make_job([]() {std::cout << "...then B" << std::endl; }, &q));
+	jbB.depends_on(jbA);
 	jbB.enable();
 	jbA.enable();
 
 	jbB.wait_until_finished();
 
-	jh.retire_workers();
+	jh.shutdown();
 }
 ```
 And with batch_job:
@@ -225,40 +228,39 @@ And with batch_job:
 int main()
 {
 	gdul::job_handler jh;
+	gdul::job_async_queue q;
+
 	jh.init();
 
-	for (std::size_t i = 0; i < std::thread::hardware_concurrency(); ++i)
-	{
+	for (std::size_t i = 0; i < std::thread::hardware_concurrency(); ++i) {
 		gdul::worker wrk(jh.make_worker());
+		wrk.add_assignment(&q);
 		wrk.enable();
 	}
 
 	std::vector<std::size_t> inputs;
 	std::vector<std::size_t> outputs;
 
-	for (std::size_t i = 0; i < 500; ++i)
-	{
+	for (std::size_t i = 0; i < 500; ++i) {
 		inputs.push_back(i);
 	}
 
-	gdul::delegate<bool(std::size_t&, std::size_t&)> process([](std::size_t& inputItem, std::size_t& outputItem)
-		{
-			// Output only the items that mod 5 == 0
-			if (inputItem % 5 == 0)
-			{
-				outputItem = inputItem;
-				return true;
-			}
-			return false;
+	gdul::delegate<bool(std::size_t&, std::size_t&)> process([](std::size_t& inputItem, std::size_t& outputItem) {
+		// Output only the items that mod 5 == 0
+		if (inputItem % 5 == 0) {
+			outputItem = inputItem;
+			return true;
+		}
+		return false;
 		});
 
-	gdul::batch_job bjb(jh.make_batch_job(inputs, outputs, process));
+	gdul::batch_job bjb(jh.make_batch_job(inputs, outputs, process, &q));
 
 	bjb.enable();
 	bjb.wait_until_finished();
 
 	// Here outputs should contain 0, 5, 10, 15...
 
-	jh.retire_workers();
+	jh.shutdown();
 }
 ```
