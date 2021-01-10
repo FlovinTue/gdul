@@ -36,7 +36,6 @@ job_impl::job_impl(delegate<void()>&& workUnit, job_handler_impl* handler, job_q
 	: m_workUnit(std::forward<delegate<void()>>(workUnit))
 	, m_info(info)
 	, m_completionTimer()
-	, m_dependantTimer()
 #if defined (GDUL_JOB_DEBUG)
 	, m_enqueueTimer()
 #endif
@@ -79,7 +78,7 @@ void job_impl::operator()()
 }
 bool job_impl::try_attach_child(job_impl_shared_ptr child)
 {
-	m_info->accumulate_runtime(child->get_remaining_accumulated_runtime());
+	m_info->accumulate_dependant_time(child->get_remaining_propagation_time());
 
 	pool_allocator<job_node> alloc(m_handler->get_job_node_allocator());
 
@@ -126,7 +125,6 @@ enable_result job_impl::enable() noexcept
 
 	while (!(exp < Job_Enable_Dependencies)) {
 		if (m_dependencies.compare_exchange_weak(exp, exp - Job_Enable_Dependencies, std::memory_order_relaxed)) {
-			m_dependantTimer.start();
 
 			std::uint8_t result(enable_result_enabled);
 			result |= enable_result_enqueue * !(exp - Job_Enable_Dependencies);
@@ -168,7 +166,7 @@ void job_impl::work_until_finished(job_queue* consumeFrom)
 	assert(is_enabled() && "Job has not yet been enabled");
 
 	if (job::this_job) {
-		m_info->accumulate_runtime(job::this_job.m_impl->get_remaining_accumulated_runtime());
+		m_info->accumulate_dependant_time(job::this_job.m_impl->get_remaining_dependant_time());
 	}
 
 	GDUL_JOB_DEBUG_CONDTIONAL(timer waitTimer)
@@ -185,7 +183,7 @@ void job_impl::work_until_ready(job_queue* consumeFrom)
 	assert(is_enabled() && "Job has not yet been enabled");
 
 	if (job::this_job) {
-		m_info->accumulate_runtime(job::this_job.m_impl->get_remaining_dependant_runtime());
+		m_info->accumulate_propagation_time(job::this_job.m_impl->get_remaining_dependant_time());
 	}
 	GDUL_JOB_DEBUG_CONDTIONAL(timer waitTimer)
 		while (!is_ready() && !is_enabled()) {
@@ -201,7 +199,7 @@ void job_impl::wait_until_finished() noexcept
 	assert(is_enabled() && "Job has not yet been enabled");
 
 	if (job::this_job) {
-		m_info->accumulate_runtime(job::this_job.m_impl->get_remaining_accumulated_runtime());
+		m_info->accumulate_dependant_time(job::this_job.m_impl->get_remaining_dependant_time());
 	}
 
 	GDUL_JOB_DEBUG_CONDTIONAL(timer waitTimer)
@@ -216,7 +214,7 @@ void job_impl::wait_until_ready() noexcept
 	assert(is_enabled() && "Job has not yet been enabled");
 
 	if (job::this_job) {
-		m_info->accumulate_runtime(job::this_job.m_impl->get_remaining_dependant_runtime());
+		m_info->accumulate_propagation_time(job::this_job.m_impl->get_remaining_dependant_time());
 	}
 
 	GDUL_JOB_DEBUG_CONDTIONAL(timer waitTimer)
@@ -226,13 +224,13 @@ void job_impl::wait_until_ready() noexcept
 		}
 	GDUL_JOB_DEBUG_CONDTIONAL(if (m_info) m_info->m_waitTimeSet.log_time(waitTimer.elapsed()))
 }
-float job_impl::get_remaining_accumulated_runtime() const noexcept
+float job_impl::get_remaining_dependant_time() const noexcept
 {
 	return m_info->get_dependant_runtime() + m_info->get_runtime() - m_completionTimer.elapsed();
 }
-float job_impl::get_remaining_dependant_runtime() const noexcept
+float job_impl::get_remaining_propagation_time() const noexcept
 {
-	return m_info->get_dependant_runtime() - m_dependantTimer.elapsed();
+	return m_info->get_propagation_runtime() + m_info->get_runtime() - m_completionTimer.elapsed();
 }
 std::size_t job_impl::get_id() const noexcept
 {

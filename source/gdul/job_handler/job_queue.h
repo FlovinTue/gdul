@@ -44,6 +44,7 @@ class job_queue
 public:
 	virtual ~job_queue() = default;
 
+	std::uint8_t assigned_workers() const;
 private:
 	friend class job;
 	friend class jh_detail::job_impl;

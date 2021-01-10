@@ -38,6 +38,8 @@ int main()
 		}
 
 		{
+			std::uint32_t high(0);
+			const float above(0.010f);
 			float predictiveMin(FLT_MAX);
 			float predictiveMax(-FLT_MAX);
 			float predictiveAccum(0.f);
@@ -47,8 +49,13 @@ int main()
 				predictiveAccum += result;
 				predictiveMin = std::min(result, predictiveMin);
 				predictiveMax = std::max(result, predictiveMax);
+
+				if (result > above) {
+					++high;
+				}
 			}
 
+			std::cout << "Exceedingly high values (>" << above << " ms): " << high << std::endl;
 			std::cout << "\n\nFinished predictive testing batch.\nAverage: " << predictiveAccum / (float)predictiveIter * 1000.f << " ms" << "\nMin: " << predictiveMin * 1000.f << " ms" << "\nMax: " << predictiveMax * 1000.f << " ms" << "\n\n" << std::endl;
 		}
 

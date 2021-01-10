@@ -50,8 +50,10 @@ struct job_info
 	job_info& operator=(const job_info& other);
 
 
-	void accumulate_runtime(float priority);
+	void accumulate_dependant_time(float priority);
+	void accumulate_propagation_time(float priority);
 	float get_dependant_runtime() const;
+	float get_propagation_runtime() const;
 	float get_runtime() const;
 	void store_runtime(float runtime);
 
@@ -79,8 +81,10 @@ private:
 
 	std::size_t m_id;
 
-	std::atomic<float> m_lastAccumulatedRuntime;
-	std::atomic<float> m_accumulatedRuntime;
+	std::atomic<float> m_lastDependantRuntime;
+	std::atomic<float> m_dependantRuntime;
+	std::atomic<float> m_lastAccumulatedPropagationTime;
+	std::atomic<float> m_propagationTime;
 
 	float m_runtime;
 

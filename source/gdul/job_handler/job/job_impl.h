@@ -82,8 +82,8 @@ public:
 	void wait_until_finished() noexcept;
 	void wait_until_ready() noexcept;
 
-	float get_remaining_accumulated_runtime() const noexcept;
-	float get_remaining_dependant_runtime() const noexcept;
+	float get_remaining_dependant_time() const noexcept;
+	float get_remaining_propagation_time() const noexcept;
 
 	std::size_t get_id() const noexcept;
 
@@ -102,7 +102,6 @@ private:
 	job_info* m_info;
 
 	timer m_completionTimer;
-	timer m_dependantTimer;
 
 #if defined GDUL_JOB_DEBUG
 	timer m_enqueueTimer;

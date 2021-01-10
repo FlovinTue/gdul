@@ -144,7 +144,7 @@ job::operator bool() const noexcept
 float job::priority() const noexcept
 {
 	if (m_impl) {
-		return m_impl->get_remaining_accumulated_runtime();
+		return m_impl->get_remaining_dependant_time();
 	}
 	return 0.f;
 }

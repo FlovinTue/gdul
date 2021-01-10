@@ -43,7 +43,7 @@ job_sync_queue::job_sync_queue(jh_detail::allocator_type alloc)
 }
 void job_sync_queue::submit_job(jh_detail::job_impl_shared_ptr jb)
 {
-	m_queue.push(std::make_pair(jb->get_remaining_accumulated_runtime(), std::move(jb)));
+	m_queue.push(std::make_pair(jb->get_remaining_dependant_time(), std::move(jb)));
 }
 jh_detail::job_impl_shared_ptr job_sync_queue::fetch_job()
 {

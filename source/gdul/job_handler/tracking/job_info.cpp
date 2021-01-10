@@ -21,14 +21,14 @@
 #include <gdul/job_handler/tracking/job_info.h>
 #include <memory>
 
-namespace gdul
-{
-namespace jh_detail
-{
+namespace gdul {
+namespace jh_detail {
 job_info::job_info()
 	: m_id(0)
-	, m_lastAccumulatedRuntime(0.f)
-	, m_accumulatedRuntime(0.f)
+	, m_lastDependantRuntime(0.f)
+	, m_dependantRuntime(0.f)
+	, m_lastAccumulatedPropagationTime(0.f)
+	, m_propagationTime(0.f)
 	, m_runtime(0.f)
 
 #if defined(GDUL_JOB_DEBUG)
@@ -64,8 +64,10 @@ job_info& job_info::operator=(const job_info& other)
 
 	m_id = other.m_id;
 
-	m_lastAccumulatedRuntime = other.m_lastAccumulatedRuntime.load();
-	m_accumulatedRuntime = other.m_accumulatedRuntime.load();
+	m_lastDependantRuntime = other.m_lastDependantRuntime.load();
+	m_dependantRuntime = other.m_dependantRuntime.load();
+	m_lastAccumulatedPropagationTime = other.m_lastAccumulatedPropagationTime.load();
+	m_propagationTime = other.m_propagationTime.load();
 
 	m_runtime = other.m_runtime;
 
@@ -76,12 +78,23 @@ job_info& job_info::operator=(const job_info& other)
 #endif
 	return *this;
 }
-void job_info::accumulate_runtime(float priority)
+void job_info::accumulate_dependant_time(float priority)
 {
-	float priorityAccumulation(m_accumulatedRuntime.load(std::memory_order_relaxed));
+	float priorityAccumulation(m_dependantRuntime.load(std::memory_order_relaxed));
 
 	while (priorityAccumulation < priority) {
-		if (m_accumulatedRuntime.compare_exchange_strong(priorityAccumulation, priority, std::memory_order_relaxed)) {
+		if (m_dependantRuntime.compare_exchange_strong(priorityAccumulation, priority, std::memory_order_relaxed)) {
+			break;
+		}
+	}
+}
+
+void job_info::accumulate_propagation_time(float priority)
+{
+	float priorityAccumulation(m_propagationTime.load(std::memory_order_relaxed));
+
+	while (priorityAccumulation < priority) {
+		if (m_propagationTime.compare_exchange_strong(priorityAccumulation, priority, std::memory_order_relaxed)) {
 			break;
 		}
 	}
@@ -91,15 +104,36 @@ void job_info::store_runtime(float runtime)
 {
 	m_runtime = runtime;
 
-	float priorityAccumulation(m_accumulatedRuntime.exchange(0.f, std::memory_order_relaxed));
+	if (m_dependantRuntime.load(std::memory_order_relaxed) != 0.f) {
 
-	if (priorityAccumulation != 0.f) {
-		m_lastAccumulatedRuntime.store(priorityAccumulation, std::memory_order_relaxed);
+		float priorityAccumulation(m_dependantRuntime.exchange(0.f, std::memory_order_relaxed));
+
+		if (priorityAccumulation != 0.f) {
+			m_lastDependantRuntime.store(priorityAccumulation, std::memory_order_relaxed);
+		}
+	}
+
+	if (m_propagationTime.load(std::memory_order_relaxed) != 0.f) {
+
+		float priorityAccumulation(m_propagationTime.exchange(0.f, std::memory_order_relaxed));
+
+		if (priorityAccumulation != 0.f) {
+			m_lastAccumulatedPropagationTime.store(priorityAccumulation, std::memory_order_relaxed);
+		}
 	}
 }
 float job_info::get_dependant_runtime() const
 {
-	return m_lastAccumulatedRuntime.load(std::memory_order_relaxed);
+	return m_lastDependantRuntime.load(std::memory_order_relaxed);
+}
+float job_info::get_propagation_runtime() const
+{
+	const  float propagationRuntime(m_lastDependantRuntime.load(std::memory_order_relaxed));
+	if (propagationRuntime == 0.f) {
+		return get_dependant_runtime();
+	}
+
+	return std::max<float>(propagationRuntime, get_dependant_runtime());
 }
 float job_info::get_runtime() const
 {
@@ -125,7 +159,7 @@ job_type job_info::get_node_type() const
 	return m_type;
 }
 
-const std::string & job_info::name() const
+const std::string& job_info::name() const
 {
 	return m_name;
 }
