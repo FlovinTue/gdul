@@ -19,14 +19,16 @@
 // SOFTWARE.
 
 #include <cassert>
-#include <gdul/job_handler/Job.h>
+#include <gdul/job_handler/job/job.h>
 #include <gdul/job_handler/job_handler_impl.h>
-#include <gdul/job_handler/job_impl.h>
-#include <gdul/job_handler/batch_job.h>
+#include <gdul/job_handler/job/job_impl.h>
+#include <gdul/job_handler/job/batch_job.h>
 #include <gdul/job_handler/globals.h>
+#include <gdul/job_handler/job_queue.h>
 
-namespace gdul
-{
+namespace gdul {
+thread_local job job::this_job(shared_ptr<jh_detail::job_impl>(nullptr));
+
 job::job() noexcept
 {
 }
@@ -48,45 +50,33 @@ job& job::operator=(const job& other) noexcept
 	m_impl = other.m_impl;
 	return *this;
 }
-void job::add_dependency(job& dependency)
+void job::depends_on(job& dependency)
 {
-	if (!m_impl)
+	if (!m_impl || !dependency)
 		return;
 
 	if (m_impl->try_add_dependencies(1)) {
 		if (!dependency.m_impl->try_attach_child(m_impl)) {
 			if (!m_impl->remove_dependencies(1)) {
-				m_impl->get_handler()->enqueue_job(m_impl);
+				m_impl->get_target()->submit_job(m_impl);
 			}
 		}
 	}
 
 }
-void job::add_dependency(batch_job& dependency)
+void job::depends_on(batch_job& dependency)
 {
-	add_dependency(dependency.get_endjob());
+	depends_on(dependency.get_endjob());
 }
-void job::set_target_queue(job_queue target) noexcept
-{
-	if (!m_impl)
-		return;
 
-	m_impl->set_target_queue(target);
-}
-job_queue job::get_target_queue() const noexcept
-{
-	if (!m_impl)
-		return jh_detail::Default_Job_Queue;
-
-	return m_impl->get_target_queue();
-}
 bool job::enable() noexcept
 {
 	if (m_impl) {
 		const jh_detail::enable_result result(m_impl->enable());
 
-		if (result & jh_detail::enable_result_enqueue)
-			m_impl->get_handler()->enqueue_job(m_impl);
+		if (result & jh_detail::enable_result_enqueue) {
+			m_impl->get_target()->submit_job(m_impl);
+		}
 
 		return result & jh_detail::enable_result_enabled;
 	}
@@ -98,7 +88,7 @@ bool job::enable_locally_if_ready() noexcept
 
 		GDUL_JOB_DEBUG_CONDTIONAL(m_impl->on_enqueue())
 
-		m_impl->operator()();
+			m_impl->operator()();
 
 		return true;
 	}
@@ -129,35 +119,41 @@ void job::wait_until_ready() noexcept
 
 	m_impl->wait_until_ready();
 }
-void job::work_until_finished(job_queue consumeFrom)
+void job::work_until_finished(job_queue* consumeFrom)
 {
-	if (!m_impl)
-		return;
+	assert(consumeFrom && "Null ptr");
 
-	m_impl->work_until_finished(consumeFrom);
+	if (m_impl)
+		m_impl->work_until_finished(consumeFrom);
+}
+void job::work_until_ready(job_queue* consumeFrom)
+{
+	assert(consumeFrom && "Null ptr");
+
+	if (m_impl)
+		m_impl->work_until_ready(consumeFrom);
 }
 job::job(gdul::shared_ptr<jh_detail::job_impl> impl) noexcept
 	: m_impl(std::move(impl))
 {
 }
-void job::work_until_ready(job_queue consumeFrom)
-{
-	if (!m_impl)
-		return;
-
-	m_impl->work_until_ready(consumeFrom);
-}
 job::operator bool() const noexcept
 {
 	return m_impl;
 }
-#if defined(GDUL_JOB_DEBUG)
-constexpr_id job::register_tracking_node(constexpr_id id, const char* name, const char* file, std::uint32_t line, bool batchSub)
+float job::priority() const noexcept
 {
-	if (!m_impl)
-		return constexpr_id::make<0>();
-
-	return m_impl->register_tracking_node(id, name, file, line, batchSub);
+	if (m_impl) {
+		return m_impl->get_remaining_dependant_time();
+	}
+	return 0.f;
 }
-#endif
+std::size_t job::get_id() const noexcept
+{
+	if (m_impl) {
+		return m_impl->get_id();
+	}
+
+	return 0ull;
+}
 }

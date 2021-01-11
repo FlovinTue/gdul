@@ -20,45 +20,57 @@
 
 #pragma once
 
-#include <gdul/job_handler/globals.h>
+#include <gdul/job_handler/job_handler_utility.h>
+#include <gdul/delegate/delegate.h>
+#include <string>
 
-#if defined (GDUL_JOB_DEBUG)
-
-#include <gdul/job_handler/debug/job_tracker_node.h>
-
-// https://stackoverflow.com/questions/48896142/is-it-possible-to-get-hash-values-as-compile-time-constants
-template <typename Str>
-constexpr std::size_t constexp_str_hash(const Str& toHash)
+namespace gdul
 {
-	std::size_t result = 0xcbf29ce484222325ull; 
+template <class Signature>
+class delegate;
 
-	for (char c : toHash) {
-		result ^= c;
-		result *= 1099511628211ull;
-	}
+class job_queue;
 
-	return result;
+namespace jh_detail
+{
+class worker_impl;
+class job_impl;
 }
-#endif
-
-namespace gdul {
-namespace jh_detail {
-
-class job_tracker
+class worker
 {
 public:
-#if defined (GDUL_JOB_DEBUG)
-	static job_tracker_node* register_full_node(constexpr_id id, const char * name, const char* file, std::uint32_t line);
-	static job_tracker_node* register_batch_sub_node(constexpr_id id, const char* name);
+	static thread_local worker this_worker;
 
-	static job_tracker_node* fetch_node(constexpr_id id);
+	worker() = default;
+	worker(jh_detail::worker_impl* impl);
+	worker(const worker&) = default;
+	worker(worker&&) = default;
+	worker& operator=(const worker&) = default;
+	worker& operator=(worker&&) = default;
 
-	static void dump_job_tree(const char* location);
-	static void dump_job_time_sets(const char* location);
-#else
-	static void dump_job_tree(const char*) {};
-	static void dump_job_time_sets(const char*) {};
-#endif
+	~worker();
+
+	void set_core_affinity(std::uint8_t core);
+	void set_execution_priority(std::int32_t priority);
+	void set_name(const std::string& name);
+
+	/// <summary>
+	/// Add queue from which to consume work. May be called multiple times
+	/// </summary>
+	/// <param name="queue">Source queue</param>
+	void add_assignment(job_queue* queue);
+
+	void enable();
+	bool disable();
+
+	void set_run_on_enable(delegate<void()> toCall);
+	void set_run_on_disable(delegate<void()> toCall);
+
+	bool is_active() const;
+
+private:
+	friend class jh_detail::job_impl;
+
+	jh_detail::worker_impl* m_impl;
 };
-}
 }

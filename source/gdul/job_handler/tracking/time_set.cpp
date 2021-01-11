@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <gdul/job_handler/debug/time_set.h>
+#include <gdul/job_handler/tracking/time_set.h>
 
 #if defined(GDUL_JOB_DEBUG)
 #include <memory>
@@ -62,11 +62,11 @@ void time_set::log_time(float completionTime)
 
 	if (completionTime < m_minTime) {
 		m_minTime = completionTime;
-		m_minTimepoint = s_globalTimer.get();
+		m_minTimepoint = s_globalTimer.elapsed();
 	}
 	if (m_maxTime < completionTime) {
 		m_maxTime = completionTime;
-		m_maxTimepoint = s_globalTimer.get();
+		m_maxTimepoint = s_globalTimer.elapsed();
 	}
 
 	m_totalTime += completionTime;

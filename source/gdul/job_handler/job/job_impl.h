@@ -22,20 +22,21 @@
 #pragma warning(push)
 #pragma warning(disable : 4324)
 
-
 #include <gdul/job_handler/job_handler_utility.h>
+#include <gdul/job_handler/tracking/job_graph.h>
+#include <gdul/job_handler/tracking/timer.h>
+#include <gdul/job_handler/job/job_node.h>
+
 #include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
-#include <gdul/job_handler/job_node.h>
 #include <gdul/delegate/delegate.h>
 
-#if defined(GDUL_JOB_DEBUG)
-#include <gdul/job_handler/debug/job_tracker.h>
-#include <gdul/job_handler/debug/timer.h>
-#endif
-
-namespace gdul{
+namespace gdul {
+class job_queue;
 
 namespace jh_detail {
+
+struct job_node;
+struct job_info;
 
 enum enable_result : std::uint8_t
 {
@@ -49,23 +50,20 @@ class job_handler_impl;
 class job_impl
 {
 public:
-	using allocator_type = gdul::jh_detail::allocator_type; 
+	using allocator_type = gdul::jh_detail::allocator_type;
 
 	using job_impl_shared_ptr = shared_ptr<job_impl>;
 	using job_impl_atomic_shared_ptr = atomic_shared_ptr<job_impl>;
 	using job_impl_raw_ptr = raw_ptr<job_impl>;
 
 	job_impl();
+	job_impl(delegate<void()>&& workUnit, job_handler_impl* handler, job_queue* target, job_info* info);
 
-	job_impl(delegate<void()>&& workUnit, job_handler_impl* handler);
 	~job_impl();
-	
+
 	void operator()();
 
 	bool try_attach_child(job_impl_shared_ptr child);
-
-	job_queue get_target_queue() const noexcept;
-	void set_target_queue(job_queue target) noexcept;
 
 	bool try_add_dependencies(std::uint32_t n = 1);
 	std::uint32_t remove_dependencies(std::uint32_t n = 1);
@@ -73,38 +71,50 @@ public:
 	enable_result enable() noexcept;
 	bool enable_if_ready() noexcept;
 
-	job_handler_impl* get_handler() const;
+	job_queue* get_target() const noexcept;
 
 	bool is_finished() const noexcept;
 	bool is_enabled() const noexcept;
 	bool is_ready() const noexcept;
 
-	GDUL_JOB_DEBUG_CONDTIONAL(constexpr_id register_tracking_node(constexpr_id id, const char* name, const char* file, std::uint32_t line, bool batchSub))
-	GDUL_JOB_DEBUG_CONDTIONAL(void on_enqueue() noexcept)
-
-	void work_until_finished(job_queue consumeFrom);
-	void work_until_ready(job_queue consumeFrom);
+	void work_until_finished(job_queue* consumeFrom);
+	void work_until_ready(job_queue* consumeFrom);
 	void wait_until_finished() noexcept;
 	void wait_until_ready() noexcept;
 
+	float get_remaining_dependant_time() const noexcept;
+	float get_remaining_propagation_time() const noexcept;
+
+	std::size_t get_id() const noexcept;
+
+	void set_info(job_info* info);
+
+#if defined GDUL_JOB_DEBUG
+	void on_enqueue() noexcept;
+#endif
+
 private:
 	void detach_children();
-
-	GDUL_JOB_DEBUG_CONDTIONAL(job_tracker_node* m_trackingNode)
-	GDUL_JOB_DEBUG_CONDTIONAL(constexpr_id m_physicalId)
-	GDUL_JOB_DEBUG_CONDTIONAL(timer m_enqueueTimer)
+	static void detach_next(job_node_shared_ptr from);
 
 	delegate<void()> m_workUnit;
 
-	job_handler_impl* const m_handler;
+	job_info* m_info;
 
-	atomic_shared_ptr<job_node> m_firstDependee;
+	timer m_completionTimer;
+
+#if defined GDUL_JOB_DEBUG
+	timer m_enqueueTimer;
+#endif
+
+	job_handler_impl* const m_handler;
+	job_queue* const m_target;
+
+	atomic_shared_ptr<job_node> m_headDependee;
 
 	std::atomic<std::uint32_t> m_dependencies;
 
 	std::atomic_bool m_finished;
-
-	job_queue m_targetQueue;
 };
 }
 }

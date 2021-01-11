@@ -18,7 +18,7 @@ int main()
 
 	std::allocator<std::uint8_t> alloc;
 	gdul::concurrent_priority_queue<int, float> q(alloc);
-	
+
 	std::pair<int, float> two	(std::make_pair(2, 1.f));
 	std::pair<int, float> six	(std::make_pair(6, 1.f));
 	std::pair<int, float> three	(std::make_pair(3, 1.f));
@@ -36,7 +36,24 @@ int main()
 	q.push(five);
 	q.push(five);
 	q.push(five);
-	
+
+	decltype(q)::iterator begin(q.unsafe_begin());
+	decltype(q)::iterator end(q.unsafe_end());
+	decltype(q)::iterator findResult(q.unsafe_find(2));
+	decltype(q)::const_iterator cBegin(q.unsafe_begin());
+	decltype(q)::const_iterator cEnd(q.unsafe_end());
+	decltype(q)::const_iterator cFindResult(q.unsafe_find(2));
+
+	const decltype(q)& constQ(q);
+
+	decltype(q)::const_iterator ccBegin(constQ.unsafe_begin());
+	decltype(q)::const_iterator ccEnd(constQ.unsafe_end());
+	decltype(q)::const_iterator ccFindResult(constQ.unsafe_find(2));
+
+	assert(findResult->first == 2 && "Unexpected find value");
+	assert(cFindResult->first == 2 && "Unexpected find value");
+	assert(ccFindResult->first == 2 && "Unexpected find value");
+
 	std::pair<int, float> outone;
 	std::pair<int, float> outtwo;
 	std::pair<int, float> outthree;
@@ -71,7 +88,7 @@ int main()
 
 	// At this point we need to test for correctness of values. Or. Perhaps multi-layer first.
 	gdul::queue_testrun<test_type, gdul::tracking_allocator<std::pair<int, float>>>(
-		1000000, 
+		1000000,
 		gdul::tracking_allocator<std::pair<int, float>>());
 
 
@@ -94,12 +111,13 @@ int main()
 	test2.clear();
 	const bool test2Empty(test2.empty());
 	test2.unsafe_reset();
+	assert(test2.empty());
 }
 
 // Run program: Ctrl + F5 or Debug > Start Without Debugging menu
 // Debug program: F5 or Debug > Start Debugging menu
 
-// Tips for Getting Started: 
+// Tips for Getting Started:
 //   1. Use the Solution Explorer window to add/manage files
 //   2. Use the Team Explorer window to connect to source control
 //   3. Use the Output window to see build output and other messages

@@ -18,49 +18,29 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#pragma once
-
-#include <gdul/job_handler/globals.h>
-
-#if defined(GDUL_JOB_DEBUG)
-#include <gdul/job_handler/debug/timer.h>
-#include <atomic>
+#include <gdul/job_handler/tracking/timer.h>
 
 namespace gdul {
 namespace jh_detail {
-
-class time_set
+timer::timer()
+	: m_fromTime()
+	, m_running(false)
+{}
+float timer::elapsed() const
 {
-public:
-	time_set();
-	time_set(const time_set& other);
-	time_set(time_set&& other);
-	time_set& operator=(time_set&& other);
-	time_set& operator=(const time_set& other);
-
-	void log_time(float completionTime);
-
-	float get_avg() const;
-	float get_max() const;
-	float get_min() const;
-	float get_minTimepoint() const;
-	float get_maxTimepoint() const;
-
-	std::size_t get_completion_count() const;
-
-private:
-	static timer s_globalTimer;
-
-	std::atomic_flag m_lock;
-
-	std::size_t m_completionCount;
-
-	float m_totalTime;
-	float m_minTime;
-	float m_maxTime;
-	float m_minTimepoint;
-	float m_maxTimepoint;
-};
+	if (m_running) {
+		return std::chrono::duration_cast<std::chrono::duration<float>>(s_clock.now() - m_fromTime).count();
+	}
+	return 0.f;
+}
+void timer::reset()
+{
+	m_running = false;
+}
+void timer::start()
+{
+	m_fromTime = s_clock.now();
+	m_running = true;
 }
 }
-#endif
+}

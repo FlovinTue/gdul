@@ -18,7 +18,12 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <gdul/job_handler/worker_impl.h>
+#include <gdul/job_handler/worker/worker_impl.h>
+#include <gdul/job_handler/job_handler_impl.h>
+#include <gdul/job_handler/job_queue.h>
+#include <gdul/job_handler/job/job.h>
+#include <gdul/job_handler/job/job_impl.h>
+
 #include <cassert>
 #include <algorithm>
 #include <cmath>
@@ -38,39 +43,34 @@ worker_impl::worker_impl()
 	: m_threadHandle(jh_detail::create_thread_handle())
 	, m_onEnable([](){})
 	, m_onDisable([](){})
-	, m_entryPoint([](){})
-	, m_queueDistributionIteration(0)
 	, m_isEnabled(false)
 	, m_allocator(allocator_type())
+	, m_targets{}
+	, m_executionPriority(0)
 	, m_sleepThreshhold(std::numeric_limits<std::uint16_t>::max())
 	, m_isActive(false)
-	, m_firstQueue(job_queue(0))
-	, m_lastQueue(job_queue(0))
+	, m_queuePushSync(0)
+	, m_queueCount(0)
 	, m_coreAffinity(0)
-	, m_executionPriority(0)
+	, m_queueIndex(0)
 {
-	set_queue_consume_first(job_queue(0));
-	set_queue_consume_last(job_queue(job_queue_count - 1));
 }
 worker_impl::worker_impl(std::thread&& thrd, allocator_type allocator)
 	: m_thread(std::move(thrd))
 	, m_onEnable([]() {})
 	, m_onDisable([]() {})
-	, m_entryPoint([]() {})
 	, m_threadHandle(m_thread.native_handle())
-	, m_queueDistributionIteration(0)
 	, m_isEnabled(false)
 	, m_allocator(allocator)
+	, m_targets{}
+	, m_executionPriority(0)
 	, m_sleepThreshhold(250)
 	, m_isActive(false)
-	, m_firstQueue(job_queue(0))
-	, m_lastQueue(job_queue(0))
+	, m_queuePushSync(0)
+	, m_queueCount(0)
 	, m_coreAffinity(0)
-	, m_executionPriority(0)
+	, m_queueIndex(0)
 {
-	set_queue_consume_first(job_queue(0));
-	set_queue_consume_last(job_queue(job_queue_count - 1));
-
 	m_isActive.store(true, std::memory_order_release);
 }
 
@@ -92,18 +92,18 @@ worker_impl & worker_impl::operator=(worker_impl && other) noexcept
 	m_thread.swap(other.m_thread);
 	m_onEnable = std::move(other.m_onEnable);
 	m_onDisable = std::move(other.m_onDisable);
-	m_entryPoint = std::move(other.m_entryPoint);
-	m_firstQueue = other.m_firstQueue;
-	m_lastQueue = other.m_lastQueue;
 	m_executionPriority = other.m_executionPriority;
+	m_queueCount = other.m_queueCount.load(std::memory_order_relaxed);
+	m_queuePushSync = other.m_queuePushSync.load(std::memory_order_relaxed);
 	m_coreAffinity = other.m_coreAffinity;
 	m_isEnabled.store(other.m_isEnabled.load(std::memory_order_relaxed), std::memory_order_relaxed);
 	std::swap(m_threadHandle, other.m_threadHandle);
 	m_sleepThreshhold = other.m_sleepThreshhold;
 	m_sleepTimer = other.m_sleepTimer;
-	m_queueDistributionIteration = other.m_queueDistributionIteration;
 	m_lastJobTimepoint = other.m_lastJobTimepoint;
 	m_isActive.store(other.m_isActive.load(std::memory_order_relaxed), std::memory_order_release);
+	m_queueIndex = other.m_queueIndex;
+	std::copy(std::begin(other.m_targets), std::end(other.m_targets), m_targets);
 
 	return *this;
 }
@@ -166,9 +166,16 @@ void worker_impl::set_run_on_disable(delegate<void()>&& toCall)
 	assert(is_active() && "cannot set_run_on_disable after worker has been retired");
 	m_onDisable = std::move(toCall);
 }
-void worker_impl::set_entry_point(delegate<void()>&& toCall)
+void worker_impl::add_assignment(job_queue* queue)
 {
-	m_entryPoint = std::move(toCall);
+	const std::uint8_t ix(m_queuePushSync++);
+	assert(ix < Max_Worker_Targets && "Max worker targets exceeded");
+
+	m_targets[ix] = queue;
+
+	m_queueCount++;
+
+	queue->m_assignees.fetch_add(1, std::memory_order_relaxed);
 }
 void worker_impl::on_enable()
 {
@@ -178,10 +185,6 @@ void worker_impl::on_disable()
 {
 	m_onDisable();
 }
-void worker_impl::entry_point()
-{
-	m_entryPoint();
-}
 void worker_impl::idle()
 {
 	if (is_sleepy()) {
@@ -190,31 +193,6 @@ void worker_impl::idle()
 	else {
 		std::this_thread::yield();
 	}
-}
-std::uint8_t worker_impl::get_queue_target()
-{
-	const std::size_t iteration(++m_queueDistributionIteration);
-
-	uint8_t index(0);
-
-	const std::uint8_t range((1 + m_lastQueue) - m_firstQueue);
-
-	for (uint8_t i = 1; i < range; ++i) {
-		const std::uint8_t power(((range) - (i + 1)));
-		const float fdesiredSlice(std::powf((float)2, (float)power));
-		const std::size_t desiredSlice((std::size_t)fdesiredSlice);
-		const std::size_t awardedSlice((m_distributionChunks) / desiredSlice);
-		const uint8_t prev(index);
-		const uint8_t eval(iteration % awardedSlice == 0);
-		index += eval * i;
-		index -= prev * eval;
-	}
-
-	return m_firstQueue + index;
-}
-std::uint8_t worker_impl::get_fetch_retries() const
-{
-	return (1 + m_lastQueue) - m_firstQueue;
 }
 allocator_type worker_impl::get_allocator() const
 {
@@ -230,23 +208,51 @@ void worker_impl::set_name(const std::string& name)
 #endif
 	jh_detail::set_thread_name(name.c_str(), m_threadHandle);
 }
-void worker_impl::set_queue_consume_first(job_queue firstQueue) noexcept
+void worker_impl::work()
 {
-	if (m_lastQueue < firstQueue){
-		m_lastQueue = firstQueue;
-	}
-	m_firstQueue = firstQueue;
+	while (is_active()) {
 
-	m_distributionChunks = jh_detail::pow2summation(0, (1 + m_lastQueue) - m_firstQueue);
+		if (job_impl_shared_ptr jb = fetch_job()) {
+			consume_job(std::move(jb));
+		}
+		else {
+			idle();
+		}
+	}
 }
-void worker_impl::set_queue_consume_last(job_queue lastQueue) noexcept
+bool worker_impl::try_consume_from_once(job_queue* consumeFrom)
 {
-	if (lastQueue < m_firstQueue){
-		m_firstQueue = lastQueue;
-	}
-	m_lastQueue = lastQueue;
+	if (job_impl_shared_ptr jb = consumeFrom->fetch_job()) {
 
-	m_distributionChunks = jh_detail::pow2summation(0, (1 + m_lastQueue) - m_firstQueue);
+		consume_job(std::move(jb));
+
+		return true;
+	}
+
+	return false;
+}
+void worker_impl::consume_job(job_impl_shared_ptr&& jb)
+{
+	job swap(std::move(job::this_job));
+
+	job::this_job = job(std::move(jb));
+	job::this_job.m_impl->operator()();
+	job::this_job = std::move(swap);
+
+	job_handler_impl::t_items.this_worker_impl->refresh_sleep_timer();
+}
+typename worker_impl::job_impl_shared_ptr worker_impl::fetch_job()
+{
+	const std::uint8_t queueCount(m_queueCount.load(std::memory_order_relaxed));
+
+	for (std::uint8_t i = 0; i < queueCount; ++i) {
+		const std::uint8_t ix(m_queueIndex++ % queueCount);
+		if (job_impl_shared_ptr out = m_targets[ix]->fetch_job()) {
+			return out;
+		}
+	}
+
+	return job_impl_shared_ptr(nullptr);
 }
 }
 }

@@ -19,29 +19,17 @@
 // SOFTWARE.
 
 #include "batch_job.h"
-#include <gdul/job_handler/batch_job_impl.h>
+#include <gdul/job_handler/job/batch_job_impl.h>
 
 namespace gdul {
 
 batch_job::batch_job()
 	: m_impl(nullptr)
 {}
-void batch_job::add_dependency(job & dependency)
+void batch_job::depends_on(job & dependency)
 {
 	if (m_impl)
-		m_impl->add_dependency(dependency);
-}
-void batch_job::set_target_queue(job_queue target) noexcept
-{
-	if (m_impl)
-		m_impl->set_target_queue(target);
-}
-job_queue batch_job::get_target_queue() const noexcept 
-{
-	if (!m_impl)
-		return jh_detail::Default_Job_Queue;
-
-	return m_impl->get_target_queue();
+		m_impl->depends_on(dependency);
 }
 bool batch_job::enable() noexcept
 {
@@ -69,13 +57,17 @@ void batch_job::wait_until_ready() noexcept
 	if (m_impl)
 		m_impl->wait_until_ready();
 }
-void batch_job::work_until_finished(job_queue consumeFrom)
+void batch_job::work_until_finished(job_queue* consumeFrom)
 {
+	assert(consumeFrom && "Null ptr");
+
 	if (m_impl)
 		m_impl->work_until_finished(consumeFrom);
 }
-void batch_job::work_until_ready(job_queue consumeFrom)
+void batch_job::work_until_ready(job_queue* consumeFrom)
 {
+	assert(consumeFrom && "Null ptr");
+
 	if (m_impl)
 		m_impl->work_until_ready(consumeFrom);
 }
@@ -90,15 +82,6 @@ std::size_t batch_job::get_output_size() const noexcept
 
 	return m_impl->get_output_size();
 }
-#if defined(GDUL_JOB_DEBUG)
-constexpr_id batch_job::register_tracking_node(constexpr_id id, const char * name, const char* file, std::uint32_t line, bool)
-{
-	if (!m_impl)
-		return constexpr_id::make<0>();
-
-	return m_impl->register_tracking_node(id, name, file, line);
-}
-#endif
 job & batch_job::get_endjob() noexcept
 {
 	return m_impl->get_endjob();

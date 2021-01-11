@@ -25,19 +25,20 @@
 
 #include <array>
 
-#include <gdul/concurrent_queue/concurrent_queue.h>
-
-#include <gdul/job_handler/job.h>
-#include <gdul/job_handler/job_handler_utility.h>
-#include <gdul/job_handler/job_impl.h>
 #include <gdul/memory/pool_allocator.h>
-#include <gdul/job_handler/worker_impl.h>
-#include <gdul/job_handler/worker.h>
 #include <gdul/delegate/delegate.h>
-#include <gdul/job_handler/batch_job_impl.h>
+#include <gdul/job_handler/job/job.h>
+#include <gdul/job_handler/job/job_impl.h>
+#include <gdul/job_handler/job/batch_job_impl.h>
+#include <gdul/job_handler/worker/worker_impl.h>
+#include <gdul/job_handler/worker/worker.h>
+#include <gdul/job_handler/job_handler_utility.h>
+#include <gdul/job_handler/job/job_node.h>
+#include <gdul/job_handler/tracking/job_graph.h>
 
 namespace gdul {
 
+class job_queue;
 namespace  jh_detail{
 
 class job_impl;
@@ -57,45 +58,43 @@ public:
 	job_handler_impl(allocator_type allocator);
 	~job_handler_impl();
 
- 	void retire_workers();
+ 	void shutdown();
 
 	worker make_worker();
-	worker make_worker(gdul::delegate<void()> entryPoint);
 
-	job make_job(delegate<void()>&& workUnit);
+#if defined (GDUL_JOB_DEBUG)
+	job make_job_internal(delegate<void()>&& workUnit, job_queue* target, std::size_t physicalId, std::size_t variationId, const char* name, const char* file, std::uint32_t line);
+	job make_sub_job_internal(delegate<void()>&& workUnit, job_queue* target, std::size_t batchId, std::size_t variationId, const char* name);
+#else
+	job make_job_internal(delegate<void()>&& workUnit, job_queue* target, std::size_t physicalId, std::size_t variationId);
+	job make_sub_job_internal(delegate<void()>&& workUnit, job_queue* target, std::size_t batchId, std::size_t variationId);
+#endif
+	std::size_t worker_count() const noexcept;
 
-	std::size_t internal_worker_count() const noexcept;
-	std::size_t external_worker_count() const noexcept;
-	std::size_t active_job_count() const noexcept;
+	job_graph& get_job_graph();
 
 	pool_allocator<job_node> get_job_node_allocator() const noexcept;
 	pool_allocator<dummy_batch_type> get_batch_job_allocator() const noexcept;
 
-	void enqueue_job(job_impl_shared_ptr job);
-
-	bool try_consume_from_once(job_queue consumeFrom);
+#if defined(GDUL_JOB_DEBUG)
+	void dump_job_graph(const char* location);
+	void dump_job_time_sets(const char* location);
+#endif
 
 private:
-
 	void launch_worker(std::uint16_t index) noexcept;
-
-	void work();
-	void consume_job(job&& jb);
-
-	job_impl_shared_ptr fetch_job();
-
-	allocator_type m_mainAllocator;
 
 	memory_pool m_jobImplMemPool;
 	memory_pool m_jobNodeMemPool;
 	memory_pool m_batchJobMemPool;
 
-	concurrent_queue<job_impl_shared_ptr, allocator_type> m_jobQueues[job_queue_count];
+	job_graph m_jobGraph;
 
 	std::array<worker_impl, Max_Workers> m_workers;
 
-	std::atomic<std::uint16_t> m_workerCount;
 	std::atomic<std::uint16_t> m_workerIndices;
+
+	allocator_type m_mainAllocator;
 };
 }
 }

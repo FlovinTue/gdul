@@ -18,55 +18,28 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <gdul/job_handler/debug/job_tracker_node.h>
+#pragma once
 
-#if defined(GDUL_JOB_DEBUG)
-
+#include <gdul/job_handler/globals.h>
+#include <chrono>
 namespace gdul
 {
 namespace jh_detail
 {
-job_tracker_node::job_tracker_node()
-	: m_id(constexpr_id::make<0>())
-	, m_parent(constexpr_id::make<0>())
-	, m_type(job_tracker_node_default)
-	, m_line(0)
+class timer
 {
-}
-constexpr_id job_tracker_node::id() const
-{
-	return m_id;
-}
-constexpr_id job_tracker_node::parent() const
-{
-	return m_parent;
-}
+public:
+	timer();
+	float elapsed() const;
 
-void job_tracker_node::set_node_type(job_tracker_node_type type)
-{
-	m_type = type;
-}
+	void reset();
+	void start();
 
-job_tracker_node_type job_tracker_node::get_node_type() const
-{
-	return m_type;
-}
+	static const std::chrono::high_resolution_clock s_clock;
 
-const std::string & job_tracker_node::name() const
-{
-	return m_name;
-}
-
-const std::string& job_tracker_node::physical_location() const
-{
-	return m_physicalLocation;
-}
-
-std::uint32_t job_tracker_node::line() const
-{
-	return m_line;
-}
-
+private:
+	std::chrono::high_resolution_clock::time_point m_fromTime;
+	bool m_running;
+};
 }
 }
-#endif

@@ -23,32 +23,44 @@
 #include <gdul/job_handler/globals.h>
 
 #if defined(GDUL_JOB_DEBUG)
-#include <chrono>
-namespace gdul
-{
-namespace jh_detail
-{
-class timer
+#include <gdul/job_handler/tracking/timer.h>
+#include <atomic>
+
+namespace gdul {
+namespace jh_detail {
+
+class time_set
 {
 public:
-	timer()
-		: m_fromTime(m_clock.now())
-	{}
-	float get() const
-	{
-		return std::chrono::duration_cast<std::chrono::duration<float>>(m_clock.now() - m_fromTime).count();
-	}
-	void reset()
-	{
-		m_fromTime = m_clock.now();
-	}
+	time_set();
+	time_set(const time_set& other);
+	time_set(time_set&& other);
+	time_set& operator=(time_set&& other);
+	time_set& operator=(const time_set& other);
+
+	void log_time(float completionTime);
+
+	float get_avg() const;
+	float get_max() const;
+	float get_min() const;
+	float get_minTimepoint() const;
+	float get_maxTimepoint() const;
+
+	std::size_t get_completion_count() const;
 
 private:
-	std::chrono::high_resolution_clock m_clock;
-	std::chrono::high_resolution_clock::time_point m_fromTime;
+	static timer s_globalTimer;
+
+	std::atomic_flag m_lock;
+
+	std::size_t m_completionCount;
+
+	float m_totalTime;
+	float m_minTime;
+	float m_maxTime;
+	float m_minTimepoint;
+	float m_maxTimepoint;
 };
 }
 }
-
-
 #endif

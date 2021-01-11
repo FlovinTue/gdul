@@ -20,13 +20,11 @@
 
 #include <gdul/job_handler/job_handler.h>
 #include <gdul/job_handler/job_handler_impl.h>
+#include <gdul/job_handler/tracking/job_graph.h>
 #include <cassert>
 
 namespace gdul
 {
-thread_local job job_handler::this_job(shared_ptr<jh_detail::job_impl>(nullptr));
-thread_local worker job_handler::this_worker(&jh_detail::job_handler_impl::t_items.m_implicitWorker);
-
 job_handler::job_handler()
 	: job_handler(jh_detail::allocator_type())
 {
@@ -42,38 +40,64 @@ void job_handler::init() {
 }
 job_handler::~job_handler()
 {
-	retire_workers();
+	shutdown();
 }
-void job_handler::retire_workers()
+void job_handler::shutdown()
 {
-	m_impl->retire_workers();
+	m_impl->shutdown();
 }
 worker job_handler::make_worker()
 {
 	return m_impl->make_worker();
 }
-worker job_handler::make_worker(gdul::delegate<void()> entryPoint)
+#if defined (GDUL_JOB_DEBUG)
+void job_handler::dump_job_graph()
 {
-	return m_impl->make_worker(std::move(entryPoint));
+	dump_job_graph("");
 }
-std::size_t job_handler::internal_worker_count() const noexcept
+void job_handler::dump_job_time_sets()
 {
-	return m_impl->internal_worker_count();
+	dump_job_time_sets("");
 }
-std::size_t job_handler::external_worker_count() const noexcept
+void job_handler::dump_job_graph(const char* location)
 {
-	return m_impl->external_worker_count();
+	m_impl->dump_job_graph(location);
 }
-std::size_t job_handler::active_job_count() const noexcept
+void job_handler::dump_job_time_sets(const char* location)
 {
-	return m_impl->active_job_count();
+	m_impl->dump_job_time_sets(location);
 }
-job job_handler::make_job(gdul::delegate<void()> workUnit)
+#endif
+job job_handler::_redirect_make_job(std::size_t physicalId, [[maybe_unused]] const char* dbgFile, [[maybe_unused]] std::uint32_t line, delegate<void()> workUnit, job_queue* target, std::size_t variationId, [[maybe_unused]] const char* dbgName)
 {
-	return m_impl->make_job(std::move(workUnit));
+#if defined (GDUL_JOB_DEBUG)
+	return m_impl->make_job_internal(std::move(workUnit), target, physicalId, variationId, dbgName, dbgFile, line);
+#else
+	return m_impl->make_job_internal(std::move(workUnit), target, physicalId, variationId);
+#endif
+}
+job job_handler::_redirect_make_job(std::size_t physicalId, [[maybe_unused]] const char* dbgFile, [[maybe_unused]] std::uint32_t line, delegate<void()> workUnit, job_queue* target, [[maybe_unused]] const char* dbgName)
+{
+#if defined (GDUL_JOB_DEBUG)
+	return m_impl->make_job_internal(std::move(workUnit), target, physicalId, 0, dbgName, dbgFile, line);
+#else
+	return m_impl->make_job_internal(std::move(workUnit), target, physicalId, 0);
+#endif
+}
+std::size_t job_handler::worker_count() const noexcept
+{
+	return m_impl->worker_count();
 }
 pool_allocator<jh_detail::dummy_batch_type> job_handler::get_batch_job_allocator() const noexcept
 {
 	return m_impl->get_batch_job_allocator();
+}
+jh_detail::job_info* job_handler::get_job_info(std::size_t physicalId, std::size_t variationId, [[maybe_unused]] const char* dbgName, [[maybe_unused]] const char* dbgFile, [[maybe_unused]] std::uint32_t line)
+{
+#if defined (GDUL_JOB_DEBUG)
+	return m_impl->get_job_graph().get_job_info(physicalId, variationId, dbgName, dbgFile, line);
+#else
+	return m_impl->get_job_graph().get_job_info(physicalId, variationId);
+#endif
 }
 }

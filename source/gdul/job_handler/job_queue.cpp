@@ -18,51 +18,41 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#pragma once
+#include "job_queue.h"
+#include <gdul/job_handler/job/job_impl.h>
 
-#include <gdul/job_handler/job_handler_utility.h>
-#include <gdul/delegate/delegate.h>
-#include <string>
+namespace gdul {
 
-namespace gdul
+void job_async_queue::submit_job(jh_detail::job_impl_shared_ptr jb)
 {
-template <class Signature>
-class delegate;
-
-namespace jh_detail
-{
-class worker_impl;
+	m_queue.push(std::move(jb));
 }
-class worker
+job_async_queue::job_async_queue(jh_detail::allocator_type alloc)
+	: m_queue(alloc)
 {
-public:
-	worker() = default;
-	worker(jh_detail::worker_impl* impl);
-	worker(const worker&) = default;
-	worker(worker&&) = default;
-	worker& operator=(const worker&) = default;
-	worker& operator=(worker&&) = default;
-
-	~worker();
-
-	void set_core_affinity(std::uint8_t core);
-	void set_execution_priority(std::int32_t priority);
-	void set_name(const std::string& name);
-
-	void enable();
-	bool disable();
-
-	void set_run_on_enable(delegate<void()> toCall);
-	void set_run_on_disable(delegate<void()> toCall);
-
-	void set_queue_consume_first(job_queue firstQueue) noexcept;
-	void set_queue_consume_last(job_queue lastQueue) noexcept;
-
-	bool is_active() const;
-
-private:
-	friend class job_handler_impl;
-
-	jh_detail::worker_impl* m_impl;
-};
+}
+jh_detail::job_impl_shared_ptr job_async_queue::fetch_job()
+{
+	jh_detail::job_impl_shared_ptr out;
+	m_queue.try_pop(out);
+	return out;
+}
+job_sync_queue::job_sync_queue(jh_detail::allocator_type alloc)
+	: m_queue(alloc)
+{
+}
+void job_sync_queue::submit_job(jh_detail::job_impl_shared_ptr jb)
+{
+	m_queue.push(std::make_pair(jb->get_remaining_dependant_time(), std::move(jb)));
+}
+jh_detail::job_impl_shared_ptr job_sync_queue::fetch_job()
+{
+	std::pair<float, jh_detail::job_impl_shared_ptr> out;
+	m_queue.try_pop(out);
+	return out.second;
+}
+std::uint8_t job_queue::assigned_workers() const
+{
+	return m_assignees.load(std::memory_order_relaxed);
+}
 }

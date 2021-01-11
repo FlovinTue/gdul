@@ -153,8 +153,8 @@ inline void tester<T>::assert_base_functionality()
 	const int six(resetTest.get());
 	GDUL_ASSERT(six == 6);
 
-	tlm<char> boolOpFalse(0);
-	tlm<char> boolOpTrue(1);
+	tlm<char> boolOpFalse(char(0));
+	tlm<char> boolOpTrue(char(1));
 
 	GDUL_ASSERT(!(bool)boolOpFalse);
 	GDUL_ASSERT((bool)boolOpTrue);
@@ -192,7 +192,7 @@ inline void tester<T>::assert_base_functionality()
 	ref->mem = 5;
 
 	GDUL_ASSERT(cref->mem == 5);
-	
+
 	src out = *ref;
 	const src out2 = *cref;
 

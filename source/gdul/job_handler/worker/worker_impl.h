@@ -29,8 +29,8 @@
 
 #include <gdul/job_handler/job_handler_utility.h>
 #include <gdul/delegate/delegate.h>
-#include <gdul/job_handler/worker.h>
-#include <gdul/job_handler/job.h>
+#include <gdul/job_handler/worker/worker.h>
+#include <gdul/job_handler/job/job.h>
 
 namespace gdul {
 namespace jh_detail
@@ -40,6 +40,8 @@ class job_handler_impl;
 class alignas(64) worker_impl
 {
 public:
+	using job_impl_shared_ptr = shared_ptr<job_impl>;
+
 	worker_impl();
 	worker_impl(std::thread&& thrd, allocator_type allocator);
 	~worker_impl();
@@ -49,10 +51,8 @@ public:
 	void set_core_affinity(std::uint8_t core);
 	void set_execution_priority(std::uint32_t priority);
 	void set_sleep_threshhold(std::uint16_t ms);
-	void set_name(const std::string & name);
 
-	void set_queue_consume_first(job_queue firstQueue) noexcept;
-	void set_queue_consume_last(job_queue lastQueue) noexcept;
+	void set_name(const std::string & name);
 
 	void enable();
 
@@ -66,20 +66,23 @@ public:
 
 	void set_run_on_enable(delegate<void()> && toCall);
 	void set_run_on_disable(delegate<void()> && toCall);
-	void set_entry_point(delegate<void()> && toCall);
+
+	void add_assignment(job_queue* queue);
 
 	void on_enable();
 	void on_disable();
-	void entry_point();
 
+	void work();
 	void idle();
-
-	std::uint8_t get_queue_target();
-	std::uint8_t get_fetch_retries() const;
 
 	allocator_type get_allocator() const;
 
+	bool try_consume_from_once(job_queue* consumeFrom);
+
 private:
+	void consume_job(job_impl_shared_ptr&& jb);
+	typename job_impl_shared_ptr fetch_job();
+
 #ifdef GDUL_JOB_DEBUG
 	std::string m_name;
 #endif
@@ -89,13 +92,11 @@ private:
 
 	gdul::delegate<void()> m_onEnable;
 	gdul::delegate<void()> m_onDisable;
-	gdul::delegate<void()> m_entryPoint;
-
-	std::size_t m_queueDistributionIteration;
-	std::size_t m_distributionChunks;
 
 	std::chrono::high_resolution_clock::time_point m_lastJobTimepoint;
 	std::chrono::high_resolution_clock m_sleepTimer;
+
+	job_queue* m_targets[Max_Worker_Targets];
 
 	std::int32_t m_executionPriority;
 
@@ -105,11 +106,11 @@ private:
 
 	std::atomic_bool m_isEnabled;
 	std::atomic_bool m_isActive;
-
-	job_queue m_firstQueue;
-	job_queue m_lastQueue;
+	std::atomic_uint8_t m_queuePushSync;
+	std::atomic_uint8_t m_queueCount;
 
 	std::uint8_t m_coreAffinity;
+	std::uint8_t m_queueIndex;
 };
 }
 }

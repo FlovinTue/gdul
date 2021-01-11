@@ -21,43 +21,33 @@
 #pragma once
 
 #include <gdul/job_handler/globals.h>
+#include <gdul/job_handler/tracking/job_info.h>
 
-#if defined(GDUL_JOB_DEBUG)
-namespace gdul
-{
-namespace jh_detail
-{
-class job_tracker;
-}
-struct constexpr_id
-{
-	template <std::uint64_t Id>
-	static constexpr constexpr_id make()
-	{
-		return constexpr_id(Id);
-	}
+#include <gdul/concurrent_skip_list/concurrent_skip_list.h>
 
-	constexpr_id merge(const constexpr_id& other) const
-	{
-		return constexpr_id(m_val + other.m_val);
-	}
-	std::uint64_t value() const noexcept { return m_val; }
+namespace gdul {
+namespace jh_detail {
 
-	constexpr_id(const constexpr_id&) = default;
-	constexpr_id(constexpr_id&&) = default;
-	constexpr_id& operator=(const constexpr_id&) = default;
-	constexpr_id& operator=(constexpr_id&&) = default;
+class job_graph
+{
+public:
+	job_graph();
+
+	job_info* fetch_job_info(std::size_t id);
+
+#if defined (GDUL_JOB_DEBUG)
+	job_info* get_job_info(std::size_t physicalId, std::size_t variationId, const char * name, const char* file, std::uint32_t line);
+	job_info* get_sub_job_info(std::size_t batchId, std::size_t variationId, const char* name);
+
+	void dump_job_graph(const char* location);
+	void dump_job_time_sets(const char* location);
+#else
+	job_info* get_job_info(std::size_t physicalId, std::size_t variationId);
+	job_info* get_sub_job_info(std::size_t batchId, std::size_t variationId);
+#endif
 
 private:
-	friend class jh_detail::job_tracker;
-
-	std::uint64_t m_val;
-
-	constexpr constexpr_id(std::uint64_t id)
-		: m_val(id)
-	{}
+	concurrent_skip_list<std::uint64_t, job_info> m_map;
 };
 }
-
-
-#endif
+}

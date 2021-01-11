@@ -10,27 +10,6 @@
     <ClCompile Include="work_tracker.cpp">
       <Filter>other</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\source\gdul\job_handler\batch_job.cpp">
-      <Filter>implementation\job</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\source\gdul\job_handler\batch_job_impl.cpp">
-      <Filter>implementation\job</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\source\gdul\job_handler\job.cpp">
-      <Filter>implementation\job</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\source\gdul\job_handler\debug\time_set.cpp">
-      <Filter>implementation\debug</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\source\gdul\job_handler\debug\job_tracker_node.cpp">
-      <Filter>implementation\debug</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\source\gdul\job_handler\debug\job_tracker.cpp">
-      <Filter>implementation\debug</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\source\gdul\job_handler\job_impl.cpp">
-      <Filter>implementation\job</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\source\gdul\job_handler\job_handler.cpp">
       <Filter>implementation</Filter>
     </ClCompile>
@@ -40,11 +19,38 @@
     <ClCompile Include="..\..\source\gdul\job_handler\job_handler_utility.cpp">
       <Filter>implementation</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\source\gdul\job_handler\worker.cpp">
+    <ClCompile Include="..\..\source\gdul\job_handler\job_queue.cpp">
       <Filter>implementation</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\source\gdul\job_handler\worker_impl.cpp">
-      <Filter>implementation</Filter>
+    <ClCompile Include="..\..\source\gdul\job_handler\worker\worker_impl.cpp">
+      <Filter>implementation\worker</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\source\gdul\job_handler\worker\worker.cpp">
+      <Filter>implementation\worker</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\source\gdul\job_handler\tracking\job_info.cpp">
+      <Filter>implementation\tracking</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\source\gdul\job_handler\tracking\time_set.cpp">
+      <Filter>implementation\tracking</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\source\gdul\job_handler\tracking\job_graph.cpp">
+      <Filter>implementation\tracking</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\source\gdul\job_handler\tracking\timer.cpp">
+      <Filter>implementation\tracking</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\source\gdul\job_handler\job\job.cpp">
+      <Filter>implementation\job</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\source\gdul\job_handler\job\batch_job_impl.cpp">
+      <Filter>implementation\job</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\source\gdul\job_handler\job\batch_job.cpp">
+      <Filter>implementation\job</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\source\gdul\job_handler\job\job_impl.cpp">
+      <Filter>implementation\job</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -53,42 +59,6 @@
     </ClInclude>
     <ClInclude Include="work_tracker.h">
       <Filter>other</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\source\gdul\job_handler\batch_job.h">
-      <Filter>implementation\job</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\source\gdul\job_handler\batch_job_impl.h">
-      <Filter>implementation\job</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\source\gdul\job_handler\batch_job_impl_interface.h">
-      <Filter>implementation\job</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\source\gdul\job_handler\job.h">
-      <Filter>implementation\job</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\source\gdul\job_handler\debug\timer.h">
-      <Filter>implementation\debug</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\source\gdul\job_handler\debug\time_set.h">
-      <Filter>implementation\debug</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\source\gdul\job_handler\debug\job_tracker_node.h">
-      <Filter>implementation\debug</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\source\gdul\job_handler\debug\job_tracker_interface.h">
-      <Filter>implementation\debug</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\source\gdul\job_handler\debug\job_tracker.h">
-      <Filter>implementation\debug</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\source\gdul\job_handler\job_node.h">
-      <Filter>implementation\job</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\source\gdul\job_handler\job_impl.h">
-      <Filter>implementation\job</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\source\gdul\job_handler\debug\constexp_id.h">
-      <Filter>implementation</Filter>
     </ClInclude>
     <ClInclude Include="..\..\source\gdul\job_handler\globals.h">
       <Filter>implementation</Filter>
@@ -105,11 +75,44 @@
     <ClInclude Include="..\..\source\gdul\job_handler\job_handler_utility.h">
       <Filter>implementation</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\source\gdul\job_handler\worker.h">
+    <ClInclude Include="..\..\source\gdul\job_handler\job_queue.h">
       <Filter>implementation</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\source\gdul\job_handler\worker_impl.h">
-      <Filter>implementation</Filter>
+    <ClInclude Include="..\..\source\gdul\job_handler\worker\worker_impl.h">
+      <Filter>implementation\worker</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\source\gdul\job_handler\worker\worker.h">
+      <Filter>implementation\worker</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\source\gdul\job_handler\tracking\job_info.h">
+      <Filter>implementation\tracking</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\source\gdul\job_handler\tracking\time_set.h">
+      <Filter>implementation\tracking</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\source\gdul\job_handler\tracking\timer.h">
+      <Filter>implementation\tracking</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\source\gdul\job_handler\tracking\job_graph.h">
+      <Filter>implementation\tracking</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\source\gdul\job_handler\job\job_node.h">
+      <Filter>implementation\job</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\source\gdul\job_handler\job\batch_job_impl_interface.h">
+      <Filter>implementation\job</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\source\gdul\job_handler\job\job.h">
+      <Filter>implementation\job</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\source\gdul\job_handler\job\batch_job_impl.h">
+      <Filter>implementation\job</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\source\gdul\job_handler\job\batch_job.h">
+      <Filter>implementation\job</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\source\gdul\job_handler\job\job_impl.h">
+      <Filter>implementation\job</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -122,8 +125,11 @@
     <Filter Include="implementation\job">
       <UniqueIdentifier>{cf04a2ad-34fa-478a-bb28-32ccea96627f}</UniqueIdentifier>
     </Filter>
-    <Filter Include="implementation\debug">
-      <UniqueIdentifier>{73a691c6-45d3-4c01-ab25-77747465520a}</UniqueIdentifier>
+    <Filter Include="implementation\worker">
+      <UniqueIdentifier>{25a29706-b80e-4706-a20c-93fc967eb7cf}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="implementation\tracking">
+      <UniqueIdentifier>{b0a84908-8207-4da4-a522-57805f3c40cf}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

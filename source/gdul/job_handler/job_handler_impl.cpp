@@ -31,8 +31,6 @@
 
 namespace gdul
 {
-
-#undef GetObject
 namespace jh_detail
 {
 thread_local job_handler_impl::tl_container job_handler_impl::t_items{ &job_handler_impl::t_items.m_implicitWorker };
@@ -44,28 +42,31 @@ job_handler_impl::job_handler_impl()
 }
 
 job_handler_impl::job_handler_impl(allocator_type allocator)
-	: m_mainAllocator(allocator)
+	: m_jobImplMemPool()
+	, m_jobNodeMemPool()
+	, m_batchJobMemPool()
+	, m_jobGraph()
+	, m_workers{}
 	, m_workerIndices(0)
-	, m_workerCount(0)
+	, m_mainAllocator(allocator)
 {
 	constexpr std::size_t jobImplAllocSize(allocate_shared_size<job_impl, pool_allocator<job_impl>>());
 	constexpr std::size_t jobNodeAllocSize(allocate_shared_size<job_node, pool_allocator<job_node>>());
 	constexpr std::size_t batchJobAllocSize(allocate_shared_size<dummy_batch_type, pool_allocator<dummy_batch_type>>());
 
-	m_jobImplMemPool.init<jobImplAllocSize, alignof(job_impl)>(jh_detail::Job_Pool_Init_Size, m_mainAllocator);
-	m_jobNodeMemPool.init<jobNodeAllocSize, alignof(job_node)>(jh_detail::Job_Pool_Init_Size + jh_detail::Batch_Job_Pool_Init_Size, m_mainAllocator);
-	m_batchJobMemPool.init<batchJobAllocSize, alignof(dummy_batch_type)>(jh_detail::Batch_Job_Pool_Init_Size, m_mainAllocator);
+	m_jobImplMemPool.init<jobImplAllocSize, alignof(job_impl)>(Job_Pool_Init_Size, m_mainAllocator);
+	m_jobNodeMemPool.init<jobNodeAllocSize, alignof(job_node)>(Job_Pool_Init_Size + jh_detail::Batch_Job_Pool_Init_Size, m_mainAllocator);
+	m_batchJobMemPool.init<batchJobAllocSize, alignof(dummy_batch_type)>(Batch_Job_Pool_Init_Size, m_mainAllocator);
 }
 
 
 job_handler_impl::~job_handler_impl()
 {
-	retire_workers();
+	shutdown();
 }
 
-void job_handler_impl::retire_workers()
+void job_handler_impl::shutdown()
 {
-	m_workerCount.store(0, std::memory_order_relaxed);
 	const std::uint16_t workers(m_workerIndices.exchange(0, std::memory_order_seq_cst));
 
 	for (size_t i = 0; i < workers; ++i) {
@@ -73,18 +74,8 @@ void job_handler_impl::retire_workers()
 	}
 }
 
+
 worker job_handler_impl::make_worker()
-{
-	gdul::delegate<void()> entryPoint(&job_handler_impl::work, this);
-
-	worker w(make_worker(entryPoint));
-	w.set_name("worker");
-
-	m_workerCount.fetch_add(1, std::memory_order_relaxed);
-
-	return w;
-}
-worker job_handler_impl::make_worker(gdul::delegate<void()> entryPoint)
 {
 	const std::uint16_t index(m_workerIndices.fetch_add(1, std::memory_order_relaxed));
 
@@ -95,43 +86,79 @@ worker job_handler_impl::make_worker(gdul::delegate<void()> entryPoint)
 	jh_detail::worker_impl impl(std::move(thread), m_mainAllocator);
 	impl.set_core_affinity(autoCoreAffinity);
 
-	impl.set_entry_point(std::move(entryPoint));
-
 	m_workers[index] = std::move(impl);
 
 	return worker(&m_workers[index]);
 }
-job job_handler_impl::make_job(delegate<void()>&& workUnit)
+#if defined (GDUL_JOB_DEBUG)
+job job_handler_impl::make_job_internal(delegate<void()>&& workUnit, job_queue* target, std::size_t physicalId, std::size_t variationId, const char* name, const char* file, std::uint32_t line)
 {
 	pool_allocator<job_impl> alloc(m_jobImplMemPool.create_allocator<job_impl>());
-	const job_impl_shared_ptr jobImpl(gdul::allocate_shared<job_impl>
+
+	job_impl_shared_ptr jobImpl(gdul::allocate_shared<job_impl>
 		(
 			alloc,
 			std::forward<delegate<void()>>(workUnit),
-			this
-			));
+			this,
+			target,
+			m_jobGraph.get_job_info(physicalId, variationId, name, file, line)));
 
 	return job(jobImpl);
 }
-
-std::size_t job_handler_impl::internal_worker_count() const noexcept
+job job_handler_impl::make_sub_job_internal(delegate<void()>&& workUnit, job_queue* target, std::size_t batchId, std::size_t variationId, const char* name)
 {
-	return m_workerCount.load(std::memory_order_relaxed);
-}
-std::size_t job_handler_impl::external_worker_count() const noexcept
-{
-	return m_workerIndices.load(std::memory_order_relaxed) - m_workerCount.load(std::memory_order_relaxed);
-}
-std::size_t job_handler_impl::active_job_count() const noexcept
-{
-	std::size_t accum(0);
+	pool_allocator<job_impl> alloc(m_jobImplMemPool.create_allocator<job_impl>());
 
-	for (std::uint8_t i = 0; i < job_queue_count; ++i) {
-		accum += m_jobQueues[i].size();
-	}
+	job_impl_shared_ptr jobImpl(gdul::allocate_shared<job_impl>
+		(
+			alloc,
+			std::forward<delegate<void()>>(workUnit),
+			this,
+			target,
+			m_jobGraph.get_sub_job_info(batchId, variationId, name)));
 
-	return accum;
+	return job(jobImpl);
 }
+#else
+job job_handler_impl::make_job_internal(delegate<void()>&& workUnit, job_queue* target, std::size_t physicalId, std::size_t variationId)
+{
+	pool_allocator<job_impl> alloc(m_jobImplMemPool.create_allocator<job_impl>());
+
+	job_impl_shared_ptr jobImpl(gdul::allocate_shared<job_impl>
+		(
+			alloc,
+			std::forward<delegate<void()>>(workUnit),
+			this,
+			target,
+			m_jobGraph.get_job_info(physicalId, variationId)));
+
+	return job(jobImpl);
+}
+job job_handler_impl::make_sub_job_internal(delegate<void()>&& workUnit, job_queue* target, std::size_t batchId, std::size_t variationId)
+{
+	pool_allocator<job_impl> alloc(m_jobImplMemPool.create_allocator<job_impl>());
+
+	job_impl_shared_ptr jobImpl(gdul::allocate_shared<job_impl>
+		(
+			alloc,
+			std::forward<delegate<void()>>(workUnit),
+			this,
+			target,
+			m_jobGraph.get_sub_job_info(batchId, variationId)));
+
+	return job(jobImpl);
+}
+#endif
+std::size_t job_handler_impl::worker_count() const noexcept
+{
+	return m_workerIndices.load(std::memory_order_relaxed);
+}
+
+job_graph& job_handler_impl::get_job_graph()
+{
+	return m_jobGraph;
+}
+
 pool_allocator<job_node> job_handler_impl::get_job_node_allocator() const noexcept
 {
 	return m_jobNodeMemPool.create_allocator<job_node>();
@@ -140,31 +167,20 @@ pool_allocator<typename dummy_batch_type> job_handler_impl::get_batch_job_alloca
 {
 	return m_batchJobMemPool.create_allocator<dummy_batch_type>();
 }
-void job_handler_impl::enqueue_job(job_impl_shared_ptr job)
+#if defined(GDUL_JOB_DEBUG)
+void job_handler_impl::dump_job_graph(const char* location)
 {
-	const std::uint8_t target(job->get_target_queue());
-
-	GDUL_JOB_DEBUG_CONDTIONAL(job->on_enqueue())
-
-	m_jobQueues[target].push(std::move(job));
+	m_jobGraph.dump_job_graph(location);
 }
-bool job_handler_impl::try_consume_from_once(job_queue consumeFrom)
+void job_handler_impl::dump_job_time_sets(const char* location)
 {
-	job_handler_impl::job_impl_shared_ptr jb;
-
-	if (m_jobQueues[consumeFrom].try_pop(jb)) {
-		
-		consume_job(job(std::move(jb)));
-		
-		return true;
-	}
-
-	return false;
+	m_jobGraph.dump_job_time_sets(location);
 }
+#endif
 void job_handler_impl::launch_worker(std::uint16_t index) noexcept
 {
 	t_items.this_worker_impl = &m_workers[index];
-	job_handler::this_worker = worker(t_items.this_worker_impl);
+	worker::this_worker = worker(t_items.this_worker_impl);
 
 	while (!t_items.this_worker_impl->is_enabled()) {
 		t_items.this_worker_impl->idle();
@@ -173,49 +189,8 @@ void job_handler_impl::launch_worker(std::uint16_t index) noexcept
 	t_items.this_worker_impl->refresh_sleep_timer();
 
 	t_items.this_worker_impl->on_enable();
-	t_items.this_worker_impl->entry_point();
+	t_items.this_worker_impl->work();
 	t_items.this_worker_impl->on_disable();
-}
-void job_handler_impl::work()
-{
-	while (t_items.this_worker_impl->is_active()) {
-
-		if (job jb = fetch_job()) {
-			consume_job(std::move(jb));
-		}
-		else {
-			t_items.this_worker_impl->idle();
-		}
-	}
-}
-
-void job_handler_impl::consume_job(job && jb)
-{
-	job swap(std::move(job_handler::this_job));
-
-	job_handler::this_job = job(std::move(jb));
-
-	job_handler::this_job.m_impl->operator()();
-
-	job_handler::this_job = std::move(swap);
-
-	t_items.this_worker_impl->refresh_sleep_timer();
-}
-
-job_handler_impl::job_impl_shared_ptr job_handler_impl::fetch_job()
-{
-	const uint8_t queueIndex(t_items.this_worker_impl->get_queue_target());
-
-	job_handler_impl::job_impl_shared_ptr out(nullptr);
-
-	for (uint8_t i = 0; i < t_items.this_worker_impl->get_fetch_retries(); ++i) {
-
-		if (m_jobQueues[queueIndex].try_pop(out)) {
-			return out;
-		}
-	}
-
-	return out;
 }
 }
 }

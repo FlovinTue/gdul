@@ -20,9 +20,10 @@
 
 #pragma once
 
-#include <gdul/job_handler/job.h>
+#include <gdul/job_handler/job/job.h>
 #include <gdul/job_handler/job_handler.h>
-#include <gdul/job_handler/worker.h>
-#include <gdul/job_handler/batch_job.h>
-#include <gdul/job_handler/batch_job_impl.h>
+#include <gdul/job_handler/worker/worker.h>
+#include <gdul/job_handler/job/batch_job.h>
+#include <gdul/job_handler/job/batch_job_impl.h>
+#include <gdul/job_handler/job_queue.h>
 #include <gdul/job_handler/globals.h>

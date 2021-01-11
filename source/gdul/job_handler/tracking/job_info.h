@@ -21,32 +21,49 @@
 #pragma once
 
 #include <gdul/job_handler/globals.h>
+#include <atomic>
 
 #if defined(GDUL_JOB_DEBUG)
-
-#include <gdul/job_handler/debug/constexp_id.h>
-#include <gdul/job_handler/debug/time_set.h>
+#include <gdul/job_handler/tracking/time_set.h>
 #include <string>
+#endif
+
 
 namespace gdul
 {
 namespace jh_detail
 {
-enum job_tracker_node_type : std::uint8_t
+#if defined (GDUL_JOB_DEBUG)
+enum job_type : std::uint8_t
 {
-	job_tracker_node_default,
-	job_tracker_node_batch,
-	job_tracker_node_matriarch,
+	job_default,
+	job_batch,
+	job_physical,
 };
-struct job_tracker_node
+#endif
+struct job_info
 {
-	job_tracker_node();
+	job_info();
+	job_info(job_info&& other);
+	job_info(const job_info& other);
+	job_info& operator=(job_info&& other);
+	job_info& operator=(const job_info& other);
 
-	constexpr_id id() const;
-	constexpr_id parent() const;
 
-	void set_node_type(job_tracker_node_type type);
-	job_tracker_node_type get_node_type() const;
+	void accumulate_dependant_time(float priority);
+	void accumulate_propagation_time(float priority);
+	float get_dependant_runtime() const;
+	float get_propagation_runtime() const;
+	float get_runtime() const;
+	void store_runtime(float runtime);
+
+	std::size_t id() const;
+
+#if defined(GDUL_JOB_DEBUG)
+	std::size_t parent() const;
+
+	void set_job_type(job_type type);
+	job_type get_node_type() const;
 
 	const std::string& name() const;
 	const std::string& physical_location() const;
@@ -56,22 +73,31 @@ struct job_tracker_node
 	time_set m_completionTimeSet;
 	time_set m_waitTimeSet;
 	time_set m_enqueueTimeSet;
+#endif
 
 private:
-	friend class job_tracker;
-	friend class job_tracker_data;
+	friend class job_graph;
+	friend class job_graph_data;
 
+	std::size_t m_id;
+
+	std::atomic<float> m_lastDependantRuntime;
+	std::atomic<float> m_dependantRuntime;
+	std::atomic<float> m_lastAccumulatedPropagationTime;
+	std::atomic<float> m_propagationTime;
+
+	float m_runtime;
+
+#if defined(GDUL_JOB_DEBUG)
 	std::string m_name;
 	std::string m_physicalLocation;
 
 	std::uint32_t m_line;
 
-	constexpr_id m_id;
-	constexpr_id m_parent;
+	std::size_t m_parent;
 
-	job_tracker_node_type m_type;
+	job_type m_type;
+#endif
 };
 }
 }
-
-#endif

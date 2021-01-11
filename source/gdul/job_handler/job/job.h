@@ -22,23 +22,27 @@
 
 #include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
 #include <gdul/job_handler/job_handler_utility.h>
-#include <gdul/job_handler/debug/job_tracker_interface.h>
 
 namespace gdul {
 
 class job_handler;
 class batch_job;
+class job_queue;
 
 namespace jh_detail {
 
 class job_handler_impl;
 class job_impl;
+class worker_impl;
+
 template <class InContainer, class OutContainer, class Process>
 class batch_job_impl;
 }
-class job : public jh_detail::job_tracker_interface
+class job
 {
 public:
+	static thread_local job this_job;
+
 	job() noexcept;
 
 	job(job&& other) noexcept;
@@ -46,13 +50,10 @@ public:
 	job& operator=(job&& other) noexcept;
 	job& operator=(const job& other) noexcept;
 
-	void add_dependency(job& dependency);
-	void add_dependency(batch_job& dependency);
+	void depends_on(job& dependency);
+	void depends_on(batch_job& dependency);
 
-	void set_target_queue(job_queue target) noexcept;
-	job_queue get_target_queue() const noexcept;
-
-	// this object may be discarded once enable() has been invoked
+	// this object may be discarded once enable has been invoked
 	bool enable() noexcept;
 	bool enable_locally_if_ready() noexcept;
 
@@ -63,24 +64,24 @@ public:
 	void wait_until_ready() noexcept;
 
 	// Consume jobs until finished. Beware of recursive calls (stack overflow, stalls etc..)
-	void work_until_finished(job_queue consumeFrom);
+	void work_until_finished(job_queue* consumeFrom);
 
 	// Consume jobs until ready. Beware of recursive calls (stack overflow, stalls etc..)
-	void work_until_ready(job_queue consumeFrom);
+	void work_until_ready(job_queue* consumeFrom);
 
 	operator bool() const noexcept;
 
+	float priority() const noexcept;
+
+	std::size_t get_id() const noexcept;
+
 private:
-	friend class jh_detail::job_handler_impl;
 	friend class job_handler;
+	friend class jh_detail::worker_impl;
 	template <class InContainer, class OutContainer, class Process>
 	friend class jh_detail::batch_job_impl;
-
-#if defined(GDUL_JOB_DEBUG)
-	friend class jh_detail::job_tracker;
-
-	constexpr_id register_tracking_node(constexpr_id id, const char* name, const char* file, std::uint32_t line, bool batchSub) override final;
-#endif
+	friend class jh_detail::job_impl;
+	friend class jh_detail::job_handler_impl;
 
 	job(gdul::shared_ptr<jh_detail::job_impl> impl) noexcept;
 

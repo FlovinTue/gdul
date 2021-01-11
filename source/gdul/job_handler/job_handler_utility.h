@@ -33,56 +33,36 @@
 
 namespace gdul
 {
+class job_queue;
 
 typedef void* thread_handle;
 
 namespace jh_detail
 {
+// https://stackoverflow.com/questions/48896142/is-it-possible-to-get-hash-values-as-compile-time-constants
+template <typename Str>
+constexpr std::size_t constexp_str_hash(const Str& toHash)
+{
+	std::size_t result = 0xcbf29ce484222325ull;
+
+	for (char c : toHash) {
+		result ^= c;
+		result *= 1099511628211ull;
+	}
+
+	return result;
+}
 
 constexpr std::uint32_t Job_Max_Dependencies = std::numeric_limits<std::uint32_t>::max() / 2;
 constexpr std::uint32_t Job_Enable_Dependencies = std::numeric_limits<std::uint32_t>::max() - Job_Max_Dependencies;
 
-
 using allocator_type = std::allocator<uint8_t>;
-
-constexpr std::size_t pow2(std::size_t n)
-{
-	std::size_t sum(1);
-	for (std::size_t i = 0; i < n; ++i) {
-		sum *= 2;
-	}
-	return sum;
-}
-constexpr std::size_t pow2summation(std::size_t from, std::size_t to)
-{
-	std::size_t sum(from);
-	for (std::size_t i = from; i < to; ++i) {
-		sum += pow2(i);
-	}
-	return sum;
-}
-constexpr std::size_t log2align(std::size_t value)
-{
-	std::size_t highBit(0);
-	std::size_t shift(value);
-	for (; shift; ++highBit) {
-		shift >>= 1;
-	}
-
-	highBit -= static_cast<bool>(highBit);
-
-	const std::size_t mask((std::size_t(1) << (highBit)) - 1);
-	const std::size_t remainder((static_cast<bool>(value & mask)));
-
-	const std::size_t sum(highBit + remainder);
-
-	return std::size_t(1) << sum;
-}
 
 void set_thread_name(const char* name, thread_handle handle);
 void set_thread_priority(std::int32_t priority, thread_handle handle);
 void set_thread_core_affinity(std::uint8_t core, thread_handle handle);
 thread_handle create_thread_handle();
 void close_thread_handle(thread_handle handle);
+std::size_t to_batch_size(std::size_t inputSize, job_queue* target);
 }
 }
