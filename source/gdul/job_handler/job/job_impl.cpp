@@ -180,8 +180,6 @@ void job_impl::work_until_finished(job_queue* consumeFrom)
 }
 void job_impl::work_until_ready(job_queue* consumeFrom)
 {
-	assert(is_enabled() && "Job has not yet been enabled");
-
 	if (job::this_job) {
 		m_info->accumulate_propagation_time(job::this_job.m_impl->get_remaining_dependant_time());
 	}
@@ -211,8 +209,6 @@ void job_impl::wait_until_finished() noexcept
 }
 void job_impl::wait_until_ready() noexcept
 {
-	assert(is_enabled() && "Job has not yet been enabled");
-
 	if (job::this_job) {
 		m_info->accumulate_propagation_time(job::this_job.m_impl->get_remaining_dependant_time());
 	}
