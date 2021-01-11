@@ -135,10 +135,9 @@ static constexpr std::uint64_t Ptr_Mask = (std::uint64_t(std::numeric_limits<std
 static constexpr size_type Buffer_Lock_Offset = Buffer_Capacity_Max + Max_Producers;
 
 }
-// The WizardLoaf MPMC unbounded lock-free queue.
-// FIFO is respected within the context of single producers.
-// Basic exception safety may be enabled via define GDUL_CQ_ENABLE_EXCEPTIONHANDLING
-// at the price of a slight performance decrease.
+// MPMC unbounded lock-free queue. FIFO is respected within the context of single producers.
+// Basic exception safety may be enabled via define GDUL_CQ_ENABLE_EXCEPTIONHANDLING at 
+// the price of a slight performance decrease.
 template <class T, class Allocator = std::allocator<std::uint8_t>>
 class concurrent_queue
 {
