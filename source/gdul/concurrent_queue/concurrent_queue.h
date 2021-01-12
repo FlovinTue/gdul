@@ -182,8 +182,8 @@ private:
 	using atomic_shared_ptr_array_type = atomic_shared_ptr<atomic_shared_ptr_slot_type[]>;
 	using shared_ptr_array_type = shared_ptr<atomic_shared_ptr_slot_type[]>;
 
-	template <class ...Arg>
-	void push_internal(Arg&&... in);
+	template <class In>
+	void push_internal(In&& in);
 
 	inline void init_producer(size_type withCapacity);
 
@@ -252,20 +252,20 @@ inline concurrent_queue<T, Allocator>::~concurrent_queue() noexcept
 template<class T, class Allocator>
 void concurrent_queue<T, Allocator>::push(const T& in)
 {
-	push_internal<const T&>(in);
+	push_internal(in);
 }
 template<class T, class Allocator>
 inline void concurrent_queue<T, Allocator>::push(T&& in)
 {
-	push_internal<T&&>(std::move(in));
+	push_internal(std::move(in));
 }
 template<class T, class Allocator>
-template<class ...Arg>
-inline void concurrent_queue<T, Allocator>::push_internal(Arg&& ...in)
+template<class In>
+inline void concurrent_queue<T, Allocator>::push_internal(In&& in)
 {
 	buffer_type* const cachedProducer(this_producer_cached());
 
-	if (!cachedProducer->try_push(std::forward<Arg>(in)...)) {
+	if (!cachedProducer->try_push(std::forward<In>(in))) {
 		if (cachedProducer->is_valid()) {
 			shared_ptr_slot_type next(create_producer_buffer(std::size_t(cachedProducer->get_capacity()) * 2));
 			cachedProducer->push_front(next);
@@ -277,7 +277,7 @@ inline void concurrent_queue<T, Allocator>::push_internal(Arg&& ...in)
 
 		refresh_cached_producer();
 
-		this_producer_cached()->try_push(std::forward<Arg>(in)...);
+		this_producer_cached()->try_push(std::forward<In>(in));
 	}
 }
 template<class T, class Allocator>
@@ -638,8 +638,8 @@ public:
 	producer_buffer(size_type capacity, item_container<T>* dataBlock);
 	~producer_buffer();
 
-	template<class ...Arg>
-	inline bool try_push(Arg&&... in);
+	template<class In>
+	inline bool try_push(In&& in);
 	inline bool try_pop(T& out);
 
 	inline size_type size() const;
@@ -918,8 +918,8 @@ inline void producer_buffer<T, Allocator>::unsafe_clear()
 	}
 }
 template<class T, class Allocator>
-template<class ...Arg>
-inline bool producer_buffer<T, Allocator>::try_push(Arg&& ...in)
+template<class In>
+inline bool producer_buffer<T, Allocator>::try_push(In&& in)
 {
 	const size_type slotTotal(m_writeSlot++);
 	const size_type slot(slotTotal % m_capacity);
@@ -929,7 +929,7 @@ inline bool producer_buffer<T, Allocator>::try_push(Arg&& ...in)
 		return false;
 	}
 
-	write_in(slot, std::forward<Arg>(in)...);
+	write_in(slot, std::forward<In>(in));
 
 	m_dataBlock[slot].set_state_local(item_state::Valid);
 
