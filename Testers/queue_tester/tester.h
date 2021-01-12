@@ -13,7 +13,7 @@
 #include <string>
 
 #if defined(GDUL_FIFO)
-#include <gdul/WIP_concurrent_queue_fifo/concurrent_queue_fifo_v6.h>
+#include <gdul/WIP_concurrent_queue_fifo/concurrent_queue_fifo_v7.h>
 #elif defined(GDUL_CPQ)
 #include <gdul/concurrent_priority_queue/concurrent_priority_queue.h>
 #endif

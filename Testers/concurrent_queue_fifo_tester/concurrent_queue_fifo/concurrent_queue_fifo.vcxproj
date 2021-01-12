@@ -100,6 +100,7 @@
     <ClInclude Include="..\..\..\source\gdul\WIP_concurrent_queue_fifo\concurrent_queue_fifo_v4.h" />
     <ClInclude Include="..\..\..\source\gdul\WIP_concurrent_queue_fifo\concurrent_queue_fifo_v5.h" />
     <ClInclude Include="..\..\..\source\gdul\WIP_concurrent_queue_fifo\concurrent_queue_fifo_v6.h" />
+    <ClInclude Include="..\..\..\source\gdul\WIP_concurrent_queue_fifo\concurrent_queue_fifo_v7.h" />
     <ClInclude Include="pch.h" />
   </ItemGroup>
   <ItemGroup>

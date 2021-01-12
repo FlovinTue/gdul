@@ -223,12 +223,10 @@ inline void concurrent_queue_fifo<T, Allocator>::push_internal(Arg&& ...in)
 		shared_ptr_buffer_type& buffer(t_producer.get());
 
 		if (buffer->is_valid()) {
-			buffer->swap_array();
-
-			if (buffer->try_push(std::forward<Arg>(in)...))
+			/*if (buffer->try_push(std::forward<Arg>(in)...))
 				return;
 
-			reserve(buffer->get_capacity() * 2);
+			reserve(buffer->get_capacity() * 2);*/
 		}
 		else {
 			initialize_producer();

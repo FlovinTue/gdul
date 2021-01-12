@@ -64,31 +64,23 @@
 #ifndef MAKE_UNIQUE_NAME
 #define CONCAT(a,b)  a##b
 #define EXPAND_AND_CONCAT(a, b) CONCAT(a,b)
-#define MAKE_UNIQUE_NAME(prefix) EXPAND_AND_CONCAT(prefix, __COUNTER__)
+#define MAKE_UNIQUE_NAME(prefix) EXPAND_AND_CONCAT(prefix, __LINE__)
 #endif
 
-#define GDUL_CQ_PADDING(bytes) const std::uint8_t MAKE_UNIQUE_NAME(trash)[bytes] {}
+#define GDUL_CACHE_PAD const std::uint8_t MAKE_UNIQUE_NAME(trash)[std::hardware_destructive_interference_size] {}
 
 // For anonymous struct and alignas
 #pragma warning(push, 2)
 #pragma warning(disable : 4201)
 #pragma warning(disable : 4324)
 
-#undef min
-#undef max
+namespace gdul {
 
-namespace gdul
-{
-
-namespace cq_fifo_detail
-{
+namespace cq_fifo_detail {
 typedef std::size_t size_type;
 
 template <class T, class Allocator>
 class item_buffer;
-
-template <class T>
-class item_slot;
 
 template <class T, class Allocator>
 class dummy_container;
@@ -96,16 +88,8 @@ class dummy_container;
 template <class T, class Allocator>
 class buffer_deleter;
 
-enum item_state : std::uint8_t
-{
-	item_state_empty,
-	item_state_valid,
-	item_state_failed,
-	item_state_dummy
-};
-
 template <class Dummy = void>
-std::size_t log2_align(std::size_t from);
+std::size_t pow2_align(std::size_t from);
 
 template <class Dummy = void>
 constexpr std::size_t aligned_size(std::size_t byteSize, std::size_t align);
@@ -116,8 +100,6 @@ class shared_ptr_allocator_adapter;
 // Not quite size_type max because we need some leaway in case we
 // need to throw consumers out of a buffer whilst repairing it
 static constexpr size_type Buffer_Capacity_Default = 8;
-
-static constexpr size_type Buffer_Block_Bit = ~(std::numeric_limits<size_type>::max() >> 1);
 
 static constexpr std::uint64_t Ptr_Mask = (std::uint64_t(std::numeric_limits<std::uint32_t>::max()) << 16 | std::uint64_t(std::numeric_limits<std::uint16_t>::max()));
 }
@@ -166,8 +148,8 @@ private:
 	using shared_ptr_buffer_type = shared_ptr<buffer_type>;
 	using atomic_shared_ptr_buffer_type = atomic_shared_ptr<buffer_type>;
 
-	template <class ...Arg>
-	void push_internal(Arg&&... in);
+	template <class In>
+	void push_internal(In&& in);
 
 	inline shared_ptr_buffer_type create_item_buffer(std::size_t withSize);
 
@@ -215,10 +197,10 @@ inline void concurrent_queue_fifo<T, Allocator>::push(T&& in)
 	push_internal<T&&>(std::move(in));
 }
 template<class T, class Allocator>
-template<class ...Arg>
-inline void concurrent_queue_fifo<T, Allocator>::push_internal(Arg&& ...in)
+template<class In>
+inline void concurrent_queue_fifo<T, Allocator>::push_internal(In&& in)
 {
-	while (!t_producer.get()->try_push(std::forward<Arg>(in)...)) {
+	while (!t_producer.get()->try_push(std::forward<In>(in))) {
 		if (t_producer.get()->is_valid()) {
 			refresh_producer();
 		}
@@ -240,7 +222,7 @@ bool concurrent_queue_fifo<T, Allocator>::try_pop(T& out)
 template<class T, class Allocator>
 inline void concurrent_queue_fifo<T, Allocator>::reserve(typename concurrent_queue_fifo<T, Allocator>::size_type capacity)
 {
-	const size_type alignedCapacity(cq_fifo_detail::log2_align<>(capacity));
+	const size_type alignedCapacity(cq_fifo_detail::pow2_align<>(capacity));
 
 	shared_ptr_buffer_type newBuffer(nullptr);
 
@@ -261,7 +243,7 @@ inline void concurrent_queue_fifo<T, Allocator>::reserve(typename concurrent_que
 			front = std::move(newFront);
 		}
 
-		if (!(front->get_capacity() < capacity)) {
+		if (!(front->capacity() < capacity)) {
 			break;
 		}
 
@@ -317,6 +299,7 @@ inline bool concurrent_queue_fifo<T, Allocator>::refresh_consumer()
 	shared_ptr_buffer_type& active(t_consumer.get());
 	raw_ptr_buffer_type globalBack(m_back);
 
+
 	// If we are holding anything else than what is in m_back, this means some other consumer has successfully swapped
 	// in a new buffer. (Or this structure was previously unsafe_reseted).
 	if (active != globalBack) {
@@ -325,6 +308,8 @@ inline bool concurrent_queue_fifo<T, Allocator>::refresh_consumer()
 		active = m_back.load(std::memory_order_relaxed);
 		return true;
 	}
+
+	std::atomic_thread_fence(std::memory_order_acquire);
 
 	// If, however, we are holding the active buffer, we try to find the active tail buffer.. 
 	// In case we are holding the dummy, this will return null as well, and refresh will fail.
@@ -340,8 +325,13 @@ inline bool concurrent_queue_fifo<T, Allocator>::refresh_consumer()
 
 	active = back;
 
+
 	// As a service to other consumers, try to swap in the buffer we found.
 	// If some other consumer swapped in a tail, we fail here. 
+
+	// Could we end up with a weird conflict here? Probably, it SMELLS like it.
+	// Definitely there could be a list of item buffers filled, and hmm. Yeah. We must be able 
+	// to guarantee a swap-in doesn't happen before all items of previous buffer is removed. I think.
 	m_back.compare_exchange_strong(globalBack, std::move(back), std::memory_order_relaxed);
 
 	return true;
@@ -349,12 +339,12 @@ inline bool concurrent_queue_fifo<T, Allocator>::refresh_consumer()
 template<class T, class Allocator>
 inline typename concurrent_queue_fifo<T, Allocator>::shared_ptr_buffer_type concurrent_queue_fifo<T, Allocator>::create_item_buffer(std::size_t withSize)
 {
-	const std::size_t log2size(cq_fifo_detail::log2_align<>(withSize));
+	const std::size_t pow2size(cq_fifo_detail::pow2_align<>(withSize));
 
 	const std::size_t alignOfData(alignof(T));
 
 	const std::size_t bufferByteSize(sizeof(buffer_type));
-	const std::size_t dataBlockByteSize(sizeof(cq_fifo_detail::item_slot<T>) * log2size);
+	const std::size_t dataBlockByteSize(sizeof(T) * pow2size);
 
 	constexpr std::size_t controlBlockByteSize(gdul::sp_claim_size_custom_delete<buffer_type, allocator_adapter_type, cq_fifo_detail::buffer_deleter<buffer_type, allocator_adapter_type>>());
 
@@ -367,13 +357,12 @@ inline typename concurrent_queue_fifo<T, Allocator>::shared_ptr_buffer_type conc
 	std::uint8_t* totalBlock(nullptr);
 
 	buffer_type* buffer(nullptr);
-	cq_fifo_detail::item_slot<T>* data(nullptr);
+	T* data(nullptr);
 
 	std::size_t constructed(0);
 
 #ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
-	try
-	{
+	try {
 #endif
 		totalBlock = m_allocator.allocate(totalBlockSize);
 
@@ -389,22 +378,19 @@ inline typename concurrent_queue_fifo<T, Allocator>::shared_ptr_buffer_type conc
 		const std::size_t dataOffset(dataBegin - totalBlockBegin);
 
 		// new (addr) (type[n]) is unreliable...
-		data = reinterpret_cast<cq_fifo_detail::item_slot<T>*>(totalBlock + dataOffset);
-		for (; constructed < log2size; ++constructed)
-		{
-			cq_fifo_detail::item_slot<T>* const item(&data[constructed]);
-			new (item) (cq_fifo_detail::item_slot<T>);
+		data = reinterpret_cast<T*>(totalBlock + dataOffset);
+		for (; constructed < pow2size; ++constructed) {
+			T* const item(&data[constructed]);
+			new (item) (T);
 		}
 
-		buffer = new(totalBlock + bufferOffset) buffer_type(data, static_cast<size_type>(log2size));
+		buffer = new(totalBlock + bufferOffset) buffer_type(data, static_cast<size_type>(pow2size));
 #ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
 	}
-	catch (...)
-	{
+	catch (...) {
 		m_allocator.deallocate(totalBlock, totalBlockSize);
-		for (std::size_t i = 0; i < constructed; ++i)
-		{
-			data[i].~item_slot<T>();
+		for (std::size_t i = 0; i < constructed; ++i) {
+			data[i].~T();
 		}
 		throw;
 	}
@@ -440,14 +426,13 @@ inline void concurrent_queue_fifo<T, Allocator>::refresh_producer()
 	shared_ptr_buffer_type front(producer->find_front());
 
 	if (!front) {
-		reserve(producer->get_capacity() * 2);
+		reserve(producer->capacity() * 2);
 		front = producer->find_front();
 	}
 
 	producer = std::move(front);
 }
-namespace cq_fifo_detail
-{
+namespace cq_fifo_detail {
 enum buffer_state : std::uint8_t
 {
 	buffer_state_valid,
@@ -465,15 +450,15 @@ public:
 	typedef typename concurrent_queue_fifo<T, Allocator>::allocator_type allocator_type;
 	typedef item_buffer<T, Allocator> buffer_type;
 
-	item_buffer(item_slot<T>* dataBlock, typename item_buffer<T, Allocator>::size_type capacity);
+	item_buffer(T* dataBlock, typename item_buffer<T, Allocator>::size_type capacity);
 	~item_buffer();
 
-	template<class ...Arg>
-	inline bool try_push(Arg&&... in);
+	template<class In>
+	inline bool try_push(In&& in);
 	inline bool try_pop(T& out);
 
 	inline size_type size() const;
-	inline size_type get_capacity() const;
+	inline size_type capacity() const;
 
 	// Contains entries and / or has no next buffer
 	inline bool is_active() const;
@@ -481,7 +466,8 @@ public:
 	// Is this a dummybuffer or one from a destroyed structure?
 	inline bool is_valid() const;
 
-	inline void assert_previous(const shared_ptr_buffer_type& to) {
+	inline void assert_previous(const shared_ptr_buffer_type& to)
+	{
 		auto ref(this);
 
 		while (ref != to.get()) {
@@ -505,74 +491,47 @@ public:
 	inline void unsafe_invalidate();
 	inline void unsafe_clear();
 
-	inline void block_writers();
-	inline void block_readers();
-
-	bool is_readers_blocked() const;
-	bool is_writers_blocked() const;
-
 private:
 
-	template <class U = T, std::enable_if_t<GDUL_CQ_BUFFER_NOTHROW_PUSH_MOVE(U)>* = nullptr>
-	inline void write_in(size_type slot, U&& in);
-	template <class U = T, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_PUSH_MOVE(U)>* = nullptr>
-	inline void write_in(size_type slot, U&& in);
-	template <class U = T, std::enable_if_t<GDUL_CQ_BUFFER_NOTHROW_PUSH_ASSIGN(U)>* = nullptr>
-	inline void write_in(size_type slot, const U& in);
-	template <class U = T, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_PUSH_ASSIGN(U)>* = nullptr>
-	inline void write_in(size_type slot, const U& in);
-
-	template <class U = T, std::enable_if_t<GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U)>* = nullptr>
-	inline void write_out(size_type slot, U& out);
-	template <class U = T, std::enable_if_t<GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>* = nullptr>
-	inline void write_out(size_type slot, U& out);
-	template <class U = T, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) && !GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>* = nullptr>
-	inline void write_out(size_type slot, U& out);
-
 	std::atomic<size_type> m_preReadSync;
-	GDUL_CQ_PADDING(64);
+	GDUL_CACHE_PAD;
 	GDUL_ATOMIC_WITH_VIEW(size_type, m_readAt);
-	GDUL_CQ_PADDING(64);
-	std::atomic<size_type> m_postReadSync;
-	GDUL_CQ_PADDING(64);
-	std::atomic<size_type> m_read;
-	GDUL_CQ_PADDING(64);
+	GDUL_CACHE_PAD;
 	std::atomic<size_type> m_writeAt;
-	GDUL_CQ_PADDING(64);
-	std::atomic<size_type> m_postWriteSync;
-	GDUL_CQ_PADDING(64);
+	GDUL_CACHE_PAD;
+	GDUL_ATOMIC_WITH_VIEW(size_type, m_postWriteSync);
+	GDUL_CACHE_PAD;
 	GDUL_ATOMIC_WITH_VIEW(size_type, m_written);
-	GDUL_CQ_PADDING(64);
+	GDUL_CACHE_PAD;
 
 	atomic_shared_ptr_buffer_type m_next;
 
 	const size_type m_capacity;
+
+	T* const m_items;
+
 	std::atomic<buffer_state> m_state;
-	item_slot<T>* const m_items;
 };
 
 template<class T, class Allocator>
-inline item_buffer<T, Allocator>::item_buffer(item_slot<T>* dataBlock, typename item_buffer<T, Allocator>::size_type capacity)
+inline item_buffer<T, Allocator>::item_buffer(T* dataBlock, typename item_buffer<T, Allocator>::size_type capacity)
 	: m_preReadSync(0)
 	, m_readAt(0)
-	, m_postReadSync(0)
-	, m_read(0)
 	, m_writeAt(0)
 	, m_postWriteSync(0)
 	, m_written(0)
 	, m_next(nullptr)
 	, m_capacity(capacity)
-	, m_state(buffer_state_valid)
 	, m_items(dataBlock)
+	, m_state(buffer_state_valid)
 {
 }
 
 template<class T, class Allocator>
 inline item_buffer<T, Allocator>::~item_buffer()
 {
-	for (size_type i = 0; i < m_capacity; ++i)
-	{
-		m_items[i].~item_slot<T>();
+	for (size_type i = 0; i < m_capacity; ++i) {
+		m_items[i].~T();
 	}
 }
 template<class T, class Allocator>
@@ -581,21 +540,16 @@ inline bool item_buffer<T, Allocator>::is_active() const
 	if (!m_next) {
 		return true;
 	}
-	const size_type preWrite(m_writeAt.load(std::memory_order_relaxed));
 
-	if (!(preWrite & Buffer_Block_Bit))
-		return true;
+	const size_type writeSlot(m_writeAt.load(std::memory_order_relaxed));
 
-	const size_type preWriteUnblocked((preWrite & ~Buffer_Block_Bit));
-	const size_type written(m_written.load(std::memory_order_seq_cst));
-
-	if (preWriteUnblocked != written) {
+	if (writeSlot < m_capacity) {
 		return true;
 	}
 
-	const size_type readAt(m_readAt.load(std::memory_order_relaxed));
+	const size_type readSync(m_preReadSync.load(std::memory_order_relaxed));
 
-	if (readAt != preWriteUnblocked) {
+	if (readSync < m_capacity) {
 		return true;
 	}
 
@@ -604,15 +558,13 @@ inline bool item_buffer<T, Allocator>::is_active() const
 template<class T, class Allocator>
 inline bool item_buffer<T, Allocator>::is_valid() const
 {
-	return m_state.load(std::memory_order_relaxed) != buffer_state_invalid;
+	return m_state.load(std::memory_order_acquire) != buffer_state_invalid;
 }
 template<class T, class Allocator>
 inline void item_buffer<T, Allocator>::unsafe_invalidate()
 {
 	m_state.store(buffer_state_invalid, std::memory_order_relaxed);
-
-	block_readers();
-	block_writers();
+	m_writeAt.store(m_capacity, std::memory_order_relaxed);
 
 	if (m_next) {
 		m_next.unsafe_get()->unsafe_invalidate();
@@ -623,7 +575,7 @@ inline typename item_buffer<T, Allocator>::shared_ptr_buffer_type item_buffer<T,
 {
 	item_buffer<T, allocator_type>* inspect(this);
 
-	while (item_buffer<T, allocator_type>* next = inspect->m_next.unsafe_get()){
+	while (item_buffer<T, allocator_type>* next = inspect->m_next.unsafe_get()) {
 		if (!next->m_next)
 			break;
 		inspect = next;
@@ -660,15 +612,13 @@ inline typename item_buffer<T, Allocator>::size_type item_buffer<T, Allocator>::
 }
 
 template<class T, class Allocator>
-inline typename item_buffer<T, Allocator>::size_type item_buffer<T, Allocator>::get_capacity() const
+inline typename item_buffer<T, Allocator>::size_type item_buffer<T, Allocator>::capacity() const
 {
 	return m_capacity;
 }
 template<class T, class Allocator>
 inline bool item_buffer<T, Allocator>::try_exchange_next_buffer(shared_ptr_buffer_type&& desired)
 {
-	block_writers();
-
 	shared_ptr_buffer_type expected(nullptr);
 	return m_next.compare_exchange_strong(expected, std::move(desired));
 }
@@ -680,10 +630,8 @@ inline void item_buffer<T, Allocator>::unsafe_clear()
 	m_readAt.store(0, std::memory_order_relaxed);
 	m_writeAt.store(0, std::memory_order_relaxed);
 
-	m_postReadSync.store(0, std::memory_order_relaxed);
 	m_postWriteSync.store(0, std::memory_order_relaxed);
 
-	m_read.store(0, std::memory_order_relaxed);
 	m_written.store(0, std::memory_order_relaxed);
 
 	if (m_next) {
@@ -691,57 +639,24 @@ inline void item_buffer<T, Allocator>::unsafe_clear()
 	}
 }
 template<class T, class Allocator>
-inline void item_buffer<T, Allocator>::block_writers()
+template<class In>
+inline bool item_buffer<T, Allocator>::try_push(In&& in)
 {
-	m_writeAt.fetch_or(Buffer_Block_Bit, std::memory_order_seq_cst);
-}
-template<class T, class Allocator>
-inline void item_buffer<T, Allocator>::block_readers()
-{
-	m_preReadSync.fetch_or(Buffer_Block_Bit, std::memory_order_seq_cst);
-}
-template<class T, class Allocator>
-inline bool item_buffer<T, Allocator>::is_readers_blocked() const
-{
-	return m_preReadSync.load(std::memory_order_relaxed) & Buffer_Block_Bit;
-}
-template<class T, class Allocator>
-inline bool item_buffer<T, Allocator>::is_writers_blocked() const
-{
-	return m_writeAt.load(std::memory_order_relaxed) & Buffer_Block_Bit;
-}
-template<class T, class Allocator>
-template<class ...Arg>
-inline bool item_buffer<T, Allocator>::try_push(Arg&& ...in)
-{
-	const size_type read(m_read.load(std::memory_order_relaxed));
 	const size_type at(m_writeAt.fetch_add(1, std::memory_order_relaxed));
-	const size_type diff(at - read);
 
-	if (!(diff < m_capacity)) {
-		size_type expected(at + 1);
-		if (m_writeAt.compare_exchange_strong(expected, at, std::memory_order_relaxed)) {
-			return false;
-		}
-		block_writers();
-
-		m_writeAt.fetch_sub(1, std::memory_order_relaxed);
-
-		const size_type reRead(m_read.load(std::memory_order_seq_cst));
-		const size_type reDiff(at - reRead);
-		if (!(reDiff < m_capacity))
-			return false;
+	if (!(at < m_capacity)) {
+		return false;
 	}
 
-	write_in(at % m_capacity, std::forward<Arg>(in)...);
+	m_items[at] = std::forward<In>(in);
 
-	const size_type postSync(m_postWriteSync.fetch_add(1, std::memory_order_relaxed));
-	std::atomic_thread_fence(std::memory_order_release);
-	size_type postAt(m_writeAt.load(std::memory_order_relaxed) & ~Buffer_Block_Bit);
+	const size_type postSync(m_postWriteSync.fetch_add(1, std::memory_order_acq_rel));
+
+	size_type postAt(m_writeAt.load(std::memory_order_relaxed));
 
 	if ((postSync + 1) == postAt) {
 		size_type xchg(postAt);
-		size_type target(0);
+		size_type target;
 		do {
 			target = xchg;
 			xchg = m_written.exchange(target, std::memory_order_relaxed);
@@ -766,168 +681,12 @@ inline bool item_buffer<T, Allocator>::try_pop(T& out)
 
 	const size_type at(m_readAt.fetch_add(1, std::memory_order_relaxed));
 
-	write_out(at % m_capacity, out);
-
-	const size_type postSync(m_postReadSync.fetch_add(1, std::memory_order_acq_rel));
-	const size_type read(m_read.load(std::memory_order_relaxed));
-	const size_type diff(postSync - read);
-	if (!(diff < m_capacity / 2)) {
-		const size_type postAt(m_readAt.load(std::memory_order_seq_cst));
-		if ((postSync + 1) == postAt) {
-
-			size_type xchg(postAt);
-			size_type target(0);
-			do {
-				target = xchg;
-				xchg = m_read.exchange(target, std::memory_order_relaxed);
-			} while (target < xchg);
-		}
-	}
+	out = std::move(m_items[at]);
 
 	return true;
 }
-template <class T, class Allocator>
-template <class U, std::enable_if_t<GDUL_CQ_BUFFER_NOTHROW_PUSH_MOVE(U)>*>
-inline void item_buffer<T, Allocator>::write_in(typename item_buffer<T, Allocator>::size_type slot, U&& in)
-{
-	m_items[slot].store(std::move(in));
-}
-template <class T, class Allocator>
-template <class U, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_PUSH_MOVE(U)>*>
-inline void item_buffer<T, Allocator>::write_in(typename item_buffer<T, Allocator>::size_type slot, U&& in)
-{
-	try
-	{
-		m_items[slot].store(std::move(in));
-	}
-	catch (...)
-	{
-		--m_writeAt;
-		throw;
-	}
-}
-template <class T, class Allocator>
-template <class U, std::enable_if_t<GDUL_CQ_BUFFER_NOTHROW_PUSH_ASSIGN(U)>*>
-inline void item_buffer<T, Allocator>::write_in(typename item_buffer<T, Allocator>::size_type slot, const U& in)
-{
-	m_items[slot].store(in);
-}
-template <class T, class Allocator>
-template <class U, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_PUSH_ASSIGN(U)>*>
-inline void item_buffer<T, Allocator>::write_in(typename item_buffer<T, Allocator>::size_type slot, const U& in)
-{
-	try
-	{
-		m_items[slot].store(in);
-	}
-	catch (...)
-	{
-		--m_writeAt;
-		throw;
-	}
-}
-template <class T, class Allocator>
-template <class U, std::enable_if_t<GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U)>*>
-inline void item_buffer<T, Allocator>::write_out(typename item_buffer<T, Allocator>::size_type slot, U& out)
-{
-	m_items[slot].move(out);
-}
-template <class T, class Allocator>
-template <class U, std::enable_if_t<GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>*>
-inline void item_buffer<T, Allocator>::write_out(typename item_buffer<T, Allocator>::size_type slot, U& out)
-{
-	m_items[slot].assign(out);
-}
-template <class T, class Allocator>
-template <class U, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) && !GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>*>
-inline void item_buffer<T, Allocator>::write_out(typename item_buffer<T, Allocator>::size_type slot, U& out)
-{
-	m_items[slot].try_move(out);
-}
-template <class T>
-class item_slot
-{
-public:
-	item_slot<T>(const item_slot<T>&) = delete;
-	item_slot<T>& operator=(const item_slot&) = delete;
-
-	inline item_slot();
-	inline item_slot(item_state state);
-
-	inline void store(const T& in);
-	inline void store(T&& in);
-
-	template<class U = T, std::enable_if_t<std::is_move_assignable<U>::value>* = nullptr>
-	inline void try_move(U& out);
-	template<class U = T, std::enable_if_t<!std::is_move_assignable<U>::value>* = nullptr>
-	inline void try_move(U& out);
-
-	inline void assign(T& out);
-	inline void move(T& out);
-
-	inline item_state get_state() const;
-	inline void set_state(item_state state);
-
-private:
-	T m_data;
-	item_state m_state;
-};
-template<class T>
-inline item_slot<T>::item_slot()
-	: m_data()
-	, m_state(item_state_empty)
-{
-}
-template<class T>
-inline item_slot<T>::item_slot(item_state state)
-	: m_data()
-	, m_state(state)
-{
-}
-template<class T>
-inline void item_slot<T>::store(const T& in)
-{
-	m_data = in;
-}
-template<class T>
-inline void item_slot<T>::store(T&& in)
-{
-	m_data = std::move(in);
-}
-template<class T>
-inline void item_slot<T>::assign(T& out)
-{
-	out = m_data;
-}
-template<class T>
-inline void item_slot<T>::move(T& out)
-{
-	out = std::move(m_data);
-}
-template<class T>
-inline void item_slot<T>::set_state(item_state state)
-{
-	m_state = state;
-}
-template<class T>
-inline item_state item_slot<T>::get_state() const
-{
-	return m_state;
-}
-template<class T>
-template<class U, std::enable_if_t<std::is_move_assignable<U>::value>*>
-inline void item_slot<T>::try_move(U& out)
-{
-	out = std::move(m_data);
-}
-template<class T>
-template<class U, std::enable_if_t<!std::is_move_assignable<U>::value>*>
-inline void item_slot<T>::try_move(U& out)
-{
-	out = m_data;
-}
 template <class Dummy>
-std::size_t log2_align(std::size_t from)
+std::size_t pow2_align(std::size_t from)
 {
 	const std::size_t from_(from < 2 ? 2 : from);
 
@@ -978,8 +737,7 @@ public:
 
 	T* allocate(std::size_t count)
 	{
-		if (!m_address)
-		{
+		if (!m_address) {
 			m_address = this->Allocator::allocate(count);
 			m_size = count;
 		}
@@ -1014,15 +772,14 @@ public:
 	using allocator_type = typename concurrent_queue_fifo<T, Allocator>::allocator_type;
 
 	shared_ptr_buffer_type m_dummyBuffer;
-	item_slot<T> m_dummyItem;
+	T m_dummyItem;
 	buffer_type m_dummyRawBuffer;
 };
 template<class T, class Allocator>
 inline dummy_container<T, Allocator>::dummy_container()
-	: m_dummyItem(item_state_dummy)
+	: m_dummyItem()
 	, m_dummyRawBuffer(&m_dummyItem, 1)
 {
-	m_dummyRawBuffer.block_writers();
 	m_dummyRawBuffer.unsafe_invalidate();
 
 	Allocator alloc;
