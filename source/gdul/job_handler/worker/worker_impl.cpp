@@ -64,7 +64,7 @@ worker_impl::worker_impl(std::thread&& thrd, allocator_type allocator)
 	, m_allocator(allocator)
 	, m_targets{}
 	, m_executionPriority(0)
-	, m_sleepThreshhold(250)
+	, m_sleepThreshhold(80)
 	, m_isActive(false)
 	, m_queuePushSync(0)
 	, m_queueCount(0)
