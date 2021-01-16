@@ -242,8 +242,10 @@ float job_handler_tester::run_predictive_scheduling_test()
 	auto spinFor = [](double ms) {
 		timer<double> t;
 		const double sec(0.001 * ms);
+
+		float accum((float)ms);
 		while (t.get() < sec)
-			std::this_thread::yield();
+			accum = std::sqrtf(accum);
 	};
 
 	// The optimal execution should be parallelSplit * serialExecutionTime,
@@ -254,10 +256,11 @@ float job_handler_tester::run_predictive_scheduling_test()
 	const double serialExecutionTime(1.0);
 	const std::size_t parallelSplit(std::thread::hardware_concurrency());
 
-	timer<float> time;
 
 	float parallelPriority(0.f);
 	float serialPriority(0.f);
+
+	timer<float> time;
 
 	for (std::size_t i = 0; i < parallelSplit; ++i) {
 		job jb(m_handler.make_job(make_delegate<void()>(spinFor, serialExecutionTime), &m_syncQueue, i, "Predictive Scheduling Parallel"));
@@ -284,15 +287,15 @@ float job_handler_tester::run_predictive_scheduling_test()
 	}
 
 	dependant.enable();
-	dependant.wait_until_finished();
 	root.enable();
+	dependant.wait_until_finished();
 
 	const float result = time.get();
-
-	std::cout << "Finished predictive scheduling test with " << result * 1000.f << " ms execution time using " << std::endl;
-	std::cout << "...The optimal execution time should be " << (double)parallelSplit * serialExecutionTime << " ms" << std::endl;
-	std::cout << "...Suboptimal execution time should be " << (double)parallelSplit * serialExecutionTime + serialExecutionTime << " ms" << std::endl;
-	std::cout << "ParallelPrio " << parallelPriority << " SerialPrio: " << serialPriority << std::endl;
+	//
+	//std::cout << "Finished predictive scheduling test with " << result * 1000.f << " ms execution time using " << std::endl;
+	//std::cout << "...The optimal execution time should be " << (double)parallelSplit * serialExecutionTime << " ms" << std::endl;
+	//std::cout << "...Suboptimal execution time should be " << (double)parallelSplit * serialExecutionTime + serialExecutionTime << " ms" << std::endl;
+	//std::cout << "ParallelPrio " << parallelPriority << " SerialPrio: " << serialPriority << std::endl;
 
 	return result;
 }

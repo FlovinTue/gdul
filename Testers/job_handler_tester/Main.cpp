@@ -13,7 +13,7 @@ int main()
 	{
 		gdul::job_handler_tester tester;
 
-
+		gdul::worker::this_worker.set_execution_priority(1);
 		gdul::job_handler_tester_info info;
 		info.affinity = gdul::JOB_HANDLER_TESTER_WORKER_AFFINITY_DYNAMIC;
 
@@ -39,13 +39,13 @@ int main()
 
 		{
 			std::uint32_t high(0);
-			const float above(0.010f);
+			const float above(10.f);
 			float predictiveMin(FLT_MAX);
 			float predictiveMax(-FLT_MAX);
 			float predictiveAccum(0.f);
-			const uint32_t predictiveIter(800);
+			const uint32_t predictiveIter(360);
 			for (auto i = 0; i < predictiveIter; ++i) {
-				const float result = tester.run_predictive_scheduling_test();
+				const float result = tester.run_predictive_scheduling_test() * 1000.f;
 				predictiveAccum += result;
 				predictiveMin = std::min(result, predictiveMin);
 				predictiveMax = std::max(result, predictiveMax);
@@ -56,7 +56,7 @@ int main()
 			}
 
 			std::cout << "Exceedingly high values (>" << above << " ms): " << high << std::endl;
-			std::cout << "\n\nFinished predictive testing batch.\nAverage: " << predictiveAccum / (float)predictiveIter * 1000.f << " ms" << "\nMin: " << predictiveMin * 1000.f << " ms" << "\nMax: " << predictiveMax * 1000.f << " ms" << "\n\n" << std::endl;
+			std::cout << "\n\nFinished predictive testing batch.\nAverage: " << predictiveAccum / (float)predictiveIter << " ms" << "\nMin: " << predictiveMin << " ms" << "\nMax: " << predictiveMax << " ms" << "\n\n" << std::endl;
 		}
 
 
