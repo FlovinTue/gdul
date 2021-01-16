@@ -11,7 +11,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "concurrent_queue", "Testers
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "atomic_shared_ptr", "Testers\atomic_shared_ptr_tester\atomic_shared_ptr.vcxproj", "{471962A3-BFAE-46B3-BBE9-0CB842BC1444}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "job_handler", "Testers\job_handler_tester\job_handler.vcxproj", "{38AC6E3A-729D-4527-83C6-3805A7274AA8}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "execution", "Testers\execution_tester\execution.vcxproj", "{38AC6E3A-729D-4527-83C6-3805A7274AA8}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "thread_local_member", "Testers\thread_local_member_tester\thread_local_member_tester.vcxproj", "{14B2FC84-037B-47A3-A99A-9F61F4F021B9}"
 EndProject
