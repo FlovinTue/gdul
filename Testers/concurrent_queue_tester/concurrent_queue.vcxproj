@@ -97,7 +97,6 @@
     <ClInclude Include="..\..\source\gdul\concurrent_queue\concurrent_queue.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
-    <ClInclude Include="Tester.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">

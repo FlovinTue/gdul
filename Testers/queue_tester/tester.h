@@ -16,6 +16,8 @@
 #include <gdul/WIP_concurrent_queue_fifo/concurrent_queue_fifo_v6.h>
 #elif defined(GDUL_CPQ)
 #include <gdul/concurrent_priority_queue/concurrent_priority_queue.h>
+#elif defined(RIGTORP)
+#include <../RigtorpQueue/MPMCQueue.h>
 #endif
 #include <queue>
 #include <mutex>
@@ -208,6 +210,8 @@ private:
 	concurrent_priority_queue<typename T::first_type, typename T::second_type, 512, gdul::cpq_allocation_strategy_pool<std::allocator<std::uint8_t>>> m_queue;
 #elif defined(MS_CPQ)
 	concurrency::concurrent_priority_queue<T> m_queue;
+#elif defined(RIGTORP)
+	rigtorp::mpmc::Queue<T> m_queue;
 #endif
 
 	gdul::thread_pool m_writer;
@@ -235,6 +239,8 @@ inline tester<T, Allocator>::tester(Allocator&
 	m_waiting(0)
 #ifdef GDUL
 	, m_queue(alloc)
+#elif defined(RIGTORP)
+	, m_queue(Writes)
 #endif
 {
 	srand(static_cast<std::uint32_t>(time(0)));
@@ -610,6 +616,9 @@ inline double tester<T, Allocator>::ExecuteMP(std::uint32_t runs) {
 		m_queue.unsafe_clear();
 #elif defined(MSC_RUNTIME) || defined(GDUL_CPQ) || defined(GDUL_CPQ)
 		m_queue.clear();
+#elif defined(RIGTORP)
+		T out;
+		while (m_queue.try_pop(out));
 #elif defined(MOODYCAMEL)
 		T out;
 		while (m_queue.try_dequeue(out));
