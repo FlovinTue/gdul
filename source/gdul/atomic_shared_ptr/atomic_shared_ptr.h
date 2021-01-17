@@ -43,7 +43,7 @@ namespace gdul
 {
 
 #pragma region declares
-namespace aspdetail
+namespace asp_detail
 {
 typedef std::allocator<std::uint8_t> default_allocator;
 
@@ -132,10 +132,10 @@ class shared_ptr;
 template <class T>
 class raw_ptr;
 
-template <class T, class Allocator, std::enable_if_t<!aspdetail::is_unbounded_array_v<T>>* = nullptr>
+template <class T, class Allocator, std::enable_if_t<!asp_detail::is_unbounded_array_v<T>>* = nullptr>
 constexpr std::size_t allocate_shared_size() noexcept;
 
-template <class T, class Allocator, std::enable_if_t<aspdetail::is_unbounded_array_v<T>>* = nullptr>
+template <class T, class Allocator, std::enable_if_t<asp_detail::is_unbounded_array_v<T>>* = nullptr>
 constexpr std::size_t allocate_shared_size(std::size_t count) noexcept;
 
 template <class T, class Allocator>
@@ -147,7 +147,7 @@ constexpr std::size_t sp_claim_size_custom_delete() noexcept;
 template
 <
 	class T,
-	std::enable_if_t<!aspdetail::is_unbounded_array_v<T>>* = nullptr,
+	std::enable_if_t<!asp_detail::is_unbounded_array_v<T>>* = nullptr,
 	class Allocator,
 	class ...Args
 >
@@ -156,7 +156,7 @@ inline shared_ptr<T> allocate_shared(Allocator, Args&& ...);
 template
 <
 	class T,
-	std::enable_if_t<aspdetail::is_unbounded_array_v<T>>* = nullptr,
+	std::enable_if_t<asp_detail::is_unbounded_array_v<T>>* = nullptr,
 	class Allocator,
 	class ...Args
 >
@@ -167,9 +167,9 @@ template <class T>
 class atomic_shared_ptr
 {
 public:
-	using size_type = aspdetail::size_type;
+	using size_type = asp_detail::size_type;
 	using value_type = T;
-	using decayed_type = aspdetail::decay_unbounded_t<T>;
+	using decayed_type = asp_detail::decay_unbounded_t<T>;
 
 	inline constexpr atomic_shared_ptr() noexcept;
 	inline constexpr atomic_shared_ptr(std::nullptr_t) noexcept;
@@ -242,10 +242,10 @@ public:
 	operator bool() const noexcept;
 
 	// Cheap hint comparison to ptr_base derivatives. Does not take version into account
-	bool operator==(const aspdetail::ptr_base<T>& other) const noexcept;
+	bool operator==(const asp_detail::ptr_base<T>& other) const noexcept;
 
 	// Cheap hint comparison to ptr_base derivatives. Does not take version into account
-	bool operator!=(const aspdetail::ptr_base<T>& other) const noexcept;
+	bool operator!=(const asp_detail::ptr_base<T>& other) const noexcept;
 
 	raw_ptr<T> get_raw_ptr() const noexcept;
 
@@ -255,18 +255,19 @@ public:
 	std::uint8_t use_count_local() const noexcept;
 	std::size_t unsafe_item_count() const noexcept;
 	size_type unsafe_use_count() const noexcept;
+	void unsafe_set_version(std::uint16_t version) noexcept;
 
 private:
 	template <class PtrType>
-	inline bool compare_exchange_strong(typename aspdetail::disable_deduction<PtrType>::type& expected, shared_ptr<T>&& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept;
+	inline bool compare_exchange_strong(typename asp_detail::disable_deduction<PtrType>::type& expected, shared_ptr<T>&& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept;
 
 	template <class PtrType>
-	inline bool compare_exchange_weak(typename aspdetail::disable_deduction<PtrType>::type& expected, shared_ptr<T>&& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept;
+	inline bool compare_exchange_weak(typename asp_detail::disable_deduction<PtrType>::type& expected, shared_ptr<T>&& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept;
 
-	inline constexpr aspdetail::control_block_free_type_base<T>* get_control_block() noexcept;
-	inline constexpr const aspdetail::control_block_free_type_base<T>* get_control_block() const noexcept;
+	inline constexpr asp_detail::control_block_free_type_base<T>* get_control_block() noexcept;
+	inline constexpr const asp_detail::control_block_free_type_base<T>* get_control_block() const noexcept;
 
-	using compressed_storage = aspdetail::compressed_storage;
+	using compressed_storage = asp_detail::compressed_storage;
 
 	inline compressed_storage unsafe_copy_internal(std::memory_order order) const;
 	inline compressed_storage copy_internal(std::memory_order order) const noexcept;
@@ -275,21 +276,21 @@ private:
 	inline void store_internal(compressed_storage from, std::memory_order order) noexcept;
 
 	inline compressed_storage unsafe_exchange_internal(compressed_storage with, std::memory_order order);
-	inline compressed_storage exchange_internal(compressed_storage to, aspdetail::CAS_FLAG flags, std::memory_order order) noexcept;
+	inline compressed_storage exchange_internal(compressed_storage to, asp_detail::CAS_FLAG flags, std::memory_order order) noexcept;
 
-	inline bool compare_exchange_weak_internal(compressed_storage& expected, compressed_storage desired, aspdetail::CAS_FLAG flags, aspdetail::memory_orders orders) noexcept;
+	inline bool compare_exchange_weak_internal(compressed_storage& expected, compressed_storage desired, asp_detail::CAS_FLAG flags, asp_detail::memory_orders orders) noexcept;
 
 	inline void unsafe_fill_local_refs() const noexcept;
 	inline void try_fill_local_refs(compressed_storage& expected) const noexcept;
 
-	inline constexpr aspdetail::control_block_free_type_base<T>* to_control_block(compressed_storage from) const noexcept;
+	inline constexpr asp_detail::control_block_free_type_base<T>* to_control_block(compressed_storage from) const noexcept;
 
-	using cb_free_type = aspdetail::control_block_free_type_base<T>;
-	using cb_count_type = aspdetail::control_block_base_count<T>;
+	using cb_free_type = asp_detail::control_block_free_type_base<T>;
+	using cb_count_type = asp_detail::control_block_base_count<T>;
 
 	friend class shared_ptr<T>;
 	friend class raw_ptr<T>;
-	friend class aspdetail::ptr_base<T>;
+	friend class asp_detail::ptr_base<T>;
 
 	union
 	{
@@ -300,7 +301,7 @@ private:
 };
 template <class T>
 inline constexpr atomic_shared_ptr<T>::atomic_shared_ptr() noexcept
-	: m_storage((std::uint64_t(std::numeric_limits<std::uint8_t>::max()) << (aspdetail::STORAGE_BYTE_LOCAL_REF * 8)))
+	: m_storage((std::uint64_t(std::numeric_limits<std::uint8_t>::max()) << (asp_detail::STORAGE_BYTE_LOCAL_REF * 8)))
 {
 }
 template<class T>
@@ -310,7 +311,7 @@ inline constexpr atomic_shared_ptr<T>::atomic_shared_ptr(std::nullptr_t) noexcep
 }
 template<class T>
 inline constexpr atomic_shared_ptr<T>::atomic_shared_ptr(std::nullptr_t, std::uint16_t version) noexcept
-	: m_storage(aspdetail::set_version(compressed_storage(), version).m_u64 | (std::uint64_t(std::numeric_limits<std::uint8_t>::max()) << (aspdetail::STORAGE_BYTE_LOCAL_REF * 8)))
+	: m_storage(asp_detail::set_version(compressed_storage(), version).m_u64 | (std::uint64_t(std::numeric_limits<std::uint8_t>::max()) << (asp_detail::STORAGE_BYTE_LOCAL_REF * 8)))
 {
 }
 template <class T>
@@ -417,28 +418,28 @@ inline bool atomic_shared_ptr<T>::compare_exchange_weak(shared_ptr<T>& expected,
 }
 template<class T>
 template<class PtrType>
-inline bool atomic_shared_ptr<T>::compare_exchange_strong(typename aspdetail::disable_deduction<PtrType>::type& expected, shared_ptr<T>&& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept
+inline bool atomic_shared_ptr<T>::compare_exchange_strong(typename asp_detail::disable_deduction<PtrType>::type& expected, shared_ptr<T>&& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept
 {
-	if (desired.use_count_local() < aspdetail::Local_Ref_Fill_Boundary)
+	if (desired.use_count_local() < asp_detail::Local_Ref_Fill_Boundary)
 		desired.set_local_refs(std::numeric_limits<std::uint8_t>::max());
 
 	const compressed_storage desired_(desired.m_controlBlockStorage.m_u64);
 
 	compressed_storage expected_(m_storage.load(std::memory_order_relaxed));
-	expected_.m_u64 &= ~aspdetail::Versioned_Cb_Mask;
-	expected_.m_u64 |= expected.m_controlBlockStorage.m_u64 & aspdetail::Versioned_Cb_Mask;
+	expected_.m_u64 &= ~asp_detail::Versioned_Cb_Mask;
+	expected_.m_u64 |= expected.m_controlBlockStorage.m_u64 & asp_detail::Versioned_Cb_Mask;
 
-	const aspdetail::memory_orders orders{ successOrder, failOrder };
+	const asp_detail::memory_orders orders{ successOrder, failOrder };
 
 	typedef typename std::remove_reference<PtrType>::type raw_type;
 
 	constexpr bool needsCapture(std::is_same<raw_type, shared_ptr<T>>::value);
-	const std::uint8_t flags(aspdetail::CAS_FLAG_CAPTURE_ON_FAILURE * needsCapture);
+	const std::uint8_t flags(asp_detail::CAS_FLAG_CAPTURE_ON_FAILURE * needsCapture);
 
-	const std::uint64_t preCompare(expected_.m_u64 & aspdetail::Versioned_Cb_Mask);
+	const std::uint64_t preCompare(expected_.m_u64 & asp_detail::Versioned_Cb_Mask);
 	do
 	{
-		if (compare_exchange_weak_internal(expected_, desired_, static_cast<aspdetail::CAS_FLAG>(flags), orders))
+		if (compare_exchange_weak_internal(expected_, desired_, static_cast<asp_detail::CAS_FLAG>(flags), orders))
 		{
 
 			desired.clear();
@@ -446,7 +447,7 @@ inline bool atomic_shared_ptr<T>::compare_exchange_strong(typename aspdetail::di
 			return true;
 		}
 
-	} while (preCompare == (expected_.m_u64 & aspdetail::Versioned_Cb_Mask));
+	} while (preCompare == (expected_.m_u64 & asp_detail::Versioned_Cb_Mask));
 
 	expected = raw_type(expected_);
 
@@ -454,33 +455,33 @@ inline bool atomic_shared_ptr<T>::compare_exchange_strong(typename aspdetail::di
 }
 template<class T>
 template<class PtrType>
-inline bool atomic_shared_ptr<T>::compare_exchange_weak(typename aspdetail::disable_deduction<PtrType>::type& expected, shared_ptr<T>&& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept
+inline bool atomic_shared_ptr<T>::compare_exchange_weak(typename asp_detail::disable_deduction<PtrType>::type& expected, shared_ptr<T>&& desired, std::memory_order successOrder, std::memory_order failOrder) noexcept
 {
-	if (desired.use_count_local() < aspdetail::Local_Ref_Fill_Boundary)
+	if (desired.use_count_local() < asp_detail::Local_Ref_Fill_Boundary)
 		desired.set_local_refs(std::numeric_limits<std::uint8_t>::max());
 
 	const compressed_storage desired_(desired.m_controlBlockStorage.m_u64);
 	compressed_storage expected_(m_storage.load(std::memory_order_relaxed));
-	expected_.m_u64 &= ~aspdetail::Versioned_Cb_Mask;
-	expected_.m_u64 |= expected.m_controlBlockStorage.m_u64 & aspdetail::Versioned_Cb_Mask;
+	expected_.m_u64 &= ~asp_detail::Versioned_Cb_Mask;
+	expected_.m_u64 |= expected.m_controlBlockStorage.m_u64 & asp_detail::Versioned_Cb_Mask;
 
-	const aspdetail::memory_orders orders{ successOrder, failOrder };
+	const asp_detail::memory_orders orders{ successOrder, failOrder };
 
 	typedef typename std::remove_reference<PtrType>::type raw_type;
 
 	constexpr bool needsCapture(std::is_same<raw_type, shared_ptr<T>>::value);
-	const std::uint8_t flags(aspdetail::CAS_FLAG_CAPTURE_ON_FAILURE * needsCapture);
+	const std::uint8_t flags(asp_detail::CAS_FLAG_CAPTURE_ON_FAILURE * needsCapture);
 
-	const std::uint64_t preCompare(expected_.m_u64 & aspdetail::Versioned_Cb_Mask);
+	const std::uint64_t preCompare(expected_.m_u64 & asp_detail::Versioned_Cb_Mask);
 
-	if (compare_exchange_weak_internal(expected_, desired_, static_cast<aspdetail::CAS_FLAG>(flags), orders)) {
+	if (compare_exchange_weak_internal(expected_, desired_, static_cast<asp_detail::CAS_FLAG>(flags), orders)) {
 
 		desired.clear();
 
 		return true;
 	}
 
-	const std::uint64_t postCompare(expected_.m_u64 & aspdetail::Versioned_Cb_Mask);
+	const std::uint64_t postCompare(expected_.m_u64 & asp_detail::Versioned_Cb_Mask);
 
 	if (preCompare != postCompare) {
 		expected = raw_type(expected_);
@@ -513,7 +514,7 @@ inline void atomic_shared_ptr<T>::store(const shared_ptr<T>& from, std::memory_o
 template<class T>
 inline void atomic_shared_ptr<T>::store(shared_ptr<T>&& from, std::memory_order order) noexcept
 {
-	if (from.use_count_local() < aspdetail::Local_Ref_Fill_Boundary)
+	if (from.use_count_local() < asp_detail::Local_Ref_Fill_Boundary)
 		from.set_local_refs(std::numeric_limits<std::uint8_t>::max());
 
 	store_internal(from.m_controlBlockStorage.m_u64, order);
@@ -527,10 +528,10 @@ inline shared_ptr<T> atomic_shared_ptr<T>::exchange(const shared_ptr<T>& with, s
 template<class T>
 inline shared_ptr<T> atomic_shared_ptr<T>::exchange(shared_ptr<T>&& with, std::memory_order order) noexcept
 {
-	if (with.use_count_local() < aspdetail::Local_Ref_Fill_Boundary)
+	if (with.use_count_local() < asp_detail::Local_Ref_Fill_Boundary)
 		with.set_local_refs(std::numeric_limits<std::uint8_t>::max());
 
-	compressed_storage previous(exchange_internal(with.m_controlBlockStorage, aspdetail::CAS_FLAG_STEAL_PREVIOUS, order));
+	compressed_storage previous(exchange_internal(with.m_controlBlockStorage, asp_detail::CAS_FLAG_STEAL_PREVIOUS, order));
 	with.clear();
 	return shared_ptr<T>(previous);
 }
@@ -538,7 +539,7 @@ template<class T>
 inline std::uint16_t atomic_shared_ptr<T>::get_version() const noexcept
 {
 	const compressed_storage storage(m_storage.load(std::memory_order_relaxed));
-	return aspdetail::to_version(storage);
+	return asp_detail::to_version(storage);
 }
 template<class T>
 inline shared_ptr<T> atomic_shared_ptr<T>::unsafe_load(std::memory_order order) const noexcept
@@ -577,7 +578,7 @@ inline raw_ptr<T> atomic_shared_ptr<T>::get_raw_ptr() const noexcept
 template<class T>
 inline typename atomic_shared_ptr<T>::decayed_type* atomic_shared_ptr<T>::unsafe_get() noexcept
 {
-	aspdetail::control_block_free_type_base<T>* const cb(get_control_block());
+	asp_detail::control_block_free_type_base<T>* const cb(get_control_block());
 	if (cb) {
 		return cb->get();
 	}
@@ -586,7 +587,7 @@ inline typename atomic_shared_ptr<T>::decayed_type* atomic_shared_ptr<T>::unsafe
 template<class T>
 inline const typename atomic_shared_ptr<T>::decayed_type* atomic_shared_ptr<T>::unsafe_get() const noexcept
 {
-	const aspdetail::control_block_free_type_base<T>* const cb(get_control_block());
+	const asp_detail::control_block_free_type_base<T>* const cb(get_control_block());
 	if (cb) {
 		return cb->get();
 	}
@@ -595,7 +596,7 @@ inline const typename atomic_shared_ptr<T>::decayed_type* atomic_shared_ptr<T>::
 template<class T>
 inline std::uint8_t atomic_shared_ptr<T>::use_count_local() const noexcept
 {
-	return compressed_storage(m_storage.load(std::memory_order_relaxed)).m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF];
+	return compressed_storage(m_storage.load(std::memory_order_relaxed)).m_u8[asp_detail::STORAGE_BYTE_LOCAL_REF];
 }
 template<class T>
 inline std::size_t atomic_shared_ptr<T>::unsafe_item_count() const noexcept
@@ -603,17 +604,23 @@ inline std::size_t atomic_shared_ptr<T>::unsafe_item_count() const noexcept
 	return raw_ptr<T>(*this).item_count();
 }
 template<class T>
-inline aspdetail::size_type atomic_shared_ptr<T>::unsafe_use_count() const noexcept
+inline asp_detail::size_type atomic_shared_ptr<T>::unsafe_use_count() const noexcept
 {
 	return raw_ptr<T>(*this).use_count();
 }
 template<class T>
-inline constexpr const aspdetail::control_block_free_type_base<T>* atomic_shared_ptr<T>::get_control_block() const noexcept
+inline void atomic_shared_ptr<T>::unsafe_set_version(std::uint16_t version) noexcept
+{
+	compressed_storage storage(m_storage.load(std::memory_order_acquire));
+	m_storage.store(asp_detail::set_version(storage, version).m_u64, std::memory_order_release);
+}
+template<class T>
+inline constexpr const asp_detail::control_block_free_type_base<T>* atomic_shared_ptr<T>::get_control_block() const noexcept
 {
 	return to_control_block(m_storage.load(std::memory_order_acquire));
 }
 template<class T>
-inline constexpr aspdetail::control_block_free_type_base<T>* atomic_shared_ptr<T>::get_control_block() noexcept
+inline constexpr asp_detail::control_block_free_type_base<T>* atomic_shared_ptr<T>::get_control_block() noexcept
 {
 	return to_control_block(m_storage.load(std::memory_order_acquire));
 }
@@ -621,7 +628,7 @@ inline constexpr aspdetail::control_block_free_type_base<T>* atomic_shared_ptr<T
 template<class T>
 inline atomic_shared_ptr<T>::operator bool() const noexcept
 {
-	return static_cast<bool>(m_storage.load(std::memory_order_relaxed) & aspdetail::Cb_Mask);
+	return static_cast<bool>(m_storage.load(std::memory_order_relaxed) & asp_detail::Cb_Mask);
 }
 // cheap hint to see if this object holds a value
 template <class T>
@@ -649,13 +656,13 @@ inline constexpr bool operator!=(const atomic_shared_ptr<T>& ptr, std::nullptr_t
 }
 // Cheap hint comparison to ptr_base derivatives. Does not take version into account
 template<class T>
-inline bool atomic_shared_ptr<T>::operator==(const aspdetail::ptr_base<T>& other) const noexcept
+inline bool atomic_shared_ptr<T>::operator==(const asp_detail::ptr_base<T>& other) const noexcept
 {
-	return !((m_storage.load(std::memory_order_relaxed) ^ other.m_controlBlockStorage.m_u64) & aspdetail::Cb_Mask);
+	return !((m_storage.load(std::memory_order_relaxed) ^ other.m_controlBlockStorage.m_u64) & asp_detail::Cb_Mask);
 }
 // Cheap hint comparison to ptr_base derivatives. Does not take version into account
 template<class T>
-inline bool atomic_shared_ptr<T>::operator!=(const aspdetail::ptr_base<T>& other) const noexcept
+inline bool atomic_shared_ptr<T>::operator!=(const asp_detail::ptr_base<T>& other) const noexcept
 {
 	return !operator==(other);
 }
@@ -667,36 +674,36 @@ inline bool atomic_shared_ptr<T>::operator!=(const aspdetail::ptr_base<T>& other
 template <class T>
 inline void atomic_shared_ptr<T>::store_internal(compressed_storage from, std::memory_order order) noexcept
 {
-	exchange_internal(from, aspdetail::CAS_FLAG_NONE, order);
+	exchange_internal(from, asp_detail::CAS_FLAG_NONE, order);
 }
 template<class T>
-inline constexpr aspdetail::control_block_free_type_base<T>* atomic_shared_ptr<T>::to_control_block(compressed_storage from) const noexcept
+inline constexpr asp_detail::control_block_free_type_base<T>* atomic_shared_ptr<T>::to_control_block(compressed_storage from) const noexcept
 {
-	return reinterpret_cast<aspdetail::control_block_free_type_base<T>*>(from.m_u64 & aspdetail::Cb_Mask);
+	return reinterpret_cast<asp_detail::control_block_free_type_base<T>*>(from.m_u64 & asp_detail::Cb_Mask);
 }
 template<class T>
-inline bool atomic_shared_ptr<T>::compare_exchange_weak_internal(compressed_storage& expected, compressed_storage desired, aspdetail::CAS_FLAG flags, aspdetail::memory_orders orders) noexcept
+inline bool atomic_shared_ptr<T>::compare_exchange_weak_internal(compressed_storage& expected, compressed_storage desired, asp_detail::CAS_FLAG flags, asp_detail::memory_orders orders) noexcept
 {
 	bool result(false);
 
-	const compressed_storage desired_(aspdetail::set_version(desired, aspdetail::to_version(expected) + 1));
+	const compressed_storage desired_(asp_detail::set_version(desired, asp_detail::to_version(expected) + 1));
 	compressed_storage expected_(expected);
 
 	result = m_storage.compare_exchange_weak(expected_.m_u64, desired_.m_u64, orders.m_first, orders.m_second);
 
-	if (result & !(flags & aspdetail::CAS_FLAG_STEAL_PREVIOUS))
+	if (result & !(flags & asp_detail::CAS_FLAG_STEAL_PREVIOUS))
 	{
-		if (aspdetail::control_block_free_type_base<T>* const cb = to_control_block(expected))
+		if (asp_detail::control_block_free_type_base<T>* const cb = to_control_block(expected))
 		{
-			cb->decref(expected.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF]);
+			cb->decref(expected.m_u8[asp_detail::STORAGE_BYTE_LOCAL_REF]);
 		}
 	}
 
-	const bool otherInterjection((expected_.m_u64 ^ expected.m_u64) & aspdetail::Versioned_Cb_Mask);
+	const bool otherInterjection((expected_.m_u64 ^ expected.m_u64) & asp_detail::Versioned_Cb_Mask);
 
 	expected = expected_;
 
-	if (otherInterjection & (flags & aspdetail::CAS_FLAG_CAPTURE_ON_FAILURE))
+	if (otherInterjection & (flags & asp_detail::CAS_FLAG_CAPTURE_ON_FAILURE))
 	{
 		expected = copy_internal(std::memory_order_relaxed);
 	}
@@ -706,20 +713,20 @@ inline bool atomic_shared_ptr<T>::compare_exchange_weak_internal(compressed_stor
 template<class T>
 inline void atomic_shared_ptr<T>::try_fill_local_refs(compressed_storage& expected) const noexcept
 {
-	if (!(expected.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] < aspdetail::Local_Ref_Fill_Boundary)) {
+	if (!(expected.m_u8[asp_detail::STORAGE_BYTE_LOCAL_REF] < asp_detail::Local_Ref_Fill_Boundary)) {
 		return;
 	}
 
-	aspdetail::control_block_free_type_base<T>* const cb(to_control_block(expected));
+	asp_detail::control_block_free_type_base<T>* const cb(to_control_block(expected));
 
-	const compressed_storage initialPtrBlock(expected.m_u64 & aspdetail::Versioned_Cb_Mask);
+	const compressed_storage initialPtrBlock(expected.m_u64 & asp_detail::Versioned_Cb_Mask);
 
 	do {
-		const std::uint8_t localRefs(expected.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF]);
+		const std::uint8_t localRefs(expected.m_u8[asp_detail::STORAGE_BYTE_LOCAL_REF]);
 		const std::uint8_t newRefs(std::numeric_limits<std::uint8_t>::max() - localRefs);
 
 		compressed_storage desired(expected);
-		desired.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] = std::numeric_limits<std::uint8_t>::max();
+		desired.m_u8[asp_detail::STORAGE_BYTE_LOCAL_REF] = std::numeric_limits<std::uint8_t>::max();
 
 		// Accept 'null' refs, to be able to avoid using compare_exchange_strong during copy_internal
 		if (cb) {
@@ -735,34 +742,34 @@ inline void atomic_shared_ptr<T>::try_fill_local_refs(compressed_storage& expect
 		}
 
 	} while (
-		(expected.m_u64 & aspdetail::Versioned_Cb_Mask) == initialPtrBlock.m_u64 &&
-		expected.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] < aspdetail::Local_Ref_Fill_Boundary);
+		(expected.m_u64 & asp_detail::Versioned_Cb_Mask) == initialPtrBlock.m_u64 &&
+		expected.m_u8[asp_detail::STORAGE_BYTE_LOCAL_REF] < asp_detail::Local_Ref_Fill_Boundary);
 }
 template <class T>
-inline union aspdetail::compressed_storage atomic_shared_ptr<T>::copy_internal(std::memory_order order) const noexcept
+inline union asp_detail::compressed_storage atomic_shared_ptr<T>::copy_internal(std::memory_order order) const noexcept
 {
-	compressed_storage initial(m_storage.fetch_sub(aspdetail::Local_Ref_Step, std::memory_order_relaxed));
-	initial.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] -= 1;
+	compressed_storage initial(m_storage.fetch_sub(asp_detail::Local_Ref_Step, std::memory_order_relaxed));
+	initial.m_u8[asp_detail::STORAGE_BYTE_LOCAL_REF] -= 1;
 
 	compressed_storage expected(initial);
 	try_fill_local_refs(expected);
 
-	initial.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] = 1;
+	initial.m_u8[asp_detail::STORAGE_BYTE_LOCAL_REF] = 1;
 
 	std::atomic_thread_fence(order);
 
 	return initial;
 }
 template <class T>
-inline union aspdetail::compressed_storage atomic_shared_ptr<T>::unsafe_copy_internal(std::memory_order order) const
+inline union asp_detail::compressed_storage atomic_shared_ptr<T>::unsafe_copy_internal(std::memory_order order) const
 {
 	compressed_storage storage(m_storage.load(std::memory_order_relaxed));
 
 	compressed_storage newStorage(storage);
-	newStorage.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] -= 1;
+	newStorage.m_u8[asp_detail::STORAGE_BYTE_LOCAL_REF] -= 1;
 	m_storage.store(newStorage.m_u64, std::memory_order_relaxed);
 
-	storage.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] = 1;
+	storage.m_u8[asp_detail::STORAGE_BYTE_LOCAL_REF] = 1;
 
 	unsafe_fill_local_refs();
 
@@ -771,10 +778,10 @@ inline union aspdetail::compressed_storage atomic_shared_ptr<T>::unsafe_copy_int
 	return storage;
 }
 template<class T>
-inline union aspdetail::compressed_storage atomic_shared_ptr<T>::unsafe_exchange_internal(compressed_storage with, std::memory_order order)
+inline union asp_detail::compressed_storage atomic_shared_ptr<T>::unsafe_exchange_internal(compressed_storage with, std::memory_order order)
 {
 	const compressed_storage old(m_storage.load(std::memory_order_relaxed));
-	const compressed_storage replacement(aspdetail::set_version(with, aspdetail::to_version(old) + 1));
+	const compressed_storage replacement(asp_detail::set_version(with, asp_detail::to_version(old) + 1));
 
 	m_storage.store(replacement.m_u64, std::memory_order_relaxed);
 
@@ -788,14 +795,14 @@ template <class T>
 inline void atomic_shared_ptr<T>::unsafe_store_internal(compressed_storage from, std::memory_order order)
 {
 	const compressed_storage previous(m_storage.load(std::memory_order_relaxed));
-	const compressed_storage next(aspdetail::set_version(from, aspdetail::to_version(previous) + 1));
+	const compressed_storage next(asp_detail::set_version(from, asp_detail::to_version(previous) + 1));
 
 	m_storage.store(next.m_u64, std::memory_order_relaxed);
 
-	aspdetail::control_block_free_type_base<T>* const prevCb(to_control_block(previous));
+	asp_detail::control_block_free_type_base<T>* const prevCb(to_control_block(previous));
 	if (prevCb)
 	{
-		prevCb->decref(previous.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF]);
+		prevCb->decref(previous.m_u8[asp_detail::STORAGE_BYTE_LOCAL_REF]);
 	}
 
 	unsafe_fill_local_refs();
@@ -806,10 +813,10 @@ template<class T>
 inline void atomic_shared_ptr<T>::unsafe_fill_local_refs() const noexcept
 {
 	const compressed_storage current(m_storage.load(std::memory_order_relaxed));
-	aspdetail::control_block_free_type_base<T>* const cb(to_control_block(current));
+	asp_detail::control_block_free_type_base<T>* const cb(to_control_block(current));
 
-	if (current.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] < aspdetail::Local_Ref_Fill_Boundary) {
-		const std::uint8_t newRefs(std::numeric_limits<std::uint8_t>::max() - current.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF]);
+	if (current.m_u8[asp_detail::STORAGE_BYTE_LOCAL_REF] < asp_detail::Local_Ref_Fill_Boundary) {
+		const std::uint8_t newRefs(std::numeric_limits<std::uint8_t>::max() - current.m_u8[asp_detail::STORAGE_BYTE_LOCAL_REF]);
 
 		// Accept 'null' refs, to be able to avoid using compare_exchange_strong during copy_internal
 		if (cb) {
@@ -817,19 +824,19 @@ inline void atomic_shared_ptr<T>::unsafe_fill_local_refs() const noexcept
 		}
 
 		compressed_storage newStorage(current);
-		newStorage.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] = std::numeric_limits<std::uint8_t>::max();
+		newStorage.m_u8[asp_detail::STORAGE_BYTE_LOCAL_REF] = std::numeric_limits<std::uint8_t>::max();
 
 		m_storage.store(newStorage.m_u64, std::memory_order_relaxed);
 	}
 }
 template<class T>
-inline union aspdetail::compressed_storage atomic_shared_ptr<T>::exchange_internal(compressed_storage to, aspdetail::CAS_FLAG flags, std::memory_order order) noexcept
+inline union asp_detail::compressed_storage atomic_shared_ptr<T>::exchange_internal(compressed_storage to, asp_detail::CAS_FLAG flags, std::memory_order order) noexcept
 {
 	compressed_storage expected(m_storage.load(std::memory_order_relaxed));
 	while (!compare_exchange_weak_internal(expected, to, flags, { order, std::memory_order_relaxed }));
 	return expected;
 }
-namespace aspdetail
+namespace asp_detail
 {
 template <class T>
 class control_block_free_type_base
@@ -837,8 +844,8 @@ class control_block_free_type_base
 public:
 	control_block_free_type_base(compressed_storage storage) noexcept;
 
-	using size_type = aspdetail::size_type;
-	using decayed_type = aspdetail::decay_unbounded_t<T>;
+	using size_type = asp_detail::size_type;
+	using decayed_type = asp_detail::decay_unbounded_t<T>;
 
 	virtual decayed_type* get() noexcept = 0;
 	virtual const decayed_type* get() const noexcept = 0;
@@ -890,8 +897,8 @@ template <class T, class U = T>
 class control_block_base : public control_block_free_type_base<U>
 {
 public:
-	using conv_type = aspdetail::decay_unbounded_t<U>;
-	using decayed_type = aspdetail::decay_unbounded_t<T>;
+	using conv_type = asp_detail::decay_unbounded_t<U>;
+	using decayed_type = asp_detail::decay_unbounded_t<T>;
 
 	inline conv_type* get() noexcept override final;
 	inline const conv_type* get() const noexcept override final;
@@ -924,8 +931,8 @@ template <class T>
 class control_block_base_count : public control_block_base<T>
 {
 public:
-	using size_type = aspdetail::size_type;
-	using decayed_type = aspdetail::decay_unbounded_t<T>;
+	using size_type = asp_detail::size_type;
+	using decayed_type = asp_detail::decay_unbounded_t<T>;
 
 	control_block_base_count(decayed_type* object, std::size_t count)  noexcept;
 
@@ -984,7 +991,7 @@ inline void control_block_make_shared<T, Allocator>::destroy() noexcept
 	constexpr std::size_t blockSize(gdul::allocate_shared_size<T, Allocator>());
 	constexpr std::size_t blockAlign(alignof(T));
 
-	using block_type = aspdetail::max_align_storage<blockAlign, blockSize>;
+	using block_type = asp_detail::max_align_storage<blockAlign, blockSize>;
 	using rebound_alloc = typename std::allocator_traits<Allocator>::template rebind_alloc<block_type>;
 
 	rebound_alloc rebound(alloc);
@@ -997,7 +1004,7 @@ template <class T, class Allocator>
 class control_block_make_unbounded_array : public control_block_base_count<T>
 {
 public:
-	using decayed_type = aspdetail::decay_unbounded_t<T>;
+	using decayed_type = asp_detail::decay_unbounded_t<T>;
 
 	template <class ...Args>
 	control_block_make_unbounded_array(decayed_type* arr, std::size_t count, Allocator alloc) noexcept;
@@ -1165,9 +1172,9 @@ template <class T>
 class ptr_base
 {
 public:
-	using size_type = aspdetail::size_type;
+	using size_type = asp_detail::size_type;
 	using value_type = T;
-	using decayed_type = aspdetail::decay_unbounded_t<T>;
+	using decayed_type = asp_detail::decay_unbounded_t<T>;
 
 	inline constexpr operator bool() const noexcept;
 
@@ -1229,13 +1236,13 @@ inline void ptr_base<T>::clear() noexcept
 template <class T>
 inline constexpr ptr_base<T>::operator bool() const noexcept
 {
-	return m_controlBlockStorage.m_u64 & aspdetail::Cb_Mask;
+	return m_controlBlockStorage.m_u64 & asp_detail::Cb_Mask;
 }
 // Cheap hint comparison to ptr_base derivatives. Does not take version into account
 template <class T>
 inline constexpr bool ptr_base<T>::operator==(const ptr_base<T>& other) const noexcept
 {
-	return !((m_controlBlockStorage.m_u64 ^ other.m_controlBlockStorage.m_u64) & aspdetail::Cb_Mask);
+	return !((m_controlBlockStorage.m_u64 ^ other.m_controlBlockStorage.m_u64) & asp_detail::Cb_Mask);
 }
 // Cheap hint comparison to ptr_base derivatives. Does not take version into account
 template <class T>
@@ -1337,17 +1344,17 @@ inline constexpr std::uint16_t ptr_base<T>::get_version() const noexcept
 }
 };
 template <class T>
-class shared_ptr : public aspdetail::ptr_base<T>
+class shared_ptr : public asp_detail::ptr_base<T>
 {
 public:
-	using decayed_type = aspdetail::decay_unbounded_t<T>;
+	using decayed_type = asp_detail::decay_unbounded_t<T>;
 
 	inline constexpr shared_ptr() noexcept;
 
 	inline explicit constexpr shared_ptr(std::nullptr_t) noexcept;
 	inline explicit constexpr shared_ptr(std::nullptr_t, std::uint16_t version) noexcept;
 
-	using aspdetail::ptr_base<T>::ptr_base;
+	using asp_detail::ptr_base<T>::ptr_base;
 
 	inline shared_ptr(const shared_ptr<T>& other) noexcept;
 
@@ -1397,8 +1404,8 @@ public:
 	inline constexpr const decayed_type* operator->() const;
 	inline constexpr const decayed_type& operator*() const;
 
-	inline const decayed_type& operator[](aspdetail::size_type index) const;
-	inline decayed_type& operator[](aspdetail::size_type index);
+	inline const decayed_type& operator[](asp_detail::size_type index) const;
+	inline decayed_type& operator[](asp_detail::size_type index);
 
 	inline constexpr raw_ptr<T> get_raw_ptr() const noexcept;
 	inline void swap(shared_ptr<T>& other) noexcept;
@@ -1409,8 +1416,8 @@ private:
 
 	constexpr void clear() noexcept;
 
-	using compressed_storage = aspdetail::compressed_storage;
-	inline constexpr shared_ptr(union aspdetail::compressed_storage from) noexcept;
+	using compressed_storage = asp_detail::compressed_storage;
+	inline constexpr shared_ptr(union asp_detail::compressed_storage from) noexcept;
 
 	template<class Deleter, class Allocator>
 	inline compressed_storage create_control_block(T* object, Allocator allocator, Deleter&& deleter);
@@ -1423,7 +1430,7 @@ private:
 	template
 		<
 		class U,
-		std::enable_if_t<!aspdetail::is_unbounded_array_v<U>>*,
+		std::enable_if_t<!asp_detail::is_unbounded_array_v<U>>*,
 		class Allocator,
 		class ...Args
 		>
@@ -1432,7 +1439,7 @@ private:
 	template
 		<
 		class U,
-		std::enable_if_t<aspdetail::is_unbounded_array_v<U>>*,
+		std::enable_if_t<asp_detail::is_unbounded_array_v<U>>*,
 		class Allocator,
 		class ...Args
 		>
@@ -1442,26 +1449,26 @@ private:
 };
 template <class T>
 inline constexpr shared_ptr<T>::shared_ptr() noexcept
-	: aspdetail::ptr_base<T>()
+	: asp_detail::ptr_base<T>()
 	, m_ptr(nullptr)
 {}
 template <class T>
 inline constexpr shared_ptr<T>::shared_ptr(std::nullptr_t) noexcept
-	: aspdetail::ptr_base<T>(compressed_storage())
+	: asp_detail::ptr_base<T>(compressed_storage())
 	, m_ptr(nullptr)
 {}
 template <class T>
 inline constexpr shared_ptr<T>::shared_ptr(std::nullptr_t, std::uint16_t version) noexcept
-	: aspdetail::ptr_base<T>(set_version(compressed_storage(), version))
+	: asp_detail::ptr_base<T>(set_version(compressed_storage(), version))
 	, m_ptr(nullptr)
 {}
 template<class T>
 inline shared_ptr<T>::~shared_ptr() noexcept
 {
-	aspdetail::control_block_free_type_base<T>* const cb(this->get_control_block());
+	asp_detail::control_block_free_type_base<T>* const cb(this->get_control_block());
 	if (cb)
 	{
-		cb->decref(this->m_controlBlockStorage.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF]);
+		cb->decref(this->m_controlBlockStorage.m_u8[asp_detail::STORAGE_BYTE_LOCAL_REF]);
 	}
 }
 template<class T>
@@ -1480,10 +1487,10 @@ inline shared_ptr<T>::shared_ptr(const shared_ptr<T>& other) noexcept
 {
 	compressed_storage copy(other.m_controlBlockStorage);
 
-	if (aspdetail::control_block_free_type_base<T>* const cb = this->to_control_block(copy))
+	if (asp_detail::control_block_free_type_base<T>* const cb = this->to_control_block(copy))
 	{
-		copy.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] = aspdetail::Default_Local_Refs;
-		cb->incref(aspdetail::Default_Local_Refs);
+		copy.m_u8[asp_detail::STORAGE_BYTE_LOCAL_REF] = asp_detail::Default_Local_Refs;
+		cb->incref(asp_detail::Default_Local_Refs);
 	}
 
 	this->m_controlBlockStorage = copy;
@@ -1493,7 +1500,7 @@ template <class T>
 inline shared_ptr<T>::shared_ptr(T* object)
 	: shared_ptr<T>()
 {
-	aspdetail::default_allocator alloc;
+	asp_detail::default_allocator alloc;
 	this->m_controlBlockStorage = create_control_block(object, alloc);
 	this->m_ptr = this->to_object(this->m_controlBlockStorage);
 }
@@ -1554,14 +1561,14 @@ template<class T>
 inline constexpr void shared_ptr<T>::clear() noexcept
 {
 	m_ptr = nullptr;
-	aspdetail::ptr_base<T>::clear();
+	asp_detail::ptr_base<T>::clear();
 }
 template<class T>
 inline void shared_ptr<T>::set_local_refs(std::uint8_t target) noexcept
 {
-	if (aspdetail::control_block_free_type_base<T>* const cb = this->get_control_block())
+	if (asp_detail::control_block_free_type_base<T>* const cb = this->get_control_block())
 	{
-		const uint8_t localRefs(this->m_controlBlockStorage.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF]);
+		const uint8_t localRefs(this->m_controlBlockStorage.m_u8[asp_detail::STORAGE_BYTE_LOCAL_REF]);
 
 		if (localRefs < target)
 		{
@@ -1576,16 +1583,16 @@ inline void shared_ptr<T>::set_local_refs(std::uint8_t target) noexcept
 		m_ptr = (decayed_type*)((uint64_t)m_ptr * (bool)target);
 	}
 
-	this->m_controlBlockStorage.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] = target;
+	this->m_controlBlockStorage.m_u8[asp_detail::STORAGE_BYTE_LOCAL_REF] = target;
 }
 template <class T>
 inline constexpr std::uint8_t shared_ptr<T>::use_count_local() const noexcept
 {
-	return this->m_controlBlockStorage.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF];
+	return this->m_controlBlockStorage.m_u8[asp_detail::STORAGE_BYTE_LOCAL_REF];
 }
 template<class T>
-inline constexpr shared_ptr<T>::shared_ptr(union aspdetail::compressed_storage from) noexcept
-	: aspdetail::ptr_base<T>(from)
+inline constexpr shared_ptr<T>::shared_ptr(union asp_detail::compressed_storage from) noexcept
+	: asp_detail::ptr_base<T>(from)
 	, m_ptr(this->to_object(from))
 {
 }
@@ -1625,12 +1632,12 @@ inline constexpr const typename shared_ptr<T>::decayed_type& shared_ptr<T>::oper
 	return *get();
 }
 template <class T>
-inline const typename shared_ptr<T>::decayed_type& shared_ptr<T>::operator[](aspdetail::size_type index) const
+inline const typename shared_ptr<T>::decayed_type& shared_ptr<T>::operator[](asp_detail::size_type index) const
 {
 	return get()[index];
 }
 template <class T>
-inline typename shared_ptr<T>::decayed_type& shared_ptr<T>::operator[](aspdetail::size_type index)
+inline typename shared_ptr<T>::decayed_type& shared_ptr<T>::operator[](asp_detail::size_type index)
 {
 	return get()[index];
 }
@@ -1647,7 +1654,7 @@ inline constexpr typename shared_ptr<T>::decayed_type* shared_ptr<T>::get() noex
 template<class T>
 inline std::size_t shared_ptr<T>::item_count() const noexcept
 {
-	if (!aspdetail::ptr_base<T>::operator bool())
+	if (!asp_detail::ptr_base<T>::operator bool())
 	{
 		return 0;
 	}
@@ -1656,7 +1663,7 @@ inline std::size_t shared_ptr<T>::item_count() const noexcept
 }
 template <class T>
 template<class Deleter, class Allocator>
-inline union aspdetail::compressed_storage shared_ptr<T>::create_control_block(T* object, Allocator allocator, Deleter&& deleter)
+inline union asp_detail::compressed_storage shared_ptr<T>::create_control_block(T* object, Allocator allocator, Deleter&& deleter)
 {
 	static_assert(!(8 < alignof(Deleter)), "No support for custom aligned deleter objects");
 
@@ -1664,7 +1671,7 @@ inline union aspdetail::compressed_storage shared_ptr<T>::create_control_block(T
 
 	rebound_alloc rebound(allocator);
 
-	aspdetail::control_block_claim_custom_delete<T, Allocator, Deleter>* controlBlock(nullptr);
+	asp_detail::control_block_claim_custom_delete<T, Allocator, Deleter>* controlBlock(nullptr);
 
 	constexpr std::size_t blockSize(sp_claim_size_custom_delete<T, Allocator, Deleter>());
 
@@ -1679,7 +1686,7 @@ inline union aspdetail::compressed_storage shared_ptr<T>::create_control_block(T
 			throw std::runtime_error("alloc_shared expects at least alignof(max_align_t) allocates");
 		}
 
-		controlBlock = new (block) aspdetail::control_block_claim_custom_delete<T, Allocator, Deleter>(object, allocator, std::forward<Deleter&&>(deleter));
+		controlBlock = new (block) asp_detail::control_block_claim_custom_delete<T, Allocator, Deleter>(object, allocator, std::forward<Deleter&&>(deleter));
 	}
 	catch (...)
 	{
@@ -1688,19 +1695,19 @@ inline union aspdetail::compressed_storage shared_ptr<T>::create_control_block(T
 		throw;
 	}
 	compressed_storage storage(reinterpret_cast<std::uint64_t>(controlBlock));
-	storage.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] = aspdetail::Default_Local_Refs;
+	storage.m_u8[asp_detail::STORAGE_BYTE_LOCAL_REF] = asp_detail::Default_Local_Refs;
 
 	return storage;
 }
 template<class T>
 template <class Allocator>
-inline union aspdetail::compressed_storage shared_ptr<T>::create_control_block(T* object, Allocator allocator)
+inline union asp_detail::compressed_storage shared_ptr<T>::create_control_block(T* object, Allocator allocator)
 {
 	using rebound_alloc = typename std::allocator_traits<Allocator>::template rebind_alloc<std::uint8_t>;
 
 	rebound_alloc rebound(allocator);
 
-	aspdetail::control_block_claim<T, Allocator>* controlBlock(nullptr);
+	asp_detail::control_block_claim<T, Allocator>* controlBlock(nullptr);
 
 	constexpr std::size_t blockSize(sp_claim_size<T, Allocator>());
 
@@ -1715,7 +1722,7 @@ inline union aspdetail::compressed_storage shared_ptr<T>::create_control_block(T
 			throw std::runtime_error("alloc_shared expects at least alignof(max_align_t) allocates");
 		}
 
-		controlBlock = new (block) aspdetail::control_block_claim<T, Allocator>(object, rebound);
+		controlBlock = new (block) asp_detail::control_block_claim<T, Allocator>(object, rebound);
 	}
 	catch (...)
 	{
@@ -1725,7 +1732,7 @@ inline union aspdetail::compressed_storage shared_ptr<T>::create_control_block(T
 	}
 
 	compressed_storage storage(reinterpret_cast<std::uint64_t>(controlBlock));
-	storage.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] = aspdetail::Default_Local_Refs;
+	storage.m_u8[asp_detail::STORAGE_BYTE_LOCAL_REF] = asp_detail::Default_Local_Refs;
 
 	return storage;
 }
@@ -1748,13 +1755,13 @@ inline shared_ptr<T>& shared_ptr<T>::operator=(shared_ptr<U>&& other) noexcept
 template<class T>
 inline void shared_ptr<T>::swap(shared_ptr<T>& other) noexcept
 {
-	aspdetail::ptr_base<T>::swap(other);
+	asp_detail::ptr_base<T>::swap(other);
 	std::swap(m_ptr, other.m_ptr);
 }
 
 // raw_ptr does not share in ownership of the object
 template <class T>
-class raw_ptr : public aspdetail::ptr_base<T>
+class raw_ptr : public asp_detail::ptr_base<T>
 {
 public:
 	inline constexpr raw_ptr() noexcept;
@@ -1762,8 +1769,8 @@ public:
 	inline explicit constexpr raw_ptr(std::nullptr_t) noexcept;
 	inline explicit constexpr raw_ptr(std::nullptr_t, std::uint16_t version) noexcept;
 
-	using aspdetail::ptr_base<T>::ptr_base;
-	using decayed_type = aspdetail::decay_unbounded_t<T>;
+	using asp_detail::ptr_base<T>::ptr_base;
+	using decayed_type = asp_detail::decay_unbounded_t<T>;
 
 	constexpr raw_ptr(raw_ptr<T>&& other) noexcept;
 	constexpr raw_ptr(const raw_ptr<T>& other) noexcept;
@@ -1786,8 +1793,8 @@ public:
 	inline constexpr const decayed_type* operator->() const;
 	inline constexpr const decayed_type& operator*() const;
 
-	inline const decayed_type& operator[](aspdetail::size_type index) const;
-	inline decayed_type& operator[](aspdetail::size_type index);
+	inline const decayed_type& operator[](asp_detail::size_type index) const;
+	inline decayed_type& operator[](asp_detail::size_type index);
 
 	inline void swap(raw_ptr<T>& other) noexcept;
 
@@ -1797,26 +1804,26 @@ public:
 	constexpr raw_ptr<T>& operator=(const atomic_shared_ptr<T>& from) noexcept;
 
 private:
-	typedef aspdetail::compressed_storage compressed_storage;
+	typedef asp_detail::compressed_storage compressed_storage;
 
 	explicit constexpr raw_ptr(compressed_storage from) noexcept;
 
-	friend class aspdetail::ptr_base<T>;
+	friend class asp_detail::ptr_base<T>;
 	friend class atomic_shared_ptr<T>;
 	friend class shared_ptr<T>;
 };
 template<class T>
 inline constexpr raw_ptr<T>::raw_ptr() noexcept
-	: aspdetail::ptr_base<T>()
+	: asp_detail::ptr_base<T>()
 {
 }
 template<class T>
 inline constexpr raw_ptr<T>::raw_ptr(std::nullptr_t) noexcept
-	: aspdetail::ptr_base<T>(compressed_storage())
+	: asp_detail::ptr_base<T>(compressed_storage())
 {}
 template<class T>
 inline constexpr raw_ptr<T>::raw_ptr(std::nullptr_t, std::uint16_t version) noexcept
-	: aspdetail::ptr_base<T>(set_version(compressed_storage(), version))
+	: asp_detail::ptr_base<T>(set_version(compressed_storage(), version))
 {}
 template<class T>
 inline constexpr raw_ptr<T>::raw_ptr(raw_ptr<T>&& other) noexcept
@@ -1832,15 +1839,15 @@ inline constexpr raw_ptr<T>::raw_ptr(const raw_ptr<T>& other) noexcept
 }
 template<class T>
 inline constexpr raw_ptr<T>::raw_ptr(const shared_ptr<T>& from) noexcept
-	: aspdetail::ptr_base<T>(from.m_controlBlockStorage)
+	: asp_detail::ptr_base<T>(from.m_controlBlockStorage)
 {
-	this->m_controlBlockStorage.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] = 0;
+	this->m_controlBlockStorage.m_u8[asp_detail::STORAGE_BYTE_LOCAL_REF] = 0;
 }
 template<class T>
 inline raw_ptr<T>::raw_ptr(const atomic_shared_ptr<T>& from) noexcept
-	: aspdetail::ptr_base<T>(from.m_storage.load(std::memory_order_relaxed))
+	: asp_detail::ptr_base<T>(from.m_storage.load(std::memory_order_relaxed))
 {
-	this->m_controlBlockStorage.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] = 0;
+	this->m_controlBlockStorage.m_u8[asp_detail::STORAGE_BYTE_LOCAL_REF] = 0;
 }
 template<class T>
 inline constexpr raw_ptr<T>& raw_ptr<T>::operator=(const raw_ptr<T>& other)  noexcept
@@ -1918,12 +1925,12 @@ inline constexpr const typename raw_ptr<T>::decayed_type& raw_ptr<T>::operator*(
 	return *get();
 }
 template <class T>
-inline const typename raw_ptr<T>::decayed_type& raw_ptr<T>::operator[](aspdetail::size_type index) const
+inline const typename raw_ptr<T>::decayed_type& raw_ptr<T>::operator[](asp_detail::size_type index) const
 {
 	return get()[index];
 }
 template <class T>
-inline typename raw_ptr<T>::decayed_type& raw_ptr<T>::operator[](aspdetail::size_type index)
+inline typename raw_ptr<T>::decayed_type& raw_ptr<T>::operator[](asp_detail::size_type index)
 {
 	return get()[index];
 }
@@ -1934,58 +1941,58 @@ inline void raw_ptr<T>::swap(raw_ptr<T>& other) noexcept
 }
 template<class T>
 inline constexpr raw_ptr<T>::raw_ptr(compressed_storage from) noexcept
-	: aspdetail::ptr_base<T>(from)
+	: asp_detail::ptr_base<T>(from)
 {
-	this->m_controlBlockStorage.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] = 0;
+	this->m_controlBlockStorage.m_u8[asp_detail::STORAGE_BYTE_LOCAL_REF] = 0;
 }
 #if 201700 < __cplusplus || _HAS_CXX17
 // The amount of memory requested from the allocator when calling
 // alloc_shared (object or statically sized array)
-template <class T, class Allocator, std::enable_if_t<!aspdetail::is_unbounded_array_v<T>>*>
+template <class T, class Allocator, std::enable_if_t<!asp_detail::is_unbounded_array_v<T>>*>
 inline constexpr std::size_t allocate_shared_size() noexcept
 {
-	return sizeof(aspdetail::control_block_make_shared<T, Allocator>);
+	return sizeof(asp_detail::control_block_make_shared<T, Allocator>);
 }
 #else
 // The amount of memory requested from the allocator when calling
 // alloc_shared (object or statically sized array)
-template <class T, class Allocator, std::enable_if_t<!aspdetail::is_unbounded_array_v<T>>*>
+template <class T, class Allocator, std::enable_if_t<!asp_detail::is_unbounded_array_v<T>>*>
 inline constexpr std::size_t allocate_shared_size() noexcept
 {
 	constexpr std::size_t align(alignof(T) < alignof(std::max_align_t) ? alignof(std::max_align_t) : alignof(T));
 	constexpr std::size_t maxExtra(align - alignof(std::max_align_t));
-	return sizeof(aspdetail::control_block_make_shared<T, Allocator>) + maxExtra;
+	return sizeof(asp_detail::control_block_make_shared<T, Allocator>) + maxExtra;
 }
 #endif
 // The amount of memory requested from the allocator when calling
 // alloc_shared (dynamically sized array)
-template <class T, class Allocator, std::enable_if_t<aspdetail::is_unbounded_array_v<T>>*>
+template <class T, class Allocator, std::enable_if_t<asp_detail::is_unbounded_array_v<T>>*>
 inline constexpr std::size_t allocate_shared_size(std::size_t count) noexcept
 {
-	using decayed_type = aspdetail::decay_unbounded_t<T>;
+	using decayed_type = asp_detail::decay_unbounded_t<T>;
 
 	constexpr std::size_t align(alignof(decayed_type) < alignof(std::max_align_t) ? alignof(std::max_align_t) : alignof(decayed_type));
 	constexpr std::size_t maxExtra(align - alignof(std::max_align_t));
-	return sizeof(aspdetail::control_block_make_unbounded_array<T, Allocator>) + maxExtra + (sizeof(decayed_type) * count);
+	return sizeof(asp_detail::control_block_make_unbounded_array<T, Allocator>) + maxExtra + (sizeof(decayed_type) * count);
 }
 // The amount of memory requested from the allocator when 
 // shared_ptr takes ownership of an object using default deleter
 template <class T, class Allocator>
 inline constexpr std::size_t sp_claim_size() noexcept
 {
-	return sizeof(aspdetail::control_block_claim<T, Allocator>);
+	return sizeof(asp_detail::control_block_claim<T, Allocator>);
 }
 // The amount of memory requested from the allocator when 
 // shared_ptr takes ownership of an object using a custom deleter
 template<class T, class Allocator, class Deleter>
 inline constexpr std::size_t sp_claim_size_custom_delete() noexcept
 {
-	return sizeof(aspdetail::control_block_claim_custom_delete<T, Allocator, Deleter>);
+	return sizeof(asp_detail::control_block_claim_custom_delete<T, Allocator, Deleter>);
 }
 template
 <
 	class T,
-	std::enable_if_t<!aspdetail::is_unbounded_array_v<T>>*,
+	std::enable_if_t<!asp_detail::is_unbounded_array_v<T>>*,
 	class Allocator,
 	class ...Args
 >
@@ -1994,12 +2001,12 @@ inline shared_ptr<T> allocate_shared(Allocator allocator, Args&& ...args)
 	constexpr std::size_t blockSize(allocate_shared_size<T, Allocator>());
 	constexpr std::size_t blockAlign(alignof(T));
 
-	using block_type = aspdetail::max_align_storage<blockAlign, blockSize>;
+	using block_type = asp_detail::max_align_storage<blockAlign, blockSize>;
 	using rebound_alloc = typename std::allocator_traits<Allocator>::template rebind_alloc<block_type>;
 
 	rebound_alloc rebound(allocator);
 	block_type* typedBlock(nullptr);
-	aspdetail::control_block_make_shared<T, Allocator>* controlBlock(nullptr);
+	asp_detail::control_block_make_shared<T, Allocator>* controlBlock(nullptr);
 	try
 	{
 		typedBlock = rebound.allocate(1);
@@ -2008,9 +2015,9 @@ inline shared_ptr<T> allocate_shared(Allocator allocator, Args&& ...args)
 		const std::uintptr_t mod((std::uintptr_t)block % blockAlign);
 		const std::uintptr_t offset(mod ? blockAlign - mod : 0);
 
-		aspdetail::assert_alignment<T>(block);
+		asp_detail::assert_alignment<T>(block);
 
-		controlBlock = new (reinterpret_cast<std::uint8_t*>(block + offset)) aspdetail::control_block_make_shared<T, Allocator>(allocator, (std::uint8_t)offset, std::forward<Args>(args)...);
+		controlBlock = new (reinterpret_cast<std::uint8_t*>(block + offset)) asp_detail::control_block_make_shared<T, Allocator>(allocator, (std::uint8_t)offset, std::forward<Args>(args)...);
 	}
 	catch (...)
 	{
@@ -2023,21 +2030,21 @@ inline shared_ptr<T> allocate_shared(Allocator allocator, Args&& ...args)
 		throw;
 	}
 
-	aspdetail::compressed_storage storage(reinterpret_cast<std::uint64_t>(controlBlock));
-	storage.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] = aspdetail::Default_Local_Refs;
+	asp_detail::compressed_storage storage(reinterpret_cast<std::uint64_t>(controlBlock));
+	storage.m_u8[asp_detail::STORAGE_BYTE_LOCAL_REF] = asp_detail::Default_Local_Refs;
 
 	return shared_ptr<T>(storage);
 }
 template
 <
 	class T,
-	std::enable_if_t<aspdetail::is_unbounded_array_v<T>>*,
+	std::enable_if_t<asp_detail::is_unbounded_array_v<T>>*,
 	class Allocator,
 	class ...Args
 >
 inline shared_ptr<T> allocate_shared(std::size_t count, Allocator allocator, Args&& ...args)
 {
-	using decayed_type = aspdetail::decay_unbounded_t<T>;
+	using decayed_type = asp_detail::decay_unbounded_t<T>;
 
 	const std::size_t blockSize(allocate_shared_size<T, Allocator>(count));
 
@@ -2045,7 +2052,7 @@ inline shared_ptr<T> allocate_shared(std::size_t count, Allocator allocator, Arg
 
 	rebound_alloc rebound(allocator);
 	std::uint8_t* block(nullptr);
-	aspdetail::control_block_make_unbounded_array<T, Allocator>* controlBlock(nullptr);
+	asp_detail::control_block_make_unbounded_array<T, Allocator>* controlBlock(nullptr);
 	decayed_type* arrayloc(nullptr);
 
 	std::size_t constructed(0);
@@ -2053,7 +2060,7 @@ inline shared_ptr<T> allocate_shared(std::size_t count, Allocator allocator, Arg
 	{
 		block = rebound.allocate(blockSize);
 
-		uint8_t* const cbend(block + sizeof(aspdetail::control_block_make_unbounded_array<T, Allocator>));
+		uint8_t* const cbend(block + sizeof(asp_detail::control_block_make_unbounded_array<T, Allocator>));
 		const uintptr_t asint((uintptr_t)cbend);
 		const uintptr_t mod(asint % alignof(decayed_type));
 		const uintptr_t offset(mod ? alignof(decayed_type) - mod : 0);
@@ -2064,9 +2071,9 @@ inline shared_ptr<T> allocate_shared(std::size_t count, Allocator allocator, Arg
 			new (&arrayloc[i]) decayed_type(std::forward<Args>(args)...);
 		}
 
-		aspdetail::assert_alignment<std::max_align_t>(block);
+		asp_detail::assert_alignment<std::max_align_t>(block);
 
-		controlBlock = new (reinterpret_cast<std::uint8_t*>(block)) aspdetail::control_block_make_unbounded_array<T, Allocator>(arrayloc, count, allocator);
+		controlBlock = new (reinterpret_cast<std::uint8_t*>(block)) asp_detail::control_block_make_unbounded_array<T, Allocator>(arrayloc, count, allocator);
 	}
 	catch (...)
 	{
@@ -2082,30 +2089,30 @@ inline shared_ptr<T> allocate_shared(std::size_t count, Allocator allocator, Arg
 		throw;
 	}
 
-	aspdetail::compressed_storage storage(reinterpret_cast<std::uint64_t>(controlBlock));
-	storage.m_u8[aspdetail::STORAGE_BYTE_LOCAL_REF] = aspdetail::Default_Local_Refs;
+	asp_detail::compressed_storage storage(reinterpret_cast<std::uint64_t>(controlBlock));
+	storage.m_u8[asp_detail::STORAGE_BYTE_LOCAL_REF] = asp_detail::Default_Local_Refs;
 
 	return shared_ptr<T>(storage);
 }
 template
 <
 	class T,
-	std::enable_if_t<!aspdetail::is_unbounded_array_v<T>>* = nullptr,
+	std::enable_if_t<!asp_detail::is_unbounded_array_v<T>>* = nullptr,
 	class ...Args
 >
 inline shared_ptr<T> make_shared(Args&& ...args)
 {
-	return gdul::allocate_shared<T>(aspdetail::default_allocator(), std::forward<Args>(args)...);
+	return gdul::allocate_shared<T>(asp_detail::default_allocator(), std::forward<Args>(args)...);
 }
 template
 <
 	class T,
-	std::enable_if_t<aspdetail::is_unbounded_array_v<T>>* = nullptr,
+	std::enable_if_t<asp_detail::is_unbounded_array_v<T>>* = nullptr,
 	class ...Args
 >
 inline shared_ptr<T> make_shared(std::size_t count, Args&& ...args)
 {
-	return gdul::allocate_shared<T>(count, aspdetail::default_allocator(), std::forward<Args>(args)...);
+	return gdul::allocate_shared<T>(count, asp_detail::default_allocator(), std::forward<Args>(args)...);
 }
 };
 #pragma warning(pop)
