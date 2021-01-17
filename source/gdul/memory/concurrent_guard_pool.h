@@ -335,6 +335,7 @@ inline void concurrent_guard_pool<T, Allocator>::unsafe_reset()
 	for (std::uint8_t i = 0; i < blockCount; ++i) {
 		m_blocks[i].m_blockKey = 0;
 		m_blocks[i].m_items = shared_ptr<T[]>(nullptr);
+		m_blocks[i].m_items.unsafe_set_version(0);
 		m_blocks[i].m_pushSync = 0;
 		m_blocks[i].m_livingItems.store((size_type)std::pow(2.f, (float)(i + 1)));
 	}
@@ -343,7 +344,6 @@ inline void concurrent_guard_pool<T, Allocator>::unsafe_reset()
 	m_fullCaches.unsafe_reset();
 }
 
-// Look at up_to_date.. Make foolproof.
 template<class T, class Allocator>
 inline bool concurrent_guard_pool<T, Allocator>::is_up_to_date(const T* item) const
 {
@@ -560,7 +560,6 @@ inline void concurrent_guard_pool<T, Allocator>::try_alloc_block(std::uint8_t bl
 		pushIndex = m_blocks[blockIndex].m_pushSync.fetch_add(m_tlCacheSize, std::memory_order_relaxed);
 	}
 
-	// Might just update this before. 
 	m_blocksEndIndex.compare_exchange_strong(blockIndex, blockIndex + 1, std::memory_order_release);
 }
 namespace cgp_detail {

@@ -49,9 +49,9 @@ job_handler_impl::job_handler_impl(allocator_type allocator)
 	constexpr std::size_t jobNodeAllocSize(allocate_shared_size<job_node, pool_allocator<job_node>>());
 	constexpr std::size_t batchJobAllocSize(allocate_shared_size<dummy_batch_type, pool_allocator<dummy_batch_type>>());
 
-	m_jobImplMemPool.init<jobImplAllocSize, alignof(job_impl)>(Job_Pool_Init_Size, m_mainAllocator);
-	m_jobNodeMemPool.init<jobNodeAllocSize, alignof(job_node)>(Job_Pool_Init_Size + jh_detail::Batch_Job_Pool_Init_Size, m_mainAllocator);
-	m_batchJobMemPool.init<batchJobAllocSize, alignof(dummy_batch_type)>(Batch_Job_Pool_Init_Size, m_mainAllocator);
+	m_jobImplMemPool.init<jobImplAllocSize, alignof(job_impl)>(Job_Pool_Init_Size, 1, m_mainAllocator);
+	m_jobNodeMemPool.init<jobNodeAllocSize, alignof(job_node)>(Job_Pool_Init_Size + jh_detail::Batch_Job_Pool_Init_Size, 1, m_mainAllocator);
+	m_batchJobMemPool.init<batchJobAllocSize, alignof(dummy_batch_type)>(Batch_Job_Pool_Init_Size, 1, m_mainAllocator);
 }
 
 
