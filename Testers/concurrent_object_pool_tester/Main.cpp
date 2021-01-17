@@ -41,6 +41,8 @@ int main()
 
 	pool.recycle(swapA);
 
+	gdul::atomic_shared_ptr<int> yo;
+
     std::cout << "Hello World!\n"; 
 }
 

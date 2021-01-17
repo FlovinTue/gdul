@@ -152,7 +152,7 @@ public:
 #ifdef ASP_MUTEX_COMPARE
 	mutexed_wrapper<T> m_testArray[ArraySize];
 #else
-	atomic_shared_ptr<T> m_testArray[ArraySize];
+	gdul::atomic_shared_ptr<T> m_testArray[ArraySize];
 	reference_comparison<T> m_referenceComparison[ArraySize]{};
 #endif
 	std::atomic_bool m_workBlock;
@@ -163,7 +163,7 @@ public:
 	std::mt19937 m_rng;
 };
 template <class T, std::uint32_t ArraySize>
-thread_local std::queue<shared_ptr<typename asp_tester<T, ArraySize>::aba_node>> asp_tester<T, ArraySize>::m_abaStorage;
+thread_local std::queue<gdul::shared_ptr<typename asp_tester<T, ArraySize>::aba_node>> asp_tester<T, ArraySize>::m_abaStorage;
 
 template<class T, std::uint32_t ArraySize>
 template<class ...InitArgs>

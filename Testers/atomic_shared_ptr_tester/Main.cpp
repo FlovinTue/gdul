@@ -165,6 +165,11 @@ int main()
 	gdul::atomic_shared_ptr<int> tar(gdul::make_shared<int>(5));
 	gdul::shared_ptr<int> des(gdul::make_shared<int>(6));
 
+	gdul::atomic_shared_ptr<int> setver;
+	setver.store(gdul::make_shared<int>(5));
+	setver.unsafe_set_version(25);
+	setver.unsafe_set_version(0);
+
 	uint32_t iter(50000);
 	auto lama = [&des, &tar, iter]()
 	{
@@ -238,6 +243,6 @@ int main()
 
 		}
 	}
-	std::cout << "Final alloc'd " << s_allocated << std::endl;
+	std::cout << "Final alloc'd " << gdul::s_allocated << std::endl;
 	return 0;
 }
