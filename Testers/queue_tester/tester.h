@@ -754,6 +754,9 @@ inline void tester<T, Allocator>::Read(std::uint32_t reads) {
 #endif
 				break;
 			}
+			else {
+				std::this_thread::yield();
+			}
 		}
 	}
 #endif
