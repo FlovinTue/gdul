@@ -195,7 +195,7 @@ A quick usage example for job:
 ```
 #include <iostream>
 #include <thread>
-#include <gdul/job_handler_master.h>
+#include <gdul/execution/job_handler_master.h>
 
 int main()
 {
@@ -224,7 +224,7 @@ int main()
 And with batch_job:
 ```
 #include <thread>
-#include <gdul/job_handler_master.h>
+#include <gdul/execution/job_handler_master.h>
 #include <vector>
 
 int main()

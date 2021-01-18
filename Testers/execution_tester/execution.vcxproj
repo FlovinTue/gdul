@@ -12,11 +12,10 @@
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>
-    <ProjectGuid>{471962A3-BFAE-46B3-BBE9-0CB842BC1444}</ProjectGuid>
+    <ProjectGuid>{38AC6E3A-729D-4527-83C6-3805A7274AA8}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>gdul</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
-    <ProjectName>atomic_shared_ptr</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
@@ -54,15 +53,16 @@
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level4</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(ProjectDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <LanguageStandard>stdcpplatest</LanguageStandard>
+      <AdditionalIncludeDirectories>$(SolutionDir)External\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/Zi %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -71,7 +71,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level4</WarningLevel>
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -80,7 +80,7 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(ProjectDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)External\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
@@ -91,19 +91,47 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\source\gdul\atomic_shared_ptr\atomic_shared_ptr.h" />
-    <ClInclude Include="pch.h" />
-    <ClInclude Include="Tester.h" />
+    <ClInclude Include="..\..\source\gdul\execution\job_handler\globals.h" />
+    <ClInclude Include="..\..\source\gdul\execution\job_handler\job\batch_job.h" />
+    <ClInclude Include="..\..\source\gdul\execution\job_handler\job\batch_job_impl.h" />
+    <ClInclude Include="..\..\source\gdul\execution\job_handler\job\batch_job_impl_interface.h" />
+    <ClInclude Include="..\..\source\gdul\execution\job_handler\job\job.h" />
+    <ClInclude Include="..\..\source\gdul\execution\job_handler\job\job_node.h" />
+    <ClInclude Include="..\..\source\gdul\execution\job_handler\job_handler.h" />
+    <ClInclude Include="..\..\source\gdul\execution\job_handler\job_queue.h" />
+    <ClInclude Include="..\..\source\gdul\execution\job_handler\job_handler_utility.h" />
+    <ClInclude Include="..\..\source\gdul\execution\job_handler\job_handler_impl.h" />
+    <ClInclude Include="..\..\source\gdul\execution\job_handler\job\job_impl.h" />
+    <ClInclude Include="..\..\source\gdul\execution\job_handler\tracking\job_graph.h" />
+    <ClInclude Include="..\..\source\gdul\execution\job_handler\tracking\job_info.h" />
+    <ClInclude Include="..\..\source\gdul\execution\job_handler\tracking\timer.h" />
+    <ClInclude Include="..\..\source\gdul\execution\job_handler\tracking\time_set.h" />
+    <ClInclude Include="..\..\source\gdul\execution\job_handler\worker\worker.h" />
+    <ClInclude Include="..\..\source\gdul\execution\job_handler\worker\worker_impl.h" />
+    <ClInclude Include="..\..\source\gdul\execution\job_handler_master.h" />
+    <ClInclude Include="..\..\source\gdul\execution\thread\thread.h" />
+    <ClInclude Include="work_tracker.h" />
+    <ClInclude Include="job_handler_tester.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\source\gdul\execution\job_handler\job\batch_job.cpp" />
+    <ClCompile Include="..\..\source\gdul\execution\job_handler\job\batch_job_impl.cpp" />
+    <ClCompile Include="..\..\source\gdul\execution\job_handler\job\job.cpp" />
+    <ClCompile Include="..\..\source\gdul\execution\job_handler\job_handler.cpp" />
+    <ClCompile Include="..\..\source\gdul\execution\job_handler\job_handler_utility.cpp" />
+    <ClCompile Include="..\..\source\gdul\execution\job_handler\job_handler_impl.cpp" />
+    <ClCompile Include="..\..\source\gdul\execution\job_handler\job\job_impl.cpp" />
+    <ClCompile Include="..\..\source\gdul\execution\job_handler\job_queue.cpp" />
+    <ClCompile Include="..\..\source\gdul\execution\job_handler\tracking\job_graph.cpp" />
+    <ClCompile Include="..\..\source\gdul\execution\job_handler\tracking\job_info.cpp" />
+    <ClCompile Include="..\..\source\gdul\execution\job_handler\tracking\timer.cpp" />
+    <ClCompile Include="..\..\source\gdul\execution\job_handler\tracking\time_set.cpp" />
+    <ClCompile Include="..\..\source\gdul\execution\job_handler\worker\worker.cpp" />
+    <ClCompile Include="..\..\source\gdul\execution\job_handler\worker\worker_impl.cpp" />
+    <ClCompile Include="..\..\source\gdul\execution\thread\thread.cpp" />
+    <ClCompile Include="work_tracker.cpp" />
     <ClCompile Include="Main.cpp" />
-    <ClCompile Include="pch.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <Natvis Include="..\..\source\gdul\atomic_shared_ptr\atomic_shared_ptr.natvis" />
+    <ClCompile Include="job_handler_tester.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

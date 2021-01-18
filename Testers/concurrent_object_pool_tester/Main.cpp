@@ -5,6 +5,7 @@
 #include <iostream>
 #include <gdul/memory/concurrent_object_pool.h>
 #include <gdul/memory/concurrent_guard_pool.h>
+#include <gdul/memory/pool_allocator.h>
 #include <vld.h>
 #include <vector>
 
@@ -43,13 +44,28 @@ int main()
 
 	pool.recycle(swapA);
 
-    std::cout << "Hello World!\n"; 
+	gdul::memory_pool mempool;
+	mempool.init<sizeof(int), alignof(int)>(4, 10);
+	gdul::pool_allocator<int> mpAlloc(mempool.create_allocator<int>());
+
+
+	int* items1 = mpAlloc.allocate();
+	int* items2 = mpAlloc.allocate();
+	int* items3 = mpAlloc.allocate();
+	int* items4 = mpAlloc.allocate();
+
+	mpAlloc.deallocate(items1);
+	mpAlloc.deallocate(items2);
+	mpAlloc.deallocate(items3);
+	mpAlloc.deallocate(items4);
+
+    std::cout << "Hello World!\n";
 }
 
 // Run program: Ctrl + F5 or Debug > Start Without Debugging menu
 // Debug program: F5 or Debug > Start Debugging menu
 
-// Tips for Getting Started: 
+// Tips for Getting Started:
 //   1. Use the Solution Explorer window to add/manage files
 //   2. Use the Team Explorer window to connect to source control
 //   3. Use the Output window to see build output and other messages

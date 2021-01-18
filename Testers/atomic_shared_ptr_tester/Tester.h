@@ -11,7 +11,9 @@
 #include <cassert>
 #include <queue>
 
-using namespace gdul;
+#define CXX20_ATOMIC_SHARED_PTR
+
+
 #pragma warning(disable : 4324)
 #pragma warning(disable:4200)
 template <class T>
@@ -24,10 +26,14 @@ template <class T>
 struct mutexed_wrapper
 {
 	std::shared_ptr<T> load(std::memory_order) {
+#if defined(CXX20_ATOMIC_SHARED_PTR)
+		return ptr.load();
+#else
 		lock.lock();
 		std::shared_ptr<T> returnValue(ptr);
 		lock.unlock();
 		return returnValue;
+#endif
 	}
 	mutexed_wrapper() = default;
 	mutexed_wrapper(std::shared_ptr<T>&& aPtr)
@@ -42,31 +48,47 @@ struct mutexed_wrapper
 	{
 		operator=(std::move(aOther));
 	}
+#if !defined(CXX20_ATOMIC_SHARED_PTR)
 	std::mutex lock;
+#endif
 
 	mutexed_wrapper& operator=(std::shared_ptr<T>& aPtr)
 	{
+#if defined(CXX20_ATOMIC_SHARED_PTR)
+		ptr.store(aPtr);
+#else
 		lock.lock();
 		ptr = aPtr;
 		lock.unlock();
-
+#endif
 		return *this;
 	}
 	mutexed_wrapper& operator=(std::shared_ptr<T>&& aPtr)
 	{
+#if defined(CXX20_ATOMIC_SHARED_PTR)
+		ptr.store(std::move(aPtr));
+#else
 		lock.lock();
 		ptr.swap(aPtr);
 		lock.unlock();
+#endif
 		return *this;
 	}
 	void Reset()
 	{
+#if defined(CXX20_ATOMIC_SHARED_PTR)
+		ptr.reset();
+#else
 		lock.lock();
 		ptr.reset();
 		lock.unlock();
+#endif
 	}
 	bool compare_exchange_strong(std::shared_ptr<T>& expected, std::shared_ptr<T>&& desired, std::memory_order)
 	{
+#if defined(CXX20_ATOMIC_SHARED_PTR)
+		return ptr.compare_exchange_strong(expected, std::move(desired), std::memory_order_seq_cst);
+#else
 		bool returnValue(false);
 		lock.lock();
 		if (ptr == expected){
@@ -78,8 +100,13 @@ struct mutexed_wrapper
 		}
 		lock.unlock();
 		return returnValue;
+#endif
 	}
+#if defined(CXX20_ATOMIC_SHARED_PTR)
+	std::atomic<std::shared_ptr<T>> ptr;
+#else
 	std::shared_ptr<T> ptr;
+#endif
 };
 
 
@@ -110,22 +137,22 @@ public:
 		{
 		}
 		bool m_owned = false;
-		atomic_shared_ptr<aba_node> m_next;
+		gdul::atomic_shared_ptr<aba_node> m_next;
 	};
 
 	void aba_claim();
 	void aba_release();
 
-	static thread_local std::queue<shared_ptr<aba_node>> m_abaStorage;
+	static thread_local std::queue<gdul::shared_ptr<aba_node>> m_abaStorage;
 
-	atomic_shared_ptr<aba_node> m_topAba;
+	gdul::atomic_shared_ptr<aba_node> m_topAba;
 
 	gdul::thread_pool m_worker;
 
 #ifdef ASP_MUTEX_COMPARE
 	mutexed_wrapper<T> m_testArray[ArraySize];
 #else
-	atomic_shared_ptr<T> m_testArray[ArraySize];
+	gdul::atomic_shared_ptr<T> m_testArray[ArraySize];
 	reference_comparison<T> m_referenceComparison[ArraySize]{};
 #endif
 	std::atomic_bool m_workBlock;
@@ -136,7 +163,7 @@ public:
 	std::mt19937 m_rng;
 };
 template <class T, std::uint32_t ArraySize>
-thread_local std::queue<shared_ptr<typename asp_tester<T, ArraySize>::aba_node>> asp_tester<T, ArraySize>::m_abaStorage;
+thread_local std::queue<gdul::shared_ptr<typename asp_tester<T, ArraySize>::aba_node>> asp_tester<T, ArraySize>::m_abaStorage;
 
 template<class T, std::uint32_t ArraySize>
 template<class ...InitArgs>
@@ -147,7 +174,7 @@ inline asp_tester<T, ArraySize>::asp_tester(bool doInitArray, InitArgs && ...arg
 	if (doInitArray) {
 		for (std::uint32_t i = 0; i < ArraySize; ++i) {
 #ifndef ASP_MUTEX_COMPARE
-			m_testArray[i] = make_shared<T>(std::forward<InitArgs&&>(args)...);
+			m_testArray[i] = gdul::make_shared<T>(std::forward<InitArgs&&>(args)...);
 			m_referenceComparison[i].m_ptr = new T(std::forward<InitArgs&&>(args)...);
 #else
 			m_testArray[i] = std::make_shared<T>(std::forward<InitArgs&&>(args)...);
@@ -189,7 +216,7 @@ inline float asp_tester<T, ArraySize>::execute(std::uint32_t passes, bool doAssi
 		}
 	}
 
-	timer<float> time;
+	gdul::timer<float> time;
 
 	m_workBlock.store(true);
 
@@ -217,7 +244,7 @@ inline void asp_tester<T, ArraySize>::work_assign(std::uint32_t passes)
 #ifdef ASP_MUTEX_COMPARE
 				= std::make_shared<T>();
 #else
-				.store(make_shared<T>(), std::memory_order_relaxed);
+				.store(gdul::make_shared<T>(), std::memory_order_relaxed);
 #endif
 		}
 	}
@@ -277,20 +304,20 @@ inline void asp_tester<T, ArraySize>::work_cas(std::uint32_t passes)
 		for (std::uint32_t i = 0; i < ArraySize; ++i) {
 
 #ifndef ASP_MUTEX_COMPARE
-			shared_ptr<T> desired(make_shared<T>());
-			shared_ptr<T> expected(m_testArray[i].load(std::memory_order_relaxed));
-			raw_ptr<T> check(expected);
+			gdul::shared_ptr<T> desired(gdul::make_shared<T>());
+			gdul::shared_ptr<T> expected(m_testArray[i].load(std::memory_order_relaxed));
+			gdul::raw_ptr<T> check(expected);
 			const bool resulta = m_testArray[i].compare_exchange_strong(expected, std::move(desired), std::memory_order_relaxed);
 
-			shared_ptr<T> desired_(make_shared<T>());
-			shared_ptr<T> expected_(m_testArray[i].load(std::memory_order_relaxed));
-			raw_ptr<T> rawExpected(expected_);
-			raw_ptr<T> check_(expected_);
-			const bool resultb = m_testArray[i].compare_exchange_strong(rawExpected, std::move(desired_), std::memory_order_relaxed);
+			//gdul::shared_ptr<T> desired_(gdul::make_shared<T>());
+			//gdul::shared_ptr<T> expected_(m_testArray[i].load(std::memory_order_relaxed));
+			//gdul::raw_ptr<T> rawExpected(expected_);
+			//gdul::raw_ptr<T> check_(expected_);
+			//const bool resultb = m_testArray[i].compare_exchange_strong(rawExpected, std::move(desired_), std::memory_order_relaxed);
 
-			if (!(resultb == (rawExpected == check_ && rawExpected.get_version() == check_.get_version()))) {
-				throw std::runtime_error("output from expected do not correspond to CAS results");
-			}
+			//if (!(resultb == (rawExpected == check_ && rawExpected.get_version() == check_.get_version()))) {
+			//	throw std::runtime_error("output from expected do not correspond to CAS results");
+			//}
 
 #else
 			std::shared_ptr<T> desired_(std::make_shared<T>());
@@ -315,10 +342,10 @@ inline void asp_tester<T, ArraySize>::work_aba(std::uint32_t passes)
 template<class T, std::uint32_t ArraySize>
 inline void asp_tester<T, ArraySize>::aba_claim()
 {
-	shared_ptr<aba_node> top(m_topAba.load(std::memory_order_relaxed));
+	gdul::shared_ptr<aba_node> top(m_topAba.load(std::memory_order_relaxed));
 	while (top)
 	{
-		shared_ptr<aba_node> next(top->m_next.load());
+		gdul::shared_ptr<aba_node> next(top->m_next.load());
 
 		if (m_topAba.compare_exchange_strong(top, next, std::memory_order_seq_cst, std::memory_order_relaxed))
 		{
@@ -329,19 +356,19 @@ inline void asp_tester<T, ArraySize>::aba_claim()
 			return;
 		}
 	}
-	m_abaStorage.push(gdul::allocate_shared<aba_node>(tracking_allocator<aba_node>()));
+	m_abaStorage.push(gdul::allocate_shared<aba_node>(gdul::tracking_allocator<aba_node>()));
 }
 
 template<class T, std::uint32_t ArraySize>
 inline void asp_tester<T, ArraySize>::aba_release()
 {
-	shared_ptr<aba_node> toRelease(nullptr);
+	gdul::shared_ptr<aba_node> toRelease(nullptr);
 
 	toRelease = m_abaStorage.front();
 	m_abaStorage.pop();
 	toRelease->m_owned = false;
 
-	shared_ptr<aba_node> top(m_topAba.load());
+	gdul::shared_ptr<aba_node> top(m_topAba.load());
 	do
 	{
 		toRelease->m_next.store(top);

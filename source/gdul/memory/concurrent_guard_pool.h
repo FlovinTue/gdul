@@ -41,7 +41,7 @@ namespace gdul {
 
 namespace cgp_detail {
 
-using size_type = std::uint32_t;
+using size_type = std::size_t;
 using defaul_allocator = std::allocator<std::uint8_t>;
 
 constexpr size_type Defaul_Block_Size = 16;
@@ -83,7 +83,16 @@ public:
 	/// </summary>
 	/// <param name="baseCapacity">initial global cached items</param>
 	/// <param name="tlCacheSize">size of the thread local caches</param>
+	/// <param name="rowLength">number of items returned by get</param>
+	concurrent_guard_pool(size_type baseCapacity, size_type tlCacheSize, size_type rowLength);
+
+	/// <summary>
+	/// constructor
+	/// </summary>
+	/// <param name="baseCapacity">initial global cached items</param>
+	/// <param name="tlCacheSize">size of the thread local caches</param>
 	concurrent_guard_pool(size_type baseCapacity, size_type tlCacheSize);
+
 	/// <summary>
 	/// constructor
 	/// </summary>
@@ -91,6 +100,15 @@ public:
 	/// <param name="tlCacheSize">size of the thread local caches</param>
 	/// <param name="allocator">allocator to use</param>
 	concurrent_guard_pool(size_type baseCapacity, size_type tlCacheSize, Allocator allocator);
+
+	/// <summary>
+	/// constructor
+	/// </summary>
+	/// <param name="baseCapacity">initial global cached items</param>
+	/// <param name="tlCacheSize">size of the thread local caches</param>
+	/// <param name="rowLength">number of items returned by get</param>
+	/// <param name="allocator">allocator to use</param>
+	concurrent_guard_pool(size_type baseCapacity, size_type tlCacheSize, size_type  rowLength, Allocator allocator);
 
 	/// <summary>
 	/// destructor
@@ -149,7 +167,7 @@ private:
 		~tl_container()
 		{
 			if (m_indexPool) {
-				m_indexPool->add(m_userIndex);
+				m_indexPool->add((std::uint32_t)m_userIndex);
 			}
 		}
 		tl_cache m_cache;
@@ -202,7 +220,7 @@ private:
 	tlm<tl_container, Allocator> t_tlContainer;
 
 	size_type m_tlCacheSize;
-
+	size_type m_rowLength;
 	Allocator m_allocator;
 
 	std::atomic<std::uint8_t> m_blocksEndIndex;
@@ -219,12 +237,22 @@ inline concurrent_guard_pool<T, Allocator>::concurrent_guard_pool(Allocator allo
 {
 }
 template<class T, class Allocator>
-inline concurrent_guard_pool<T, Allocator>::concurrent_guard_pool(typename concurrent_guard_pool<T, Allocator>::size_type baseCapacity, size_type tlCacheSize)
-	: concurrent_guard_pool(baseCapacity, tlCacheSize, Allocator())
+inline concurrent_guard_pool<T, Allocator>::concurrent_guard_pool(typename concurrent_guard_pool<T, Allocator>::size_type baseCapacity, size_type  rowLength, size_type tlCacheSize)
+	: concurrent_guard_pool(baseCapacity, tlCacheSize, rowLength, Allocator())
 {
 }
 template<class T, class Allocator>
-inline concurrent_guard_pool<T, Allocator>::concurrent_guard_pool(typename concurrent_guard_pool<T, Allocator>::size_type baseCapacity, size_type tlCacheSize, Allocator allocator)
+inline concurrent_guard_pool<T, Allocator>::concurrent_guard_pool(size_type baseCapacity, size_type tlCacheSize)
+	: concurrent_guard_pool(baseCapacity, tlCacheSize, 1, Allocator())
+{
+}
+template<class T, class Allocator>
+inline concurrent_guard_pool<T, Allocator>::concurrent_guard_pool(size_type baseCapacity, size_type tlCacheSize, Allocator allocator)
+	: concurrent_guard_pool(baseCapacity, tlCacheSize, 1, allocator)
+{
+}
+template<class T, class Allocator>
+inline concurrent_guard_pool<T, Allocator>::concurrent_guard_pool(typename concurrent_guard_pool<T, Allocator>::size_type baseCapacity, size_type  rowLength, size_type tlCacheSize, Allocator allocator)
 	: m_fullCaches(allocator)
 	, m_emptyCaches(allocator)
 	, m_indices{}
@@ -232,12 +260,10 @@ inline concurrent_guard_pool<T, Allocator>::concurrent_guard_pool(typename concu
 	, m_indexPool(gdul::allocate_shared<tlm_detail::index_pool<void>>(allocator))
 	, t_tlContainer(allocator, m_indexPool, allocator)
 	, m_tlCacheSize(0)
+	, m_rowLength(rowLength)
 	, m_allocator()
 	, m_blocksEndIndex(0)
 {
-	m_fullCaches.reserve(512);
-	m_emptyCaches.reserve(512);
-
 	assert(baseCapacity && tlCacheSize && "Cannot instantiate pool with zero sizes");
 
 	for (std::uint8_t i = 0; i < cgp_detail::Capacity_Bits; ++i)
@@ -309,6 +335,7 @@ inline void concurrent_guard_pool<T, Allocator>::unsafe_reset()
 	for (std::uint8_t i = 0; i < blockCount; ++i) {
 		m_blocks[i].m_blockKey = 0;
 		m_blocks[i].m_items = shared_ptr<T[]>(nullptr);
+		m_blocks[i].m_items.unsafe_set_version(0);
 		m_blocks[i].m_pushSync = 0;
 		m_blocks[i].m_livingItems.store((size_type)std::pow(2.f, (float)(i + 1)));
 	}
@@ -317,7 +344,6 @@ inline void concurrent_guard_pool<T, Allocator>::unsafe_reset()
 	m_fullCaches.unsafe_reset();
 }
 
-// Look at up_to_date.. Make foolproof.
 template<class T, class Allocator>
 inline bool concurrent_guard_pool<T, Allocator>::is_up_to_date(const T* item) const
 {
@@ -514,7 +540,7 @@ inline void concurrent_guard_pool<T, Allocator>::try_alloc_block(std::uint8_t bl
 
 	if (expected.get_version() == 0) {
 
-		shared_ptr<T[]> desired(gdul::allocate_shared<T[]>(size, m_allocator));
+		shared_ptr<T[]> desired(gdul::allocate_shared<T[]>(size * m_rowLength, m_allocator));
 		if (m_blocks[blockIndex].m_items.compare_exchange_strong(expected, desired, std::memory_order_release)) {
 			expected = std::move(desired);
 		}
@@ -528,13 +554,12 @@ inline void concurrent_guard_pool<T, Allocator>::try_alloc_block(std::uint8_t bl
 	while (pushIndex < size) {
 		tl_cache cache(gdul::allocate_shared<T* []>(m_tlCacheSize, m_allocator));
 		for (size_type i = pushIndex; i < (pushIndex + m_tlCacheSize); ++i) {
-			cache[i - pushIndex] = &expected[i];
+			cache[i - pushIndex] = &expected[i * m_rowLength];
 		}
 		m_fullCaches.push(std::move(cache));
 		pushIndex = m_blocks[blockIndex].m_pushSync.fetch_add(m_tlCacheSize, std::memory_order_relaxed);
 	}
 
-	// Might just update this before. 
 	m_blocksEndIndex.compare_exchange_strong(blockIndex, blockIndex + 1, std::memory_order_release);
 }
 namespace cgp_detail {
