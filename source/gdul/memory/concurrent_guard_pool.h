@@ -252,7 +252,7 @@ inline concurrent_guard_pool<T, Allocator>::concurrent_guard_pool(size_type base
 {
 }
 template<class T, class Allocator>
-inline concurrent_guard_pool<T, Allocator>::concurrent_guard_pool(typename concurrent_guard_pool<T, Allocator>::size_type baseCapacity, size_type  rowLength, size_type tlCacheSize, Allocator allocator)
+inline concurrent_guard_pool<T, Allocator>::concurrent_guard_pool(size_type baseCapacity, size_type tlCacheSize, size_type  rowLength, Allocator allocator)
 	: m_fullCaches(allocator)
 	, m_emptyCaches(allocator)
 	, m_indices{}
@@ -455,9 +455,9 @@ inline std::pair<typename concurrent_guard_pool<T, Allocator>::size_type, typena
 		const size_type previous(tl.m_indexCache[i]);
 		const size_type current(m_indices[i].i);
 		const size_type even(current % 2);
-		const size_type change(!(bool)(previous ^ current));
+		const size_type changed(previous == current);
 		const size_type evenBit(even << i);
-		const size_type changeBit(change << i);
+		const size_type changeBit(changed << i);
 
 		masks.first |= evenBit;
 		masks.second |= changeBit;
