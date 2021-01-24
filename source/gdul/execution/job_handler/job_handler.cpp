@@ -88,7 +88,7 @@ std::size_t job_handler::worker_count() const noexcept
 {
 	return m_impl->worker_count();
 }
-pool_allocator<jh_detail::dummy_batch_type> job_handler::get_batch_job_allocator() const noexcept
+pool_allocator<std::uint8_t> job_handler::get_batch_job_allocator() const noexcept
 {
 	return m_impl->get_batch_job_allocator();
 }

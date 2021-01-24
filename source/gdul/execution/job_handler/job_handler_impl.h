@@ -73,8 +73,8 @@ public:
 
 	job_graph& get_job_graph();
 
-	pool_allocator<job_node> get_job_node_allocator() const noexcept;
-	pool_allocator<dummy_batch_type> get_batch_job_allocator() const noexcept;
+	pool_allocator<std::uint8_t> get_job_node_allocator() const noexcept;
+	pool_allocator<std::uint8_t> get_batch_job_allocator() const noexcept;
 
 #if defined(GDUL_JOB_DEBUG)
 	void dump_job_graph(const char* location);

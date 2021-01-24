@@ -259,7 +259,7 @@ private:
 	template <class InContainer, class OutContainer, class Process>
 	friend class jh_detail::batch_job_impl;
 
-	pool_allocator<jh_detail::dummy_batch_type> get_batch_job_allocator() const noexcept;
+	pool_allocator<std::uint8_t> get_batch_job_allocator() const noexcept;
 	jh_detail::job_info* get_job_info(std::size_t physicalId, std::size_t variationId, const char* dbgName, const char* dbgFile, std::uint32_t line);
 
 	gdul::shared_ptr<jh_detail::job_handler_impl> m_impl;
@@ -278,7 +278,7 @@ inline batch_job job_handler::_redirect_make_batch_job(std::size_t physicalId, c
 {
 	using batch_type = jh_detail::batch_job_impl<InContainer, InContainer, delegate<void(typename InContainer::value_type&)>>;
 
-	pool_allocator<batch_type> alloc(get_batch_job_allocator());
+	pool_allocator<std::uint8_t> alloc(get_batch_job_allocator());
 
 	shared_ptr<batch_type> sp = gdul::allocate_shared<batch_type>(
 		alloc,
@@ -302,7 +302,7 @@ inline batch_job job_handler::_redirect_make_batch_job(std::size_t physicalId, c
 {
 	using batch_type = jh_detail::batch_job_impl<InOutContainer, InOutContainer, delegate<bool(typename InOutContainer::value_type&)>>;
 
-	pool_allocator<batch_type> alloc(get_batch_job_allocator());
+	pool_allocator<std::uint8_t> alloc(get_batch_job_allocator());
 
 	shared_ptr<batch_type> sp = gdul::allocate_shared<batch_type>(
 		alloc,
@@ -326,7 +326,7 @@ inline batch_job job_handler::_redirect_make_batch_job(std::size_t physicalId, c
 {
 	using batch_type = jh_detail::batch_job_impl<InContainer, OutContainer, delegate<bool(typename InContainer::value_type&, typename OutContainer::value_type&)>>;
 
-	pool_allocator<batch_type> alloc(get_batch_job_allocator());
+	pool_allocator<std::uint8_t> alloc(get_batch_job_allocator());
 
 	shared_ptr<batch_type> sp = gdul::allocate_shared<batch_type>(
 		alloc,

@@ -45,9 +45,9 @@ job_handler_impl::job_handler_impl(allocator_type allocator)
 	, m_workerIndices(0)
 	, m_mainAllocator(allocator)
 {
-	constexpr std::size_t jobImplAllocSize(allocate_shared_size<job_impl, pool_allocator<job_impl>>());
-	constexpr std::size_t jobNodeAllocSize(allocate_shared_size<job_node, pool_allocator<job_node>>());
-	constexpr std::size_t batchJobAllocSize(allocate_shared_size<dummy_batch_type, pool_allocator<dummy_batch_type>>());
+	constexpr std::size_t jobImplAllocSize(allocate_shared_size<job_impl, pool_allocator<std::uint8_t>>());
+	constexpr std::size_t jobNodeAllocSize(allocate_shared_size<job_node, pool_allocator<std::uint8_t>>());
+	constexpr std::size_t batchJobAllocSize(allocate_shared_size<dummy_batch_type, pool_allocator<std::uint8_t>>());
 
 	m_jobImplMemPool.init<jobImplAllocSize, alignof(job_impl)>(Job_Pool_Init_Size, 1, m_mainAllocator);
 	m_jobNodeMemPool.init<jobNodeAllocSize, alignof(job_node)>(Job_Pool_Init_Size + jh_detail::Batch_Job_Pool_Init_Size, 1, m_mainAllocator);
@@ -85,7 +85,7 @@ worker job_handler_impl::make_worker()
 #if defined (GDUL_JOB_DEBUG)
 job job_handler_impl::make_job_internal(delegate<void()>&& workUnit, job_queue* target, std::size_t physicalId, std::size_t variationId, const char* name, const char* file, std::uint32_t line)
 {
-	pool_allocator<job_impl> alloc(m_jobImplMemPool.create_allocator<job_impl>());
+	pool_allocator<std::uint8_t> alloc(m_jobImplMemPool.create_allocator<std::uint8_t>());
 
 	job_impl_shared_ptr jobImpl(gdul::allocate_shared<job_impl>
 		(
@@ -99,7 +99,7 @@ job job_handler_impl::make_job_internal(delegate<void()>&& workUnit, job_queue* 
 }
 job job_handler_impl::make_sub_job_internal(delegate<void()>&& workUnit, job_queue* target, std::size_t batchId, std::size_t variationId, const char* name)
 {
-	pool_allocator<job_impl> alloc(m_jobImplMemPool.create_allocator<job_impl>());
+	pool_allocator<std::uint8_t> alloc(m_jobImplMemPool.create_allocator<std::uint8_t>());
 
 	job_impl_shared_ptr jobImpl(gdul::allocate_shared<job_impl>
 		(
@@ -114,7 +114,7 @@ job job_handler_impl::make_sub_job_internal(delegate<void()>&& workUnit, job_que
 #else
 job job_handler_impl::make_job_internal(delegate<void()>&& workUnit, job_queue* target, std::size_t physicalId, std::size_t variationId)
 {
-	pool_allocator<job_impl> alloc(m_jobImplMemPool.create_allocator<job_impl>());
+	pool_allocator<std::uint8_t> alloc(m_jobImplMemPool.create_allocator<std::uint8_t>());
 
 	job_impl_shared_ptr jobImpl(gdul::allocate_shared<job_impl>
 		(
@@ -128,7 +128,7 @@ job job_handler_impl::make_job_internal(delegate<void()>&& workUnit, job_queue* 
 }
 job job_handler_impl::make_sub_job_internal(delegate<void()>&& workUnit, job_queue* target, std::size_t batchId, std::size_t variationId)
 {
-	pool_allocator<job_impl> alloc(m_jobImplMemPool.create_allocator<job_impl>());
+	pool_allocator<std::uint8_t> alloc(m_jobImplMemPool.create_allocator<std::uint8_t>());
 
 	job_impl_shared_ptr jobImpl(gdul::allocate_shared<job_impl>
 		(
@@ -151,13 +151,13 @@ job_graph& job_handler_impl::get_job_graph()
 	return m_jobGraph;
 }
 
-pool_allocator<job_node> job_handler_impl::get_job_node_allocator() const noexcept
+pool_allocator<std::uint8_t> job_handler_impl::get_job_node_allocator() const noexcept
 {
-	return m_jobNodeMemPool.create_allocator<job_node>();
+	return m_jobNodeMemPool.create_allocator<std::uint8_t>();
 }
-pool_allocator<typename dummy_batch_type> job_handler_impl::get_batch_job_allocator() const noexcept
+pool_allocator<std::uint8_t> job_handler_impl::get_batch_job_allocator() const noexcept
 {
-	return m_batchJobMemPool.create_allocator<dummy_batch_type>();
+	return m_batchJobMemPool.create_allocator<std::uint8_t>();
 }
 #if defined(GDUL_JOB_DEBUG)
 void job_handler_impl::dump_job_graph(const char* location)
