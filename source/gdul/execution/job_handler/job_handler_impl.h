@@ -23,7 +23,6 @@
 #pragma warning(push)
 #pragma warning(disable : 4324)
 
-#include <array>
 
 #include <gdul/memory/pool_allocator.h>
 #include <gdul/delegate/delegate.h>
@@ -36,6 +35,8 @@
 #include <gdul/execution/job_handler/job/job_node.h>
 #include <gdul/execution/job_handler/tracking/job_graph.h>
 
+#include <string_view>
+#include <array>
 namespace gdul {
 
 class job_queue;
@@ -63,8 +64,8 @@ public:
 	worker make_worker();
 
 #if defined (GDUL_JOB_DEBUG)
-	job make_job_internal(delegate<void()>&& workUnit, job_queue* target, std::size_t physicalId, std::size_t variationId, const char* name, const char* file, std::uint32_t line);
-	job make_sub_job_internal(delegate<void()>&& workUnit, job_queue* target, std::size_t batchId, std::size_t variationId, const char* name);
+	job make_job_internal(delegate<void()>&& workUnit, job_queue* target, std::size_t physicalId, std::size_t variationId, const std::string_view& name, const std::string_view& file, std::uint32_t line);
+	job make_sub_job_internal(delegate<void()>&& workUnit, job_queue* target, std::size_t batchId, std::size_t variationId, const std::string_view& name);
 #else
 	job make_job_internal(delegate<void()>&& workUnit, job_queue* target, std::size_t physicalId, std::size_t variationId);
 	job make_sub_job_internal(delegate<void()>&& workUnit, job_queue* target, std::size_t batchId, std::size_t variationId);
@@ -77,8 +78,8 @@ public:
 	pool_allocator<std::uint8_t> get_batch_job_allocator() const noexcept;
 
 #if defined(GDUL_JOB_DEBUG)
-	void dump_job_graph(const char* location);
-	void dump_job_time_sets(const char* location);
+	void dump_job_graph(const std::string_view& location);
+	void dump_job_time_sets(const std::string_view& location);
 #endif
 
 private:

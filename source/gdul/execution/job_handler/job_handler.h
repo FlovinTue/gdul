@@ -29,6 +29,8 @@
 #include <gdul/delegate/delegate.h>
 #include <gdul/memory/pool_allocator.h>
 
+#include <string_view>
+
 #undef make_job
 #undef make_batch_job
 
@@ -90,7 +92,7 @@ public:
 	/// <param name="target">Scheduling target</param>
 	/// <param name="dbgName">Job name</param>
 	/// <returns>New job</returns>
-	job make_job(delegate<void()> workUnit, job_queue* target, const char* dbgName = "") { workUnit; target; dbgName; /* See make_job macro definition */ }
+	job make_job(delegate<void()> workUnit, job_queue* target, const std::string_view& dbgName = "") { workUnit; target; dbgName; /* See make_job macro definition */ }
 
 	/// <summary>
 	/// Creates a basic job
@@ -100,7 +102,7 @@ public:
 	/// <param name="id">Persistent identifier. Used to keep track of this physical job instantiation</param>
 	/// <param name="dbgName">Job name</param>
 	/// <returns>New job</returns>
-	job make_job(delegate<void()> workUnit, job_queue* target, std::size_t variationId, const char* dbgName = "") { workUnit; target; variationId; dbgName; /* See make_job macro definition */ }
+	job make_job(delegate<void()> workUnit, job_queue* target, std::size_t variationId, const std::string_view& dbgName = "") { workUnit; target; variationId; dbgName; /* See make_job macro definition */ }
 
 
 	/// <summary>
@@ -113,7 +115,7 @@ public:
 	/// <param name="dbgName">Job debug name</param>
 	/// <returns>New batch job</returns>
 	template <class InContainer>
-	batch_job make_batch_job(InContainer& input, delegate<void(typename InContainer::value_type&)> process, job_queue* target, const char* dbgName = "")
+	batch_job make_batch_job(InContainer& input, delegate<void(typename InContainer::value_type&)> process, job_queue* target, const std::string_view& dbgName = "")
 	{
 		input; process; target; dbgName; /* See make_batch_job macro definition */
 	}
@@ -129,7 +131,7 @@ public:
 	/// <param name="dbgName">Job debug name</param>
 	/// <returns>New batch job</returns>
 	template <class InContainer>
-	batch_job make_batch_job(InContainer& input, delegate<void(typename InContainer::value_type&)> process, job_queue* target, std::size_t variationId, const char* dbgName = "")
+	batch_job make_batch_job(InContainer& input, delegate<void(typename InContainer::value_type&)> process, job_queue* target, std::size_t variationId, const std::string_view& dbgName = "")
 	{
 		input; process; target; variationId; dbgName; /* See make_batch_job macro definition */
 	}
@@ -144,7 +146,7 @@ public:
 	/// <param name="dbgName">Job debug name</param>
 	/// <returns>New batch job</returns>
 	template <class InOutContainer>
-	batch_job make_batch_job(InOutContainer& inputOutput, delegate<bool(typename InOutContainer::value_type&)> process, job_queue* target, const char* dbgName = "")
+	batch_job make_batch_job(InOutContainer& inputOutput, delegate<bool(typename InOutContainer::value_type&)> process, job_queue* target, const std::string_view& dbgName = "")
 	{
 		inputOutput; process; target; dbgName; /* See make_batch_job macro definition */
 	}
@@ -160,7 +162,7 @@ public:
 	/// <param name="dbgName">Job debug name</param>
 	/// <returns>New batch job</returns>
 	template <class InOutContainer>
-	batch_job make_batch_job(InOutContainer& inputOutput, delegate<bool(typename InOutContainer::value_type&)> process, job_queue* target, std::size_t variationId, const char* dbgName = "")
+	batch_job make_batch_job(InOutContainer& inputOutput, delegate<bool(typename InOutContainer::value_type&)> process, job_queue* target, std::size_t variationId, const std::string_view& dbgName = "")
 	{
 		inputOutput; process; target; variationId; dbgName; /* See make_batch_job macro definition */
 	};
@@ -177,7 +179,7 @@ public:
 	/// <param name="dbgName">Job debug name</param>
 	/// <returns>New batch job</returns>
 	template <class InContainer, class OutContainer>
-	batch_job make_batch_job(InContainer& input, OutContainer& output, delegate<bool(typename InContainer::value_type&, typename OutContainer::value_type&)> process, job_queue* target, const char* dbgName = "")
+	batch_job make_batch_job(InContainer& input, OutContainer& output, delegate<bool(typename InContainer::value_type&, typename OutContainer::value_type&)> process, job_queue* target, const std::string_view& dbgName = "")
 	{
 		input; output; process; target; dbgName; /* See make_batch_job macro definition */
 	}
@@ -195,7 +197,7 @@ public:
 	/// <param name="dbgName">Job debug name</param>
 	/// <returns>New batch job</returns>
 	template <class InContainer, class OutContainer>
-	batch_job make_batch_job(InContainer& input, OutContainer& output, delegate<bool(typename InContainer::value_type&, typename OutContainer::value_type&)> process, job_queue* target, std::size_t variationId, const char* dbgName = "")
+	batch_job make_batch_job(InContainer& input, OutContainer& output, delegate<bool(typename InContainer::value_type&, typename OutContainer::value_type&)> process, job_queue* target, std::size_t variationId, const std::string_view& dbgName = "")
 
 	{
 		input; output; process; target; variationId; dbgName; /* See make_batch_job macro definition */
@@ -216,51 +218,51 @@ public:
 	/// Write the current job graph to a dgml file
 	/// </summary>
 	/// <param name="location">Output file location</param>
-	void dump_job_graph(const char* location);
+	void dump_job_graph(const std::string_view& location);
 
 	/// <summary>
 	/// Write job timing sets to file
 	/// </summary>
 	/// <param name="location">Output file location</param>
-	void dump_job_time_sets(const char* location);
+	void dump_job_time_sets(const std::string_view& location);
 #endif
 
 	//// Not for direct use
-	//job _redirect_make_job(delegate<void()> workUnit, job_queue* target, std::size_t variationId, const char* dbgName, std::size_t physicalId, const char* dbgFile, std::uint32_t line);
+	//job _redirect_make_job(delegate<void()> workUnit, job_queue* target, std::size_t variationId, const std::string_view& dbgName, std::size_t physicalId, const std::string_view& dbgFile, std::uint32_t line);
 	//// Not for direct use
-	//job _redirect_make_job(delegate<void()> workUnit, job_queue* target, std::size_t variationId, std::size_t physicalId, const char* dbgFile, std::uint32_t line);
+	//job _redirect_make_job(delegate<void()> workUnit, job_queue* target, std::size_t variationId, std::size_t physicalId, const std::string_view& dbgFile, std::uint32_t line);
 	//// Not for direct use
-	//job _redirect_make_job(delegate<void()> workUnit, job_queue* target, const char* dbgName, std::size_t physicalId, const char* dbgFile, std::uint32_t line);
+	//job _redirect_make_job(delegate<void()> workUnit, job_queue* target, const std::string_view& dbgName, std::size_t physicalId, const std::string_view& dbgFile, std::uint32_t line);
 	//// Not for direct use
-	//job _redirect_make_job(delegate<void()> workUnit, job_queue* target, std::size_t physicalId, const char* dbgFile, std::uint32_t line);
+	//job _redirect_make_job(delegate<void()> workUnit, job_queue* target, std::size_t physicalId, const std::string_view& dbgFile, std::uint32_t line);
 
 
 	// Not for direct use
-	job _redirect_make_job(std::size_t physicalId, const char* dbgFile, std::uint32_t line, delegate<void()> workUnit, job_queue* target, std::size_t variationId, const char* dbgName = "");
+	job _redirect_make_job(std::size_t physicalId, const std::string_view& dbgFile, std::uint32_t line, delegate<void()> workUnit, job_queue* target, std::size_t variationId, const std::string_view& dbgName = "");
 	// Not for direct use
-	job _redirect_make_job(std::size_t physicalId, const char* dbgFile, std::uint32_t line, delegate<void()> workUnit, job_queue* target, const char* dbgName = "");
+	job _redirect_make_job(std::size_t physicalId, const std::string_view& dbgFile, std::uint32_t line, delegate<void()> workUnit, job_queue* target, const std::string_view& dbgName = "");
 
 
 	// Not for direct use
 	template <class InContainer>
-	batch_job _redirect_make_batch_job(std::size_t physicalId, const char* dbgFile, std::uint32_t line, InContainer& input, delegate<void(typename InContainer::value_type&)> process, job_queue* target, const char* dbgName = "");
+	batch_job _redirect_make_batch_job(std::size_t physicalId, const std::string_view& dbgFile, std::uint32_t line, InContainer& input, delegate<void(typename InContainer::value_type&)> process, job_queue* target, const std::string_view& dbgName = "");
 	template <class InContainer>
-	batch_job _redirect_make_batch_job(std::size_t physicalId, const char* dbgFile, std::uint32_t line, InContainer& input, delegate<void(typename InContainer::value_type&)> process, job_queue* target, std::size_t variationId, const char* dbgName = "");
+	batch_job _redirect_make_batch_job(std::size_t physicalId, const std::string_view& dbgFile, std::uint32_t line, InContainer& input, delegate<void(typename InContainer::value_type&)> process, job_queue* target, std::size_t variationId, const std::string_view& dbgName = "");
 	template <class InOutContainer>
-	batch_job _redirect_make_batch_job(std::size_t physicalId, const char* dbgFile, std::uint32_t line, InOutContainer& inputOutput, delegate<bool(typename InOutContainer::value_type&)> process, job_queue* target, const char* dbgName = "");
+	batch_job _redirect_make_batch_job(std::size_t physicalId, const std::string_view& dbgFile, std::uint32_t line, InOutContainer& inputOutput, delegate<bool(typename InOutContainer::value_type&)> process, job_queue* target, const std::string_view& dbgName = "");
 	template <class InOutContainer>
-	batch_job _redirect_make_batch_job(std::size_t physicalId, const char* dbgFile, std::uint32_t line, InOutContainer& inputOutput, delegate<bool(typename InOutContainer::value_type&)> process, job_queue* target, std::size_t variationId, const char* dbgName = "");
+	batch_job _redirect_make_batch_job(std::size_t physicalId, const std::string_view& dbgFile, std::uint32_t line, InOutContainer& inputOutput, delegate<bool(typename InOutContainer::value_type&)> process, job_queue* target, std::size_t variationId, const std::string_view& dbgName = "");
 	template <class InContainer, class OutContainer>
-	batch_job _redirect_make_batch_job(std::size_t physicalId, const char* dbgFile, std::uint32_t line, InContainer& input, OutContainer& output, delegate<bool(typename InContainer::value_type&, typename OutContainer::value_type&)> process, job_queue* target, const char* dbgName = "");
+	batch_job _redirect_make_batch_job(std::size_t physicalId, const std::string_view& dbgFile, std::uint32_t line, InContainer& input, OutContainer& output, delegate<bool(typename InContainer::value_type&, typename OutContainer::value_type&)> process, job_queue* target, const std::string_view& dbgName = "");
 	template <class InContainer, class OutContainer>
-	batch_job _redirect_make_batch_job(std::size_t physicalId, const char* dbgFile, std::uint32_t line, InContainer& input, OutContainer& output, delegate<bool(typename InContainer::value_type&, typename OutContainer::value_type&)> process, job_queue* target, std::size_t variationId, const char* dbgName = "");
+	batch_job _redirect_make_batch_job(std::size_t physicalId, const std::string_view& dbgFile, std::uint32_t line, InContainer& input, OutContainer& output, delegate<bool(typename InContainer::value_type&, typename OutContainer::value_type&)> process, job_queue* target, std::size_t variationId, const std::string_view& dbgName = "");
 
 private:
 	template <class InContainer, class OutContainer, class Process>
 	friend class jh_detail::batch_job_impl;
 
 	pool_allocator<std::uint8_t> get_batch_job_allocator() const noexcept;
-	jh_detail::job_info* get_job_info(std::size_t physicalId, std::size_t variationId, const char* dbgName, const char* dbgFile, std::uint32_t line);
+	jh_detail::job_info* get_job_info(std::size_t physicalId, std::size_t variationId, const std::string_view& dbgName, const std::string_view& dbgFile, std::uint32_t line);
 
 	gdul::shared_ptr<jh_detail::job_handler_impl> m_impl;
 
@@ -268,13 +270,13 @@ private:
 };
 
 template<class InContainer>
-inline batch_job job_handler::_redirect_make_batch_job(std::size_t physicalId, const char* dbgFile, std::uint32_t line, InContainer& input, delegate<void(typename InContainer::value_type&)> process, job_queue* target, const char* dbgName)
+inline batch_job job_handler::_redirect_make_batch_job(std::size_t physicalId, const std::string_view& dbgFile, std::uint32_t line, InContainer& input, delegate<void(typename InContainer::value_type&)> process, job_queue* target, const std::string_view& dbgName)
 {
 	return _redirect_make_batch_job(physicalId, dbgFile, line, input, std::move(process), target, 0, dbgName);
 }
 
 template<class InContainer>
-inline batch_job job_handler::_redirect_make_batch_job(std::size_t physicalId, const char* dbgFile, std::uint32_t line, InContainer& input, delegate<void(typename InContainer::value_type&)> process, job_queue* target, std::size_t variationId, [[maybe_unused]] const char* dbgName)
+inline batch_job job_handler::_redirect_make_batch_job(std::size_t physicalId, const std::string_view& dbgFile, std::uint32_t line, InContainer& input, delegate<void(typename InContainer::value_type&)> process, job_queue* target, std::size_t variationId, [[maybe_unused]] const std::string_view& dbgName)
 {
 	using batch_type = jh_detail::batch_job_impl<InContainer, InContainer, delegate<void(typename InContainer::value_type&)>>;
 
@@ -293,12 +295,12 @@ inline batch_job job_handler::_redirect_make_batch_job(std::size_t physicalId, c
 }
 
 template<class InOutContainer>
-inline batch_job job_handler::_redirect_make_batch_job(std::size_t physicalId, const char* dbgFile, std::uint32_t line, InOutContainer& inputOutput, delegate<bool(typename InOutContainer::value_type&)> process, job_queue* target, const char* dbgName)
+inline batch_job job_handler::_redirect_make_batch_job(std::size_t physicalId, const std::string_view& dbgFile, std::uint32_t line, InOutContainer& inputOutput, delegate<bool(typename InOutContainer::value_type&)> process, job_queue* target, const std::string_view& dbgName)
 {
 	return _redirect_make_batch_job(physicalId, dbgFile, line, inputOutput, std::move(process), target, 0, dbgName);
 }
 template<class InOutContainer>
-inline batch_job job_handler::_redirect_make_batch_job(std::size_t physicalId, const char* dbgFile, std::uint32_t line, InOutContainer& inputOutput, delegate<bool(typename InOutContainer::value_type&)> process, job_queue* target, std::size_t variationId, [[maybe_unused]] const char* dbgName)
+inline batch_job job_handler::_redirect_make_batch_job(std::size_t physicalId, const std::string_view& dbgFile, std::uint32_t line, InOutContainer& inputOutput, delegate<bool(typename InOutContainer::value_type&)> process, job_queue* target, std::size_t variationId, [[maybe_unused]] const std::string_view& dbgName)
 {
 	using batch_type = jh_detail::batch_job_impl<InOutContainer, InOutContainer, delegate<bool(typename InOutContainer::value_type&)>>;
 
@@ -317,12 +319,12 @@ inline batch_job job_handler::_redirect_make_batch_job(std::size_t physicalId, c
 }
 
 template<class InContainer, class OutContainer>
-inline batch_job job_handler::_redirect_make_batch_job(std::size_t physicalId, const char* dbgFile, std::uint32_t line, InContainer& input, OutContainer& output, delegate<bool(typename InContainer::value_type&, typename OutContainer::value_type&)> process, job_queue* target, const char* dbgName)
+inline batch_job job_handler::_redirect_make_batch_job(std::size_t physicalId, const std::string_view& dbgFile, std::uint32_t line, InContainer& input, OutContainer& output, delegate<bool(typename InContainer::value_type&, typename OutContainer::value_type&)> process, job_queue* target, const std::string_view& dbgName)
 {
 	return _redirect_make_batch_job(physicalId, dbgFile, line, input, output, std::move(process), target, 0, dbgName);
 }
 template<class InContainer, class OutContainer>
-inline batch_job job_handler::_redirect_make_batch_job(std::size_t physicalId, const char* dbgFile, std::uint32_t line, InContainer& input, OutContainer& output, delegate<bool(typename InContainer::value_type&, typename OutContainer::value_type&)> process, job_queue* target, std::size_t variationId, [[maybe_unused]] const char* dbgName)
+inline batch_job job_handler::_redirect_make_batch_job(std::size_t physicalId, const std::string_view& dbgFile, std::uint32_t line, InContainer& input, OutContainer& output, delegate<bool(typename InContainer::value_type&, typename OutContainer::value_type&)> process, job_queue* target, std::size_t variationId, [[maybe_unused]] const std::string_view& dbgName)
 {
 	using batch_type = jh_detail::batch_job_impl<InContainer, OutContainer, delegate<bool(typename InContainer::value_type&, typename OutContainer::value_type&)>>;
 
@@ -341,7 +343,6 @@ inline batch_job job_handler::_redirect_make_batch_job(std::size_t physicalId, c
 }
 }
 
-
 #if  defined(_MSC_VER) || defined(__INTEL_COMPILER)
 #if !defined (GDUL_INLINE_PRAGMA)
 #define GDUL_INLINE_PRAGMA(pragma) __pragma(pragma)
@@ -351,8 +352,8 @@ inline batch_job job_handler::_redirect_make_batch_job(std::size_t physicalId, c
 #endif
 #endif
 
-// Signature 1:  gdul::job (delegate<void()> workUnit, job_queue* target, (opt) const char* dbgName)
-// Signature 2:  gdul::job (delegate<void()> workUnit, job_queue* target, std::size_t variationId, (opt) const char* dbgName)
+// Signature 1:  gdul::job (delegate<void()> workUnit, job_queue* target, (opt) const std::string_view& dbgName)
+// Signature 2:  gdul::job (delegate<void()> workUnit, job_queue* target, std::size_t variationId, (opt) const std::string_view& dbgName)
 #define make_job(...) _redirect_make_job( \
 GDUL_INLINE_PRAGMA(warning(push)) \
 GDUL_INLINE_PRAGMA(warning(disable : 4307)) \
@@ -362,12 +363,12 @@ GDUL_INLINE_PRAGMA(warning(pop)) \
 , __FILE__, __LINE__, __VA_ARGS__)
 
 
-// Signature 1:  gdul::batch_job (InContainer& input, delegate<void(typename InContainer::value_type&)> process, job_queue* target, (opt) const char* dbgName)
-// Signature 2:  gdul::batch_job (InContainer& input, delegate<void(typename InContainer::value_type&)> process, job_queue* target, std::size_t variationId, (opt) const char* dbgName)
-// Signature 3:  gdul::batch_job (InOutContainer& inputOutput, delegate<bool(typename InOutContainer::value_type&)> process, job_queue* target, (opt) const char* dbgName)
-// Signature 4:  gdul::batch_job (InOutContainer& inputOutput, delegate<bool(typename InOutContainer::value_type&)> process, job_queue* target, std::size_t variationId, (opt) const char* dbgName)
-// Signature 5:  gdul::batch_job (InContainer& input, OutContainer& output, delegate<bool(typename InContainer::value_type&, typename OutContainer::value_type&)> process, job_queue* target, (opt) const char* dbgName)
-// Signature 6:  gdul::batch_job (InContainer& input, OutContainer& output, delegate<bool(typename InContainer::value_type&, typename OutContainer::value_type&)> process, job_queue* target, std::size_t variationId, (opt) const char* dbgName)
+// Signature 1:  gdul::batch_job (InContainer& input, delegate<void(typename InContainer::value_type&)> process, job_queue* target, (opt) const std::string_view& dbgName)
+// Signature 2:  gdul::batch_job (InContainer& input, delegate<void(typename InContainer::value_type&)> process, job_queue* target, std::size_t variationId, (opt) const std::string_view& dbgName)
+// Signature 3:  gdul::batch_job (InOutContainer& inputOutput, delegate<bool(typename InOutContainer::value_type&)> process, job_queue* target, (opt) const std::string_view& dbgName)
+// Signature 4:  gdul::batch_job (InOutContainer& inputOutput, delegate<bool(typename InOutContainer::value_type&)> process, job_queue* target, std::size_t variationId, (opt) const std::string_view& dbgName)
+// Signature 5:  gdul::batch_job (InContainer& input, OutContainer& output, delegate<bool(typename InContainer::value_type&, typename OutContainer::value_type&)> process, job_queue* target, (opt) const std::string_view& dbgName)
+// Signature 6:  gdul::batch_job (InContainer& input, OutContainer& output, delegate<bool(typename InContainer::value_type&, typename OutContainer::value_type&)> process, job_queue* target, std::size_t variationId, (opt) const std::string_view& dbgName)
 #define make_batch_job(...) _redirect_make_batch_job( \
 GDUL_INLINE_PRAGMA(warning(push)) \
 GDUL_INLINE_PRAGMA(warning(disable : 4307)) \

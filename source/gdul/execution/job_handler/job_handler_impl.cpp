@@ -83,7 +83,7 @@ worker job_handler_impl::make_worker()
 	return worker(&m_workers[index]);
 }
 #if defined (GDUL_JOB_DEBUG)
-job job_handler_impl::make_job_internal(delegate<void()>&& workUnit, job_queue* target, std::size_t physicalId, std::size_t variationId, const char* name, const char* file, std::uint32_t line)
+job job_handler_impl::make_job_internal(delegate<void()>&& workUnit, job_queue* target, std::size_t physicalId, std::size_t variationId, const std::string_view& name, const std::string_view& file, std::uint32_t line)
 {
 	pool_allocator<std::uint8_t> alloc(m_jobImplMemPool.create_allocator<std::uint8_t>());
 
@@ -97,7 +97,7 @@ job job_handler_impl::make_job_internal(delegate<void()>&& workUnit, job_queue* 
 
 	return job(jobImpl);
 }
-job job_handler_impl::make_sub_job_internal(delegate<void()>&& workUnit, job_queue* target, std::size_t batchId, std::size_t variationId, const char* name)
+job job_handler_impl::make_sub_job_internal(delegate<void()>&& workUnit, job_queue* target, std::size_t batchId, std::size_t variationId, const std::string_view& name)
 {
 	pool_allocator<std::uint8_t> alloc(m_jobImplMemPool.create_allocator<std::uint8_t>());
 
@@ -160,11 +160,11 @@ pool_allocator<std::uint8_t> job_handler_impl::get_batch_job_allocator() const n
 	return m_batchJobMemPool.create_allocator<std::uint8_t>();
 }
 #if defined(GDUL_JOB_DEBUG)
-void job_handler_impl::dump_job_graph(const char* location)
+void job_handler_impl::dump_job_graph(const std::string_view& location)
 {
 	m_jobGraph.dump_job_graph(location);
 }
-void job_handler_impl::dump_job_time_sets(const char* location)
+void job_handler_impl::dump_job_time_sets(const std::string_view& location)
 {
 	m_jobGraph.dump_job_time_sets(location);
 }

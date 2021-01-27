@@ -59,16 +59,16 @@ void job_handler::dump_job_time_sets()
 {
 	dump_job_time_sets("");
 }
-void job_handler::dump_job_graph(const char* location)
+void job_handler::dump_job_graph(const std::string_view& location)
 {
 	m_impl->dump_job_graph(location);
 }
-void job_handler::dump_job_time_sets(const char* location)
+void job_handler::dump_job_time_sets(const std::string_view& location)
 {
 	m_impl->dump_job_time_sets(location);
 }
 #endif
-job job_handler::_redirect_make_job(std::size_t physicalId, [[maybe_unused]] const char* dbgFile, [[maybe_unused]] std::uint32_t line, delegate<void()> workUnit, job_queue* target, std::size_t variationId, [[maybe_unused]] const char* dbgName)
+job job_handler::_redirect_make_job(std::size_t physicalId, [[maybe_unused]] const std::string_view& dbgFile, [[maybe_unused]] std::uint32_t line, delegate<void()> workUnit, job_queue* target, std::size_t variationId, [[maybe_unused]] const std::string_view& dbgName)
 {
 #if defined (GDUL_JOB_DEBUG)
 	return m_impl->make_job_internal(std::move(workUnit), target, physicalId, variationId, dbgName, dbgFile, line);
@@ -76,7 +76,7 @@ job job_handler::_redirect_make_job(std::size_t physicalId, [[maybe_unused]] con
 	return m_impl->make_job_internal(std::move(workUnit), target, physicalId, variationId);
 #endif
 }
-job job_handler::_redirect_make_job(std::size_t physicalId, [[maybe_unused]] const char* dbgFile, [[maybe_unused]] std::uint32_t line, delegate<void()> workUnit, job_queue* target, [[maybe_unused]] const char* dbgName)
+job job_handler::_redirect_make_job(std::size_t physicalId, [[maybe_unused]] const std::string_view& dbgFile, [[maybe_unused]] std::uint32_t line, delegate<void()> workUnit, job_queue* target, [[maybe_unused]] const std::string_view& dbgName)
 {
 #if defined (GDUL_JOB_DEBUG)
 	return m_impl->make_job_internal(std::move(workUnit), target, physicalId, 0, dbgName, dbgFile, line);
@@ -92,7 +92,7 @@ pool_allocator<std::uint8_t> job_handler::get_batch_job_allocator() const noexce
 {
 	return m_impl->get_batch_job_allocator();
 }
-jh_detail::job_info* job_handler::get_job_info(std::size_t physicalId, std::size_t variationId, [[maybe_unused]] const char* dbgName, [[maybe_unused]] const char* dbgFile, [[maybe_unused]] std::uint32_t line)
+jh_detail::job_info* job_handler::get_job_info(std::size_t physicalId, std::size_t variationId, [[maybe_unused]] const std::string_view& dbgName, [[maybe_unused]] const std::string_view& dbgFile, [[maybe_unused]] std::uint32_t line)
 {
 #if defined (GDUL_JOB_DEBUG)
 	return m_impl->get_job_graph().get_job_info(physicalId, variationId, dbgName, dbgFile, line);
