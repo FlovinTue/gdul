@@ -281,7 +281,7 @@ private:
 	static void load_set(node_view_set& outSet, const node_type* at, std::uint8_t offset = 0, std::uint8_t max = LinkTowerHeight);
 
 	bool has_been_delinked_by_other(const node_type* of, node_view actual, node_view triedReplacement) const;
-	bool exists_in_list(const node_type* node, const node_type* searchStart) const;
+	bool can_be_found_from(const node_type* searchStart, const node_type* node) const;
 
 	bool is_flagged(node_view n) const;
 
@@ -706,7 +706,7 @@ inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 		return link_to_node(atSet, nextSet, node);
 	}
 
-	const node_view front(m_head.m_linkViews[0].load(std::memory_order_relaxed));
+	node_view front(m_head.m_linkViews[0].load(std::memory_order_acquire));
 
 	// Inserting after front node...
 	if (atSet[0] == front) {
@@ -715,18 +715,22 @@ inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 		if (nextSet[0].get_version() == cpq_detail::version_add_one(front.get_version())) {
 
 			// In case we are looking at front node, we need to make sure our view of head base layer version 
-			// is younger than that of front base layer version. Else we might think it'd be okay with a
-			// regular link at front node in the middle of deletion!
+			// is younger than that of front base layer version.
 			atSet[0] = front;
 
 			return link_to_front(atSet, nextSet, node);
 		}
 
-		return false;
+		// Front node has been supplanted in the middle of deletion, then promoted to front again. We'll help unflag it
+		else {
+			delink_unflag_node(front, nextSet[0]);
+
+			return false;
+		}
 	}
 
-	// Inserting after flagged node that has been supplanted in the middle of deletion
-	if (exists_in_list(atSet[0], front)) {
+	// Inserting after flagged node at least beyond front that has been supplanted in the middle of deletion
+	if (can_be_found_from(front, atSet[0])) {
 		return link_to_node(atSet, nextSet, node);
 	}
 
@@ -790,15 +794,17 @@ inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 	const node_type* const ofNode(of);
 	const node_type* fromNode(nullptr);
 
-	if (!(actualVersion < triedVersion)) {
+	// Establish search node view that is younger than that of 'of' node. 
+	if (!cpq_detail::in_range(actualVersion, triedVersion)) {
+
 		fromNode = actual;
 	}
 	else {
 		fromNode = m_head.m_linkViews[0].load(std::memory_order_relaxed);
 	}
 
-	// If we can't find the node in the structure and version still belongs to us, it must be ours :)
-	if (!exists_in_list(ofNode, fromNode)) {
+	// If we can't find the node from fromNode (of which our view is younger than that of ofNode) and version still belongs to us, it must be ours.
+	if (!can_be_found_from(fromNode, ofNode)) {
 		const std::uint32_t currentVersion(ofNode->m_linkViews[0].load(std::memory_order_relaxed).get_version());
 		const bool stillUnclaimed(currentVersion == triedVersion);
 
@@ -852,7 +858,7 @@ inline cpq_detail::exchange_link_result concurrent_priority_queue_impl<Key, Valu
 }
 
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class AllocationStrategy, class Compare>
-inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::exists_in_list(const typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_type* node, const typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_type* searchStart) const
+inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::can_be_found_from(const typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_type* searchStart, const typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_type* node) const
 {
 	const comparator_type comparator;
 

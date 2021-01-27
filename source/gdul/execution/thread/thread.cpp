@@ -1,5 +1,8 @@
 #include "thread.h"
 
+#include <cassert>
+#include <string>
+
 #if defined(_WIN64) | defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
@@ -20,6 +23,7 @@ typedef struct tagTHREADNAME_INFO
 } THREADNAME_INFO;
 #pragma pack(pop)  
 };
+
 void thread::set_name(const std::string& name)
 {
 	assert(valid() && "Cannot set name to invalid thread");

@@ -58,10 +58,6 @@ constexpr std::uint32_t Job_Enable_Dependencies = std::numeric_limits<std::uint3
 
 using allocator_type = std::allocator<uint8_t>;
 
-void set_thread_name(const char* name, thread_handle handle);
-void set_thread_priority(std::int32_t priority, thread_handle handle);
-thread_handle create_thread_handle();
-void close_thread_handle(thread_handle handle);
-std::size_t to_batch_size(std::size_t inputSize, job_queue* target);
+std::size_t to_batch_size(std::size_t inputSize, const job_queue* target);
 }
 }

@@ -80,7 +80,7 @@ bool job_impl::try_attach_child(job_impl_shared_ptr child)
 {
 	m_info->accumulate_dependant_time(child->get_remaining_propagation_time());
 
-	pool_allocator<job_node> alloc(m_handler->get_job_node_allocator());
+	pool_allocator<std::uint8_t> alloc(m_handler->get_job_node_allocator());
 
 	job_node_shared_ptr dependee(gdul::allocate_shared<job_node>(alloc));
 	dependee->m_job = std::move(child);

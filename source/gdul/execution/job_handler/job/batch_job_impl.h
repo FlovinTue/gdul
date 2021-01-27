@@ -42,12 +42,12 @@ struct dummy_batch_container { using value_type = int; };
 using dummy_batch_type = batch_job_impl<dummy_batch_container, dummy_batch_container, delegate<bool(int&, int&)>>;
 
 // Gets rid of circular dependency job_handler->batch_job_impl & batch_job_impl->job_handler
-gdul::job _redirect_make_job(job_handler_impl* handler, gdul::delegate<void()>&& workUnit, job_queue* target, std::size_t batchId, std::size_t variationId, const char* name);
+gdul::job _redirect_make_job(job_handler_impl* handler, gdul::delegate<void()>&& workUnit, job_queue* target, std::size_t batchId, std::size_t variationId, const std::string_view& name);
 
 bool _redirect_enable_if_ready(gdul::shared_ptr<job_impl>& jb);
 void _redirect_invoke_job(gdul::shared_ptr<job_impl>& jb);
 bool _redirect_is_enabled(const gdul::shared_ptr<job_impl>& jb);
-void _redirect_set_info(shared_ptr<job_handler_impl>& handler, gdul::shared_ptr<job_impl>& jb, std::size_t physicalId, std::size_t variationId, const char* name);
+void _redirect_set_info(shared_ptr<job_handler_impl>& handler, gdul::shared_ptr<job_impl>& jb, std::size_t physicalId, std::size_t variationId, const std::string_view& name);
 
 template <class InContainer, class OutContainer, class Process>
 class batch_job_impl : public batch_job_impl_interface
@@ -93,7 +93,7 @@ private:
 	std::uint32_t clamp_batch_size(std::size_t desired) const;
 
 	template <class Fun>
-	job make_work_slice(Fun fun, std::size_t batchIndex, std::size_t variationId, const char* name);
+	job make_work_slice(Fun fun, std::size_t batchIndex, std::size_t variationId, const std::string_view& name);
 
 	template <class U = batch_job_impl, std::enable_if_t<U::Specialize_Input_Output>* = nullptr>
 	void work_process(std::size_t batchIndex);
@@ -285,7 +285,7 @@ inline std::size_t batch_job_impl<InContainer, OutContainer, Process>::get_outpu
 }
 template<class InContainer, class OutContainer, class Process>
 template<class Fun>
-inline job batch_job_impl<InContainer, OutContainer, Process>::make_work_slice(Fun fun, std::size_t batchIndex, std::size_t variationId, const char* name)
+inline job batch_job_impl<InContainer, OutContainer, Process>::make_work_slice(Fun fun, std::size_t batchIndex, std::size_t variationId, const std::string_view& name)
 {
 	return _redirect_make_job(m_handler, delegate<void()>(fun, this, batchIndex), m_target, m_info->id(), variationId, name);
 }

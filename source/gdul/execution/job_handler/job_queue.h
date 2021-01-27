@@ -32,8 +32,6 @@ class job_handler;
 namespace jh_detail {
 class job_impl;
 using job_impl_shared_ptr = shared_ptr<job_impl>;
-std::size_t jh_detail::to_batch_size(std::size_t, job_queue*);
-
 }
 
 /// <summary>
@@ -49,7 +47,6 @@ private:
 	friend class job;
 	friend class jh_detail::job_impl;
 	friend class jh_detail::worker_impl;
-	friend std::size_t jh_detail::to_batch_size(std::size_t, job_queue*);
 
 	virtual jh_detail::job_impl_shared_ptr fetch_job() = 0;
 	virtual void submit_job(jh_detail::job_impl_shared_ptr jb) = 0;

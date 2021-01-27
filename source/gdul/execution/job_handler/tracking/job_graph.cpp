@@ -40,12 +40,12 @@ std::string executable_name()
 #if defined _WIN32
 	char buffer[256];
 	if (GetModuleFileNameA(NULL, buffer, 256)) {
-		const char* cstr(buffer);
+		const std::string_view& cstr(buffer);
 
 		return std::filesystem::path(cstr).replace_extension().string();
 	}
 #endif
-	return std::string("Unnamed");
+	return std::string("Unknown");
 }
 
 #endif
@@ -70,7 +70,7 @@ job_graph::job_graph()
 }
 
 #if defined (GDUL_JOB_DEBUG)
-job_info* job_graph::get_job_info(std::size_t physicalId, std::size_t variationId, const char* name, const char* file, std::uint32_t line)
+job_info* job_graph::get_job_info(std::size_t physicalId, std::size_t variationId, const std::string_view& name, const std::string_view& file, std::uint32_t line)
 #else
 job_info* job_graph::get_job_info(std::size_t physicalId, std::size_t variationId)
 #endif
@@ -125,7 +125,7 @@ job_info* job_graph::get_job_info(std::size_t physicalId, std::size_t variationI
 	return &itr->second;
 }
 #if defined (GDUL_JOB_DEBUG)
-job_info* job_graph::get_sub_job_info(std::size_t batchId, std::size_t variationId, const char* name)
+job_info* job_graph::get_sub_job_info(std::size_t batchId, std::size_t variationId, const std::string_view& name)
 #else
 job_info* job_graph::get_sub_job_info(std::size_t batchId, std::size_t variationId)
 #endif
@@ -161,7 +161,7 @@ job_info* job_graph::fetch_job_info(std::size_t id)
 	return nullptr;
 }
 #if defined (GDUL_JOB_DEBUG)
-void job_graph::dump_job_graph(const char* location)
+void job_graph::dump_job_graph(const std::string_view& location)
 {
 	const std::string folder(location);
 	const std::string programName(executable_name());
@@ -257,7 +257,7 @@ void write_dgml_node(const job_info& node, const std::unordered_map<std::uint64_
 		outLinks.append(bufferString);
 	}
 }
-void write_job_time_set(const time_set& timeSet, std::ofstream& toStream, const char* withName)
+void write_job_time_set(const time_set& timeSet, std::ofstream& toStream, const std::string_view& withName)
 {
 	toStream << "<time_set name=\"" << withName << "\">\n";
 	toStream << "<avg_time>" << timeSet.get_avg() << "</avg_time>\n";
@@ -268,7 +268,7 @@ void write_job_time_set(const time_set& timeSet, std::ofstream& toStream, const 
 	toStream << "<completion_count>" << timeSet.get_completion_count() << "</completion_count>\n";
 	toStream << "</time_set>\n";
 }
-void job_graph::dump_job_time_sets(const char* location)
+void job_graph::dump_job_time_sets(const std::string_view& location)
 {
 	const std::string folder(location);
 	const std::string programName(executable_name());

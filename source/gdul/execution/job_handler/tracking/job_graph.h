@@ -36,11 +36,11 @@ public:
 	job_info* fetch_job_info(std::size_t id);
 
 #if defined (GDUL_JOB_DEBUG)
-	job_info* get_job_info(std::size_t physicalId, std::size_t variationId, const char * name, const char* file, std::uint32_t line);
-	job_info* get_sub_job_info(std::size_t batchId, std::size_t variationId, const char* name);
+	job_info* get_job_info(std::size_t physicalId, std::size_t variationId, const std::string_view& name, const std::string_view& file, std::uint32_t line);
+	job_info* get_sub_job_info(std::size_t batchId, std::size_t variationId, const std::string_view& name);
 
-	void dump_job_graph(const char* location);
-	void dump_job_time_sets(const char* location);
+	void dump_job_graph(const std::string_view& location);
+	void dump_job_time_sets(const std::string_view& location);
 #else
 	job_info* get_job_info(std::size_t physicalId, std::size_t variationId);
 	job_info* get_sub_job_info(std::size_t batchId, std::size_t variationId);
