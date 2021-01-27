@@ -90,19 +90,19 @@ public:
 
 	bool try_pop(T& out);
 
-	inline void reserve(size_type capacity);
+	inline void unsafe_reserve(size_type capacity);
 
-	// size hint
-	inline size_type size() const;
+// size hint
+inline size_type size() const;
 
-	// fast unsafe size hint
-	inline size_type unsafe_size() const;
+// fast unsafe size hint
+inline size_type unsafe_size() const;
 
-	// logically remove entries
-	void unsafe_clear();
+// logically remove entries
+void unsafe_clear();
 
-	// reset the structure to its initial state
-	void unsafe_reset();
+// reset the structure to its initial state
+void unsafe_reset();
 
 private:
 	friend class cq_fifo_detail::item_buffer<T, allocator_type>;
@@ -145,7 +145,7 @@ template<class T, class Allocator>
 inline concurrent_queue_fifo<T, Allocator>::concurrent_queue_fifo(Allocator allocator)
 	: m_back(create_item_buffer(cq_fifo_detail::Buffer_Capacity_Default, allocator))
 	, m_front(m_back.load(std::memory_order_relaxed))
-	, t_producer(allocator, m_back.load(std::memory_order_relaxed))
+	, t_producer(allocator, m_front.load(std::memory_order_relaxed))
 	, t_consumer(allocator, m_back.load(std::memory_order_relaxed))
 	, m_allocator(allocator)
 {
@@ -188,33 +188,20 @@ bool concurrent_queue_fifo<T, Allocator>::try_pop(T& out)
 	return true;
 }
 template<class T, class Allocator>
-inline void concurrent_queue_fifo<T, Allocator>::reserve(typename concurrent_queue_fifo<T, Allocator>::size_type capacity)
+inline void concurrent_queue_fifo<T, Allocator>::unsafe_reserve(typename concurrent_queue_fifo<T, Allocator>::size_type capacity)
 {
-	const size_type alignedCapacity(cq_fifo_detail::pow2_align<>(capacity));
+	raw_ptr_buffer_type front(m_front);
 
-	shared_ptr_buffer_type newBuffer(nullptr);
+	if (!(front->capacity() < capacity)){
+		return;
+	}
 
+	m_back.unsafe_load(std::memory_order_relaxed)->unsafe_invalidate();
 
-	shared_ptr_buffer_type  front(m_back.load(std::memory_order_relaxed));
+	m_back.unsafe_store(create_item_buffer(capacity, m_allocator));
+	m_front.unsafe_store(m_back.unsafe_load(std::memory_order_relaxed));
 
-	do {
-		shared_ptr_buffer_type newFront(front->find_front());
-
-		if (newFront) {
-			front = std::move(newFront);
-		}
-
-		if (!(front->capacity() < capacity)) {
-			break;
-		}
-
-		if (!newBuffer) {
-			newBuffer = create_item_buffer(alignedCapacity, m_allocator);
-		}
-
-	} while (!front->try_exchange_next_buffer(std::move(newBuffer)));
-
-	m_front = t_producer.get()->find_front();
+	std::atomic_thread_fence(std::memory_order_release);
 }
 template<class T, class Allocator>
 inline void concurrent_queue_fifo<T, Allocator>::unsafe_clear()
@@ -239,6 +226,7 @@ inline void concurrent_queue_fifo<T, Allocator>::unsafe_reset()
 {
 	m_back.unsafe_get()->unsafe_invalidate();
 	m_back.unsafe_store(create_item_buffer(cq_fifo_detail::Buffer_Capacity_Default, m_allocator), std::memory_order_relaxed);
+	m_front.unsafe_store(m_back.unsafe_load(std::memory_order_relaxed));
 
 	std::atomic_thread_fence(std::memory_order_release);
 }
@@ -258,23 +246,22 @@ inline bool concurrent_queue_fifo<T, Allocator>::refresh_consumer()
 	shared_ptr_buffer_type& active(t_consumer.get());
 	raw_ptr_buffer_type globalBack(m_back);
 
+	std::atomic_thread_fence(std::memory_order_acquire);
+
 	if (active != globalBack) {
 		active = m_back.load(std::memory_order_relaxed);
 		return true;
 	}
 
-	std::atomic_thread_fence(std::memory_order_acquire);
-
 	shared_ptr_buffer_type back(active->find_back());
 
-	if (!back)
+	if (!back) {
 		return false;
-
-	active->assert_previous(back);
+	}
 
 	active = back;
 
-	m_back.compare_exchange_strong(globalBack, std::move(back), std::memory_order_relaxed);
+	m_back.compare_exchange_strong(globalBack, std::move(back), std::memory_order_release);
 
 	return true;
 }
@@ -316,11 +303,11 @@ inline typename concurrent_queue_fifo<T, Allocator>::shared_ptr_buffer_type conc
 
 	data = reinterpret_cast<T*>(totalBlock + dataOffset);
 
-	std::uninitialized_fill(data, data + pow2size, T());
+	std::uninitialized_default_construct(data, data + pow2size);
 
 	buffer = new(totalBlock + bufferOffset) buffer_type(data, static_cast<size_type>(pow2size));
 
-	allocator_adapter_type allocAdaptor(totalBlock, totalBlockSize);
+	const allocator_adapter_type allocAdaptor(totalBlock, totalBlockSize);
 
 	shared_ptr_buffer_type returnValue(buffer, allocAdaptor, cq_fifo_detail::buffer_deleter<buffer_type, allocator_adapter_type>());
 
@@ -329,12 +316,7 @@ inline typename concurrent_queue_fifo<T, Allocator>::shared_ptr_buffer_type conc
 template<class T, class Allocator>
 inline void concurrent_queue_fifo<T, Allocator>::initialize_producer()
 {
-	shared_ptr_buffer_type back(m_back.load(std::memory_order_acquire));
-	shared_ptr_buffer_type front(back->find_front());
-	if (!front)
-		front = std::move(back);
-
-	t_producer = std::move(front);
+	t_producer = m_front.load(std::memory_order_acquire);
 }
 
 template<class T, class Allocator>
@@ -342,21 +324,26 @@ inline void concurrent_queue_fifo<T, Allocator>::refresh_producer()
 {
 	assert(t_producer.get()->is_valid() && "producer needs to be initialized");
 
-	// This should only succeed when the active buffer is filled.
+	shared_ptr_buffer_type& active(t_producer);
+	raw_ptr_buffer_type globalFront(m_front);
 
-	// Perhaps simpler with only one buffer reference
-
-
-	shared_ptr_buffer_type& producer(t_producer.get());
-
-	shared_ptr_buffer_type front(producer->find_front());
-
-	if (!front) {
-		reserve(producer->capacity() * 2);
-		front = producer->find_front();
+	if (active != globalFront) {
+		active = m_front.load(std::memory_order_acquire);
 	}
+	else {
+		shared_ptr_buffer_type next(active->find_front());
 
-	producer = std::move(front);
+		if (!next) {
+			shared_ptr_buffer_type desired(create_item_buffer(active->capacity() * 2, m_allocator));
+			if (active->compare_exchange_next(next, desired)) {
+				next = std::move(desired);
+			}
+		}
+
+		active = next;
+
+		m_front.compare_exchange_strong(globalFront, std::move(next), std::memory_order_release);
+	}
 }
 namespace cq_fifo_detail {
 enum buffer_state : std::uint8_t
@@ -392,16 +379,6 @@ public:
 	// Is this a dummybuffer or one from a destroyed structure?
 	inline bool is_valid() const;
 
-	inline void assert_previous(const shared_ptr_buffer_type& to)
-	{
-		auto ref(this);
-
-		while (ref != to.get()) {
-			assert(!ref->is_active());
-			ref = m_next.unsafe_get();
-		}
-	}
-
 	// Searches the buffer list towards the front for
 	// the front-most buffer
 	inline shared_ptr_buffer_type find_front();
@@ -411,7 +388,7 @@ public:
 	inline shared_ptr_buffer_type find_back();
 
 	// Try push a buffer to the front of buffer list. Returns value after attempt
-	inline bool try_exchange_next_buffer(shared_ptr_buffer_type&& desired);
+	inline bool compare_exchange_next(shared_ptr_buffer_type& expected, shared_ptr_buffer_type desired);
 
 	// Used to signal that this buffer list is to be discarded
 	inline void unsafe_invalidate();
@@ -543,10 +520,9 @@ inline typename item_buffer<T, Allocator>::size_type item_buffer<T, Allocator>::
 	return m_capacity;
 }
 template<class T, class Allocator>
-inline bool item_buffer<T, Allocator>::try_exchange_next_buffer(shared_ptr_buffer_type&& desired)
+inline bool item_buffer<T, Allocator>::compare_exchange_next(shared_ptr_buffer_type& expected, shared_ptr_buffer_type desired)
 {
-	shared_ptr_buffer_type expected(nullptr);
-	return m_next.compare_exchange_strong(expected, std::move(desired));
+	return m_next.compare_exchange_strong(expected, std::move(desired), std::memory_order_release, std::memory_order_acquire);
 }
 template<class T, class Allocator>
 inline void item_buffer<T, Allocator>::unsafe_clear()
@@ -568,11 +544,15 @@ template<class T, class Allocator>
 template<class In>
 inline bool item_buffer<T, Allocator>::try_push(In&& in)
 {
-	const size_type at(m_writeAt.fetch_add(1, std::memory_order_relaxed));
+	size_type at(m_writeAt.load(std::memory_order_relaxed));
 
-	if (!(at < m_capacity)) {
-		return false;
-	}
+	do {
+		if (!(at < m_capacity)) {
+			return false;
+		}
+
+	} while (!m_writeAt.compare_exchange_weak(at, at + 1, std::memory_order_relaxed));
+
 
 	m_items[at] = std::forward<In>(in);
 

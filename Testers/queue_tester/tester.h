@@ -263,7 +263,7 @@ inline double tester<T, Allocator>::ExecuteMPMC(std::uint32_t runs) {
 	m_readSum = 0;
 
 #if defined(GDUL_FIFO)
-	m_queue.reserve(Writes);
+	m_queue.unsafe_reserve(Writes);
 #endif
 
 	for (std::uint32_t i = 0; i < runs; ++i) {
@@ -276,7 +276,7 @@ inline double tester<T, Allocator>::ExecuteMPMC(std::uint32_t runs) {
 		gdul::timer<float> time;
 		m_isRunning = true;
 
-		while (m_writer.has_unfinished_tasks() | m_reader.has_unfinished_tasks())
+		while (m_writer.has_unfinished_tasks() || m_reader.has_unfinished_tasks())
 			std::this_thread::yield();
 
 #if defined(GDUL) | defined(GDUL_FIFO)
@@ -316,7 +316,7 @@ inline double tester<T, Allocator>::ExecuteSPMC(std::uint32_t runs)
 	m_readSum = 0;
 
 #if defined(GDUL_FIFO)
-	m_queue.reserve(Writes);
+	m_queue.unsafe_reserve(Writes);
 #endif
 
 	for (std::uint32_t i = 0; i < runs; ++i) {
@@ -331,7 +331,7 @@ inline double tester<T, Allocator>::ExecuteSPMC(std::uint32_t runs)
 		gdul::timer<float> time;
 		m_isRunning = true;
 
-		while (m_writer.has_unfinished_tasks() | m_reader.has_unfinished_tasks())
+		while (m_writer.has_unfinished_tasks() || m_reader.has_unfinished_tasks())
 			std::this_thread::yield();
 
 #if defined(GDUL) | defined(GDUL_FIFO)
@@ -371,7 +371,7 @@ inline double tester<T, Allocator>::ExecuteMPSC(std::uint32_t runs)
 	m_readSum = 0;
 
 #if defined(GDUL_FIFO)
-	m_queue.reserve(Writes);
+	m_queue.unsafe_reserve(Writes);
 #endif
 
 	for (std::uint32_t i = 0; i < runs; ++i) {
@@ -386,7 +386,7 @@ inline double tester<T, Allocator>::ExecuteMPSC(std::uint32_t runs)
 		gdul::timer<float> time;
 		m_isRunning = true;
 
-		while (m_writer.has_unfinished_tasks() | m_reader.has_unfinished_tasks())
+		while (m_writer.has_unfinished_tasks() || m_reader.has_unfinished_tasks())
 			std::this_thread::yield();
 
 #if defined(GDUL) | defined(GDUL_FIFO)
@@ -424,7 +424,7 @@ inline double tester<T, Allocator>::ExecuteSingleThread(std::uint32_t runs) {
 	m_readSum = 0;
 
 #if defined(GDUL_FIFO)
-	m_queue.reserve(Writes);
+	m_queue.unsafe_reserve(Writes);
 #endif
 
 	for (std::uint32_t i = 0; i < runs; ++i) {
@@ -470,7 +470,7 @@ inline double tester<T, Allocator>::ExecuteSPSC(std::uint32_t runs) {
 #endif
 
 #if defined(GDUL_FIFO)
-	m_queue.reserve(runs);
+	m_queue.unsafe_reserve(runs);
 #endif
 
 	double result(0.0);
@@ -489,7 +489,7 @@ inline double tester<T, Allocator>::ExecuteSPSC(std::uint32_t runs) {
 
 		m_isRunning = true;
 
-		while (m_writer.has_unfinished_tasks() | m_reader.has_unfinished_tasks())
+		while (m_writer.has_unfinished_tasks() || m_reader.has_unfinished_tasks())
 			std::this_thread::yield();
 
 		result += time.get();
@@ -524,7 +524,7 @@ inline double tester<T, Allocator>::ExecuteMC(std::uint32_t runs) {
 #endif
 
 #if defined(GDUL_FIFO)
-	m_queue.reserve(Writes);
+	m_queue.unsafe_reserve(Writes);
 #endif
 
 	double result(0.0);
@@ -585,7 +585,7 @@ inline double tester<T, Allocator>::ExecuteMP(std::uint32_t runs) {
 #endif
 
 #if defined(GDUL_FIFO)
-	m_queue.reserve(Writes);
+	m_queue.unsafe_reserve(Writes);
 #endif
 
 	double result(0.0);
@@ -644,7 +644,7 @@ inline bool tester<T, Allocator>::CheckResults() const {
 template<class T, class Allocator>
 inline void tester<T, Allocator>::Write(std::uint32_t writes) {
 #ifdef GDUL
-	/*m_queue.reserve(Writes);*/
+	/*m_queue.unsafe_reserve(Writes);*/
 #endif
 
 	++m_waiting;
