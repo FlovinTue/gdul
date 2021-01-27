@@ -29,36 +29,10 @@
 #include <gdul/thread_local_member/thread_local_member.h>
 #include "../../../Testers/Common/util.h"
 
-// Exception handling may be enabled for basic exception safety at the cost of
-// a slight performance decrease
-
-
-/* #define GDUL_CQ_ENABLE_EXCEPTIONHANDLING */
-
-// In the event an exception is thrown during a pop operation, some entries may
-// be dequeued out-of-order as some consumers may already be halfway through a
-// pop operation before reintegration efforts are started.
-
-#ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
-#define GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(type) (std::is_nothrow_move_assignable<type>::value)
-#define GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(type) (!GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(type) && (std::is_nothrow_copy_assignable<type>::value))
-#define GDUL_CQ_BUFFER_NOTHROW_PUSH_MOVE(type) (std::is_nothrow_move_assignable<type>::value)
-#define GDUL_CQ_BUFFER_NOTHROW_PUSH_ASSIGN(type) (std::is_nothrow_copy_assignable<type>::value)
-#else
-#define GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(type) (std::is_move_assignable<type>::value)
-#define GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(type) (!GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(type))
-#define GDUL_CQ_BUFFER_NOTHROW_PUSH_ASSIGN(type) (std::is_same<type, type>::value)
-#define GDUL_CQ_BUFFER_NOTHROW_PUSH_MOVE(type) (std::is_same<type, type>::value)
-#endif
-
-#if !defined(GDUL_DISABLE_VIEWABLE_ATOMICS)
 #ifndef GDUL_ATOMIC_WITH_VIEW
 #define GDUL_ATOMIC_WITH_VIEW(type, name) union{std::atomic<type> name; type _##name;}
-#endif
 #else
-#ifndef GDUL_ATOMIC_WITH_VIEW
 #define GDUL_ATOMIC_WITH_VIEW(type, name) std::atomic<type> name
-#endif
 #endif
 
 #ifndef MAKE_UNIQUE_NAME
@@ -83,25 +57,18 @@ template <class T, class Allocator>
 class item_buffer;
 
 template <class T, class Allocator>
-class dummy_container;
-
-template <class T, class Allocator>
 class buffer_deleter;
 
 template <class Dummy = void>
 std::size_t pow2_align(std::size_t from);
 
-template <class Dummy = void>
-constexpr std::size_t aligned_size(std::size_t byteSize, std::size_t align);
+constexpr std::size_t align_value(std::size_t byteSize, std::size_t align);
 
 template <class T, class Allocator>
 class shared_ptr_allocator_adapter;
 
-// Not quite size_type max because we need some leaway in case we
-// need to throw consumers out of a buffer whilst repairing it
-static constexpr size_type Buffer_Capacity_Default = 8;
+constexpr size_type Buffer_Capacity_Default = 8;
 
-static constexpr std::uint64_t Ptr_Mask = (std::uint64_t(std::numeric_limits<std::uint32_t>::max()) << 16 | std::uint64_t(std::numeric_limits<std::uint16_t>::max()));
 }
 // MPMC unbounded lock-free queue.
 // Basic exception safety may be enabled via define GDUL_CQ_ENABLE_EXCEPTIONHANDLING
@@ -139,7 +106,6 @@ public:
 
 private:
 	friend class cq_fifo_detail::item_buffer<T, allocator_type>;
-	friend class cq_fifo_detail::dummy_container<T, allocator_type>;
 
 	using buffer_type = cq_fifo_detail::item_buffer<T, allocator_type>;
 	using allocator_adapter_type = cq_fifo_detail::shared_ptr_allocator_adapter<std::uint8_t, allocator_type>;
@@ -151,22 +117,23 @@ private:
 	template <class In>
 	void push_internal(In&& in);
 
-	inline shared_ptr_buffer_type create_item_buffer(std::size_t withSize);
+	static inline shared_ptr_buffer_type create_item_buffer(std::size_t withSize, allocator_type allocator);
 
 	inline void initialize_producer();
 
 	inline bool refresh_consumer();
 	inline void refresh_producer();
 
-	static cq_fifo_detail::dummy_container<T, allocator_type> s_dummyContainer;
+	allocator_type m_allocator;
+
+	// Maintained by consumers
+	atomic_shared_ptr_buffer_type m_back;
+
+	// Maintained by producers
+	atomic_shared_ptr_buffer_type m_front;
 
 	tlm<shared_ptr_buffer_type, allocator_type> t_producer;
 	tlm<shared_ptr_buffer_type, allocator_type> t_consumer;
-
-	atomic_shared_ptr_buffer_type m_back;
-	atomic_shared_ptr_buffer_type m_frontPeek;
-
-	allocator_type m_allocator;
 };
 
 template<class T, class Allocator>
@@ -176,9 +143,10 @@ inline concurrent_queue_fifo<T, Allocator>::concurrent_queue_fifo()
 }
 template<class T, class Allocator>
 inline concurrent_queue_fifo<T, Allocator>::concurrent_queue_fifo(Allocator allocator)
-	: t_producer(allocator, s_dummyContainer.m_dummyBuffer)
-	, t_consumer(allocator, s_dummyContainer.m_dummyBuffer)
-	, m_back(s_dummyContainer.m_dummyBuffer)
+	: m_back(create_item_buffer(cq_fifo_detail::Buffer_Capacity_Default, allocator))
+	, m_front(m_back.load(std::memory_order_relaxed))
+	, t_producer(allocator, m_back.load(std::memory_order_relaxed))
+	, t_consumer(allocator, m_back.load(std::memory_order_relaxed))
 	, m_allocator(allocator)
 {
 }
@@ -226,13 +194,6 @@ inline void concurrent_queue_fifo<T, Allocator>::reserve(typename concurrent_que
 
 	shared_ptr_buffer_type newBuffer(nullptr);
 
-	raw_ptr_buffer_type peek(m_back);
-	if (peek == s_dummyContainer.m_dummyBuffer) {
-		newBuffer = create_item_buffer(alignedCapacity);
-
-		if (m_back.compare_exchange_strong(peek, std::move(newBuffer), std::memory_order_relaxed))
-			return;
-	}
 
 	shared_ptr_buffer_type  front(m_back.load(std::memory_order_relaxed));
 
@@ -248,12 +209,12 @@ inline void concurrent_queue_fifo<T, Allocator>::reserve(typename concurrent_que
 		}
 
 		if (!newBuffer) {
-			newBuffer = create_item_buffer(alignedCapacity);
+			newBuffer = create_item_buffer(alignedCapacity, m_allocator);
 		}
 
 	} while (!front->try_exchange_next_buffer(std::move(newBuffer)));
 
-	m_frontPeek = t_producer.get()->find_front();
+	m_front = t_producer.get()->find_front();
 }
 template<class T, class Allocator>
 inline void concurrent_queue_fifo<T, Allocator>::unsafe_clear()
@@ -276,10 +237,8 @@ inline void concurrent_queue_fifo<T, Allocator>::unsafe_clear()
 template<class T, class Allocator>
 inline void concurrent_queue_fifo<T, Allocator>::unsafe_reset()
 {
-	std::atomic_thread_fence(std::memory_order_acquire);
-
 	m_back.unsafe_get()->unsafe_invalidate();
-	m_back.unsafe_store(s_dummyContainer.m_dummyBuffer, std::memory_order_relaxed);
+	m_back.unsafe_store(create_item_buffer(cq_fifo_detail::Buffer_Capacity_Default, m_allocator), std::memory_order_relaxed);
 
 	std::atomic_thread_fence(std::memory_order_release);
 }
@@ -299,57 +258,40 @@ inline bool concurrent_queue_fifo<T, Allocator>::refresh_consumer()
 	shared_ptr_buffer_type& active(t_consumer.get());
 	raw_ptr_buffer_type globalBack(m_back);
 
-
-	// If we are holding anything else than what is in m_back, this means some other consumer has successfully swapped
-	// in a new buffer. (Or this structure was previously unsafe_reseted).
 	if (active != globalBack) {
-
-		// Load and try with new buffer..
 		active = m_back.load(std::memory_order_relaxed);
 		return true;
 	}
 
 	std::atomic_thread_fence(std::memory_order_acquire);
 
-	// If, however, we are holding the active buffer, we try to find the active tail buffer.. 
-	// In case we are holding the dummy, this will return null as well, and refresh will fail.
 	shared_ptr_buffer_type back(active->find_back());
 
-	// In case we find no tail, we are holding the most relevant buffer
 	if (!back)
 		return false;
-
-	// We found one.. !
 
 	active->assert_previous(back);
 
 	active = back;
 
-
-	// As a service to other consumers, try to swap in the buffer we found.
-	// If some other consumer swapped in a tail, we fail here. 
-
-	// Could we end up with a weird conflict here? Probably, it SMELLS like it.
-	// Definitely there could be a list of item buffers filled, and hmm. Yeah. We must be able 
-	// to guarantee a swap-in doesn't happen before all items of previous buffer is removed. I think.
 	m_back.compare_exchange_strong(globalBack, std::move(back), std::memory_order_relaxed);
 
 	return true;
 }
 template<class T, class Allocator>
-inline typename concurrent_queue_fifo<T, Allocator>::shared_ptr_buffer_type concurrent_queue_fifo<T, Allocator>::create_item_buffer(std::size_t withSize)
+inline typename concurrent_queue_fifo<T, Allocator>::shared_ptr_buffer_type concurrent_queue_fifo<T, Allocator>::create_item_buffer(std::size_t withSize, allocator_type allocator)
 {
 	const std::size_t pow2size(cq_fifo_detail::pow2_align<>(withSize));
 
-	const std::size_t alignOfData(alignof(T));
+	constexpr std::size_t alignOfData(alignof(T));
 
-	const std::size_t bufferByteSize(sizeof(buffer_type));
+	constexpr std::size_t bufferByteSize(sizeof(buffer_type));
 	const std::size_t dataBlockByteSize(sizeof(T) * pow2size);
 
 	constexpr std::size_t controlBlockByteSize(gdul::sp_claim_size_custom_delete<buffer_type, allocator_adapter_type, cq_fifo_detail::buffer_deleter<buffer_type, allocator_adapter_type>>());
 
-	constexpr std::size_t controlBlockSize(cq_fifo_detail::aligned_size<>(controlBlockByteSize, 8));
-	constexpr std::size_t bufferSize(cq_fifo_detail::aligned_size<>(bufferByteSize, 8));
+	constexpr std::size_t controlBlockSize(cq_fifo_detail::align_value(controlBlockByteSize, 8));
+	constexpr std::size_t bufferSize(cq_fifo_detail::align_value(bufferByteSize, 8));
 	const std::size_t dataBlockSize(dataBlockByteSize);
 
 	const std::size_t totalBlockSize(controlBlockSize + bufferSize + dataBlockSize + (8 < alignOfData ? alignOfData : 0));
@@ -359,42 +301,24 @@ inline typename concurrent_queue_fifo<T, Allocator>::shared_ptr_buffer_type conc
 	buffer_type* buffer(nullptr);
 	T* data(nullptr);
 
-	std::size_t constructed(0);
+	totalBlock = allocator.allocate(totalBlockSize);
 
-#ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
-	try {
-#endif
-		totalBlock = m_allocator.allocate(totalBlockSize);
+	const std::size_t totalBlockBegin(reinterpret_cast<std::size_t>(totalBlock));
+	const std::size_t controlBlockBegin(totalBlockBegin);
+	const std::size_t bufferBegin(controlBlockBegin + controlBlockSize);
 
-		const std::size_t totalBlockBegin(reinterpret_cast<std::size_t>(totalBlock));
-		const std::size_t controlBlockBegin(totalBlockBegin);
-		const std::size_t bufferBegin(controlBlockBegin + controlBlockSize);
+	const std::size_t bufferEnd(bufferBegin + bufferSize);
+	const std::size_t dataBeginOffset((bufferEnd % alignOfData ? (alignOfData - (bufferEnd % alignOfData)) : 0));
+	const std::size_t dataBegin(bufferEnd + dataBeginOffset);
 
-		const std::size_t bufferEnd(bufferBegin + bufferSize);
-		const std::size_t dataBeginOffset((bufferEnd % alignOfData ? (alignOfData - (bufferEnd % alignOfData)) : 0));
-		const std::size_t dataBegin(bufferEnd + dataBeginOffset);
+	const std::size_t bufferOffset(bufferBegin - totalBlockBegin);
+	const std::size_t dataOffset(dataBegin - totalBlockBegin);
 
-		const std::size_t bufferOffset(bufferBegin - totalBlockBegin);
-		const std::size_t dataOffset(dataBegin - totalBlockBegin);
+	data = reinterpret_cast<T*>(totalBlock + dataOffset);
 
-		// new (addr) (type[n]) is unreliable...
-		data = reinterpret_cast<T*>(totalBlock + dataOffset);
-		for (; constructed < pow2size; ++constructed) {
-			T* const item(&data[constructed]);
-			new (item) (T);
-		}
+	std::uninitialized_fill(data, data + pow2size, T());
 
-		buffer = new(totalBlock + bufferOffset) buffer_type(data, static_cast<size_type>(pow2size));
-#ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
-	}
-	catch (...) {
-		m_allocator.deallocate(totalBlock, totalBlockSize);
-		for (std::size_t i = 0; i < constructed; ++i) {
-			data[i].~T();
-		}
-		throw;
-	}
-#endif
+	buffer = new(totalBlock + bufferOffset) buffer_type(data, static_cast<size_type>(pow2size));
 
 	allocator_adapter_type allocAdaptor(totalBlock, totalBlockSize);
 
@@ -405,10 +329,7 @@ inline typename concurrent_queue_fifo<T, Allocator>::shared_ptr_buffer_type conc
 template<class T, class Allocator>
 inline void concurrent_queue_fifo<T, Allocator>::initialize_producer()
 {
-	if (m_back == s_dummyContainer.m_dummyBuffer) {
-		reserve(cq_fifo_detail::Buffer_Capacity_Default);
-	}
-	shared_ptr_buffer_type back(m_back.load(std::memory_order_relaxed));
+	shared_ptr_buffer_type back(m_back.load(std::memory_order_acquire));
 	shared_ptr_buffer_type front(back->find_front());
 	if (!front)
 		front = std::move(back);
@@ -420,6 +341,11 @@ template<class T, class Allocator>
 inline void concurrent_queue_fifo<T, Allocator>::refresh_producer()
 {
 	assert(t_producer.get()->is_valid() && "producer needs to be initialized");
+
+	// This should only succeed when the active buffer is filled.
+
+	// Perhaps simpler with only one buffer reference
+
 
 	shared_ptr_buffer_type& producer(t_producer.get());
 
@@ -698,8 +624,7 @@ std::size_t pow2_align(std::size_t from)
 
 	return nextVal;
 }
-template <class Dummy>
-constexpr std::size_t aligned_size(std::size_t byteSize, std::size_t align)
+constexpr std::size_t align_value(std::size_t byteSize, std::size_t align)
 {
 	const std::size_t div(byteSize / align);
 	const std::size_t mod(byteSize % align);
@@ -797,7 +722,5 @@ inline void buffer_deleter<T, Allocator>::operator()(T* obj, Allocator&)
 	(*obj).~T();
 }
 }
-template <class T, class Allocator>
-cq_fifo_detail::dummy_container<T, typename concurrent_queue_fifo<T, Allocator>::allocator_type> concurrent_queue_fifo<T, Allocator>::s_dummyContainer;
 }
 #pragma warning(pop)
