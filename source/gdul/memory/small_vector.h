@@ -1,11 +1,14 @@
 #pragma once
 
+
 #include <memory>
 #include <cassert>
 #include <vector>
 
 namespace gdul {
 namespace sv_detail {
+
+
 template <class T, std::uint8_t LocalItems, class ParentAllocator>
 class small_allocator;
 
@@ -72,7 +75,9 @@ inline void small_allocator_proxy<T, SmallAllocator>::deallocate(T* p, std::size
 	if constexpr (std::is_same_v<value_type, typename SmallAllocator::value_type>) {
 		m_smallAllocator.deallocate(p, count);
 	}
-
+	else {
+		m_parent.deallocate(p, count);
+	}
 }
 template <class T, class SmallAllocator>
 inline T* small_allocator_proxy<T, SmallAllocator>::allocate(std::size_t count)
@@ -96,6 +101,12 @@ public:
 	using size_type = std::size_t;
 	using parent_allocator_type = ParentAllocator;
 
+	using propagate_on_container_copy_assignment = std::false_type;
+	using propagate_on_container_move_assignment = std::false_type;
+	using propagate_on_container_swap = std::false_type;
+
+	using is_always_equal = std::false_type;
+
 	template <typename U>
 	struct rebind
 	{
@@ -108,10 +119,22 @@ public:
 		using other = small_allocator<T, LocalItems, ParentAllocator>;
 	};
 
-	small_allocator(const small_allocator&) = delete;
-	small_allocator(small_allocator&&) = delete;
-	small_allocator& operator=(const small_allocator&) = delete;
-	small_allocator& operator=(small_allocator&&) = delete;
+	small_allocator(const small_allocator& other)
+	{
+		operator=(other);
+	};
+	//small_allocator(small_allocator&& other)
+	//{
+	//	operator=(other);
+	//};
+	small_allocator& operator=(const small_allocator&)
+	{
+		return *this;
+	};
+	//small_allocator& operator=(small_allocator&& other)
+	//{
+	//	return operator=(other);
+	//};
 
 	small_allocator();
 	small_allocator(const ParentAllocator& parent);
@@ -121,8 +144,16 @@ public:
 
 	ParentAllocator& parent();
 
-	bool operator==(const small_allocator<T, LocalItems, ParentAllocator>& other) const = delete;
-	bool operator!=(const small_allocator<T, LocalItems, ParentAllocator>& other) const = delete;
+	bool operator==(const small_allocator<T, LocalItems, ParentAllocator>& other) const
+	{
+		other;
+		return false;
+	}
+	bool operator!=(const small_allocator<T, LocalItems, ParentAllocator>& other) const
+	{
+		other;
+		return true;
+	}
 
 private:
 
@@ -212,31 +243,17 @@ inline T* small_allocator<T, LocalItems, ParentAllocator>::local_allocate(size_t
 	return reinterpret_cast<T*>(&m_items[at]);
 }
 
-template <class T, std::uint8_t LocalItems = 6, class Allocator = std::allocator<T>>
+template <class T, std::uint8_t LocalItems, class Allocator>
 class small_vector : public std::vector<T, small_allocator<T, LocalItems, Allocator>>
 {
+	using mytype = small_vector<T, LocalItems, Allocator>;
 public:
 	using std::vector<T, small_allocator<T, LocalItems, Allocator>>::vector;
 
-	small_vector(small_vector<T, LocalItems, Allocator>&& other) noexcept;
-	void swap(small_vector<T, LocalItems, Allocator>& other) noexcept;
+private:
+
 };
-template <class T, std::uint8_t LocalItems, class Allocator>
-small_vector<T, LocalItems, Allocator>::small_vector(small_vector<T, LocalItems, Allocator>&& other) noexcept
-{
-	this->assign(other.begin(), other.end());
 }
-template <class T, std::uint8_t LocalItems, class Allocator>
-void small_vector<T, LocalItems, Allocator>::swap(small_vector<T, LocalItems, Allocator>& other) noexcept
-{
-	small_vector local(other.begin(), other.end());
-
-	other.assign(this->begin(), this->end());
-
-	this->assign(local.begin(), local.end());
-}
-}
-
 template <class T, std::uint8_t LocalItems = 6, class Allocator = std::allocator<T>>
 using small_vector = sv_detail::small_vector<T, LocalItems, Allocator>;
 
