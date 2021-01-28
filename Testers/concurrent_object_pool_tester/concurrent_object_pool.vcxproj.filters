@@ -10,5 +10,6 @@
     <ClInclude Include="..\..\source\gdul\memory\concurrent_object_pool.h" />
     <ClInclude Include="..\..\source\gdul\memory\concurrent_scratch_pool.h" />
     <ClInclude Include="..\..\source\gdul\memory\concurrent_guard_pool.h" />
+    <ClInclude Include="..\..\source\gdul\memory\small_vector.h" />
   </ItemGroup>
 </Project>
