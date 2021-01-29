@@ -1,5 +1,5 @@
 # gdul
-A collection of (mainly concurrency related) data structures, created with game programming in mind
+A collection of (mainly concurrency related) data structures & utilities, created with game programming in mind
 
 
 -------------------------------------------------------------------------------------------------------------------------------------------
