@@ -19,7 +19,7 @@ There are eight different versions of compare_exchange_strong, four of which tak
 ## atomic_128
 utility wrapper class for 128 bit atomic operations. 
 ```
-#include <gdul\atomic_128\atomic_128.h>
+#include <gdul/memory/atomic_128.h>
 
 struct custom_struct
 {
@@ -67,7 +67,7 @@ Concurrency safe, lock free priority queue based around skip list design. Provid
 
 Ex. Usage
 ```
-#include <gdul/concurrent_priority_queue/concurrent_priority_queue.h>
+#include <gdul/containers/concurrent_priority_queue.h>
 
 int main()
 {
