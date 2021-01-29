@@ -2,12 +2,12 @@
 //
 
 #include <iostream>
-#include <gdul/delegate/delegate.h>
+#include <gdul/utility/delegate.h>
 #include <functional>
 #include <vld.h>
 #include "../Common/Timer.h"
 #include <functional>
-#include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
+#include <gdul/memory/atomic_shared_ptr.h>
 #include "../Common/util.h"
 
 uint64_t global = 0;

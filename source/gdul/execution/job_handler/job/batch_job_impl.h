@@ -25,7 +25,7 @@
 #include <gdul/execution/job_handler/tracking/job_graph.h>
 #include <gdul/execution/job_handler/job/batch_job_impl_interface.h>
 
-#include <gdul/delegate/delegate.h>
+#include <gdul/utility/delegate.h>
 
 #include <array>
 #include <cassert>

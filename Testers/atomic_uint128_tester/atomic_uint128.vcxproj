@@ -91,7 +91,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\source\gdul\atomic_128\atomic_128.h" />
+    <ClInclude Include="..\..\source\gdul\memory\atomic_128.h" />
     <ClInclude Include="pch.h" />
   </ItemGroup>
   <ItemGroup>
@@ -102,7 +102,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <Natvis Include="..\..\source\gdul\atomic_128\atomic_128.natvis" />
+    <Natvis Include="..\..\source\gdul\memory\atomic_128.natvis" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -28,7 +28,7 @@
 #include <thread>
 
 #include <gdul/execution/job_handler/job_handler_utility.h>
-#include <gdul/delegate/delegate.h>
+#include <gdul/utility/delegate.h>
 #include <gdul/execution/job_handler/worker/worker.h>
 #include <gdul/execution/job_handler/job/job.h>
 #include <gdul/execution/thread/thread.h>

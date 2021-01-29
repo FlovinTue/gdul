@@ -22,10 +22,10 @@
 
 
 #include <xhash>
-#include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
+#include <gdul/memory/atomic_shared_ptr.h>
 #include <gdul/memory/concurrent_guard_pool.h>
-#include <gdul/thread_local_member/thread_local_member.h>
-#include <gdul/atomic_128/atomic_128.h>
+#include <gdul/memory/thread_local_member.h>
+#include <gdul/memory/atomic_128.h>
 
 #pragma warning(push)
 // Anonymous struct

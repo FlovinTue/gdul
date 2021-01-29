@@ -3,7 +3,7 @@
 #include "..\Common\thread_pool.h"
 #include "..\Common\util.h"
 #include "..\Common\tracking_allocator.h"
-#include <gdul\atomic_shared_ptr\atomic_shared_ptr.h>
+#include <gdul/memory/atomic_shared_ptr.h>
 #include <random>
 #include <string>
 #include "../Common/Timer.h"

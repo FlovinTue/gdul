@@ -2,7 +2,7 @@
 
 #include <thread>
 #include "../Common/thread_pool.h"
-#include <gdul\concurrent_queue\concurrent_queue.h>
+#include <gdul/containers/concurrent_queue.h>
 #include <concurrent_priority_queue.h>
 #include "../Common/Timer.h"
 #include <concurrent_queue.h>
@@ -15,7 +15,7 @@
 #if defined(GDUL_FIFO)
 #include <gdul/WIP_concurrent_queue_fifo/concurrent_queue_fifo_v6.h>
 #elif defined(GDUL_CPQ)
-#include <gdul/concurrent_priority_queue/concurrent_priority_queue.h>
+#include <gdul/containers/concurrent_priority_queue.h>
 #elif defined(RIGTORP)
 #include <../RigtorpQueue/MPMCQueue.h>
 #endif

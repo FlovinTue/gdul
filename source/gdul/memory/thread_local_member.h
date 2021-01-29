@@ -23,7 +23,7 @@
 #include <vector>
 #include <array>
 #include <atomic>
-#include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
+#include <gdul/memory/atomic_shared_ptr.h>
 
 namespace gdul
 {

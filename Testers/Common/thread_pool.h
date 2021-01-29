@@ -4,7 +4,7 @@
 #include <thread>
 #include <atomic>
 #include <concurrent_queue.h>
-#include <gdul/concurrent_queue/concurrent_queue.h>
+#include <gdul/containers/concurrent_queue.h>
 #include <vector>
 
 #define WIN32_LEAN_AND_MEAN

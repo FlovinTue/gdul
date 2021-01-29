@@ -20,9 +20,9 @@
 
 #pragma once
 
-#include <gdul/concurrent_queue/concurrent_queue.h>
-#include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
-#include <gdul/thread_local_member/thread_local_member.h>
+#include <gdul/containers/concurrent_queue.h>
+#include <gdul/memory/atomic_shared_ptr.h>
+#include <gdul/memory/thread_local_member.h>
 
 #include <assert.h>
 #include <thread>

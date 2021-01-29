@@ -26,7 +26,7 @@
 #include <algorithm>
 #include <thread>
 #include <gdul/memory/concurrent_guard_pool.h>
-#include <gdul/concurrent_skip_list/concurrent_skip_list_base.h>
+#include <gdul/containers/concurrent_skip_list_base.h>
 
 #pragma warning(push)
 // Alignment padding

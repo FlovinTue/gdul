@@ -4,7 +4,7 @@
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\source\gdul\concurrent_skip_list\concurrent_skip_list.h" />
-    <ClInclude Include="..\..\source\gdul\concurrent_skip_list\concurrent_skip_list_base.h" />
+    <ClInclude Include="..\..\source\gdul\containers\concurrent_skip_list.h" />
+    <ClInclude Include="..\..\source\gdul\containers\concurrent_skip_list_base.h" />
   </ItemGroup>
 </Project>

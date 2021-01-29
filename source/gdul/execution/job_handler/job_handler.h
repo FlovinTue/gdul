@@ -20,13 +20,13 @@
 
 #pragma once
 
-#include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
+#include <gdul/memory/atomic_shared_ptr.h>
 #include <gdul/execution/job_handler/job_handler_utility.h>
 #include <gdul/execution/job_handler/worker/worker.h>
 #include <gdul/execution/job_handler/job/job.h>
 #include <gdul/execution/job_handler/job/batch_job_impl.h>
 #include <gdul/execution/job_handler/job/batch_job.h>
-#include <gdul/delegate/delegate.h>
+#include <gdul/utility/delegate.h>
 #include <gdul/memory/pool_allocator.h>
 
 #include <string_view>

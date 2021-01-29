@@ -20,7 +20,7 @@
 
 #pragma once
 
-#include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
+#include <gdul/memory/atomic_shared_ptr.h>
 #include <gdul/execution/job_handler/job_handler_utility.h>
 
 namespace gdul {

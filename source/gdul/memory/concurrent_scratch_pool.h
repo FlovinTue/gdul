@@ -23,7 +23,7 @@
 #include <memory>
 #include <atomic>
 #include <cmath>
-#include <gdul/thread_local_member/thread_local_member.h>
+#include <gdul/memory/thread_local_member.h>
 
 #pragma warning(push)
 // Anonymous struct
