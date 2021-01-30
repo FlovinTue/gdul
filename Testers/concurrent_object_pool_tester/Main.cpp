@@ -6,8 +6,10 @@
 #include <gdul/memory/concurrent_object_pool.h>
 #include <gdul/memory/concurrent_guard_pool.h>
 #include <gdul/memory/pool_allocator.h>
+#include <gdul/WIP/scratch_allocator.h>
+#include <gdul/WIP/small_vector.h>
+
 #include <vld.h>
-#include <vector>
 
 float func(int arg)
 {
@@ -58,6 +60,21 @@ int main()
 	mpAlloc.deallocate(items2);
 	mpAlloc.deallocate(items3);
 	mpAlloc.deallocate(items4);
+
+	constexpr gdul::least_unsigned_integer_t<5> ch(5);
+	constexpr gdul::least_unsigned_integer_t<257> sh(5);
+	constexpr gdul::least_unsigned_integer_t<std::numeric_limits<int>::max()> ui(5);
+	constexpr gdul::least_unsigned_integer_t<std::numeric_limits<long long int>::max()> uli(5);
+
+	gdul::scratch_pad<64> pad;
+	gdul::scratch_allocator<int> sall(pad.create_allocator<int>());
+
+	int* a = sall.allocate(10);
+	int* b = sall.allocate(5);
+	sall.deallocate(a, 10);
+	sall.deallocate(b, 5);
+
+	gdul::small_vector<int> vec;
 
     std::cout << "Hello World!\n";
 }

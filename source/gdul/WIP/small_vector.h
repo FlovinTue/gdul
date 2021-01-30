@@ -1,260 +1,212 @@
 #pragma once
 
+#include <gdul/WIP/scratch_allocator.h>
+#include <gdul/utility/type_traits.h>
 
 #include <memory>
 #include <cassert>
 #include <vector>
 
 namespace gdul {
+
 namespace sv_detail {
 
-
-template <class T, std::uint8_t LocalItems, class ParentAllocator>
-class small_allocator;
-
-template <class T, class SmallAllocator>
-class small_allocator_proxy
-{
-public:
-	using value_type = T;
-	using pointer = value_type*;
-	using const_pointer = const pointer;
-	using size_type = std::size_t;
-	using parent_allocator_type = typename SmallAllocator::parent_allocator_type::template rebind<T>::other;
-
-	template <typename U>
-	struct rebind
-	{
-		using other = small_allocator_proxy<U, SmallAllocator>;
-	};
-
-	small_allocator_proxy(SmallAllocator& smallAllocator);
-
-	bool operator==(const small_allocator_proxy<T, SmallAllocator>& other) const;
-	bool operator!=(const small_allocator_proxy<T, SmallAllocator>& other) const;
-	bool operator==(const SmallAllocator& other) const;
-	bool operator!=(const SmallAllocator& other) const;
-
-	T* allocate(std::size_t count);
-	void deallocate(T* p, std::size_t count) noexcept;
-
-private:
-	SmallAllocator& m_smallAllocator;
-	parent_allocator_type m_parent;
-};
-template <class T, class SmallAllocator>
-small_allocator_proxy<T, SmallAllocator>::small_allocator_proxy(SmallAllocator& smallAllocator)
-	: m_smallAllocator(smallAllocator)
-	, m_parent(smallAllocator.parent())
-{
-
-}
-template <class T, class SmallAllocator>
-inline bool small_allocator_proxy<T, SmallAllocator>::operator==(const small_allocator_proxy<T, SmallAllocator>& other) const
-{
-	return m_smallAllocator == other.m_smallAllocator;
-}
-template <class T, class SmallAllocator>
-inline bool small_allocator_proxy<T, SmallAllocator>::operator!=(const small_allocator_proxy<T, SmallAllocator>& other) const
-{
-	return !operator==(other);
-}
-template <class T, class SmallAllocator>
-inline bool small_allocator_proxy<T, SmallAllocator>::operator==(const SmallAllocator& other) const
-{
-	return m_smallAllocator == other;;
-}
-template <class T, class SmallAllocator>
-inline bool small_allocator_proxy<T, SmallAllocator>::operator!=(const SmallAllocator& other) const
-{
-	return !operator==(other);
-}
-template <class T, class SmallAllocator>
-inline void small_allocator_proxy<T, SmallAllocator>::deallocate(T* p, std::size_t count) noexcept
-{
-	if constexpr (std::is_same_v<value_type, typename SmallAllocator::value_type>) {
-		m_smallAllocator.deallocate(p, count);
-	}
-	else {
-		m_parent.deallocate(p, count);
-	}
-}
-template <class T, class SmallAllocator>
-inline T* small_allocator_proxy<T, SmallAllocator>::allocate(std::size_t count)
-{
-	return m_parent.allocate(count);
+// Arbitrary small value
+constexpr std::size_t Default_Local_Storage = 6;
 }
 
 /// <summary>
-/// Allocator with small local block. A bit special case, as it does not support copy or move construction
+/// Small vector class with built in local storage. If capacity goes beyond local storage, allocator will be used
 /// </summary>
 /// <typeparam name="T">Value type</typeparam>
-/// <typeparam name="LocalItems">Items stored locally</typeparam>
-/// <typeparam name="ParentAllocator">Parent allocator used for larger blocks</typeparam>
-template <class T, std::uint8_t LocalItems, class ParentAllocator>
-class small_allocator
+/// <typeparam name="LocalStorage">Items in local storage, may slightly less than this when using debug iterators</typeparam>
+/// <typeparam name="Allocator">Allocator type</typeparam>
+template <class T, std::size_t LocalStorage = sv_detail::Default_Local_Storage, class Allocator = std::allocator<T>>
+class small_vector
 {
+	using internal_vector_type = std::vector<T, scratch_allocator<T, Allocator>>;
 public:
 	using value_type = T;
-	using pointer = value_type*;
-	using const_pointer = const pointer;
 	using size_type = std::size_t;
-	using parent_allocator_type = ParentAllocator;
+	using allocator_type = Allocator;
+	using iterator = typename internal_vector_type::iterator;
+	using const_iterator = typename internal_vector_type::const_iterator;
+	using reverse_iterator = typename internal_vector_type::reverse_iterator;
+	using const_reverse_iterator = typename internal_vector_type::const_reverse_iterator;
 
-	using propagate_on_container_copy_assignment = std::false_type;
-	using propagate_on_container_move_assignment = std::false_type;
-	using propagate_on_container_swap = std::false_type;
+	small_vector() noexcept;
+	explicit small_vector(const Allocator& alloc) noexcept;
+	small_vector(size_type count, const T& value, const Allocator& alloc = Allocator());
+	explicit small_vector(size_type count, const Allocator& alloc = Allocator());
 
-	using is_always_equal = std::false_type;
+	template< class InputIt >
+	small_vector(InputIt first, InputIt last, const Allocator& alloc = Allocator());
 
-	template <typename U>
-	struct rebind
-	{
-		using other = small_allocator_proxy<U, small_allocator<T, LocalItems, ParentAllocator>>;
-	};
+	small_vector(const small_vector& other);
+	small_vector(const small_vector& other, const Allocator& alloc = Allocator());
+	small_vector(small_vector&& other) noexcept;
+	small_vector(small_vector&& other, const Allocator& alloc);
+	small_vector(std::initializer_list<T> init, const Allocator& alloc = Allocator());
 
-	template <>
-	struct rebind<T>
-	{
-		using other = small_allocator<T, LocalItems, ParentAllocator>;
-	};
+	small_vector& operator=(const small_vector& right);
+	small_vector& operator=(small_vector&& right);
 
-	small_allocator(const small_allocator& other)
-	{
-		operator=(other);
-	};
-	//small_allocator(small_allocator&& other)
-	//{
-	//	operator=(other);
-	//};
-	small_allocator& operator=(const small_allocator&)
-	{
-		return *this;
-	};
-	//small_allocator& operator=(small_allocator&& other)
-	//{
-	//	return operator=(other);
-	//};
+	void swap(small_vector& other) noexcept;
 
-	small_allocator();
-	small_allocator(const ParentAllocator& parent);
+	allocator_type get_allocator() const noexcept;
 
-	T* allocate(size_type count);
-	void deallocate(T* p, size_type count);
+	__forceinline void push_back(const T& item) { m_vec.push_back(item); }
+	__forceinline void push_back(T&& item) { m_vec.push_back(std::move(item)); }
 
-	ParentAllocator& parent();
+	template <class ...Args>
+	__forceinline void emplace_back(Args&& ... args) { m_vec.emplace_back(std::forward<Args...>(args)); }
 
-	bool operator==(const small_allocator<T, LocalItems, ParentAllocator>& other) const
-	{
-		other;
-		return false;
-	}
-	bool operator!=(const small_allocator<T, LocalItems, ParentAllocator>& other) const
-	{
-		other;
-		return true;
-	}
+	template <class ...Args>
+	__forceinline void emplace(const_iterator at, Args&& ...args) { m_vec.emplace(at, std::forward<Args...>(args)); }
 
-private:
+	__forceinline iterator begin() { return m_vec.begin(); }
+	__forceinline iterator end() { return m_vec.end(); }
 
-	std::uint8_t locally_avaliable() const;
+	__forceinline const_iterator begin() const { return m_vec.begin(); }
+	__forceinline const_iterator cbegin() const { return m_vec.cbegin(); }
 
-	bool locally_allocated(const T* p) const;
+	__forceinline const_iterator end() const { return m_vec.end(); }
+	__forceinline const_iterator cend() const { return m_vec.cend(); }
 
-	void local_deallocate(size_type count);
-	T* local_allocate(size_type count);
+	__forceinline reverse_iterator rbegin() { return m_vec.rbegin(); }
+	__forceinline reverse_iterator rend() { return m_vec.rend(); }
 
-	struct alignas(alignof(T)) rep { std::uint8_t block[sizeof(T)]; };
+	__forceinline const_reverse_iterator rbegin() const { return m_vec.rbegin(); }
+	__forceinline const_reverse_iterator crbegin() const { return m_vec.crbegin(); }
 
-	rep m_items[LocalItems];
-	std::uint8_t m_at;
-	std::uint8_t m_used;
+	__forceinline const_reverse_iterator rend() const { return m_vec.rend(); }
+	__forceinline const_reverse_iterator crend() const { return m_vec.crend(); }
 
-	ParentAllocator m_allocator;
-};
-template<class T, std::uint8_t LocalItems, class ParentAllocator>
-inline small_allocator<T, LocalItems, ParentAllocator>::small_allocator()
-	: small_allocator<T, LocalItems, ParentAllocator>(ParentAllocator())
-{
-}
-template<class T, std::uint8_t LocalItems, class ParentAllocator>
-inline small_allocator<T, LocalItems, ParentAllocator>::small_allocator(const ParentAllocator& parent)
-	: m_items{}
-	, m_at(0)
-	, m_used(0)
-	, m_allocator(parent)
-{
-}
-template<class T, std::uint8_t LocalItems, class ParentAllocator>
-inline T* small_allocator<T, LocalItems, ParentAllocator>::allocate(size_type count)
-{
-	if (!(locally_avaliable() < count)) {
-		return local_allocate(count);
-	}
+	__forceinline void reserve(size_type newCapacity) { m_vec.reserve(newCapacity); }
 
-	return m_allocator.allocate(count);
-}
-template<class T, std::uint8_t LocalItems, class ParentAllocator>
-inline void small_allocator<T, LocalItems, ParentAllocator>::deallocate(T* p, size_type count)
-{
-	if (locally_allocated(p)) {
-		local_deallocate(count);
-	}
-	else {
-		m_allocator.deallocate(p, count);
-	}
-}
-template<class T, std::uint8_t LocalItems, class ParentAllocator>
-inline ParentAllocator& small_allocator<T, LocalItems, ParentAllocator>::parent()
-{
-	return m_allocator;
-}
-template<class T, std::uint8_t LocalItems, class ParentAllocator>
-inline std::uint8_t small_allocator<T, LocalItems, ParentAllocator>::locally_avaliable() const
-{
-	return LocalItems - m_at;
-}
-template<class T, std::uint8_t LocalItems, class ParentAllocator>
-inline bool small_allocator<T, LocalItems, ParentAllocator>::locally_allocated(const T* p) const
-{
-	return !(p < reinterpret_cast<const T*>(&m_items[0])) && p < reinterpret_cast<const T*>(&m_items[LocalItems]);
-}
-template<class T, std::uint8_t LocalItems, class ParentAllocator>
-inline void small_allocator<T, LocalItems, ParentAllocator>::local_deallocate(size_type count)
-{
-	assert(!(LocalItems < count) && "Local block cannot fit");
+	__forceinline void resize(size_type newSize) { m_vec.resize(newSize); }
+	__forceinline void resize(size_type newSize, const T& val) { m_vec.resize(newSize, val); }
 
-	m_used -= static_cast<std::uint8_t>(count);
+	__forceinline size_type size() const noexcept { return m_vec.size(); }
 
-	if (m_used == 0) {
-		m_at = 0;
-	}
-}
-template<class T, std::uint8_t LocalItems, class ParentAllocator>
-inline T* small_allocator<T, LocalItems, ParentAllocator>::local_allocate(size_type count)
-{
-	assert(!(locally_avaliable() < count) && "Local block cannot fit");
+	__forceinline void clear() noexcept { m_vec.clear(); }
 
-	const std::uint8_t at(m_at);
+	__forceinline void shrink_to_fit() { m_vec.shrink_to_fit(); }
 
-	m_used += static_cast<std::uint8_t>(count);
-	m_at += static_cast<std::uint8_t>(count);
+	template <class Iterator, std::enable_if_t<is_iterator_v<Iterator>>* = nullptr>
+	__forceinline void assign(Iterator first, Iterator last) { m_vec.assign(first, last); }
+	__forceinline void assign(std::initializer_list<T> ilist) { m_vec.assign(ilist); }
+	__forceinline void assign(const T& val, size_type newSize) { m_vec.assign(val, newSize); }
 
-	return reinterpret_cast<T*>(&m_items[at]);
-}
+	__forceinline const T& at(size_type index) const { return m_vec.at; }
+	__forceinline T& at(size_type index) { return m_vec.at; }
 
-template <class T, std::uint8_t LocalItems, class Allocator>
-class small_vector : public std::vector<T, small_allocator<T, LocalItems, Allocator>>
-{
-	using mytype = small_vector<T, LocalItems, Allocator>;
-public:
-	using std::vector<T, small_allocator<T, LocalItems, Allocator>>::vector;
+	__forceinline size_type capacity() const noexcept { return m_vec.capacity(); }
+
+	__forceinline const T& back() const { return m_vec.back(); }
+	__forceinline T& back() { return m_vec.back(); }
+
+	__forceinline const T& front() const { return m_vec.front(); }
+	__forceinline T& front() { return m_vec.front(); }
+
+	__forceinline bool empty() const noexcept { return m_vec.empty(); }
+
+	__forceinline T& operator[](size_type pos) { return m_vec[pos]; }
+	__forceinline const T& operator[](size_type pos) const { return m_vec[pos]; }
+
+	template <class Iterator, std::enable_if_t<is_iterator_v<Iterator>>* = nullptr>
+	__forceinline iterator insert(const_iterator at, Iterator first, Iterator last) { m_vec.insert(at, first, last); }
+	__forceinline iterator insert(const_iterator at, std::initializer_list<T> ilist) { m_vec.insert(at, ilist); }
+	__forceinline iterator insert(const_iterator at, const T& val) { m_vec.insert(at, val); }
+	__forceinline iterator insert(const_iterator at, T&& val) { return m_vec.insert(at, std::move(val)); }
+	__forceinline iterator insert(const_iterator at, size_type count, const T& val) { return m_vec.insert(at, count, val); }
+
+	__forceinline const void* data() const noexcept { return m_vec.data(); }
+	__forceinline void* data() noexcept { return m_vec.data(); }
+
+	__forceinline size_type max_size() const { return m_vec.max_size(); }
+
+	__forceinline iterator erase(const_iterator at) { return m_vec.erase(at); }
+	__forceinline iterator erase(const_iterator first, const_iterator last) { return m_vec.erase(first, last); }
+
+	__forceinline void pop_back() noexcept { m_vec.pop_back(); }
 
 private:
-
+	scratch_pad<LocalStorage * sizeof(T)> m_scratchPad;
+	internal_vector_type m_vec;
 };
+template<class T, std::size_t LocalStorage, class Allocator>
+inline small_vector<T, LocalStorage, Allocator>::small_vector() noexcept
+	: m_vec(m_scratchPad.create_allocator<T, Allocator>())
+{
+	m_vec.reserve(m_scratchPad.remaining_storage() / sizeof(T));
 }
-template <class T, std::uint8_t LocalItems = 6, class Allocator = std::allocator<T>>
-using small_vector = sv_detail::small_vector<T, LocalItems, Allocator>;
-
+template<class T, std::size_t LocalStorage, class Allocator>
+inline small_vector<T, LocalStorage, Allocator>::small_vector(const Allocator& alloc) noexcept
+	: m_vec(m_scratchPad.create_allocator<T, Allocator>(alloc))
+{
+	m_vec.reserve(m_scratchPad.remaining_storage() / sizeof(T));
+}
+template<class T, std::size_t LocalStorage, class Allocator>
+inline small_vector<T, LocalStorage, Allocator>::small_vector(size_type count, const T& value, const Allocator& alloc)
+	: m_vec(count, value, m_scratchPad.create_allocator<T, Allocator>(alloc))
+{
+}
+template<class T, std::size_t LocalStorage, class Allocator>
+inline small_vector<T, LocalStorage, Allocator>::small_vector(size_type count, const Allocator& alloc)
+	: m_vec(count, m_scratchPad.create_allocator<T, Allocator>(alloc))
+{
+}
+template<class T, std::size_t LocalStorage, class Allocator>
+inline small_vector<T, LocalStorage, Allocator>::small_vector(const small_vector& other)
+	: m_vec(other, m_scratchPad.create_allocator<T, Allocator>())
+{
+}
+template<class T, std::size_t LocalStorage, class Allocator>
+inline small_vector<T, LocalStorage, Allocator>::small_vector(const small_vector& other, const Allocator& alloc)
+	: m_vec(other, m_scratchPad.create_allocator<T, Allocator>(alloc))
+{
+}
+template<class T, std::size_t LocalStorage, class Allocator>
+inline small_vector<T, LocalStorage, Allocator>::small_vector(small_vector&& other) noexcept
+	: m_vec(other.m_scratchPad.owns(other.m_vec.data()) ? other : std::move(other), m_scratchPad.create_allocator<T, Allocator>())
+{
+}
+template<class T, std::size_t LocalStorage, class Allocator>
+inline small_vector<T, LocalStorage, Allocator>::small_vector(small_vector&& other, const Allocator& alloc)
+	: m_vec(other.m_scratchPad.owns(other.m_vec.data()) ? other : std::move(other), m_scratchPad.create_allocator<T, Allocator>(alloc))
+{
+}
+template<class T, std::size_t LocalStorage, class Allocator>
+inline small_vector<T, LocalStorage, Allocator>::small_vector(std::initializer_list<T> init, const Allocator& alloc)
+	: m_vec(init, m_scratchPad.create_allocator<T, Allocator>(alloc))
+{
+}
+template<class T, std::size_t LocalStorage, class Allocator>
+template<class InputIt>
+inline small_vector<T, LocalStorage, Allocator>::small_vector(InputIt first, InputIt last, const Allocator& alloc)
+	: m_vec(first, last, m_scratchPad.create_allocator<T, Allocator>(alloc))
+{
+}
+template<class T, std::size_t LocalStorage, class Allocator>
+inline small_vector<T, LocalStorage, Allocator>& small_vector<T, LocalStorage, Allocator>::operator=(const small_vector& right)
+{
+	m_vec = right;
+}
+template<class T, std::size_t LocalStorage, class Allocator>
+inline small_vector<T, LocalStorage, Allocator>& small_vector<T, LocalStorage, Allocator>::operator=(small_vector&& right)
+{
+	m_vec = std::move(right);
+}
+template<class T, std::size_t LocalStorage, class Allocator>
+inline void small_vector<T, LocalStorage, Allocator>::swap(small_vector& other) noexcept
+{
+	other;
+	//
+}
+template<class T, std::size_t LocalStorage, class Allocator>
+inline typename small_vector<T, LocalStorage, Allocator>::allocator_type small_vector<T, LocalStorage, Allocator>::get_allocator() const noexcept
+{
+	return m_vec.get_allocator().get_parent();
+}
 }
