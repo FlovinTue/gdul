@@ -21,6 +21,7 @@
 #pragma once
 
 #include <gdul/utility/type_traits.h>
+#include <gdul/math/math.h>
 
 #include <atomic>
 #include <memory>
@@ -144,17 +145,6 @@ public:
 
 	virtual bool owns(const void* p) const = 0;
 };
-
-constexpr std::size_t align_value(std::size_t value, std::size_t align)
-{
-	const std::size_t mod(value % align);
-	const std::size_t multi(static_cast<bool>(mod));
-	const std::size_t diff(align - mod);
-	const std::size_t offset(diff * multi);
-
-	return value + offset;
-}
-
 }
 
 /// <summary>
@@ -166,7 +156,7 @@ template <std::size_t StorageSize, std::size_t StorageAlignment = alignof(std::m
 class scratch_pad : public sa_detail::scratch_pad_base
 {
 public:
-	static constexpr std::size_t AlignedStorageSize = sa_detail::align_value(StorageSize, StorageAlignment);
+	static constexpr std::size_t AlignedStorageSize = align_value(StorageSize, StorageAlignment);
 
 	using size_type = least_unsigned_integer_t<AlignedStorageSize>;
 
@@ -221,7 +211,7 @@ inline void* scratch_pad<StorageSize, StorageAlignment>::allocate(std::size_t co
 		const size_type begin(expected.at);
 		const void* const addr(&m_bytes[begin]);
 		const std::uintptr_t addrValue(reinterpret_cast<std::size_t>(addr));
-		const std::uintptr_t addrAligned(sa_detail::align_value(addrValue, _align));
+		const std::uintptr_t addrAligned(align_value(addrValue, _align));
 
 		const size_type offset(static_cast<size_type>(addrAligned - addrValue));
 		alignedBegin = begin + offset;

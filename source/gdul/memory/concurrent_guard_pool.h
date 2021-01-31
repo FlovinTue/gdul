@@ -23,6 +23,7 @@
 #include <gdul/containers/concurrent_queue.h>
 #include <gdul/memory/atomic_shared_ptr.h>
 #include <gdul/memory/thread_local_member.h>
+#include <gdul/math/math.h>
 
 #include <assert.h>
 #include <thread>
@@ -32,6 +33,7 @@
 #include <stdint.h>
 #include <limits>
 #include <algorithm>
+#include <cmath>
 
 #pragma warning(push)
 // Alignment padding
@@ -48,8 +50,6 @@ constexpr size_type Defaul_Block_Size = 16;
 constexpr size_type Defaul_Tl_Cache_Size = 4;
 constexpr size_type Max_Users = 16;
 constexpr std::uint8_t Capacity_Bits = 19;
-
-static inline size_type pow2_align(size_type from, size_type clamp);
 
 struct critical_sec;
 
@@ -132,7 +132,7 @@ public:
 	/// ensure no item that is potentially referenced by another thread is recycled.
 	/// Ex. auto result = guard(&node_tree::remove_from_tree, &m_tree, key);
 	/// </summary>
-	/// <param name="f">callable to guard</param>
+	/// <param name="f">critical section callable to guard</param>
 	/// <param name="args">arguments for passed callable</param>
 	/// <returns>return value of passed callable</returns>
 	template <class Fn, class ...Args>
@@ -269,8 +269,8 @@ inline concurrent_guard_pool<T, Allocator>::concurrent_guard_pool(size_type base
 	for (std::uint8_t i = 0; i < cgp_detail::Capacity_Bits; ++i)
 		m_blocks[i].m_livingItems.store((size_type)std::pow(2.f, (float)(i + 1)), std::memory_order_relaxed);
 
-	const size_type alignedSize(cgp_detail::pow2_align(baseCapacity, Max_Capacity));
-	m_tlCacheSize = (size_type)cgp_detail::pow2_align(tlCacheSize, alignedSize);
+	const size_type alignedSize(align_value_pow2(baseCapacity, Max_Capacity));
+	m_tlCacheSize = (size_type)align_value_pow2(tlCacheSize, alignedSize);
 
 	const std::uint8_t blockIndex((std::uint8_t)std::log2f((float)alignedSize) - 1);
 
@@ -571,20 +571,6 @@ struct critical_sec
 
 	size_type& m_tlIndex;
 };
-
-inline size_type pow2_align(size_type from, size_type clamp)
-{
-	const size_type from_(from < 2 ? 2 : from);
-
-	const float flog2(std::log2f(static_cast<float>(from_)));
-	const float nextLog2(std::ceil(flog2));
-	const float fNextVal(powf(2.f, nextLog2));
-
-	const size_type nextVal(static_cast<size_t>(fNextVal));
-	const size_type clampedNextVal((clamp < nextVal) ? clamp : nextVal);
-
-	return clampedNextVal;
-}
 }
 }
 #pragma warning(pop)

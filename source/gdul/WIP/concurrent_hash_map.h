@@ -47,21 +47,6 @@ constexpr size_type to_bucket_count(size_type desiredCapacity)
 	return desiredCapacity * Growth_Multiple;
 }
 
-template <class Dummy = void>
-inline size_type pow2_align(std::size_t from, std::size_t clamp = std::numeric_limits<size_type>::max())
-{
-	const std::size_t from_(from < 2 ? 2 : from);
-
-	const float flog2(std::log2f(static_cast<float>(from_)));
-	const float nextLog2(std::ceil(flog2));
-	const float fNextVal(powf(2.f, nextLog2));
-
-	const std::size_t nextVal(static_cast<size_t>(fNextVal));
-	const std::size_t clampedNextVal((clamp < nextVal) ? clamp : nextVal);
-
-	return clampedNextVal;
-}
-
 template <class Item>
 struct iterator;
 template <class Item>
@@ -236,9 +221,9 @@ inline concurrent_hash_map<Key, Value, Hash, Allocator>::concurrent_hash_map(siz
 }
 template<class Key, class Value, class Hash, class Allocator>
 inline concurrent_hash_map<Key, Value, Hash, Allocator>::concurrent_hash_map(size_type capacity, Allocator alloc)
-	: m_pool((std::uint32_t)chm_detail::to_bucket_count(chm_detail::pow2_align<>(capacity)), (std::uint32_t)chm_detail::to_bucket_count(chm_detail::pow2_align<>(capacity)) / 1, alloc)
-	, m_items(gdul::allocate_shared<bucket_type[]>(chm_detail::to_bucket_count(chm_detail::pow2_align<>(capacity)), alloc))
-	, t_items(alloc, t_container{ m_items.load(), chm_detail::to_bucket_count(chm_detail::pow2_align<>(capacity)) })
+	: m_pool((std::uint32_t)chm_detail::to_bucket_count(align_value_pow2(capacity)), (std::uint32_t)chm_detail::to_bucket_count(align_value_pow2(capacity)) / 1, alloc)
+	, m_items(gdul::allocate_shared<bucket_type[]>(chm_detail::to_bucket_count(align_value_pow2(capacity)), alloc))
+	, t_items(alloc, t_container{ m_items.load(), chm_detail::to_bucket_count(align_value_pow2(capacity)) })
 	, m_size(0)
 	, m_allocator(alloc)
 {
