@@ -13,4 +13,7 @@
     <ClInclude Include="..\..\source\gdul\WIP\small_vector.h" />
     <ClInclude Include="..\..\source\gdul\WIP\scratch_allocator.h" />
   </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="..\..\source\gdul\WIP\small_vector.natvis" />
+  </ItemGroup>
 </Project>

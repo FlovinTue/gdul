@@ -5,6 +5,7 @@
 
 #include <memory>
 #include <cassert>
+
 #include <vector>
 
 namespace gdul {
@@ -16,11 +17,11 @@ constexpr std::size_t Default_Local_Storage = 6;
 }
 
 /// <summary>
-/// Small vector class with built in local storage. If capacity goes beyond local storage, allocator will be used
+/// Small vector class with built in local storage
 /// </summary>
 /// <typeparam name="T">Value type</typeparam>
-/// <typeparam name="LocalStorage">Items in local storage, may slightly less than this when using debug iterators</typeparam>
-/// <typeparam name="Allocator">Allocator type</typeparam>
+/// <typeparam name="LocalStorage">Items in local storage. If debug iterators are enabled, they may consume some of this space</typeparam>
+/// <typeparam name="Allocator">Allocator to use if capacity goes beyond local storage</typeparam>
 template <class T, std::size_t LocalStorage = sv_detail::Default_Local_Storage, class Allocator = std::allocator<T>>
 class small_vector
 {
@@ -43,13 +44,13 @@ public:
 	small_vector(InputIt first, InputIt last, const Allocator& alloc = Allocator());
 
 	small_vector(const small_vector& other);
-	small_vector(const small_vector& other, const Allocator& alloc = Allocator());
+	small_vector(const small_vector& other, const Allocator& alloc);
 	small_vector(small_vector&& other) noexcept;
 	small_vector(small_vector&& other, const Allocator& alloc);
 	small_vector(std::initializer_list<T> init, const Allocator& alloc = Allocator());
 
 	small_vector& operator=(const small_vector& right);
-	small_vector& operator=(small_vector&& right);
+	small_vector& operator=(small_vector&& right) noexcept;
 
 	void swap(small_vector& other) noexcept;
 
@@ -159,22 +160,22 @@ inline small_vector<T, LocalStorage, Allocator>::small_vector(size_type count, c
 }
 template<class T, std::size_t LocalStorage, class Allocator>
 inline small_vector<T, LocalStorage, Allocator>::small_vector(const small_vector& other)
-	: m_vec(other, m_scratchPad.create_allocator<T, Allocator>())
+	: m_vec(other.m_vec, m_scratchPad.create_allocator<T, Allocator>())
 {
 }
 template<class T, std::size_t LocalStorage, class Allocator>
 inline small_vector<T, LocalStorage, Allocator>::small_vector(const small_vector& other, const Allocator& alloc)
-	: m_vec(other, m_scratchPad.create_allocator<T, Allocator>(alloc))
+	: m_vec(other.m_vec, m_scratchPad.create_allocator<T, Allocator>(alloc))
 {
 }
 template<class T, std::size_t LocalStorage, class Allocator>
 inline small_vector<T, LocalStorage, Allocator>::small_vector(small_vector&& other) noexcept
-	: m_vec(other.m_scratchPad.owns(other.m_vec.data()) ? other : std::move(other), m_scratchPad.create_allocator<T, Allocator>())
+	: m_vec(other.m_scratchPad.owns(other.m_vec.data()) ? other.m_vec : std::move(other.m_vec), m_scratchPad.create_allocator<T, Allocator>())
 {
 }
 template<class T, std::size_t LocalStorage, class Allocator>
 inline small_vector<T, LocalStorage, Allocator>::small_vector(small_vector&& other, const Allocator& alloc)
-	: m_vec(other.m_scratchPad.owns(other.m_vec.data()) ? other : std::move(other), m_scratchPad.create_allocator<T, Allocator>(alloc))
+	: m_vec(other.m_scratchPad.owns(other.m_vec.data()) ? other.m_vec : std::move(other.m_vec), m_scratchPad.create_allocator<T, Allocator>(alloc))
 {
 }
 template<class T, std::size_t LocalStorage, class Allocator>
@@ -191,18 +192,23 @@ inline small_vector<T, LocalStorage, Allocator>::small_vector(InputIt first, Inp
 template<class T, std::size_t LocalStorage, class Allocator>
 inline small_vector<T, LocalStorage, Allocator>& small_vector<T, LocalStorage, Allocator>::operator=(const small_vector& right)
 {
-	m_vec = right;
+	m_vec = right.m_vec;
+	return *this;
 }
 template<class T, std::size_t LocalStorage, class Allocator>
-inline small_vector<T, LocalStorage, Allocator>& small_vector<T, LocalStorage, Allocator>::operator=(small_vector&& right)
+inline small_vector<T, LocalStorage, Allocator>& small_vector<T, LocalStorage, Allocator>::operator=(small_vector&& right) noexcept
 {
-	m_vec = std::move(right);
+	m_vec = std::move(right.m_vec);
+	return *this;
 }
 template<class T, std::size_t LocalStorage, class Allocator>
 inline void small_vector<T, LocalStorage, Allocator>::swap(small_vector& other) noexcept
 {
-	other;
-	//
+	internal_vector_type swp(std::move(other.m_vec));
+
+	other = std::move(*this);
+
+	m_vec = std::move(swp);
 }
 template<class T, std::size_t LocalStorage, class Allocator>
 inline typename small_vector<T, LocalStorage, Allocator>::allocator_type small_vector<T, LocalStorage, Allocator>::get_allocator() const noexcept

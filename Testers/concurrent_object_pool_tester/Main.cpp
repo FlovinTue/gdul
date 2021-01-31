@@ -11,6 +11,41 @@
 
 #include <vld.h>
 
+void test_small_vector()
+{
+	gdul::scratch_pad<64> pad;
+	gdul::scratch_allocator<int> sall(pad.create_allocator<int>());
+
+	int* a = sall.allocate(10);
+	int* b = sall.allocate(5);
+	sall.deallocate(a, 10);
+	sall.deallocate(b, 5);
+
+	std::array<int, 5> collection{ 1, 2, 3, 4, 5 };
+
+	gdul::small_vector<int> c1;
+	gdul::small_vector<int> c2 = gdul::small_vector<int>(std::allocator<int>());
+	gdul::small_vector<int> c3(5, 5);
+	gdul::small_vector<int> c4 = gdul::small_vector<int>(5, std::allocator<int>());
+	gdul::small_vector<int> c5(collection.begin(), collection.end());
+	gdul::small_vector<int> c6(c5);
+	gdul::small_vector<int> c7(c5, std::allocator<int>());
+	gdul::small_vector<int> c8(std::move(c5));
+	gdul::small_vector<int> c9(std::move(c6), std::allocator<int>());
+	gdul::small_vector<int> c10({ 1, 2, 3, 4, 5 });
+
+	gdul::small_vector<int> assign;
+	assign = c10;
+	gdul::small_vector<int> move;
+	move = std::move(assign);
+
+	gdul::small_vector<int> swap;
+	swap.swap(move);
+
+	std::allocator<int> alloc(c1.get_allocator());
+}
+
+
 float func(int arg)
 {
 	return (float)arg;
@@ -66,15 +101,7 @@ int main()
 	constexpr gdul::least_unsigned_integer_t<std::numeric_limits<int>::max()> ui(5);
 	constexpr gdul::least_unsigned_integer_t<std::numeric_limits<long long int>::max()> uli(5);
 
-	gdul::scratch_pad<64> pad;
-	gdul::scratch_allocator<int> sall(pad.create_allocator<int>());
-
-	int* a = sall.allocate(10);
-	int* b = sall.allocate(5);
-	sall.deallocate(a, 10);
-	sall.deallocate(b, 5);
-
-	gdul::small_vector<int> vec;
+	test_small_vector();
 
     std::cout << "Hello World!\n";
 }
