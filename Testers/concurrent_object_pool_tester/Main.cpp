@@ -33,6 +33,9 @@ void test_small_vector()
 	gdul::small_vector<int> c8(std::move(c5));
 	gdul::small_vector<int> c9(std::move(c6), std::allocator<int>());
 	gdul::small_vector<int> c10({ 1, 2, 3, 4, 5 });
+	std::vector<int> vec({ 1, 2, 3, 4, 5 });
+	gdul::small_vector<int> c11(vec);
+	gdul::small_vector<int> c12(std::vector<int>({ 1, 2, 3, 4, 5 }));
 
 	gdul::small_vector<int> assign;
 	assign = c10;
@@ -41,6 +44,8 @@ void test_small_vector()
 
 	gdul::small_vector<int> swap;
 	swap.swap(move);
+
+	std::vector<int> convert(swap);
 
 	std::allocator<int> alloc(c1.get_allocator());
 }

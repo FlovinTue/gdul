@@ -156,7 +156,7 @@ public:
 	void* allocate(std::size_t count, std::size_t align = 1) override final;
 	void deallocate(void* p, std::size_t count) override final;
 
-	std::size_t remaining_storage() const noexcept;
+	std::size_t unused_storage() const noexcept;
 
 	bool owns(const void* p) const override final;
 
@@ -240,7 +240,7 @@ inline void scratch_pad<StorageSize, StorageAlignment>::deallocate([[maybe_unuse
 	} while (!m_sizes.compare_exchange_weak(expected, desired, std::memory_order_release, std::memory_order_relaxed));
 }
 template<std::size_t StorageSize, std::size_t StorageAlignment>
-inline std::size_t scratch_pad<StorageSize, StorageAlignment>::remaining_storage() const noexcept
+inline std::size_t scratch_pad<StorageSize, StorageAlignment>::unused_storage() const noexcept
 {
 	return AlignedStorageSize - m_sizes.load(std::memory_order_acquire).at;
 }
