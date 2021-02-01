@@ -80,81 +80,81 @@ public:
 
 	allocator_type get_allocator() const noexcept;
 
-	__forceinline void push_back(const T& item) { m_vec.push_back(item); }
-	__forceinline void push_back(T&& item) { m_vec.push_back(std::move(item)); }
+	inline void push_back(const T& item) { m_vec.push_back(item); }
+	inline void push_back(T&& item) { m_vec.push_back(std::move(item)); }
 
 	template <class ...Args>
-	__forceinline void emplace_back(Args&& ... args) { m_vec.emplace_back(std::forward<Args...>(args)); }
+	inline void emplace_back(Args&& ... args) { m_vec.emplace_back(std::forward<Args...>(args)); }
 
 	template <class ...Args>
-	__forceinline void emplace(const_iterator at, Args&& ...args) { m_vec.emplace(at, std::forward<Args...>(args)); }
+	inline void emplace(const_iterator at, Args&& ...args) { m_vec.emplace(at, std::forward<Args...>(args)); }
 
-	__forceinline iterator begin() { return m_vec.begin(); }
-	__forceinline iterator end() { return m_vec.end(); }
+	inline iterator begin() { return m_vec.begin(); }
+	inline iterator end() { return m_vec.end(); }
 
-	__forceinline const_iterator begin() const { return m_vec.begin(); }
-	__forceinline const_iterator cbegin() const { return m_vec.cbegin(); }
+	inline const_iterator begin() const { return m_vec.begin(); }
+	inline const_iterator cbegin() const { return m_vec.cbegin(); }
 
-	__forceinline const_iterator end() const { return m_vec.end(); }
-	__forceinline const_iterator cend() const { return m_vec.cend(); }
+	inline const_iterator end() const { return m_vec.end(); }
+	inline const_iterator cend() const { return m_vec.cend(); }
 
-	__forceinline reverse_iterator rbegin() { return m_vec.rbegin(); }
-	__forceinline reverse_iterator rend() { return m_vec.rend(); }
+	inline reverse_iterator rbegin() { return m_vec.rbegin(); }
+	inline reverse_iterator rend() { return m_vec.rend(); }
 
-	__forceinline const_reverse_iterator rbegin() const { return m_vec.rbegin(); }
-	__forceinline const_reverse_iterator crbegin() const { return m_vec.crbegin(); }
+	inline const_reverse_iterator rbegin() const { return m_vec.rbegin(); }
+	inline const_reverse_iterator crbegin() const { return m_vec.crbegin(); }
 
-	__forceinline const_reverse_iterator rend() const { return m_vec.rend(); }
-	__forceinline const_reverse_iterator crend() const { return m_vec.crend(); }
+	inline const_reverse_iterator rend() const { return m_vec.rend(); }
+	inline const_reverse_iterator crend() const { return m_vec.crend(); }
 
-	__forceinline void reserve(size_type newCapacity) { m_vec.reserve(newCapacity); }
+	inline void reserve(size_type newCapacity) { m_vec.reserve(newCapacity); }
 
-	__forceinline void resize(size_type newSize) { m_vec.resize(newSize); }
-	__forceinline void resize(size_type newSize, const T& val) { m_vec.resize(newSize, val); }
+	inline void resize(size_type newSize) { m_vec.resize(newSize); }
+	inline void resize(size_type newSize, const T& val) { m_vec.resize(newSize, val); }
 
-	__forceinline size_type size() const noexcept { return m_vec.size(); }
+	inline size_type size() const noexcept { return m_vec.size(); }
 
-	__forceinline void clear() noexcept { m_vec.clear(); }
+	inline void clear() noexcept { m_vec.clear(); }
 
-	__forceinline void shrink_to_fit() { m_vec.shrink_to_fit(); }
-
-	template <class Iterator, std::enable_if_t<is_iterator_v<Iterator>>* = nullptr>
-	__forceinline void assign(Iterator first, Iterator last) { m_vec.assign(first, last); }
-	__forceinline void assign(std::initializer_list<T> ilist) { m_vec.assign(ilist); }
-	__forceinline void assign(const T& val, size_type newSize) { m_vec.assign(val, newSize); }
-
-	__forceinline const T& at(size_type index) const { return m_vec.at; }
-	__forceinline T& at(size_type index) { return m_vec.at; }
-
-	__forceinline size_type capacity() const noexcept { return m_vec.capacity(); }
-
-	__forceinline const T& back() const { return m_vec.back(); }
-	__forceinline T& back() { return m_vec.back(); }
-
-	__forceinline const T& front() const { return m_vec.front(); }
-	__forceinline T& front() { return m_vec.front(); }
-
-	__forceinline bool empty() const noexcept { return m_vec.empty(); }
-
-	__forceinline T& operator[](size_type pos) { return m_vec[pos]; }
-	__forceinline const T& operator[](size_type pos) const { return m_vec[pos]; }
+	inline void shrink_to_fit() { m_vec.shrink_to_fit(); }
 
 	template <class Iterator, std::enable_if_t<is_iterator_v<Iterator>>* = nullptr>
-	__forceinline iterator insert(const_iterator at, Iterator first, Iterator last) { m_vec.insert(at, first, last); }
-	__forceinline iterator insert(const_iterator at, std::initializer_list<T> ilist) { m_vec.insert(at, ilist); }
-	__forceinline iterator insert(const_iterator at, const T& val) { m_vec.insert(at, val); }
-	__forceinline iterator insert(const_iterator at, T&& val) { return m_vec.insert(at, std::move(val)); }
-	__forceinline iterator insert(const_iterator at, size_type count, const T& val) { return m_vec.insert(at, count, val); }
+	inline void assign(Iterator first, Iterator last) { m_vec.assign(first, last); }
+	inline void assign(std::initializer_list<T> ilist) { m_vec.assign(ilist); }
+	inline void assign(const T& val, size_type newSize) { m_vec.assign(val, newSize); }
 
-	__forceinline const void* data() const noexcept { return m_vec.data(); }
-	__forceinline void* data() noexcept { return m_vec.data(); }
+	inline const T& at(size_type index) const { return m_vec.at; }
+	inline T& at(size_type index) { return m_vec.at; }
 
-	__forceinline size_type max_size() const { return m_vec.max_size(); }
+	inline size_type capacity() const noexcept { return m_vec.capacity(); }
 
-	__forceinline iterator erase(const_iterator at) { return m_vec.erase(at); }
-	__forceinline iterator erase(const_iterator first, const_iterator last) { return m_vec.erase(first, last); }
+	inline const T& back() const { return m_vec.back(); }
+	inline T& back() { return m_vec.back(); }
 
-	__forceinline void pop_back() noexcept { m_vec.pop_back(); }
+	inline const T& front() const { return m_vec.front(); }
+	inline T& front() { return m_vec.front(); }
+
+	inline bool empty() const noexcept { return m_vec.empty(); }
+
+	inline T& operator[](size_type pos) { return m_vec[pos]; }
+	inline const T& operator[](size_type pos) const { return m_vec[pos]; }
+
+	template <class Iterator, std::enable_if_t<is_iterator_v<Iterator>>* = nullptr>
+	inline iterator insert(const_iterator at, Iterator first, Iterator last) { m_vec.insert(at, first, last); }
+	inline iterator insert(const_iterator at, std::initializer_list<T> ilist) { m_vec.insert(at, ilist); }
+	inline iterator insert(const_iterator at, const T& val) { m_vec.insert(at, val); }
+	inline iterator insert(const_iterator at, T&& val) { return m_vec.insert(at, std::move(val)); }
+	inline iterator insert(const_iterator at, size_type count, const T& val) { return m_vec.insert(at, count, val); }
+
+	inline const void* data() const noexcept { return m_vec.data(); }
+	inline void* data() noexcept { return m_vec.data(); }
+
+	inline size_type max_size() const { return m_vec.max_size(); }
+
+	inline iterator erase(const_iterator at) { return m_vec.erase(at); }
+	inline iterator erase(const_iterator first, const_iterator last) { return m_vec.erase(first, last); }
+
+	inline void pop_back() noexcept { m_vec.pop_back(); }
 
 private:
 	scratch_pad<LocalStorage * sizeof(T)> m_scratchPad;
