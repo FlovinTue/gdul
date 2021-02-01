@@ -20,12 +20,13 @@
 
 #pragma once
 
-
-#include <xhash>
 #include <gdul/memory/atomic_shared_ptr.h>
 #include <gdul/memory/concurrent_guard_pool.h>
 #include <gdul/memory/thread_local_member.h>
 #include <gdul/memory/atomic_128.h>
+
+#include <xhash>
+#include <iterator>
 
 #pragma warning(push)
 // Anonymous struct
@@ -47,9 +48,9 @@ constexpr size_type to_bucket_count(size_type desiredCapacity)
 	return desiredCapacity * Growth_Multiple;
 }
 
-template <class Item>
+template <class Map>
 struct iterator;
-template <class Item>
+template <class Map>
 struct const_iterator;
 
 enum bucket_flag : std::uint8_t
@@ -72,8 +73,8 @@ public:
 	using item_type = std::pair<key_type, value_type>;
 	using hash_type = Hash;
 	using allocator_type = Allocator;
-	using iterator = chm_detail::iterator<item_type>;
-	using const_iterator = chm_detail::const_iterator<const item_type>;
+	using iterator = chm_detail::iterator<concurrent_hash_map<Key, Value, Hash, Allocator>>;
+	using const_iterator = chm_detail::const_iterator<concurrent_hash_map<Key, Value, Hash, Allocator>>;
 	using reverse_iterator = std::reverse_iterator<iterator>;
 	using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
@@ -153,28 +154,52 @@ public:
 	size_type capacity() const;
 
 	/// <summary>
-	/// Iterator to end
+	/// Iterator to first item. Concurrency safe, but item order may change if bucket array grows
+	/// </summary>
+	/// <returns>Iterator</returns>
+	iterator begin() { return iterator(this, scan_for_item(nullptr, 1).kv); }
+
+	/// <summary>
+	/// Iterator to first item. Concurrency safe, but item order may change if bucket array grows
+	/// </summary>
+	/// <returns>Iterator</returns>
+	const_iterator begin() const { return const_iterator(this, scan_for_item(nullptr, 1).kv); }
+
+	/// <summary>
+	/// Iterator to last item. Concurrency safe, but item order may change if bucket array grows
+	/// </summary>
+	/// <returns>Iterator</returns>
+	reverse_iterator rbegin() { return reverse_iterator(iterator(this, scan_for_item(nullptr, -1).kv)); }
+
+	/// <summary>
+	/// Iterator to last item. Concurrency safe, but item order may change if bucket array grows
+	/// </summary>
+	/// <returns>Iterator</returns>
+	const_reverse_iterator rbegin() const { return reverse_iterator(const_iterator(this, scan_for_item(nullptr, -1).kv)); }
+
+	/// <summary>
+	/// Iterator to end. Concurrency safe, but item order may change if bucket array grows
 	/// </summary>
 	/// <returns>Iterator</returns>
 	iterator end() { return iterator(this, nullptr); }
 
 	/// <summary>
-	/// Iterator to end
+	/// Iterator to end. Concurrency safe, but item order may change if bucket array grows
 	/// </summary>
 	/// <returns>Iterator</returns>
 	const_iterator end() const { return const_iterator(this, nullptr); }
 
 	/// <summary>
-	/// Iterator to reverse end
+	/// Iterator to reverse end. Concurrency safe, but item order may change if bucket array grows
 	/// </summary>
 	/// <returns>Iterator</returns>
-	reverse_iterator rend() { return reverse_iterator(this, nullptr); }
+	reverse_iterator rend() { return reverse_iterator(end()); }
 
 	/// <summary>
-	/// Iterator to reverse end
+	/// Iterator to reverse end. Concurrency safe, but item order may change if bucket array grows
 	/// </summary>
 	/// <returns>Iterator</returns>
-	const reverse_iterator rend() const { return reverse_iterator(this, nullptr); }
+	const reverse_iterator rend() const { return reverse_iterator(end()); }
 
 	/// <summary>
 	/// Attempt deletion of item
@@ -188,8 +213,8 @@ private:
 	using bucket_type = atomic_128<bucket_items_type>;
 	using bucket_array = shared_ptr<bucket_type[]>;
 
-	friend class iterator;
-	friend class const_iterator;
+	friend struct iterator;
+	friend struct const_iterator;
 
 	struct t_container
 	{
@@ -209,11 +234,7 @@ private:
 
 	static size_type find_index(const t_container& tContainer, size_type hash);
 
-	item_type* scan_for_item(key_type from, int direction);
-	iterator find_next(key_type k);
-	const_iterator find_next(key_type k) const;
-	iterator find_previous(key_type k);
-	const_iterator find_previous(key_type k) const;
+	typename bucket_items_type::packed_ptr scan_for_item(const item_type* from, int direction) const;
 
 	static void help_dispose_bucket_array(t_container& tContainer);
 	static void dispose_bucket(bucket_type& bucket);
@@ -442,55 +463,31 @@ inline typename concurrent_hash_map<Key, Value, Hash, Allocator>::size_type conc
 	return bucketCount;
 }
 template<class Key, class Value, class Hash, class Allocator>
-inline typename concurrent_hash_map<Key, Value, Hash, Allocator>::item_type* concurrent_hash_map<Key, Value, Hash, Allocator>::scan_for_item(key_type from, int direction)
+inline typename concurrent_hash_map<Key, Value, Hash, Allocator>::bucket_items_type::packed_ptr concurrent_hash_map<Key, Value, Hash, Allocator>::scan_for_item(const item_type* from, int direction) const
 {
-	refresh_tl();
+	t_container& tl(t_items);
 
-	const t_container& tl(t_items);
+	refresh_tl(tl);
 
-	size_type index(find_index(tl, hash_type()(k)));
+	size_type index(from ? find_index(tl, hash_type()(from->first)) : (tl.bucketCount - 1 + direction) % tl.bucketCount);
 
-	for (; index < tl.bucketCount; index += direction) {
-		if (tl.buckets[index].my_val().state & chm_detail::bucket_flag_valid) {
+	typename bucket_items_type::packed_ptr result;
+	result.kv = nullptr;
+
+
+	for (index = index + direction; index < tl.bucketCount; index += direction) {
+		if (tl.buckets[index].my_val().packedPtr.state & chm_detail::bucket_flag_valid) {
 			bucket_items_type bucket(tl.buckets[index].load());
 
-			if (bucket.state == chm_detail::bucket_flag_valid) {
-				packed_ptr ptr(bucket.packedPtr);
-				ptr.stateValue = 0;
-				return ptr.kv;
+			if (bucket.packedPtr.state == chm_detail::bucket_flag_valid) {
+				result = bucket.packedPtr;
+				result.stateValue = 0;
+				break;
 			}
 		}
 	}
 
-	return nullptr;
-}
-template<class Key, class Value, class Hash, class Allocator>
-inline typename concurrent_hash_map<Key, Value, Hash, Allocator>::iterator concurrent_hash_map<Key, Value, Hash, Allocator>::find_next(key_type k)
-{
-	item_type* item(scan_for_item(k, 1));
-
-	return iterator(this, item);
-}
-template<class Key, class Value, class Hash, class Allocator>
-inline typename concurrent_hash_map<Key, Value, Hash, Allocator>::const_iterator concurrent_hash_map<Key, Value, Hash, Allocator>::find_next(key_type k) const
-{
-	const item_type* item(scan_for_item(k, 1));
-
-	return const_iterator(this, item);
-}
-template<class Key, class Value, class Hash, class Allocator>
-inline typename concurrent_hash_map<Key, Value, Hash, Allocator>::iterator concurrent_hash_map<Key, Value, Hash, Allocator>::find_previous(key_type k)
-{
-	item_type* item(scan_for_item(k, -1));
-
-	return iterator(this, item);
-}
-template<class Key, class Value, class Hash, class Allocator>
-inline typename concurrent_hash_map<Key, Value, Hash, Allocator>::const_iterator concurrent_hash_map<Key, Value, Hash, Allocator>::find_previous(key_type k) const
-{
-	const item_type* item(scan_for_item(k, -1));
-
-	return const_iterator(this, item);
+	return result;
 }
 template<class Key, class Value, class Hash, class Allocator>
 inline bool concurrent_hash_map<Key, Value, Hash, Allocator>::refresh_tl(typename concurrent_hash_map<Key, Value, Hash, Allocator>::t_container& tContainer) const
@@ -558,7 +555,7 @@ inline std::pair<typename concurrent_hash_map<Key, Value, Hash, Allocator>::iter
 
 	if (items.packedPtr.state & chm_detail::bucket_flag_valid) {
 		items.packedPtr.state = chm_detail::bucket_flag_null;
-		return std::make_pair(items.packedPtr.kv, false);
+		return std::make_pair(iterator(this, items.packedPtr.kv), false);
 	}
 
 	bucket_items_type desired;
@@ -567,7 +564,7 @@ inline std::pair<typename concurrent_hash_map<Key, Value, Hash, Allocator>::iter
 	desired.packedPtr.state = chm_detail::bucket_flag_valid;
 
 	if (buckets[index].compare_exchange_strong(items, desired)) {
-		return std::make_pair(iterator(item), true);
+		return std::make_pair(iterator(this, item), true);
 	}
 
 	return std::make_pair(end(), false);
@@ -619,51 +616,12 @@ struct alignas(16) bucket
 template <class Map>
 struct iterator_base
 {
-	using iterator_tag = std::bidirectional_iterator_tag;
-	using item_type = typename Map::item_type;
-	using key_type = typename item_type::first_type;
-	using value_type = typename item_type::second_type;
+	using iterator_category = std::bidirectional_iterator_tag;
+	using value_type = typename Map::item_type;
+	using difference_type = std::ptrdiff_t;
+	using pointer = value_type*;
+	using reference = value_type&;
 
-	iterator_base()
-		: m_at(nullptr)
-	{
-	}
-
-	iterator_base(const iterator_base<Map>& itr)
-		: iterator_base(itr.m_at)
-	{
-	}
-
-	iterator_base(Map* parent, item_type* at)
-		: m_at(at)
-		, m_parent(parent)
-	{
-	}
-
-	const std::pair<key_type, value_type>& operator*() const
-	{
-		return m_at;
-	}
-
-	const std::pair<key_type, value_type>* operator->() const
-	{
-		return &m_at;
-	}
-
-	bool operator==(const iterator_base& other) const
-	{
-		return other.m_at == m_at;
-	}
-
-	bool operator!=(const iterator_base& other) const
-	{
-		return !operator==(other);
-	}
-
-	item_type* m_at;
-
-protected:
-	Map* m_parent;
 };
 
 template <class Map>
@@ -671,47 +629,155 @@ struct iterator : public iterator_base<Map>
 {
 	using iterator_base<Map>::iterator_base;
 
+	iterator()
+		: m_at(nullptr)
+	{
+	}
+
+	iterator(const iterator<Map>& itr)
+		: iterator(itr.m_parent, itr.m_at)
+	{
+	}
+
+	iterator(Map* parent, typename iterator_base<Map>::value_type* at)
+		: m_at(at)
+		, m_parent(parent)
+	{
+	}
+
+	const typename iterator_base<Map>::value_type& operator*() const
+	{
+		return m_at;
+	}
+
+	const typename iterator_base<Map>::value_type* operator->() const
+	{
+		return &m_at;
+	}
+
+	bool operator==(const iterator<Map>& other) const
+	{
+		return other.m_at == m_at;
+	}
+
+	bool operator!=(const iterator<Map>& other) const
+	{
+		return !operator==(other);
+	}
+
+	bool operator==(const const_iterator<Map>& other) const
+	{
+		return other.m_at == m_at;
+	}
+
+	bool operator!=(const const_iterator<Map>& other) const
+	{
+		return !operator==(other);
+	}
+
 	iterator operator++()
 	{
-		const std::size_t index(this->m_parent->find_index(this->m_item->first));
-		this->m_at = this->m_parent->find_next_index(index);
+		m_at = m_parent->scan_for_item(m_at, 1).kv;
+		return *this;
 	}
 	iterator operator--()
 	{
-		const std::size_t index(this->m_parent->find_index(this->m_item->first));
-		this->m_at = this->m_parent->find_previous_index(index);
+		m_at = m_parent->scan_for_item(m_at, -1).kv;
+		return *this;
 	}
 
-	std::pair<iterator_base<Map>::key_type, iterator_base<Map>::value_type>& operator*()
+	typename iterator_base<Map>::value_type& operator*()
 	{
-		return *this->m_at;
+		return *m_at;
 	}
 
-	std::pair<iterator_base<Map>::key_type, iterator_base<Map>::value_type>* operator->()
+	typename iterator_base<Map>::value_type* operator->()
 	{
-		return this->m_at;
+		return m_at;
 	}
+
+	typename iterator_base<Map>::value_type* m_at;
+
+private:
+	friend struct const_iterator<Map>;
+
+	Map* m_parent;
 };
 template <class Map>
-struct const_iterator : public iterator_base<Item>
+struct const_iterator : public iterator_base<Map>
 {
 	using iterator_base<Map>::iterator_base;
 
-	const_iterator(iterator<std::remove_const_t<Map>> it)
-		: iterator_base<Map>(it.m_parent, it.m_at)
+	const_iterator()
+		: m_at(nullptr)
+	{
+	}
+
+	const_iterator(const const_iterator<Map>& itr)
+		: m_at(itr.m_at)
+		, m_parent(itr.m_parent)
+	{
+	}
+
+	const_iterator(const Map* parent, const typename iterator_base<Map>::value_type* at)
+		: m_at(at)
+		, m_parent(parent)
+	{
+	}
+
+	const typename iterator_base<Map>::value_type& operator*() const
+	{
+		return m_at;
+	}
+
+	const typename iterator_base<Map>::value_type* operator->() const
+	{
+		return &m_at;
+	}
+
+	bool operator==(const iterator<Map>& other) const
+	{
+		return other.m_at == m_at;
+	}
+
+	bool operator!=(const iterator<Map>& other) const
+	{
+		return !operator==(other);
+	}
+
+	bool operator==(const const_iterator<Map>& other) const
+	{
+		return other.m_at == m_at;
+	}
+
+	bool operator!=(const const_iterator<Map>& other) const
+	{
+		return !operator==(other);
+	}
+
+	const_iterator(iterator<Map> it)
+		: m_at(it.m_at)
+		, m_parent(it.m_parent)
 	{
 	}
 
 	const_iterator operator++() const
 	{
-		const std::size_t index(this->m_parent->find_index(this->m_item->first));
-		this->m_at = this->m_parent->find_next_index(index);
+		m_at = m_parent->scan_for_item(m_at, 1).kv;
+		return *this;
 	}
 	const_iterator operator--() const
 	{
-		const std::size_t index(this->m_parent->find_index(this->m_item->first));
-		this->m_at = this->m_parent->find_previous_index(index);
+		m_at = m_parent->scan_for_item(m_at, -1).kv;
+		return *this;
 	}
+
+	mutable const typename iterator_base<Map>::value_type* m_at;
+
+private:
+	friend struct iterator<Map>;
+
+	mutable const Map* m_parent;
 };
 }
 }
