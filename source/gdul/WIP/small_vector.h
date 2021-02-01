@@ -55,8 +55,8 @@ public:
 	using reverse_iterator = typename internal_vector_type::reverse_iterator;
 	using const_reverse_iterator = typename internal_vector_type::const_reverse_iterator;
 
-	small_vector() noexcept;
-	explicit small_vector(const Allocator& alloc) noexcept;
+	small_vector() noexcept(false);
+	explicit small_vector(const Allocator& alloc) noexcept(false);
 	small_vector(size_type count, const T& value, const Allocator& alloc = Allocator());
 	explicit small_vector(size_type count, const Allocator& alloc = Allocator());
 
@@ -65,18 +65,18 @@ public:
 
 	small_vector(const small_vector& other);
 	small_vector(const small_vector& other, const Allocator& alloc);
-	small_vector(small_vector&& other);
-	small_vector(small_vector&& other, const Allocator& alloc);
+	small_vector(small_vector&& other) noexcept(false);
+	small_vector(small_vector&& other, const Allocator& alloc) noexcept(false);
 	small_vector(std::initializer_list<T> init, const Allocator& alloc = Allocator());
-	small_vector(std::vector<T, Allocator>&& vector);
+	small_vector(std::vector<T, Allocator>&& vector) noexcept(false);
 	small_vector(const std::vector<T, Allocator>& vector);
 
 	operator std::vector<T, Allocator>() const;
 
 	small_vector& operator=(const small_vector& right);
-	small_vector& operator=(small_vector&& right);
+	small_vector& operator=(small_vector&& right) noexcept(false);
 
-	void swap(small_vector& other);
+	void swap(small_vector& other) noexcept(false);
 
 	allocator_type get_allocator() const noexcept;
 
@@ -161,13 +161,13 @@ private:
 	internal_vector_type m_vec;
 };
 template<class T, std::size_t LocalStorage, class Allocator>
-inline small_vector<T, LocalStorage, Allocator>::small_vector() noexcept
+inline small_vector<T, LocalStorage, Allocator>::small_vector() noexcept(false)
 	: m_vec(m_scratchPad.create_allocator<T, Allocator>())
 {
 	m_vec.reserve(m_scratchPad.unused_storage() / sizeof(T));
 }
 template<class T, std::size_t LocalStorage, class Allocator>
-inline small_vector<T, LocalStorage, Allocator>::small_vector(const Allocator& alloc) noexcept
+inline small_vector<T, LocalStorage, Allocator>::small_vector(const Allocator& alloc) noexcept(false)
 	: m_vec(m_scratchPad.create_allocator<T, Allocator>(alloc))
 {
 	m_vec.reserve(m_scratchPad.unused_storage() / sizeof(T));
@@ -193,12 +193,12 @@ inline small_vector<T, LocalStorage, Allocator>::small_vector(const small_vector
 {
 }
 template<class T, std::size_t LocalStorage, class Allocator>
-inline small_vector<T, LocalStorage, Allocator>::small_vector(small_vector&& other)
+inline small_vector<T, LocalStorage, Allocator>::small_vector(small_vector&& other) noexcept(false)
 	: m_vec(other.m_scratchPad.owns(other.m_vec.data()) ? other.m_vec : std::move(other.m_vec), m_scratchPad.create_allocator<T, Allocator>())
 {
 }
 template<class T, std::size_t LocalStorage, class Allocator>
-inline small_vector<T, LocalStorage, Allocator>::small_vector(small_vector&& other, const Allocator& alloc)
+inline small_vector<T, LocalStorage, Allocator>::small_vector(small_vector&& other, const Allocator& alloc) noexcept(false)
 	: m_vec(other.m_scratchPad.owns(other.m_vec.data()) ? other.m_vec : std::move(other.m_vec), m_scratchPad.create_allocator<T, Allocator>(alloc))
 {
 }
@@ -208,7 +208,7 @@ inline small_vector<T, LocalStorage, Allocator>::small_vector(std::initializer_l
 {
 }
 template<class T, std::size_t LocalStorage, class Allocator>
-inline small_vector<T, LocalStorage, Allocator>::small_vector(std::vector<T, Allocator>&& vector)
+inline small_vector<T, LocalStorage, Allocator>::small_vector(std::vector<T, Allocator>&& vector) noexcept(false)
 	: m_vec(vector.begin(), vector.end(), m_scratchPad.create_allocator<T, Allocator>(vector.get_allocator()))
 {
 }
@@ -235,13 +235,13 @@ inline small_vector<T, LocalStorage, Allocator>& small_vector<T, LocalStorage, A
 	return *this;
 }
 template<class T, std::size_t LocalStorage, class Allocator>
-inline small_vector<T, LocalStorage, Allocator>& small_vector<T, LocalStorage, Allocator>::operator=(small_vector&& right)
+inline small_vector<T, LocalStorage, Allocator>& small_vector<T, LocalStorage, Allocator>::operator=(small_vector&& right) noexcept(false)
 {
 	m_vec = std::move(right.m_vec);
 	return *this;
 }
 template<class T, std::size_t LocalStorage, class Allocator>
-inline void small_vector<T, LocalStorage, Allocator>::swap(small_vector& other)
+inline void small_vector<T, LocalStorage, Allocator>::swap(small_vector& other) noexcept(false)
 {
 	internal_vector_type swp(std::move(other.m_vec));
 
