@@ -1,15 +1,37 @@
 
 
 #include <gdul/WIP/concurrent_hash_map_v2.h>
+#include <gdul/utility/packed_ptr.h>
 
 #pragma warning(disable:4530)
 #include <iostream>
+
+
+struct mystruct
+{
+	int mem = 10;
+	uint32_t other = 533;
+};
+
+enum myenum : uint32_t
+{
+	donkey,
+	cow,
+	sheep,
+	owl,
+	horse,
+	house,
+	cat,
+	dog,
+	flea,
+	duck,
+};
 
 int main()
 {
 	gdul::concurrent_hash_map<std::uint64_t, float> m;
 
-	m.insert(std::make_pair(1ull, 1.f));
+	auto result(m.insert(std::make_pair(1ull, 1.f)));
 
 
 	//for (std::size_t i = 0; i < 10000; ++i) {
@@ -42,6 +64,11 @@ int main()
 
 	//const bool endcheck(citr == itrcheck.end());
 	//const bool rendcheck(ritr == itrcheck.rend());
+
+	myenum blah = duck;
+	gdul::packed_ptr<mystruct, myenum> pp(new mystruct(), duck);
+
+	delete pp.ptr();
 
 	return 0;
 }
