@@ -77,6 +77,8 @@ public:
 	P& operator*();
 	const P& operator*() const;
 
+	operator bool() const;
+
 private:
 	std::uintptr_t m_storage;
 };
@@ -155,5 +157,10 @@ template<class P, class ExtraBits>
 inline const P& packed_ptr<P, ExtraBits>::operator*() const
 {
 	return *ptr();
+}
+template<class P, class ExtraBits>
+inline packed_ptr<P, ExtraBits>::operator bool() const
+{
+	return ptr();
 }
 }

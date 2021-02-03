@@ -304,7 +304,7 @@ inline typename concurrent_hash_map<Key, Value, Hash, Allocator>::iterator concu
 			if (bucket.packedPtr.state & chm_detail::bucket_flag_valid) {
 				bucket.packedPtr.state = chm_detail::bucket_flag_null;
 
-				return iterator(bucket.packedPtr.kv);
+				return iterator(this, bucket.packedPtr.kv);
 			}
 		}
 

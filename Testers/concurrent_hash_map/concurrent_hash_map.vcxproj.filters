@@ -10,5 +10,6 @@
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="..\..\source\gdul\utility\packed_ptr.natvis" />
+    <Natvis Include="..\..\source\gdul\WIP\concurrent_hash_map.natvis" />
   </ItemGroup>
 </Project>

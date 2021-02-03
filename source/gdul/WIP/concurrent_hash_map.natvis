@@ -22,12 +22,16 @@
 
 <AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
 
-	<Type Name="gdul::packed_ptr&lt;*&gt;">
-		<DisplayString>{(pointer)(m_storage &amp; pp_detail::Ptr_Mask)}</DisplayString>
+	<Type Name="gdul::chm_detail::iterator&lt;*&gt;">
+		<DisplayString>{m_at->second}</DisplayString>
 		<Expand>
-			<ExpandedItem>(pointer)(m_storage &amp; pp_detail::Ptr_Mask)</ExpandedItem>
-			<Item Name="[extra_type]">(extra_type)((m_storage &amp; pp_detail::Lower_Mask) + ((m_storage &amp; pp_detail::Upper_Mask) &gt;&gt; 45))</Item>
-			
+			<Item Name="Value">m_at->second</Item>
+		</Expand>
+	</Type>
+	<Type Name="gdul::chm_detail::const_iterator&lt;*&gt;">
+		<DisplayString>{m_at->second}</DisplayString>
+		<Expand>
+			<Item Name="Value">m_at->second</Item>
 		</Expand>
 	</Type>
 
