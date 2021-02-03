@@ -20,10 +20,11 @@
 
 #pragma once
 
-#include <memory>
-#include <atomic>
-#include <cmath>
 #include <gdul/memory/thread_local_member.h>
+#include <gdul/math/math.h>
+
+#include <atomic>
+#include <memory>
 
 #pragma warning(push)
 // Anonymous struct
@@ -34,7 +35,6 @@ namespace gdul {
 namespace csp_detail {
 using size_type = std::size_t;
 
-static inline size_type pow2_align(size_type from, size_type clamp = std::numeric_limits<size_type>::max());
 
 constexpr size_type Default_Scratch_Size = 128;
 constexpr size_type Default_Tl_Cache_Size = 32;
@@ -149,9 +149,9 @@ inline concurrent_scratch_pool<T, Allocator>::concurrent_scratch_pool(size_type 
 template<class T, class Allocator>
 inline concurrent_scratch_pool<T, Allocator>::concurrent_scratch_pool(size_type initialScratchSize, size_type tlCacheSize, Allocator alloc)
 	: t_details(alloc, tl_container{ 0, 0, nullptr })
-	, m_block(allocate_shared<T[]>(csp_detail::pow2_align(initialScratchSize), alloc))
+	, m_block(allocate_shared<T[]>(align_value_pow2(initialScratchSize), alloc))
 	, m_iteration(1)
-	, m_tlCacheSize(csp_detail::pow2_align(tlCacheSize, csp_detail::pow2_align(initialScratchSize)))
+	, m_tlCacheSize(align_value_pow2(tlCacheSize, align_value_pow2(initialScratchSize)))
 	, m_allocator(alloc)
 {
 	assert(tlCacheSize && initialScratchSize && "Cannot instantiate pool with zero sizes");
@@ -239,22 +239,6 @@ inline T* concurrent_scratch_pool<T, Allocator>::acquire_tl_scratch()
 	} while (!m_excessBlocks.compare_exchange_strong(expected, std::move(node), std::memory_order_relaxed));
 
 	return ret;
-}
-
-namespace csp_detail {
-inline size_type pow2_align(size_type from, size_type clamp)
-{
-	const size_type from_(from < 2 ? 2 : from);
-
-	const float flog2(std::log2f(static_cast<float>(from_)));
-	const float nextLog2(std::ceil(flog2));
-	const float fNextVal(powf(2.f, nextLog2));
-
-	const size_type nextVal(static_cast<size_t>(fNextVal));
-	const size_type clampedNextVal((clamp < nextVal) ? clamp : nextVal);
-
-	return clampedNextVal;
-}
 }
 }
 #pragma warning(pop)

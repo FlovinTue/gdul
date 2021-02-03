@@ -10,12 +10,12 @@
 #include <gdul/memory/atomic_shared_ptr.h>
 #include <gdul/WIP/concurrent_hash_map.h>
 #include <iostream>
-#include <concurrent_unordered_set.h>
+#include <concurrent_unordered_map.h>
 #include <unordered_set>
 #include <mutex>
 
 constexpr uint32_t inserts = 256 * 8;
-constexpr size_t iterations(1000000);
+constexpr size_t iterations(100000);
 
 struct container
 {
@@ -23,8 +23,8 @@ struct container
 	gdul::concurrent_skip_list<uint32_t, uint32_t, inserts> sl;
 	std::vector<uint32_t> keys;
 	gdul::concurrent_hash_map<uint32_t, uint32_t> hm = gdul::concurrent_hash_map<uint32_t, uint32_t>(inserts);
-	//concurrency::concurrent_unordered_set<int> us;
-	std::unordered_map<int, int> us;
+	concurrency::concurrent_unordered_map<uint32_t, uint32_t> us;
+	//std::unordered_map<int, int> us;
 };
 
 gdul::shared_ptr<container> c;
@@ -40,7 +40,7 @@ void find()
 
 	for (auto& itr : c->keys) {
 		//auto result(c->us.find(itr));
-		//sl.find(itr) != sl.end();
+		//auto result = sl.find(itr);
 		auto result(c->hm.find(itr));
 
 		nonsense += (*result).second;
@@ -106,5 +106,5 @@ int main()
 	itr.operator==(citr);
 	itr.operator!=(citr);
 
-	std::cout << 10000 * inserts << " finds took: " << t.get() << " seconds" << std::endl;
+	std::cout << iterations * inserts << " finds took: " << t.get() << " seconds" << std::endl;
 }
