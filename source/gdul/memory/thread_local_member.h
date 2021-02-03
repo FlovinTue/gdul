@@ -318,6 +318,7 @@ inline thread_local_member<T, Allocator>::thread_local_member(Allocator allocato
 	, m_index(s_st_container.m_indexPool.get(allocator))
 	, m_iteration(initialize_instance_tracker(std::forward<Args>(constructorArgs)...))
 {
+	static_assert(std::is_default_constructible_v<T>, "Type must be default constructible");
 }
 template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::~thread_local_member() noexcept
@@ -473,10 +474,7 @@ inline void thread_local_member<T, Allocator>::refresh() const
 	for (size_type i = 0; i < items; ++i) {
 		instance_tracker_entry instance(trackedInstances[i].load(std::memory_order_acquire));
 
-		if (instance 
-			&& ((t_tl_container.m_iteration < instance->m_iteration) 
-			& !(m_iteration < instance->m_iteration))) {
-
+		if (instance && ((t_tl_container.m_iteration < instance->m_iteration) & !(m_iteration < instance->m_iteration))) {
 			instance->construct_at(&t_tl_container.m_items[i]);
 		}
 	}

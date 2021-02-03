@@ -23,11 +23,13 @@
 #include <gdul/memory/atomic_shared_ptr.h>
 #include <gdul/memory/thread_local_member.h>
 #include <gdul/utility/platform.h>
+#include <gdul/math/math.h>
 
 #include <limits>
 #include <assert.h>
-#include <cmath>
 #include <atomic>
+#include <thread>
+
 
 // In the event an exception is thrown during a pop operation, some entries may
 // be dequeued out-of-order as some consumers may already be halfway through a
@@ -62,7 +64,6 @@
 #endif
 
 #define GDUL_CQ_PADDING(bytes) const std::uint8_t MAKE_UNIQUE_NAME(trash)[bytes] {}
-#define GDUL_CACHELINE_SIZE 64u
 
 // For anonymous struct and alignas
 #pragma warning(push, 2)
@@ -105,9 +106,6 @@ enum class item_state : std::uint8_t
 };
 
 template <class Dummy>
-std::size_t pow2_align(std::size_t from, std::size_t clamp);
-
-template <class Dummy>
 constexpr std::size_t aligned_size(std::size_t byteSize, std::size_t align);
 
 template <class T, class Allocator>
@@ -131,7 +129,7 @@ static constexpr size_type Buffer_Lock_Offset = Buffer_Capacity_Max + Max_Produc
 
 }
 // MPMC unbounded lock-free queue. FIFO is respected within the context of single producers.
-// Basic exception safety may be enabled via define GDUL_EXCEPTIONS at 
+// Basic exception safety may be enabled via define GDUL_EXCEPTIONS at
 // the price of a slight performance decrease.
 template <class T, class Allocator = std::allocator<std::uint8_t>>
 class concurrent_queue
@@ -297,7 +295,7 @@ inline void concurrent_queue<T, Allocator>::reserve(typename concurrent_queue<T,
 		init_producer(capacity);
 	}
 	else if (producer->get_capacity() < capacity) {
-		const size_type log2Capacity(cqdetail::pow2_align<void>(capacity, cqdetail::Buffer_Capacity_Max));
+		const size_type log2Capacity(align_value_pow2(capacity, cqdetail::Buffer_Capacity_Max));
 		shared_ptr_slot_type buffer(create_producer_buffer(log2Capacity));
 		producer->push_front(buffer);
 		producer = std::move(buffer);
@@ -433,7 +431,7 @@ inline bool concurrent_queue<T, Allocator>::relocate_consumer()
 template<class T, class Allocator>
 inline typename concurrent_queue<T, Allocator>::shared_ptr_slot_type concurrent_queue<T, Allocator>::create_producer_buffer(std::size_t withSize)
 {
-	const std::size_t log2size(cqdetail::pow2_align<void>(withSize, cqdetail::Buffer_Capacity_Max));
+	const std::size_t log2size(align_value_pow2(withSize, cqdetail::Buffer_Capacity_Max));
 
 	const std::size_t alignOfData(alignof(T));
 
@@ -442,8 +440,8 @@ inline typename concurrent_queue<T, Allocator>::shared_ptr_slot_type concurrent_
 
 	constexpr std::size_t controlBlockByteSize(gdul::sp_claim_size_custom_delete<buffer_type, allocator_adapter_type, cqdetail::buffer_deleter<buffer_type, allocator_adapter_type>>());
 
-	constexpr std::size_t controlBlockSize(cqdetail::aligned_size<void>(controlBlockByteSize, 8));
-	constexpr std::size_t bufferSize(cqdetail::aligned_size<void>(bufferByteSize, 8));
+	constexpr std::size_t controlBlockSize(align_value(controlBlockByteSize, 8));
+	constexpr std::size_t bufferSize(align_value(bufferByteSize, 8));
 	const std::size_t dataBlockSize(dataBlockByteSize);
 
 	const std::size_t totalBlockSize(controlBlockSize + bufferSize + dataBlockSize + (8 < alignOfData ? alignOfData : 0));
@@ -705,16 +703,17 @@ private:
 	std::atomic<size_type> m_read;
 	std::atomic<std::uint16_t> m_failureCount;
 	std::atomic<std::uint16_t> m_failureIndex;
-	GDUL_CQ_PADDING((GDUL_CACHELINE_SIZE * 2) - ((sizeof(size_type) * 3) + (sizeof(std::uint16_t) * 2)));
+	GDUL_CQ_PADDING((std::hardware_destructive_interference_size * 2) - ((sizeof(size_type) * 3) + (sizeof(std::uint16_t) * 2)));
 
 #else
-	GDUL_CQ_PADDING((GDUL_CACHELINE_SIZE * 2) - sizeof(size_type) * 2);
+	GDUL_CQ_PADDING((std::hardware_destructive_interference_size * 2) - sizeof(size_type) * 2);
 #endif
 	GDUL_ATOMIC_WITH_VIEW(size_type, m_written);
 	size_type m_writeSlot;
 
-	GDUL_CQ_PADDING(GDUL_CACHELINE_SIZE - sizeof(size_type) * 2);
+	GDUL_CQ_PADDING(std::hardware_destructive_interference_size - sizeof(size_type) * 2);
 	atomic_shared_ptr_slot_type m_next;
+
 
 	const size_type m_capacity;
 	item_container<T>* const m_dataBlock;
@@ -1233,29 +1232,6 @@ inline void item_container<T>::try_move(U& out)
 #else
 	out = m_data;
 #endif
-}
-template <class Dummy>
-std::size_t pow2_align(std::size_t from, std::size_t clamp)
-{
-	const std::size_t from_(from < 2 ? 2 : from);
-
-	const float flog2(std::log2f(static_cast<float>(from_)));
-	const float nextLog2(std::ceil(flog2));
-	const float fNextVal(powf(2.f, nextLog2));
-
-	const std::size_t nextVal(static_cast<size_t>(fNextVal));
-	const std::size_t clampedNextVal((clamp < nextVal) ? clamp : nextVal);
-
-	return clampedNextVal;
-}
-template <class Dummy>
-constexpr std::size_t aligned_size(std::size_t byteSize, std::size_t align)
-{
-	const std::size_t div(byteSize / align);
-	const std::size_t mod(byteSize % align);
-	const std::size_t total(div + static_cast<std::size_t>(static_cast<bool>(mod)));
-
-	return align * total;
 }
 template <class SharedPtrSlotType, class SharedPtrArrayType>
 struct consumer_wrapper

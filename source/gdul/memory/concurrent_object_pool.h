@@ -20,9 +20,11 @@
 
 #pragma once
 
-#include <assert.h>
 #include <gdul/containers/concurrent_queue.h>
 #include <gdul/memory/atomic_shared_ptr.h>
+#include <gdul/math/math.h>
+
+#include <assert.h>
 
 namespace gdul {
 
@@ -79,8 +81,6 @@ private:
 	void force_hint_update();
 	void try_alloc_block(std::uint8_t blockIndex);
 
-	std::size_t pow2_align(std::size_t from, std::size_t clamp);
-
 	block_node m_blocks[Capacity_Bits];
 
 	std::atomic<std::uintptr_t> m_activeBlockKeyHint;
@@ -114,7 +114,7 @@ inline concurrent_object_pool<Object, Allocator>::concurrent_object_pool(std::si
 	for (std::uint8_t i = 0; i < Capacity_Bits; ++i)
 		m_blocks[i].m_livingObjects.store((std::uint32_t)std::pow(2.f, (float)(i + 1)), std::memory_order_relaxed);
 
-	const std::size_t alignedSize(pow2_align(baseCapacity, Max_Capacity));
+	const std::size_t alignedSize(align_value_pow2(baseCapacity, Max_Capacity));
 	const std::uint8_t blockIndex((std::uint8_t)std::log2f((float)alignedSize) - 1);
 
 	m_blocksEndIndex.store(blockIndex, std::memory_order_relaxed);
@@ -296,20 +296,6 @@ inline void concurrent_object_pool<Object, Allocator>::try_alloc_block(std::uint
 	m_blocksEndIndex.compare_exchange_strong(blockIndex, blockIndex + 1, std::memory_order_release);
 
 	force_hint_update();
-}
-template<class Object, class Allocator>
-inline std::size_t concurrent_object_pool<Object, Allocator>::pow2_align(std::size_t from, std::size_t clamp)
-{
-	const std::size_t from_(from < 2 ? 2 : from);
-
-	const float flog2(std::log2f(static_cast<float>(from_)));
-	const float nextLog2(std::ceil(flog2));
-	const float fNextVal(powf(2.f, nextLog2));
-
-	const std::size_t nextVal(static_cast<size_t>(fNextVal));
-	const std::size_t clampedNextVal((clamp < nextVal) ? clamp : nextVal);
-
-	return clampedNextVal;
 }
 }
 
