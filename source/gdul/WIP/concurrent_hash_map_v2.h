@@ -221,6 +221,7 @@ private:
 
 	struct t_container
 	{
+		t_container() = default;
 		t_container(shared_ptr<bucket_pack> b)
 			: buckets(std::move(b))
 			, hashes(buckets->hashes.get())
@@ -557,7 +558,7 @@ inline shared_ptr<typename concurrent_hash_map<Key, Value, Hash, Allocator>::buc
 {
 	shared_ptr<bucket_pack> pack(gdul::allocate_shared<bucket_pack>(alloc));
 	pack->items = gdul::allocate_shared<std::atomic<packed_item_ptr>[]>(size, alloc);
-	pack->hashes = gdul::allocate_shared<std::atomic<std::size_t>[]>(size, alloc);
+	pack->hashes = gdul::allocate_shared<std::atomic<std::size_t>[]>(size, alloc, 0ull);
 
 	return pack;
 }
@@ -566,7 +567,8 @@ template<class Key, class Value, class Hash, class Allocator>
 inline std::pair<typename concurrent_hash_map<Key, Value, Hash, Allocator>::iterator, bool> concurrent_hash_map<Key, Value, Hash, Allocator>::try_insert_in_bucket_array(typename concurrent_hash_map<Key, Value, Hash, Allocator>::bucket_pack* buckets, typename concurrent_hash_map<Key, Value, Hash, Allocator>::item_type* item, std::size_t hash)
 {
 	// Our break conditions are:
-	// * A slot for the hash is not found (at which point array growth will have to occur)
+	// * A slot or existing hash is not found 
+	// * The item has been disposed (that is, it is flagged to be moved to a larger array)
 	// * The item was previously inserted
 	// * The item was inserted successfully
 	for (;;) {
@@ -590,7 +592,6 @@ inline std::pair<typename concurrent_hash_map<Key, Value, Hash, Allocator>::iter
 			return std::make_pair(iterator(this, existingItem.item), false);
 		}
 
-		// if state is null, try to put our item here
 		if (existingItem.state == chm_detail::item_flag_null) {
 			packed_item_ptr desired;
 			desired.item = item;
@@ -605,15 +606,12 @@ inline std::pair<typename concurrent_hash_map<Key, Value, Hash, Allocator>::iter
 
 		const std::size_t desiredHash(hash_type()(existingItem.item->first));
 
-		// Try to insert whatever hash matches the existing item (everyone helps, result of cas doesn't matter, only that the value is guaranteed after this point)
 		buckets->hashes[index].compare_exchange_strong(existingHash, desiredHash, std::memory_order_release, std::memory_order_relaxed);
 
-		// If the item was ours, success!
 		if (existingItem.item == item) {
 			return std::make_pair(iterator(this, item), true);
 		}
 	}
-	return std::make_pair(end(), false);
 }
 
 template<class Key, class Value, class Hash, class Allocator>
