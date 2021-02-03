@@ -13,7 +13,7 @@
 #include <string>
 
 #if defined(GDUL_FIFO)
-#include <gdul/WIP_concurrent_queue_fifo/concurrent_queue_fifo_v7.h>
+#include <gdul/WIP/concurrent_queue_fifo_v7.h>
 #elif defined(GDUL_CPQ)
 #include <gdul/containers/concurrent_priority_queue.h>
 #elif defined(RIGTORP)
@@ -280,7 +280,7 @@ inline double tester<T, Allocator>::ExecuteMPMC(std::uint32_t runs) {
 			std::this_thread::yield();
 
 #if defined(GDUL) | defined(GDUL_FIFO)
-		m_queue.unsafe_clear();
+		m_queue.unsafe_reset();
 #elif defined(MSC_RUNTIME) || defined(MTX_WRAPPER) || defined(GDUL_CPQ)
 		m_queue.clear();
 #endif
@@ -335,7 +335,7 @@ inline double tester<T, Allocator>::ExecuteSPMC(std::uint32_t runs)
 			std::this_thread::yield();
 
 #if defined(GDUL) | defined(GDUL_FIFO)
-		m_queue.unsafe_clear();
+		m_queue.unsafe_reset();
 #elif defined(MSC_RUNTIME) || defined(MTX_WRAPPER) || defined(GDUL_CPQ)
 		m_queue.clear();
 #endif
@@ -390,7 +390,7 @@ inline double tester<T, Allocator>::ExecuteMPSC(std::uint32_t runs)
 			std::this_thread::yield();
 
 #if defined(GDUL) | defined(GDUL_FIFO)
-		m_queue.unsafe_clear();
+		m_queue.unsafe_reset();
 #elif defined(MSC_RUNTIME) || defined(MTX_WRAPPER) || defined(GDUL_CPQ)
 		m_queue.clear();
 #endif
@@ -444,7 +444,7 @@ inline double tester<T, Allocator>::ExecuteSingleThread(std::uint32_t runs) {
 		m_isRunning = false;
 
 #if defined(GDUL) | defined(GDUL_FIFO)
-		m_queue.unsafe_clear();
+		m_queue.unsafe_reset();
 #elif defined(MSC_RUNTIME) || defined(MTX_WRAPPER) || defined(GDUL_CPQ)
 		m_queue.clear();
 #endif
@@ -498,7 +498,7 @@ inline double tester<T, Allocator>::ExecuteSPSC(std::uint32_t runs) {
 
 		m_isRunning = false;
 #if defined(GDUL) | defined(GDUL_FIFO)
-		m_queue.unsafe_clear();
+		m_queue.unsafe_reset();
 #elif defined(MSC_RUNTIME) || defined(MTX_WRAPPER) || defined(GDUL_CPQ)
 		m_queue.clear();
 #endif
@@ -560,7 +560,7 @@ inline double tester<T, Allocator>::ExecuteMC(std::uint32_t runs) {
 		m_isRunning = false;
 
 #if defined(GDUL) | defined(GDUL_FIFO)
-		m_queue.unsafe_clear();
+		m_queue.unsafe_reset();
 #elif defined(MSC_RUNTIME) || defined(MTX_WRAPPER) || defined(GDUL_CPQ)
 		m_queue.clear();
 #endif
@@ -613,7 +613,7 @@ inline double tester<T, Allocator>::ExecuteMP(std::uint32_t runs) {
 		m_isRunning = false;
 
 #if  defined(GDUL) | defined(GDUL_FIFO)
-		m_queue.unsafe_clear();
+		m_queue.unsafe_reset();
 #elif defined(MSC_RUNTIME) || defined(GDUL_CPQ) || defined(GDUL_CPQ)
 		m_queue.clear();
 #elif defined(RIGTORP)

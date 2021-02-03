@@ -24,8 +24,8 @@
 #include <assert.h>
 #include <cmath>
 #include <atomic>
-#include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
-#include <gdul/thread_local_member/thread_local_member.h>
+#include <gdul/memory/atomic_shared_ptr.h>
+#include <gdul/memory/thread_local_member.h>
 #include "../../../Testers/Common/util.h"
 
 // Exception handling may be enabled for basic exception safety at the cost of

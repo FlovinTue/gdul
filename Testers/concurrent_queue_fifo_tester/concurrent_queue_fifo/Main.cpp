@@ -1,11 +1,10 @@
-
-
+#pragma warning(disable:4530)
 
 #include "pch.h"
 #include <vld.h>
 #include <random>
 
-#include <gdul/WIP_concurrent_queue_fifo/concurrent_queue_fifo_v7.h>
+#include <gdul/WIP/concurrent_queue_fifo_v7.h>
 
 #define GDUL_FIFO
 
