@@ -1,4 +1,4 @@
-// Copyright(c) 2020 Flovin Michaelsen
+// Copyright(c) 2021 Flovin Michaelsen
 // 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files(the "Software"), to deal
@@ -20,23 +20,9 @@
 
 #pragma once
 
-#include <gdul/memory/atomic_shared_ptr.h>
 
-namespace gdul
-{
-namespace jh_detail
-{
+#if defined (__cpp_exceptions) && !defined (GDUL_EXCEPTIONS)
+#define GDUL_EXCEPTIONS 1
+#endif
 
-class job_impl;
 
-struct job_node
-{
-	gdul::shared_ptr<job_node> m_next;
-	gdul::shared_ptr<job_impl> m_job;
-};
-
-using job_node_shared_ptr = gdul::shared_ptr<job_node>;
-using job_node_atomic_shared_ptr = gdul::atomic_shared_ptr<job_node>;
-using job_node_raw_ptr = gdul::raw_ptr<job_node>;
-}
-}

@@ -27,8 +27,8 @@
 #include <gdul/execution/job_handler/tracking/timer.h>
 #include <gdul/execution/job_handler/job/job_node.h>
 
-#include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
-#include <gdul/delegate/delegate.h>
+#include <gdul/memory/atomic_shared_ptr.h>
+#include <gdul/utility/delegate.h>
 
 namespace gdul {
 class job_queue;

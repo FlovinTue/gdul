@@ -1,8 +1,10 @@
 
 #include "pch.h"
+#pragma warning(disable:4530)
 #include <iostream>
 
 //#define ASP_MUTEX_COMPARE
+
 
 #include <memory>
 #include "Tester.h"

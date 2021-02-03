@@ -21,7 +21,7 @@
 #pragma once
 
 #include <gdul/execution/job_handler/job_handler_utility.h>
-#include <gdul/delegate/delegate.h>
+#include <gdul/utility/delegate.h>
 #include <string>
 namespace gdul
 {

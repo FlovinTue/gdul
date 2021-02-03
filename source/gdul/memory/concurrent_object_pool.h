@@ -21,8 +21,8 @@
 #pragma once
 
 #include <assert.h>
-#include <gdul/concurrent_queue/concurrent_queue.h>
-#include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
+#include <gdul/containers/concurrent_queue.h>
+#include <gdul/memory/atomic_shared_ptr.h>
 
 namespace gdul {
 

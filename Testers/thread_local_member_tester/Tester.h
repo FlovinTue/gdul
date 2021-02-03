@@ -3,8 +3,8 @@
 #include "../Common/thread_pool.h"
 #include "../Common/util.h"
 #include "../Common/tracking_allocator.h"
-#include <gdul/concurrent_queue/concurrent_queue.h>
-#include <gdul/thread_local_member/thread_local_member.h>
+#include <gdul/containers/concurrent_queue.h>
+#include <gdul/memory/thread_local_member.h>
 
 namespace gdul
 {

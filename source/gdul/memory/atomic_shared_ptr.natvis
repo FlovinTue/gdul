@@ -43,12 +43,12 @@
         <Size>(*(size_t*)((m_controlBlockStorage.m_u64 + 24) &amp; asp_detail::Cb_Mask))</Size>
         <ValuePointer>(decayed_type*)(((cb_free_type*)(m_controlBlockStorage.m_u64 &amp; asp_detail::Cb_Mask))->m_ptrStorage.m_u64 &amp; asp_detail::Owned_Mask)</ValuePointer>
       </ArrayItems>
-      <Item Name="[**ptr_use_count]" Condition="(m_controlBlockStorage.m_u64 &amp; asp_detail::Cb_Mask) != 0">
+      <Item Name="[ptr_use_count]" Condition="(m_controlBlockStorage.m_u64 &amp; asp_detail::Cb_Mask) != 0">
         ((cb_free_type*)(m_controlBlockStorage.m_u64 &amp; asp_detail::Cb_Mask))->m_useCount
       </Item>
-      <Item Name="[**ptr_use_count]" Condition="(m_controlBlockStorage.m_u64 &amp; asp_detail::Cb_Mask) == 0">0UL</Item>
-      <Item Name="[**ptr_local_refs]">(size_type)m_controlBlockStorage.m_u8[asp_detail::STORAGE_BYTE_LOCAL_REF]</Item>
-      <Item Name="[**ptr_version]">(((size_type)m_controlBlockStorage.m_u8[asp_detail::STORAGE_BYTE_VERSION_UPPER]) &lt;&lt; asp_detail::Cb_Ptr_Bottom_Bits) | (((uint64_t)m_controlBlockStorage.m_u8[asp_detail::STORAGE_BYTE_VERSION_LOWER]) &amp; ~asp_detail::Cb_Mask)</Item>
+      <Item Name="[ptr_use_count]" Condition="(m_controlBlockStorage.m_u64 &amp; asp_detail::Cb_Mask) == 0">0UL</Item>
+      <Item Name="[ptr_local_refs]">(size_type)m_controlBlockStorage.m_u8[asp_detail::STORAGE_BYTE_LOCAL_REF]</Item>
+      <Item Name="[ptr_version]">(((size_type)m_controlBlockStorage.m_u8[asp_detail::STORAGE_BYTE_VERSION_UPPER]) &lt;&lt; asp_detail::Cb_Ptr_Bottom_Bits) | (((uint64_t)m_controlBlockStorage.m_u8[asp_detail::STORAGE_BYTE_VERSION_LOWER]) &amp; ~asp_detail::Cb_Mask)</Item>
     </Expand>
   </Type>
 
@@ -72,12 +72,12 @@
         <Size>(*(size_t*)((m_controlBlockStorage.m_u64 + 24) &amp; asp_detail::Cb_Mask))</Size>
         <ValuePointer>m_ptr</ValuePointer>
       </ArrayItems>
-      <Item Name="[**ptr_use_count]" Condition="(m_controlBlockStorage.m_u64 &amp; asp_detail::Cb_Mask) != 0">
+      <Item Name="[ptr_use_count]" Condition="(m_controlBlockStorage.m_u64 &amp; asp_detail::Cb_Mask) != 0">
         ((cb_free_type*)(m_controlBlockStorage.m_u64 &amp; asp_detail::Cb_Mask))->m_useCount
       </Item>
-      <Item Name="[**ptr_use_count]" Condition="(m_controlBlockStorage.m_u64 &amp; asp_detail::Cb_Mask) == 0">0UL</Item>
-      <Item Name="[**ptr_local_refs]">(size_type)m_controlBlockStorage.m_u8[asp_detail::STORAGE_BYTE_LOCAL_REF]</Item>
-      <Item Name="[**ptr_version]">(((size_type)m_controlBlockStorage.m_u8[asp_detail::STORAGE_BYTE_VERSION_UPPER]) &lt;&lt; asp_detail::Cb_Ptr_Bottom_Bits) | (((uint64_t)m_controlBlockStorage.m_u8[asp_detail::STORAGE_BYTE_VERSION_LOWER]) &amp; ~asp_detail::Cb_Mask)</Item>
+      <Item Name="[ptr_use_count]" Condition="(m_controlBlockStorage.m_u64 &amp; asp_detail::Cb_Mask) == 0">0UL</Item>
+      <Item Name="[ptr_local_refs]">(size_type)m_controlBlockStorage.m_u8[asp_detail::STORAGE_BYTE_LOCAL_REF]</Item>
+      <Item Name="[ptr_version]">(((size_type)m_controlBlockStorage.m_u8[asp_detail::STORAGE_BYTE_VERSION_UPPER]) &lt;&lt; asp_detail::Cb_Ptr_Bottom_Bits) | (((uint64_t)m_controlBlockStorage.m_u8[asp_detail::STORAGE_BYTE_VERSION_LOWER]) &amp; ~asp_detail::Cb_Mask)</Item>
     </Expand>
   </Type>
 
@@ -101,12 +101,12 @@
         <Size>(*(size_t*)((m_debugView.m_u64 + 24) &amp; asp_detail::Cb_Mask))</Size>
         <ValuePointer>(decayed_type*)(((cb_free_type*)(m_debugView.m_u64 &amp; asp_detail::Cb_Mask))->m_ptrStorage.m_u64 &amp; asp_detail::Owned_Mask)</ValuePointer>
       </ArrayItems>
-      <Item Name="[**ptr_use_count]" Condition="(m_debugView.m_u64 &amp; asp_detail::Cb_Mask) != 0">
+      <Item Name="[ptr_use_count]" Condition="(m_debugView.m_u64 &amp; asp_detail::Cb_Mask) != 0">
         ((cb_free_type*)(m_debugView.m_u64 &amp; asp_detail::Cb_Mask))->m_useCount
       </Item>
-      <Item Name="[**ptr_use_count]" Condition="(m_debugView.m_u64 &amp; asp_detail::Cb_Mask) == 0">0UL</Item>
-      <Item Name="[**ptr_local_refs]">(size_type)m_debugView.m_u8[asp_detail::STORAGE_BYTE_LOCAL_REF]</Item>
-      <Item Name="[**ptr_version]">(((size_type)m_debugView.m_u8[asp_detail::STORAGE_BYTE_VERSION_UPPER]) &lt;&lt; asp_detail::Cb_Ptr_Bottom_Bits) | (((uint64_t)m_debugView.m_u8[asp_detail::STORAGE_BYTE_VERSION_LOWER]) &amp; ~asp_detail::Cb_Mask)</Item>
+      <Item Name="[ptr_use_count]" Condition="(m_debugView.m_u64 &amp; asp_detail::Cb_Mask) == 0">0UL</Item>
+      <Item Name="[ptr_local_refs]">(size_type)m_debugView.m_u8[asp_detail::STORAGE_BYTE_LOCAL_REF]</Item>
+      <Item Name="[ptr_version]">(((size_type)m_debugView.m_u8[asp_detail::STORAGE_BYTE_VERSION_UPPER]) &lt;&lt; asp_detail::Cb_Ptr_Bottom_Bits) | (((uint64_t)m_debugView.m_u8[asp_detail::STORAGE_BYTE_VERSION_LOWER]) &amp; ~asp_detail::Cb_Mask)</Item>
     </Expand>
   </Type>
 	

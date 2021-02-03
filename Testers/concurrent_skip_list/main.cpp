@@ -6,9 +6,9 @@
 #include "../Common/thread_pool.h"
 #include "../Common/Timer.h"
 #include "../Common/util.h"
-#include <gdul/concurrent_skip_list/concurrent_skip_list.h>
-#include <gdul/atomic_shared_ptr/atomic_shared_ptr.h>
-#include <gdul/concurrent_hash_map/concurrent_hash_map.h>
+#include <gdul/containers/concurrent_skip_list.h>
+#include <gdul/memory/atomic_shared_ptr.h>
+#include <gdul/WIP/concurrent_hash_map.h>
 #include <iostream>
 #include <concurrent_unordered_set.h>
 #include <unordered_set>

@@ -23,7 +23,7 @@
 #include <gdul/execution/job_handler/globals.h>
 #include <gdul/execution/job_handler/tracking/job_info.h>
 
-#include <gdul/concurrent_skip_list/concurrent_skip_list.h>
+#include <gdul/containers/concurrent_skip_list.h>
 
 namespace gdul {
 namespace jh_detail {

@@ -20,7 +20,7 @@
 
 #pragma once
 
-#include <gdul/concurrent_skip_list/concurrent_skip_list_base.h>
+#include <gdul/containers/concurrent_skip_list_base.h>
 #include <gdul/memory/concurrent_scratch_pool.h>
 #include <gdul/memory/concurrent_guard_pool.h>
 

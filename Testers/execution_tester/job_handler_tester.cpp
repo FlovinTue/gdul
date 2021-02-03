@@ -4,7 +4,7 @@
 #include <algorithm>
 #include <thread>
 #include "../Common/Timer.h"
-#include <gdul/delegate/delegate.h>
+#include <gdul/utility/delegate.h>
 #include <array>
 #include "../Common/util.h"
 #include <gdul/execution/job_handler/tracking/job_graph.h>

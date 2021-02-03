@@ -1,5 +1,5 @@
 # gdul
-A collection of (mainly concurrency related) data structures, created with game programming in mind
+A collection of (mainly concurrency related) data structures & utilities, created with game programming in mind
 
 
 -------------------------------------------------------------------------------------------------------------------------------------------
@@ -19,7 +19,7 @@ There are eight different versions of compare_exchange_strong, four of which tak
 ## atomic_128
 utility wrapper class for 128 bit atomic operations. 
 ```
-#include <gdul\atomic_128\atomic_128.h>
+#include <gdul/memory/atomic_128.h>
 
 struct custom_struct
 {
@@ -58,6 +58,12 @@ Multi producer multi consumer unbounded lock-free queue. FIFO is respected withi
 
 -------------------------------------------------------------------------------------------------------------------------------------------
 
+## concurrent_skip_list
+#### --new--
+Skip list with support for lock free insertions and lookup. Behaves much like a binary map. Has iterator support
+
+-------------------------------------------------------------------------------------------------------------------------------------------
+
 ## concurrent_priority_queue
 #### --new--
 Concurrency safe, lock free priority queue based around skip list design. Provides 3 different methods of node allocation:
@@ -67,7 +73,7 @@ Concurrency safe, lock free priority queue based around skip list design. Provid
 
 Ex. Usage
 ```
-#include <gdul/concurrent_priority_queue/concurrent_priority_queue.h>
+#include <gdul/containers/concurrent_priority_queue.h>
 
 int main()
 {

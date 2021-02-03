@@ -1,5 +1,3 @@
-#pragma once
-
 // Copyright(c) 2020 Flovin Michaelsen
 // 
 // Permission is hereby granted, free of chargeo any person obtaining a copy

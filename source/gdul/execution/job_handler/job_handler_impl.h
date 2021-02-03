@@ -25,7 +25,7 @@
 
 
 #include <gdul/memory/pool_allocator.h>
-#include <gdul/delegate/delegate.h>
+#include <gdul/utility/delegate.h>
 #include <gdul/execution/job_handler/job/job.h>
 #include <gdul/execution/job_handler/job/job_impl.h>
 #include <gdul/execution/job_handler/job/batch_job_impl.h>

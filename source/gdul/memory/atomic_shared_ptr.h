@@ -2067,7 +2067,7 @@ inline shared_ptr<T> allocate_shared(std::size_t count, Allocator allocator, Arg
 
 		arrayloc = (decayed_type*)(cbend + offset);
 
-		for (std::size_t i = 0; i < count; ++i) {
+		for (std::size_t i = 0; i < count; ++i, ++constructed) {
 			new (&arrayloc[i]) decayed_type(std::forward<Args>(args)...);
 		}
 
@@ -2081,7 +2081,8 @@ inline shared_ptr<T> allocate_shared(std::size_t count, Allocator allocator, Arg
 			(*controlBlock).~control_block_make_unbounded_array();
 		}
 		for (std::size_t i = 0; i < constructed; ++i) {
-			arrayloc[i].~decayed_type();
+			const std::size_t reverseIndex(constructed - i - 1);
+			arrayloc[reverseIndex].~decayed_type();
 		}
 		if (block) {
 			rebound.deallocate(block, blockSize);

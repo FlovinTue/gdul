@@ -22,8 +22,8 @@
 
 #include <gdul/execution/job_handler/job/job.h>
 #include <gdul/execution/job_handler/globals.h>
-#include <gdul/concurrent_priority_queue/concurrent_priority_queue.h>
-#include <gdul/concurrent_queue/concurrent_queue.h>
+#include <gdul/containers/concurrent_priority_queue.h>
+#include <gdul/containers/concurrent_queue.h>
 
 namespace gdul {
 	
