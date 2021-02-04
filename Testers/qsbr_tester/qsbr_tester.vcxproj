@@ -14,14 +14,15 @@
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\source\gdul\WIP\qsbr.h" />
+    <ClInclude Include="..\..\source\gdul\WIP\ebr.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
-    <ProjectGuid>{9A52AFB5-3696-4CC9-9291-54A62CA43993}</ProjectGuid>
+    <ProjectGuid>{9AA37222-AB45-4C08-AC3D-7DC95F151DED}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>qsbr</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <ProjectName>epoch_tracker</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">

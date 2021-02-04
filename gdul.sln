@@ -27,6 +27,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "concurrent_skip_list", "Tes
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "concurrent_hash_map", "Testers\concurrent_hash_map\concurrent_hash_map.vcxproj", "{F087835D-BC0F-410A-A798-976737BB7739}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "epoch_tracker", "Testers\qsbr_tester\qsbr_tester.vcxproj", "{9AA37222-AB45-4C08-AC3D-7DC95F151DED}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -107,6 +109,12 @@ Global
 		{F087835D-BC0F-410A-A798-976737BB7739}.Release|x64.ActiveCfg = Release|x64
 		{F087835D-BC0F-410A-A798-976737BB7739}.Release|x64.Build.0 = Release|x64
 		{F087835D-BC0F-410A-A798-976737BB7739}.Release|x86.ActiveCfg = Release|x64
+		{9AA37222-AB45-4C08-AC3D-7DC95F151DED}.Debug|x64.ActiveCfg = Debug|x64
+		{9AA37222-AB45-4C08-AC3D-7DC95F151DED}.Debug|x64.Build.0 = Debug|x64
+		{9AA37222-AB45-4C08-AC3D-7DC95F151DED}.Debug|x86.ActiveCfg = Debug|x64
+		{9AA37222-AB45-4C08-AC3D-7DC95F151DED}.Release|x64.ActiveCfg = Release|x64
+		{9AA37222-AB45-4C08-AC3D-7DC95F151DED}.Release|x64.Build.0 = Release|x64
+		{9AA37222-AB45-4C08-AC3D-7DC95F151DED}.Release|x86.ActiveCfg = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
