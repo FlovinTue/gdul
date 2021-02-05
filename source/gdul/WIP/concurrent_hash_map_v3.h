@@ -707,12 +707,12 @@ struct const_iterator : public iterator_base<Map>
 
 	const typename iterator_base<Map>::value_type& operator*() const
 	{
-		return m_at;
+		return *m_at;
 	}
 
 	const typename iterator_base<Map>::value_type* operator->() const
 	{
-		return &m_at;
+		return m_at;
 	}
 
 	bool operator==(const iterator<Map>& other) const
