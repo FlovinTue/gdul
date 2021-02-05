@@ -8,7 +8,7 @@
 #include "../Common/util.h"
 #include <gdul/containers/concurrent_skip_list.h>
 #include <gdul/memory/atomic_shared_ptr.h>
-#include <gdul/WIP/concurrent_hash_map.h>
+#include <gdul/WIP/concurrent_hash_map_v3.h>
 #include <iostream>
 #include <concurrent_unordered_map.h>
 #include <unordered_set>
