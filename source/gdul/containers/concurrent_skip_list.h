@@ -45,7 +45,7 @@ class alignas(std::hardware_destructive_interference_size) concurrent_skip_list_
 
 
 /// <summary>
-/// A concurrency safe lock-free skip list with a map-style interface. It does not support concurrent deletion
+/// A concurrency safe lock-free skip list with a map-style interface
 /// </summary>
 /// <typeparam name="Key">Key type</typeparam>
 /// <typeparam name="Value">Value type</typeparam>
@@ -112,6 +112,12 @@ public:
 	/// Assumes no concurrent inserts and an empty list
 	/// </summary>
 	void unsafe_reset();
+
+	/// <summary>
+	/// Removes items
+	/// Not concurrency safe
+	/// </summary>
+	void unsafe_clear();
 
 private:
 	using node_view = typename node_type::node_view;
@@ -182,7 +188,23 @@ inline void concurrent_skip_list_impl<Key, Value, LinkTowerHeight, Compare, Allo
 	assert(this->empty() && "Bad call to unsafe_reset, there are still items in the list");
 	this->m_pool.unsafe_reset();
 
-	std::for_each(std::begin(m_head.m_linkViews), std::end(m_head.m_linkViews), [this](std::atomic<node_type*>& link) {link.store(&m_head, std::memory_order_relaxed); });
+	std::for_each(std::begin(m_head.m_linkViews), std::end(m_head.m_linkViews), [this](std::atomic<node_view>& link) {link.store(&m_head, std::memory_order_relaxed); });
+}
+
+template<class Key, class Value, std::uint8_t LinkTowerHeight, class Compare, class Allocator>
+inline void concurrent_skip_list_impl<Key, Value, LinkTowerHeight, Compare, Allocator>::unsafe_clear()
+{
+	node_type* n(m_head.m_linkViews[0].load(std::memory_order_relaxed));
+
+	while (!this->at_end(n)) {
+		node_type* const next(n->m_linkViews[0].load(std::memory_order_relaxed));
+
+		m_pool.recycle(n);
+
+		n = next;
+	}
+
+	std::for_each(std::begin(m_head.m_linkViews), std::end(m_head.m_linkViews), [this](std::atomic<node_view>& link) {link.store(&m_head, std::memory_order_relaxed); });
 }
 
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class Compare, class Allocator>

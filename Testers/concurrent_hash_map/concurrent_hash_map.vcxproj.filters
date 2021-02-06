@@ -7,6 +7,7 @@
     <ClInclude Include="..\..\source\gdul\WIP\concurrent_hash_map.h" />
     <ClInclude Include="..\..\source\gdul\WIP\concurrent_hash_map_v2.h" />
     <ClInclude Include="..\..\source\gdul\utility\packed_ptr.h" />
+    <ClInclude Include="..\..\source\gdul\WIP\concurrent_hash_map_v3.h" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="..\..\source\gdul\utility\packed_ptr.natvis" />

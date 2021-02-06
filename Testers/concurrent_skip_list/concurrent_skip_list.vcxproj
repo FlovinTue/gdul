@@ -12,10 +12,12 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="map_tester.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\source\gdul\containers\concurrent_skip_list.h" />
     <ClInclude Include="..\..\source\gdul\containers\concurrent_skip_list_base.h" />
+    <ClInclude Include="map_tester.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
