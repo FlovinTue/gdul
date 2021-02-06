@@ -21,7 +21,7 @@
 #pragma once
 
 #include <gdul/memory/atomic_shared_ptr.h>
-#include <gdul/memory/concurrent_guard_pool.h>
+#include <gdul/memory/pool_allocator.h>
 #include <gdul/memory/thread_local_member.h>
 #include <gdul/memory/atomic_128.h>
 #include <gdul/utility/packed_ptr.h>
@@ -54,13 +54,19 @@ struct const_iterator;
 enum item_flag : std::uint8_t
 {
 	item_flag_null = 0,
-	item_flag_empty = 0,
 	item_flag_valid = 1 << 0,
 	item_flag_deleted = 1 << 1,
 	item_flag_disposed = 1 << 2,
 };
 }
 
+/// <summary>
+/// Concurrency safe lock-free hash map. Uses open addressing with quadratic probing
+/// </summary>
+/// <typeparam name="Key">Key type</typeparam>
+/// <typeparam name="Value">Value type</typeparam>
+/// <typeparam name="Hash">Hashing type</typeparam>
+/// <typeparam name="Allocator">Allocator type</typeparam>
 template <class Key, class Value, class Hash = std::hash<Key>, class Allocator = std::allocator<std::uint8_t>>
 class concurrent_hash_map
 {
@@ -90,13 +96,13 @@ public:
 	/// <summary>
 	/// Constructor with capacity
 	/// </summary>
-	/// <param name="capacity">Initial capacity of map</param>
+	/// <param name="capacity">Initial capacity</param>
 	concurrent_hash_map(size_type capacity);
 
 	/// <summary>
 	/// Constructor with capacity and allocator
 	/// </summary>
-	/// <param name="capacity">Initial capacity of map</param>
+	/// <param name="capacity">Initial capacity</param>
 	/// <param name="alloc">Allocator for array and items</param>
 	concurrent_hash_map(size_type capacity, Allocator alloc);
 
@@ -104,13 +110,24 @@ public:
 	/// Insert an item
 	/// </summary>
 	/// <param name="in">Item to be inserted</param>
+	/// <returns>Iterator to item and insertion result</returns>
 	std::pair<iterator, bool> insert(const item_type& in);
 
 	/// <summary>
 	/// Insert an item
 	/// </summary>
 	/// <param name="in">Item to be inserted using move semantics</param>
+	/// <returns>Iterator to item and insertion result</returns>
 	std::pair<iterator, bool> insert(item_type&& in);
+
+	/// <summary>
+	/// Insert an item using in place construction
+	/// </summary>
+	/// <typeparam name="...Args">Constructor argument types</typeparam>
+	/// <param name="...args">Constructor arguments</param>
+	/// <returns>Iterator to item and insertion result</returns>
+	template <class ...Args>
+	std::pair<iterator, bool> emplace(Args&&... args);
 
 	/// <summary>
 	/// Search for key
@@ -155,56 +172,63 @@ public:
 	/// Iterator to first item. Concurrency safe, but item order may change if bucket array grows
 	/// </summary>
 	/// <returns>Iterator</returns>
-	iterator begin() { return iterator(this, scan_for_bucket(nullptr, 1).ptr()); }
+	iterator begin();
 
 	/// <summary>
 	/// Iterator to first item. Concurrency safe, but item order may change if bucket array grows
 	/// </summary>
 	/// <returns>Iterator</returns>
-	const_iterator begin() const { return const_iterator(this, scan_for_bucket(nullptr, 1).ptr()); }
+	const_iterator begin() const;
 
 	/// <summary>
 	/// Iterator to last item. Concurrency safe, but item order may change if bucket array grows
 	/// </summary>
 	/// <returns>Iterator</returns>
-	reverse_iterator rbegin() { return reverse_iterator(iterator(this, scan_for_bucket(nullptr, -1).ptr())); }
+	reverse_iterator rbegin();
 
 	/// <summary>
 	/// Iterator to last item. Concurrency safe, but item order may change if bucket array grows
 	/// </summary>
 	/// <returns>Iterator</returns>
-	const_reverse_iterator rbegin() const { return reverse_iterator(const_iterator(this, scan_for_bucket(nullptr, -1).ptr())); }
+	const_reverse_iterator rbegin() const;
 
 	/// <summary>
 	/// Iterator to end. Concurrency safe
 	/// </summary>
 	/// <returns>Iterator</returns>
-	iterator end() { return iterator(this, nullptr); }
+	iterator end();
 
 	/// <summary>
 	/// Iterator to end. Concurrency safe
 	/// </summary>
 	/// <returns>Iterator</returns>
-	const_iterator end() const { return const_iterator(this, nullptr); }
+	const_iterator end() const;
 
 	/// <summary>
 	/// Iterator to reverse end. Concurrency safe
 	/// </summary>
 	/// <returns>Iterator</returns>
-	reverse_iterator rend() { return reverse_iterator(end()); }
+	reverse_iterator rend();
 
 	/// <summary>
 	/// Iterator to reverse end. Concurrency safe
 	/// </summary>
 	/// <returns>Iterator</returns>
-	const reverse_iterator rend() const { return reverse_iterator(end()); }
+	const_reverse_iterator rend() const;
 
 	/// <summary>
 	/// Attempt deletion of item
+	/// Not concurrency safe
 	/// </summary>
 	/// <param name="k">Search key</param>
 	/// <returns>True if item was present, and deleted</returns>
 	bool unsafe_erase(Key k);
+
+	/// <summary>
+	/// Remove all items
+	/// Not concurrency safe
+	/// </summary>
+	void unsafe_clear();
 
 private:
 	using packed_item_ptr = packed_ptr<item_type, chm_detail::item_flag>;
@@ -223,7 +247,8 @@ private:
 		t_container(bucket_array b)
 			: buckets(std::move(b))
 			, bucketCount(buckets.item_count())
-		{ }
+		{
+		}
 		// For ownership
 		bucket_array buckets;
 		size_type bucketCount;
@@ -232,16 +257,14 @@ private:
 	friend struct iterator;
 	friend struct const_iterator;
 
-	template <class In>
-	std::pair<iterator, bool> insert_internal(In&& in);
+	template <class ...Args>
+	std::pair<iterator, bool> insert_internal(Args&& ... args);
 
 	packed_item_ptr find_internal(Key k) const;
 
 	bool refresh_tl(t_container& tl) const;
 
 	void grow_buckets(t_container& tl);
-
-	static bucket_array allocate_buckets(size_type size, allocator_type alloc);
 
 	std::pair<iterator, bool> try_insert_in_bucket_array(bucket_array& buckets, item_type* item, std::size_t hash);
 
@@ -250,10 +273,12 @@ private:
 
 	typename packed_item_ptr scan_for_bucket(const item_type* from, int direction) const;
 
-	static void help_dispose_buckets(t_container& tl);
+	static void help_dispose_buckets(bucket_array& buckets);
 	static void dispose_bucket(atomic_128<bucket>& b);
 
-	concurrent_guard_pool<item_type, allocator_type> m_itemPool;
+	static pool_allocator<item_type, true> create_pool_allocator(std::size_t initialCapacity, Allocator alloc);
+
+	pool_allocator<item_type, true> m_itemAllocator;
 
 	atomic_shared_ptr<atomic_128<bucket>[]> m_items;
 
@@ -268,35 +293,41 @@ inline concurrent_hash_map<Key, Value, Hash, Allocator>::concurrent_hash_map()
 	: concurrent_hash_map<Key, Value, Hash, Allocator>::concurrent_hash_map(chm_detail::Default_Capacity, Allocator())
 {
 }
+
 template<class Key, class Value, class Hash, class Allocator>
 inline concurrent_hash_map<Key, Value, Hash, Allocator>::concurrent_hash_map(Allocator alloc)
 	: concurrent_hash_map<Key, Value, Hash, Allocator>::concurrent_hash_map(chm_detail::Default_Capacity, alloc)
 {
 }
+
 template<class Key, class Value, class Hash, class Allocator>
 inline concurrent_hash_map<Key, Value, Hash, Allocator>::concurrent_hash_map(size_type capacity)
 	: concurrent_hash_map<Key, Value, Hash, Allocator>::concurrent_hash_map(capacity, Allocator())
 {
 }
+
 template<class Key, class Value, class Hash, class Allocator>
 inline concurrent_hash_map<Key, Value, Hash, Allocator>::concurrent_hash_map(size_type capacity, Allocator alloc)
-	: m_itemPool((std::uint32_t)chm_detail::to_bucket_count(align_value_pow2(capacity)), (std::uint32_t)chm_detail::to_bucket_count(align_value_pow2(capacity)) / 1, alloc)
+	: m_itemAllocator(create_pool_allocator(chm_detail::to_bucket_count(align_value_pow2(capacity)), alloc))
 	, m_items(gdul::allocate_shared<atomic_128<bucket>[]>(chm_detail::to_bucket_count(align_value_pow2(capacity)), alloc))
 	, t_items(alloc, m_items.load(std::memory_order_relaxed))
 	, m_size(0)
 	, m_allocator(alloc)
 {
 }
+
 template<class Key, class Value, class Hash, class Allocator>
 inline std::pair<typename concurrent_hash_map<Key, Value, Hash, Allocator>::iterator, bool> concurrent_hash_map<Key, Value, Hash, Allocator>::insert(const item_type& in)
 {
-	return insert_internal(std::move(in));
+	return insert_internal(in);
 }
+
 template<class Key, class Value, class Hash, class Allocator>
 inline std::pair<typename concurrent_hash_map<Key, Value, Hash, Allocator>::iterator, bool> concurrent_hash_map<Key, Value, Hash, Allocator>::insert(item_type&& in)
 {
 	return insert_internal(std::move(in));
 }
+
 template<class Key, class Value, class Hash, class Allocator>
 inline typename concurrent_hash_map<Key, Value, Hash, Allocator>::iterator concurrent_hash_map<Key, Value, Hash, Allocator>::find(Key k)
 {
@@ -304,6 +335,7 @@ inline typename concurrent_hash_map<Key, Value, Hash, Allocator>::iterator concu
 
 	return iterator(this, item.ptr());
 }
+
 template<class Key, class Value, class Hash, class Allocator>
 inline const typename concurrent_hash_map<Key, Value, Hash, Allocator>::const_iterator concurrent_hash_map<Key, Value, Hash, Allocator>::find(Key k) const
 {
@@ -311,6 +343,7 @@ inline const typename concurrent_hash_map<Key, Value, Hash, Allocator>::const_it
 
 	return const_iterator(this, item.ptr());
 }
+
 template<class Key, class Value, class Hash, class Allocator>
 inline typename concurrent_hash_map<Key, Value, Hash, Allocator>::iterator concurrent_hash_map<Key, Value, Hash, Allocator>::operator[](size_type k)
 {
@@ -322,16 +355,19 @@ inline typename concurrent_hash_map<Key, Value, Hash, Allocator>::iterator concu
 
 	return insert(std::make_pair(Key(), Value())).first;
 }
+
 template<class Key, class Value, class Hash, class Allocator>
 inline typename concurrent_hash_map<Key, Value, Hash, Allocator>::size_type concurrent_hash_map<Key, Value, Hash, Allocator>::size() const
 {
 	return m_size.load(std::memory_order_relaxed);
 }
+
 template<class Key, class Value, class Hash, class Allocator>
 inline bool concurrent_hash_map<Key, Value, Hash, Allocator>::empty() const
 {
 	return !size();
 }
+
 template<class Key, class Value, class Hash, class Allocator>
 inline typename concurrent_hash_map<Key, Value, Hash, Allocator>::size_type concurrent_hash_map<Key, Value, Hash, Allocator>::capacity() const
 {
@@ -341,6 +377,55 @@ inline typename concurrent_hash_map<Key, Value, Hash, Allocator>::size_type conc
 
 	return tl.bucketCount / chm_detail::Growth_Multiple;
 }
+
+template<class Key, class Value, class Hash, class Allocator>
+typename concurrent_hash_map<Key, Value, Hash, Allocator>::iterator concurrent_hash_map<Key, Value, Hash, Allocator>::begin()
+{
+	return iterator(this, scan_for_bucket(nullptr, 1).ptr());
+}
+
+template<class Key, class Value, class Hash, class Allocator>
+typename concurrent_hash_map<Key, Value, Hash, Allocator>::const_iterator concurrent_hash_map<Key, Value, Hash, Allocator>::begin() const
+{
+	return const_iterator(this, scan_for_bucket(nullptr, 1).ptr());
+}
+
+template<class Key, class Value, class Hash, class Allocator>
+typename concurrent_hash_map<Key, Value, Hash, Allocator>::reverse_iterator concurrent_hash_map<Key, Value, Hash, Allocator>::rbegin()
+{
+	return reverse_iterator(iterator(this, scan_for_bucket(nullptr, -1).ptr()));
+}
+
+template<class Key, class Value, class Hash, class Allocator>
+typename concurrent_hash_map<Key, Value, Hash, Allocator>::const_reverse_iterator concurrent_hash_map<Key, Value, Hash, Allocator>::rbegin() const
+{
+	return reverse_iterator(const_iterator(this, scan_for_bucket(nullptr, -1).ptr()));
+}
+
+template<class Key, class Value, class Hash, class Allocator>
+typename concurrent_hash_map<Key, Value, Hash, Allocator>::iterator concurrent_hash_map<Key, Value, Hash, Allocator>::end()
+{
+	return iterator(this, nullptr);
+}
+
+template<class Key, class Value, class Hash, class Allocator>
+typename concurrent_hash_map<Key, Value, Hash, Allocator>::const_iterator concurrent_hash_map<Key, Value, Hash, Allocator>::end() const
+{
+	return const_iterator(this, nullptr);
+}
+
+template<class Key, class Value, class Hash, class Allocator>
+typename concurrent_hash_map<Key, Value, Hash, Allocator>::reverse_iterator concurrent_hash_map<Key, Value, Hash, Allocator>::rend()
+{
+	return reverse_iterator(end());
+}
+
+template<class Key, class Value, class Hash, class Allocator>
+typename concurrent_hash_map<Key, Value, Hash, Allocator>::const_reverse_iterator concurrent_hash_map<Key, Value, Hash, Allocator>::rend() const
+{
+	return reverse_iterator(end());
+}
+
 template<class Key, class Value, class Hash, class Allocator>
 inline bool concurrent_hash_map<Key, Value, Hash, Allocator>::unsafe_erase(Key k)
 {
@@ -366,20 +451,57 @@ inline bool concurrent_hash_map<Key, Value, Hash, Allocator>::unsafe_erase(Key k
 
 	b.item.set_extra((chm_detail::item_flag)state);
 
-	m_itemPool.recycle(b.item.ptr());
+	std::destroy_at(b.item.ptr());
+
+	m_itemAllocator.deallocate(b.item.ptr());
 
 	std::atomic_thread_fence(std::memory_order_release);
 
 	return true;
 }
-template<class Key, class Value, class Hash, class Allocator>
-template<class In>
-inline std::pair<typename concurrent_hash_map<Key, Value, Hash, Allocator>::iterator, bool> concurrent_hash_map<Key, Value, Hash, Allocator>::insert_internal(In&& in)
-{
-	item_type* const item(m_itemPool.get());
-	*item = std::forward<In>(in);
 
-	const size_type hash(hash_type()(in.first));
+template<class Key, class Value, class Hash, class Allocator>
+inline void concurrent_hash_map<Key, Value, Hash, Allocator>::unsafe_clear()
+{
+	bucket_array buckets(m_items.load(std::memory_order_acquire));
+
+	bucket emptyBucket;
+	emptyBucket.hash = 0;
+	emptyBucket.item = packed_item_ptr(nullptr);
+
+	for (std::size_t i = 0; i < buckets.item_count(); ++i) {
+		item_type* const item(buckets[i].my_val().item.ptr());
+
+		if (item) {
+			std::destroy_at(item);
+			m_itemAllocator.deallocate(item);
+		}
+
+		buckets[i].my_val() = emptyBucket;
+	}
+
+	m_size.store(0, std::memory_order_relaxed);
+
+	std::atomic_thread_fence(std::memory_order_release);
+}
+
+template<class Key, class Value, class Hash, class Allocator>
+template<class ...Args>
+inline std::pair<typename concurrent_hash_map<Key, Value, Hash, Allocator>::iterator, bool> concurrent_hash_map<Key, Value, Hash, Allocator>::emplace(Args && ...args)
+{
+	return insert_internal(std::forward<Args>(args)...);
+}
+
+template<class Key, class Value, class Hash, class Allocator>
+template<class ...Args>
+inline std::pair<typename concurrent_hash_map<Key, Value, Hash, Allocator>::iterator, bool> concurrent_hash_map<Key, Value, Hash, Allocator>::insert_internal(Args&& ... args)
+{
+	item_type* const item(m_itemAllocator.allocate());
+	new (item) item_type(std::forward<Args>(args)...);
+
+	const size_type hash(hash_type()(item->first));
+
+	assert(hash && "Zero hash");
 
 	for (;;) {
 		t_container& tl(t_items);
@@ -394,17 +516,16 @@ inline std::pair<typename concurrent_hash_map<Key, Value, Hash, Allocator>::iter
 				}
 			}
 			else {
-				m_itemPool.recycle(item);
+				std::destroy_at(item);
+				m_itemAllocator.deallocate(item);
 			}
 
 			return result;
 		}
 
-		if (refresh_tl(tl)) {
-			continue;
+		if (!refresh_tl(tl)) {
+			grow_buckets(tl);
 		}
-
-		grow_buckets(tl);
 	}
 }
 
@@ -420,7 +541,7 @@ inline typename concurrent_hash_map<Key, Value, Hash, Allocator>::size_type conc
 		if (thisHash == hash) {
 
 			// If we find it, make sure we can see the whole bucket
-			//std::atomic_thread_fence(std::memory_order_acquire);
+			std::atomic_thread_fence(std::memory_order_acquire);
 
 			return index;
 		}
@@ -428,6 +549,7 @@ inline typename concurrent_hash_map<Key, Value, Hash, Allocator>::size_type conc
 
 	return bucketCount;
 }
+
 template<class Key, class Value, class Hash, class Allocator>
 inline std::pair<typename concurrent_hash_map<Key, Value, Hash, Allocator>::size_type, typename concurrent_hash_map<Key, Value, Hash, Allocator>::bucket> concurrent_hash_map<Key, Value, Hash, Allocator>::find_slot_or_bucket(const bucket_array& buckets, size_type bucketCount, typename concurrent_hash_map<Key, Value, Hash, Allocator>::size_type hash)
 {
@@ -443,6 +565,7 @@ inline std::pair<typename concurrent_hash_map<Key, Value, Hash, Allocator>::size
 
 	return std::make_pair(bucketCount, bucket());
 }
+
 template<class Key, class Value, class Hash, class Allocator>
 inline typename concurrent_hash_map<Key, Value, Hash, Allocator>::packed_item_ptr concurrent_hash_map<Key, Value, Hash, Allocator>::scan_for_bucket(const item_type* from, int direction) const
 {
@@ -466,6 +589,7 @@ inline typename concurrent_hash_map<Key, Value, Hash, Allocator>::packed_item_pt
 
 	return result;
 }
+
 template<class Key, class Value, class Hash, class Allocator>
 inline bool concurrent_hash_map<Key, Value, Hash, Allocator>::refresh_tl(typename concurrent_hash_map<Key, Value, Hash, Allocator>::t_container& tl) const
 {
@@ -479,32 +603,35 @@ inline bool concurrent_hash_map<Key, Value, Hash, Allocator>::refresh_tl(typenam
 
 	return true;
 }
+
 template<class Key, class Value, class Hash, class Allocator>
 inline typename concurrent_hash_map<Key, Value, Hash, Allocator>::packed_item_ptr concurrent_hash_map<Key, Value, Hash, Allocator>::find_internal(Key k) const
 {
 	const std::size_t hash(hash_type()(k));
 	t_container& tl(t_items);
 
+	const std::size_t& bucketCount(tl.bucketCount);
+	bucket_array& buckets(tl.buckets);
+
 	do {
-		const size_type index(find_bucket(tl.buckets, tl.bucketCount, hash));
+		const size_type index(find_bucket(buckets, bucketCount, hash));
 
-		if (index != tl.bucketCount) {
-			const bucket b(tl.buckets[index].my_val());
+		if (index != bucketCount) {
+			const packed_item_ptr item(buckets[index].my_val().item);
 
-			if (b.item.extra() & chm_detail::item_flag_valid) {
-				return b.item;
+			if (item.extra() & chm_detail::item_flag_valid) {
+				return item;
 			}
 		}
 
 	} while (refresh_tl(tl));
 
-	return packed_item_ptr( nullptr );
+	return packed_item_ptr(nullptr);
 }
+
 template<class Key, class Value, class Hash, class Allocator>
 inline void concurrent_hash_map<Key, Value, Hash, Allocator>::grow_buckets(typename concurrent_hash_map<Key, Value, Hash, Allocator>::t_container& tl)
 {
-	help_dispose_buckets(tl);
-
 	bucket_array currentBuckets(m_items.load());
 	const std::size_t currentArraysSize(currentBuckets.item_count());
 
@@ -514,17 +641,26 @@ inline void concurrent_hash_map<Key, Value, Hash, Allocator>::grow_buckets(typen
 		return;
 	}
 
+	assert(tl.buckets == m_items && "Mismatch buckets should be the same");
+
+	help_dispose_buckets(currentBuckets);
+
 	bucket_array newBuckets(gdul::allocate_shared<atomic_128<bucket>[]>(currentArraysSize * 2, m_allocator));
 
+	std::atomic_thread_fence(std::memory_order_acquire);
+
 	for (size_type i = 0; i < currentArraysSize; ++i) {
-		bucket b(currentBuckets[i].load());
+		bucket b(currentBuckets[i].my_val());
+
+		assert(b.item.extra() & chm_detail::item_flag_disposed && "No further items should exist in old bucket array, and all should be disposed");
 
 		if (b.item) {
-			try_insert_in_bucket_array(newBuckets, b.item.ptr(), hash_type()(b.item->first));
+			std::pair<iterator, bool> [[maybe_unused]]itr(try_insert_in_bucket_array(newBuckets, b.item.ptr(), hash_type()(b.item->first)));
+			assert(itr.second && "Failed insert in new array");
 		}
 	}
 
-	if (m_items.compare_exchange_strong(currentBuckets, newBuckets)) {
+	if (m_items.compare_exchange_strong(currentBuckets, newBuckets, std::memory_order_release, std::memory_order_acquire)) {
 		tl.bucketCount = newBuckets.item_count();
 		tl.buckets = std::move(newBuckets);
 	}
@@ -550,7 +686,7 @@ inline std::pair<typename concurrent_hash_map<Key, Value, Hash, Allocator>::iter
 			return std::make_pair(end(), false);
 		}
 
-		bucket expected(buckets[index].load());
+		bucket expected(findResult.second);
 
 		if (expected.item.extra() & chm_detail::item_flag_disposed) {
 			return std::make_pair(end(), false);
@@ -572,16 +708,17 @@ inline std::pair<typename concurrent_hash_map<Key, Value, Hash, Allocator>::iter
 }
 
 template<class Key, class Value, class Hash, class Allocator>
-inline void concurrent_hash_map<Key, Value, Hash, Allocator>::help_dispose_buckets(typename concurrent_hash_map<Key, Value, Hash, Allocator>::t_container& tl)
+inline void concurrent_hash_map<Key, Value, Hash, Allocator>::help_dispose_buckets(typename concurrent_hash_map<Key, Value, Hash, Allocator>::bucket_array& buckets)
 {
-	for (size_type i = 0; i < tl.bucketCount; ++i) {
-		dispose_bucket(tl.buckets[i]);
+	for (size_type i = 0; i < buckets.item_count(); ++i) {
+		dispose_bucket(buckets[i]);
 	}
 }
+
 template<class Key, class Value, class Hash, class Allocator>
 inline void concurrent_hash_map<Key, Value, Hash, Allocator>::dispose_bucket(atomic_128<bucket>& b)
 {
-	bucket expected(b.load());
+	bucket expected(b.my_val());
 
 	while (!(expected.item.extra() & chm_detail::item_flag_disposed)) {
 		bucket desired(expected);
@@ -592,6 +729,15 @@ inline void concurrent_hash_map<Key, Value, Hash, Allocator>::dispose_bucket(ato
 		}
 	}
 }
+
+template<class Key, class Value, class Hash, class Allocator>
+inline pool_allocator<typename concurrent_hash_map<Key, Value, Hash, Allocator>::item_type, true> concurrent_hash_map<Key, Value, Hash, Allocator>::create_pool_allocator(std::size_t initialCapacity, Allocator alloc)
+{
+	memory_pool pool;
+	pool.init<sizeof(item_type), alignof(item_type), Allocator>(initialCapacity, 1, alloc);
+	return pool.create_allocator<item_type, true>();
+}
+
 namespace chm_detail {
 template <class Map>
 struct iterator_base
@@ -683,6 +829,7 @@ private:
 
 	Map* m_parent;
 };
+
 template <class Map>
 struct const_iterator : public iterator_base<Map>
 {
