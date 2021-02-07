@@ -24,6 +24,37 @@
 
 namespace gdul {
 
+constexpr std::size_t least_factor(std::size_t of)
+{
+	for (std::size_t div(7); !(of < div * div); div += 30) {
+		if (of % div == 0) {
+			return  div;
+		}
+		if (of % (div + 4) == 0) {
+			return div + 4;
+		}
+		if (of % (div + 6) == 0) {
+			return div + 6;
+		}
+		if (of % (div + 10) == 0) {
+			return div + 10;
+		}
+		if (of % (div + 12) == 0) {
+			return div + 12;
+		}
+		if (of % (div + 16) == 0) {
+			return div + 16;
+		}
+		if (of % (div + 22) == 0) {
+			return div + 22;
+		}
+		if (of % (div + 24) == 0) {
+			return div + 24;
+		}
+	}
+	return of;
+}
+
 constexpr bool is_prime(std::size_t value)
 {
 	if (value == 2 || value == 3) {
@@ -40,13 +71,7 @@ constexpr bool is_prime(std::size_t value)
 		return false;
 	}
 
-	for (std::size_t div(3); !(value < div * div); ++div) {
-		if (value % div == 0) {
-			return false;
-		}
-	}
-
-	return true;
+	return least_factor(value) == value;
 }
 
 constexpr std::size_t align_value_pow2(std::size_t from)
