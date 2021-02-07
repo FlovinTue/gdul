@@ -15,7 +15,7 @@
     <ClCompile Include="map_tester.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\source\gdul\containers\concurrent_skip_list.h" />
+    <ClInclude Include="..\..\source\gdul\containers\concurrent_map.h" />
     <ClInclude Include="..\..\source\gdul\containers\concurrent_skip_list_base.h" />
     <ClInclude Include="map_tester.h" />
   </ItemGroup>
@@ -25,6 +25,7 @@
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>concurrentskiplist</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <ProjectName>concurrent_map</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">

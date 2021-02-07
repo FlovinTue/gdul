@@ -1,7 +1,7 @@
 #pragma once
 
-#include <gdul/WIP/concurrent_hash_map_v3.h>
-#include <gdul/containers/concurrent_skip_list.h>
+#include <gdul/containers/concurrent_unordered_map.h>
+#include <gdul/containers/concurrent_map.h>
 #include "../Common/util.h"
 #include <gdul/utility/delegate.h>
 #include <vector>
@@ -22,8 +22,8 @@ private:
 	void do_insertions(int inserts);
 	void verify_insertions();
 
-	concurrent_skip_list<int, int> m_sl;
-	concurrent_hash_map<int, int> m_hm;
+	concurrent_map<int, int> m_sl;
+	concurrent_unordered_map<int, int> m_hm;
 
 	static thread_local std::vector<int> t_keys;
 };
