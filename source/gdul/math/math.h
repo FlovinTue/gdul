@@ -24,6 +24,31 @@
 
 namespace gdul {
 
+constexpr bool is_prime(std::size_t value)
+{
+	if (value == 2 || value == 3) {
+		return true;
+	}
+
+	if (value == 1 || value % 2 == 0) {
+		return false;
+	}
+
+	const std::uint8_t mod6(value % 6);
+
+	if (mod6 != 1 && mod6 != 5) {
+		return false;
+	}
+
+	for (std::size_t div(3); !(value < div * div); ++div) {
+		if (value % div == 0) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
 constexpr std::size_t align_value_pow2(std::size_t from)
 {
 	const std::size_t _from(from + (std::size_t)!(bool)(from));
@@ -36,10 +61,12 @@ constexpr std::size_t align_value_pow2(std::size_t from)
 
 	return std::size_t(1ull << lastBit);
 }
+
 constexpr std::size_t align_value_pow2(std::size_t from, std::size_t max)
 {
 	return std::min<std::size_t>(align_value_pow2(from), max);
 }
+
 constexpr std::size_t align_value(std::size_t value, std::size_t align)
 {
 	const std::size_t mod(value % align);
@@ -48,5 +75,16 @@ constexpr std::size_t align_value(std::size_t value, std::size_t align)
 	const std::size_t offset(diff * multi);
 
 	return value + offset;
+}
+
+constexpr std::size_t align_value_prime(std::size_t value)
+{
+	std::size_t probe(value);
+
+	while (!is_prime(probe)) {
+		++probe;
+	}
+
+	return probe;
 }
 }

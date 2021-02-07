@@ -1,6 +1,6 @@
 
 
-#include <gdul/WIP/concurrent_hash_map_v3.h>
+#include <gdul/containers/concurrent_unordered_map.h>
 #include <gdul/utility/packed_ptr.h>
 
 #pragma warning(disable:4530)
@@ -29,7 +29,7 @@ enum myenum : uint32_t
 
 int main()
 {
-	gdul::concurrent_hash_map<std::uint64_t, float> m;
+	gdul::concurrent_unordered_map<std::uint64_t, float> m;
 
 	auto result(m.insert(std::make_pair(1ull, 1.f)));
 	auto result2(m.insert(std::make_pair(1ull, 1.f)));
@@ -44,7 +44,7 @@ int main()
 		m.unsafe_erase(i);
 	}
 
-	gdul::concurrent_hash_map<std::uint64_t, float> itrcheck;
+	gdul::concurrent_unordered_map<std::uint64_t, float> itrcheck;
 	std::pair<decltype(itrcheck)::iterator, bool> a(itrcheck.insert({ 1ull, 1.f }));
 	std::pair<decltype(itrcheck)::iterator, bool> b(itrcheck.insert({ 2ull, 2.f }));
 	std::pair<decltype(itrcheck)::iterator, bool> c(itrcheck.insert({ 3ull, 3.f }));
@@ -70,6 +70,15 @@ int main()
 	gdul::packed_ptr<mystruct, myenum> pp(new mystruct(), duck);
 
 	delete pp.ptr();
+
+
+	gdul::concurrent_unordered_map<int, int> capacityTest(11);
+
+	const std::size_t capA(capacityTest.capacity());
+
+	capacityTest.reserve(12);
+
+	const std::size_t capB(capacityTest.capacity());
 
 	return 0;
 }

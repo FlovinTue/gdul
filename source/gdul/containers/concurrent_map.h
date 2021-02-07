@@ -38,31 +38,31 @@ namespace gdul {
 namespace csl_detail {
 
 template <class Key, class Value, std::uint8_t LinkTowerHeight, class Compare, class Allocator>
-class alignas(std::hardware_destructive_interference_size) concurrent_skip_list_impl;
+class alignas(std::hardware_destructive_interference_size) concurrent_map_impl;
 
 }
 #pragma endregion
 
 
 /// <summary>
-/// A concurrency safe lock-free skip list with a map-style interface
+/// A concurrency safe lock-free map based on skip list design
 /// </summary>
 /// <typeparam name="Key">Key type</typeparam>
 /// <typeparam name="Value">Value type</typeparam>
-/// <typeparam name="ExpectedListSize">How many items is expected to be in the list at any one time. Hint to determine node tower height</typeparam>
+/// <typeparam name="ExpectedMapSize">How many items is expected to be in the map at any one time. Hint to determine node tower height</typeparam>
 /// <typeparam name="Allocator">Allocator passed to the node pool</typeparam>
 /// <typeparam name="Compare">Comparator to decide node ordering</typeparam>
-template <class Key, class Value, csl_detail::size_type ExpectedListSize = 512, class Compare = std::less<Key>, class Allocator = std::allocator<std::uint8_t>>
-class concurrent_skip_list : public csl_detail::concurrent_skip_list_impl<Key, Value, csl_detail::to_tower_height(ExpectedListSize), Compare, Allocator>
+template <class Key, class Value, csl_detail::size_type ExpectedMapSize = 512, class Compare = std::less<Key>, class Allocator = std::allocator<std::uint8_t>>
+class concurrent_map : public csl_detail::concurrent_map_impl<Key, Value, csl_detail::to_tower_height(ExpectedMapSize), Compare, Allocator>
 {
 public:
-	using csl_detail::concurrent_skip_list_impl<Key, Value, csl_detail::to_tower_height(ExpectedListSize), Compare, Allocator>::concurrent_skip_list_impl;
+	using csl_detail::concurrent_map_impl<Key, Value, csl_detail::to_tower_height(ExpectedMapSize), Compare, Allocator>::concurrent_map_impl;
 };
 
 namespace csl_detail {
 
 template <class Key, class Value, std::uint8_t LinkTowerHeight, class Compare, class Allocator>
-class alignas(std::hardware_destructive_interference_size) concurrent_skip_list_impl : public concurrent_skip_list_base<Key, Value, LinkTowerHeight, Compare>
+class alignas(std::hardware_destructive_interference_size) concurrent_map_impl : public concurrent_skip_list_base<Key, Value, LinkTowerHeight, Compare>
 {
 public:
 	using typename concurrent_skip_list_base<Key, Value, LinkTowerHeight, Compare>::key_type;
@@ -78,18 +78,18 @@ public:
 	/// <summary>
 	/// Constructor
 	/// </summary>
-	concurrent_skip_list_impl();
+	concurrent_map_impl();
 
 	/// <summary>
 	/// Constructor
 	/// </summary>
 	/// <param name="alloc">Allocator passed to node pool</param>
-	concurrent_skip_list_impl(allocator_type);
+	concurrent_map_impl(allocator_type);
 
 	/// <summary>
 	/// Destructor
 	/// </summary>
-	~concurrent_skip_list_impl() noexcept;
+	~concurrent_map_impl() noexcept;
 
 	/// <summary>
 	/// Insert an item
@@ -133,37 +133,37 @@ private:
 	concurrent_guard_pool<node_type, Allocator> m_pool;
 };
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class Compare, class Allocator>
-inline concurrent_skip_list_impl<Key, Value, LinkTowerHeight, Compare, Allocator>::concurrent_skip_list_impl()
-	: concurrent_skip_list_impl<Key, Value, LinkTowerHeight, Compare, Allocator>(allocator_type())
+inline concurrent_map_impl<Key, Value, LinkTowerHeight, Compare, Allocator>::concurrent_map_impl()
+	: concurrent_map_impl<Key, Value, LinkTowerHeight, Compare, Allocator>(allocator_type())
 {
 }
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class Compare, class Allocator>
-inline concurrent_skip_list_impl<Key, Value, LinkTowerHeight, Compare, Allocator>::concurrent_skip_list_impl(typename concurrent_skip_list_impl<Key, Value, LinkTowerHeight, Compare, Allocator>::allocator_type alloc)
+inline concurrent_map_impl<Key, Value, LinkTowerHeight, Compare, Allocator>::concurrent_map_impl(typename concurrent_map_impl<Key, Value, LinkTowerHeight, Compare, Allocator>::allocator_type alloc)
 	: concurrent_skip_list_base<Key, Value, LinkTowerHeight, Compare>::concurrent_skip_list_base()
 	, m_pool((typename decltype(m_pool)::size_type)csl_detail::to_expected_list_size(LinkTowerHeight), (typename decltype(m_pool)::size_type)csl_detail::to_expected_list_size(LinkTowerHeight) / std::thread::hardware_concurrency(), alloc)
 {
 }
 
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class Compare, class Allocator>
-inline concurrent_skip_list_impl<Key, Value, LinkTowerHeight, Compare, Allocator>::~concurrent_skip_list_impl()
+inline concurrent_map_impl<Key, Value, LinkTowerHeight, Compare, Allocator>::~concurrent_map_impl()
 {
 }
 
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class Compare, class Allocator>
-inline std::pair<typename concurrent_skip_list_impl<Key, Value, LinkTowerHeight, Compare, Allocator>::iterator, bool> concurrent_skip_list_impl<Key, Value, LinkTowerHeight, Compare, Allocator>::insert(typename std::pair<Key, Value>&& in)
+inline std::pair<typename concurrent_map_impl<Key, Value, LinkTowerHeight, Compare, Allocator>::iterator, bool> concurrent_map_impl<Key, Value, LinkTowerHeight, Compare, Allocator>::insert(typename std::pair<Key, Value>&& in)
 {
 	return insert_internal(std::move(in));
 }
 
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class Compare, class Allocator>
-inline std::pair<typename concurrent_skip_list_impl<Key, Value, LinkTowerHeight, Compare, Allocator>::iterator, bool> concurrent_skip_list_impl<Key, Value, LinkTowerHeight, Compare, Allocator>::insert(const typename std::pair<Key, Value>& in)
+inline std::pair<typename concurrent_map_impl<Key, Value, LinkTowerHeight, Compare, Allocator>::iterator, bool> concurrent_map_impl<Key, Value, LinkTowerHeight, Compare, Allocator>::insert(const typename std::pair<Key, Value>& in)
 {
 	return insert_internal(in);
 }
 
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class Compare, class Allocator>
 template<class In>
-inline std::pair<typename concurrent_skip_list_impl<Key, Value, LinkTowerHeight, Compare, Allocator>::iterator, bool> concurrent_skip_list_impl<Key, Value, LinkTowerHeight, Compare, Allocator>::insert_internal(In&& in)
+inline std::pair<typename concurrent_map_impl<Key, Value, LinkTowerHeight, Compare, Allocator>::iterator, bool> concurrent_map_impl<Key, Value, LinkTowerHeight, Compare, Allocator>::insert_internal(In&& in)
 {
 	node_type* const n = m_pool.get();
 	n->m_kv = std::forward<In>(in);
@@ -183,7 +183,7 @@ inline std::pair<typename concurrent_skip_list_impl<Key, Value, LinkTowerHeight,
 }
 
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class Compare, class Allocator>
-inline void concurrent_skip_list_impl<Key, Value, LinkTowerHeight, Compare, Allocator>::unsafe_reset()
+inline void concurrent_map_impl<Key, Value, LinkTowerHeight, Compare, Allocator>::unsafe_reset()
 {
 	assert(this->empty() && "Bad call to unsafe_reset, there are still items in the list");
 	this->m_pool.unsafe_reset();
@@ -192,7 +192,7 @@ inline void concurrent_skip_list_impl<Key, Value, LinkTowerHeight, Compare, Allo
 }
 
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class Compare, class Allocator>
-inline void concurrent_skip_list_impl<Key, Value, LinkTowerHeight, Compare, Allocator>::unsafe_clear()
+inline void concurrent_map_impl<Key, Value, LinkTowerHeight, Compare, Allocator>::unsafe_clear()
 {
 	node_type* n(m_head.m_linkViews[0].load(std::memory_order_relaxed));
 
@@ -208,7 +208,7 @@ inline void concurrent_skip_list_impl<Key, Value, LinkTowerHeight, Compare, Allo
 }
 
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class Compare, class Allocator>
-inline bool concurrent_skip_list_impl<Key, Value, LinkTowerHeight, Compare, Allocator>::find_slot(node_view_set& atSet, node_view_set& nextSet, const node_type* node) const
+inline bool concurrent_map_impl<Key, Value, LinkTowerHeight, Compare, Allocator>::find_slot(node_view_set& atSet, node_view_set& nextSet, const node_type* node) const
 {
 	constexpr comparator_type comparator;
 
@@ -244,7 +244,7 @@ inline bool concurrent_skip_list_impl<Key, Value, LinkTowerHeight, Compare, Allo
 }
 
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class Compare, class Allocator>
-inline std::pair<typename concurrent_skip_list_impl<Key, Value, LinkTowerHeight, Compare, Allocator>::iterator, bool> concurrent_skip_list_impl<Key, Value, LinkTowerHeight, Compare, Allocator>::try_insert(typename concurrent_skip_list_impl<Key, Value, LinkTowerHeight, Compare, Allocator>::node_type* node)
+inline std::pair<typename concurrent_map_impl<Key, Value, LinkTowerHeight, Compare, Allocator>::iterator, bool> concurrent_map_impl<Key, Value, LinkTowerHeight, Compare, Allocator>::try_insert(typename concurrent_map_impl<Key, Value, LinkTowerHeight, Compare, Allocator>::node_type* node)
 {
 	node_view_set atSet{};
 	node_view_set nextSet{};

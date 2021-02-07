@@ -23,15 +23,15 @@
 <AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
 
 	<Type Name="gdul::chm_detail::iterator&lt;*&gt;">
-		<DisplayString>{m_at->second}</DisplayString>
+		<DisplayString>{*m_at}</DisplayString>
 		<Expand>
-			<Item Name="Value">m_at->second</Item>
+			<ExpandedItem>*m_at</ExpandedItem>
 		</Expand>
 	</Type>
 	<Type Name="gdul::chm_detail::const_iterator&lt;*&gt;">
-		<DisplayString>{m_at->second}</DisplayString>
+		<DisplayString>{*m_at}</DisplayString>
 		<Expand>
-			<Item Name="Value">m_at->second</Item>
+			<ExpandedItem>*m_at</ExpandedItem>
 		</Expand>
 	</Type>
 
