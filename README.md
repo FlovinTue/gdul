@@ -58,9 +58,15 @@ Multi producer multi consumer unbounded lock-free queue. FIFO is respected withi
 
 -------------------------------------------------------------------------------------------------------------------------------------------
 
-## concurrent_skip_list
+## concurrent_map
 #### --new--
-Skip list with support for lock free insertions and lookup. Behaves much like a binary map. Has iterator support
+Concurrency safe lock-free ordered map based on skip list design
+
+-------------------------------------------------------------------------------------------------------------------------------------------
+
+## concurrent_unordered_map
+#### --new--
+Concurrency safe lock-free hash map based on open addressing with quadratic probing
 
 -------------------------------------------------------------------------------------------------------------------------------------------
 
