@@ -6,8 +6,8 @@
 #include <gdul/memory/concurrent_object_pool.h>
 #include <gdul/memory/concurrent_guard_pool.h>
 #include <gdul/memory/pool_allocator.h>
-#include <gdul/WIP/scratch_allocator.h>
-#include <gdul/WIP/small_vector.h>
+#include <gdul/memory/scratch_allocator.h>
+#include <gdul/containers/small_vector.h>
 
 #include <vld.h>
 

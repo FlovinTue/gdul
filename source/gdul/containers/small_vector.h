@@ -20,7 +20,7 @@
 
 #pragma once
 
-#include <gdul/WIP/scratch_allocator.h>
+#include <gdul/memory/scratch_allocator.h>
 #include <gdul/utility/type_traits.h>
 
 #include <memory>
