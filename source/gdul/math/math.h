@@ -20,49 +20,19 @@
 
 #pragma once
 
+#include <cstdint>
 #include <limits>
+#include <algorithm>
 
 namespace gdul {
 
-constexpr std::size_t least_factor(std::size_t of)
-{
-	for (std::size_t div(7); !(of < div * div); div += 30) {
-		if (of % div == 0) {
-			return  div;
-		}
-		if (of % (div + 4) == 0) {
-			return div + 4;
-		}
-		if (of % (div + 6) == 0) {
-			return div + 6;
-		}
-		if (of % (div + 10) == 0) {
-			return div + 10;
-		}
-		if (of % (div + 12) == 0) {
-			return div + 12;
-		}
-		if (of % (div + 16) == 0) {
-			return div + 16;
-		}
-		if (of % (div + 22) == 0) {
-			return div + 22;
-		}
-		if (of % (div + 24) == 0) {
-			return div + 24;
-		}
-	}
-	return of;
-}
-
 constexpr bool is_prime(std::size_t value)
 {
-	if (value == 2 || value == 3) {
-		return true;
-	}
-
 	if (value < 2) {
 		return false;
+	}
+	if (value < 4) {
+		return true;
 	}
 
 	const std::uint8_t mod6(value % 6);
@@ -71,7 +41,13 @@ constexpr bool is_prime(std::size_t value)
 		return false;
 	}
 
-	return least_factor(value) == value;
+	for (std::size_t div(3); !(value < div * div); ++div) {
+		if (value % div == 0) {
+			return false;
+		}
+	}
+
+	return true;
 }
 
 constexpr std::size_t align_value_pow2(std::size_t from)
@@ -104,10 +80,27 @@ constexpr std::size_t align_value(std::size_t value, std::size_t align)
 
 constexpr std::size_t align_value_prime(std::size_t value)
 {
-	std::size_t probe(value);
+	if (value < 3) {
+		return 2;
+	}
 
-	while (!is_prime(probe)) {
-		++probe;
+	if (is_prime(value)) {
+		return value;
+	}
+
+	if (is_prime(value + 1)) {
+		return value + 1;
+	}
+
+	std::size_t probe(align_value(value + 1, 6));
+
+	for (;;probe += 6) {
+		if (is_prime(probe - 1)) {
+			return probe - 1;
+		}
+		if (is_prime(probe + 1)) {
+			return probe + 1;
+		}
 	}
 
 	return probe;
