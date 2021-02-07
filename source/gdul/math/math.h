@@ -23,6 +23,7 @@
 #include <cstdint>
 #include <limits>
 #include <algorithm>
+#include <cmath>
 
 namespace gdul {
 
@@ -34,16 +35,34 @@ constexpr bool is_prime(std::size_t value)
 	if (value < 4) {
 		return true;
 	}
+	if (value % 5 == 0 && value != 5) {
+		return false;
+	}
 
+	// Non bottom primes only at multiples of 6 +-1
 	const std::uint8_t mod6(value % 6);
-
 	if (mod6 != 1 && mod6 != 5) {
 		return false;
 	}
 
-	for (std::size_t div(3); !(value < div * div); ++div) {
-		if (value % div == 0) {
-			return false;
+	for (std::size_t div(7); !(value < div * div); div += 30) {
+
+		// Skip multiples of 2, 3, 5. We already know they aren't interesting from checks at top
+		const std::size_t divChecks[]{
+			div,
+			div + 4,
+			div + 6,
+			div + 10,
+			div + 12,
+			div + 16,
+			div + 22,
+			div + 24
+		};
+
+		for (auto& n : divChecks) {
+			if (value % n == 0) {
+				return false;
+			}
 		}
 	}
 
