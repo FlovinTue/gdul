@@ -26,7 +26,6 @@
 #include <cmath>
 
 namespace gdul {
-
 constexpr bool is_prime(std::size_t value)
 {
 	if (value < 2) {
@@ -111,17 +110,19 @@ constexpr std::size_t align_value_prime(std::size_t value)
 		return value + 1;
 	}
 
-	std::size_t probe(align_value(value + 1, 6));
+	std::size_t result(0);
 
-	for (;;probe += 6) {
+	for (std::size_t probe(align_value(value + 1, 6));;probe += 6) {
 		if (is_prime(probe - 1)) {
-			return probe - 1;
+			result = probe - 1;
+			break;
 		}
 		if (is_prime(probe + 1)) {
-			return probe + 1;
+			result = probe + 1;
+			break;
 		}
 	}
 
-	return probe;
+	return result;
 }
 }
