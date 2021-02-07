@@ -30,7 +30,7 @@ constexpr bool is_prime(std::size_t value)
 		return true;
 	}
 
-	if (value == 1 || value % 2 == 0) {
+	if (value < 2) {
 		return false;
 	}
 
