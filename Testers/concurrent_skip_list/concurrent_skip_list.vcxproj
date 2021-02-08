@@ -19,6 +19,9 @@
     <ClInclude Include="..\..\source\gdul\containers\concurrent_skip_list_base.h" />
     <ClInclude Include="map_tester.h" />
   </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="..\..\source\gdul\containers\concurrent_skip_list_base.natvis" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
     <ProjectGuid>{9A52AFB5-3696-4CC9-9291-54A62CA43993}</ProjectGuid>

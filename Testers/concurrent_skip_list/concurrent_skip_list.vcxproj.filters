@@ -9,4 +9,7 @@
     <ClInclude Include="map_tester.h" />
     <ClInclude Include="..\..\source\gdul\containers\concurrent_map.h" />
   </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="..\..\source\gdul\containers\concurrent_skip_list_base.natvis" />
+  </ItemGroup>
 </Project>

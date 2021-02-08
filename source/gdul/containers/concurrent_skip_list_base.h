@@ -378,8 +378,11 @@ struct node
 	node(const std::pair<Key, Value>& item) : m_kv(item), m_linkViews{}, m_height(LinkTowerHeight){}
 
 
-
-	std::atomic<node_view> m_linkViews[LinkTowerHeight];
+	union
+	{
+		std::atomic<node_view> m_linkViews[LinkTowerHeight];
+		const std::uintptr_t _dbgViews[LinkTowerHeight];
+	};
 	std::uint8_t m_height;
 	std::pair<Key, Value> m_kv;
 };
