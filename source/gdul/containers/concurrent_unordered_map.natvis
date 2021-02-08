@@ -35,6 +35,29 @@
 		</Expand>
 	</Type>
 
+	<Type Name="gdul::concurrent_unordered_map&lt;*&gt;">
+		<DisplayString>{m_size}</DisplayString>
+		<Expand>
+			<CustomListItems MaxItemsPerView="500">
+				<Variable Name="pNode" InitialValue="(bucket*)((*(uint64_t*)(8 + (m_items.m_debugView.m_u64 &amp; gdul::asp_detail::Cb_Mask))) &amp; gdul::asp_detail::Cb_Mask)"/>
+				<Variable Name="ix" InitialValue="0"/>
+				<Variable Name="found" InitialValue="0"/>
+				
+				<Item Name="size">m_size</Item>
+
+				<Loop>
+					<Break Condition="!(found &lt; _dbgSize)"/>
+					<Item Condition="pNode->item.m_storage &amp; chm_detail::item_flag_valid">*(item_type*)(pNode->item.m_storage &amp; pp_detail::Ptr_Mask)</Item>
+					<Exec Condition="pNode->item.m_storage">++found</Exec>
+					<Exec>++pNode</Exec>
+					<Exec>++ix</Exec>
+				</Loop>
+
+			</CustomListItems>
+		</Expand>
+
+	</Type>
+
 </AutoVisualizer>
 
 

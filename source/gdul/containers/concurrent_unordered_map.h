@@ -324,7 +324,11 @@ private:
 
 	mutable tlm<t_container, allocator_type> t_items;
 
-	std::atomic<size_type> m_size;
+	union
+	{
+		std::atomic<size_type> m_size;
+		const size_type _dbgSize;
+	};
 
 	allocator_type m_allocator;
 };
@@ -501,7 +505,7 @@ inline bool concurrent_unordered_map<Key, Value, Hash, Allocator>::unsafe_erase(
 
 	m_itemAllocator.deallocate(b.item.ptr());
 
-	std::atomic_thread_fence(std::memory_order_release);
+	m_size.fetch_sub(1, std::memory_order_release);
 
 	return true;
 }

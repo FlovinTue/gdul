@@ -31,6 +31,10 @@ int main()
 {
 	gdul::concurrent_unordered_map<std::uint64_t, float> m;
 
+	m.insert({ 10, 10 });
+	m.unsafe_erase(10);
+	m.insert({ 10, 25 });
+
 	auto result(m.insert(std::make_pair(1ull, 1.f)));
 	auto result2(m.insert(std::make_pair(1ull, 1.f)));
 
