@@ -162,19 +162,19 @@ public:
 	/// Query for number of items in map
 	/// </summary>
 	/// <returns>Item count</returns>
-	size_type size() const;
+	size_type size() const noexcept;
 
 	/// <summary>
 	/// Query for empty map
 	/// </summary>
 	/// <returns>True if no items are present</returns>
-	bool empty() const;
+	bool empty() const noexcept;
 
 	/// <summary>
 	/// Query for map capacity
 	/// </summary>
 	/// <returns>Item capacity</returns>
-	size_type capacity() const;
+	size_type capacity() const noexcept;
 
 	/// <summary>
 	/// The number of internal buckets
@@ -405,19 +405,19 @@ inline typename concurrent_unordered_map<Key, Value, Hash, Allocator>::value_typ
 	return insert(std::make_pair(Key(), Value())).first->second;
 }
 template<class Key, class Value, class Hash, class Allocator>
-inline typename concurrent_unordered_map<Key, Value, Hash, Allocator>::size_type concurrent_unordered_map<Key, Value, Hash, Allocator>::size() const
+inline typename concurrent_unordered_map<Key, Value, Hash, Allocator>::size_type concurrent_unordered_map<Key, Value, Hash, Allocator>::size() const noexcept
 {
 	return m_size.load(std::memory_order_relaxed);
 }
 
 template<class Key, class Value, class Hash, class Allocator>
-inline bool concurrent_unordered_map<Key, Value, Hash, Allocator>::empty() const
+inline bool concurrent_unordered_map<Key, Value, Hash, Allocator>::empty() const noexcept
 {
 	return !size();
 }
 
 template<class Key, class Value, class Hash, class Allocator>
-inline typename concurrent_unordered_map<Key, Value, Hash, Allocator>::size_type concurrent_unordered_map<Key, Value, Hash, Allocator>::capacity() const
+inline typename concurrent_unordered_map<Key, Value, Hash, Allocator>::size_type concurrent_unordered_map<Key, Value, Hash, Allocator>::capacity() const noexcept
 {
 	return bucket_count() / chm_detail::Growth_Multiple;
 }
@@ -531,7 +531,7 @@ inline float concurrent_unordered_map<Key, Value, Hash, Allocator>::max_load_fac
 template<class Key, class Value, class Hash, class Allocator>
 inline float concurrent_unordered_map<Key, Value, Hash, Allocator>::load_factor() const noexcept
 {
-	return static_cast<float>(size()) / static_cast<float>(capacity());
+	return static_cast<float>(size()) / static_cast<float>(bucket_count());
 }
 
 template<class Key, class Value, class Hash, class Allocator>

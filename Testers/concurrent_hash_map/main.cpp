@@ -84,5 +84,9 @@ int main()
 
 	const std::size_t capB(capacityTest.capacity());
 
+	capacityTest.insert({ 1, 1 });
+	const float lf(capacityTest.load_factor());
+	const float mlf(capacityTest.max_load_factor());
+
 	return 0;
 }
