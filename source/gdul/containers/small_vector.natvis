@@ -1,6 +1,6 @@
-<?xml version="1.0" encoding="utf-8"?> 
+<?xml version="1.0" encoding="utf-8"?>
 
-<!-- Copyright(c) 2020 Flovin Michaelsen                                                  -->
+<!-- Copyright(c) 2021 Flovin Michaelsen                                                  -->
 <!--                                                                                      -->
 <!-- Permission is hereby granted, free of charge, to any person obtaining a copy         -->
 <!-- of this software and associated documentation files(the "Software"), to deal         -->
@@ -20,21 +20,15 @@
 <!-- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE        -->
 <!-- SOFTWARE.                                                                            -->
 
-
 <AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
 
-	<Type Name="gdul::thread_local_member&lt;*&gt;">
-		<DisplayString Condition="m_index &lt; t_tl_container.m_items.m_capacity &amp;&amp; !(t_tl_container.m_iteration &lt; m_iteration)">{t_tl_container.m_items.m_arrayRef[m_index]}</DisplayString>
-		<DisplayString Condition="!(m_index &lt; t_tl_container.m_items.m_capacity) || (t_tl_container.m_iteration &lt; m_iteration)">
-			{*(value_type*)((((((uint64_t*)((*(uint64_t*)((s_st_container.m_instanceTrackers.m_debugView.m_u64 &amp; asp_detail::CbMask) + 8)) &amp; asp_detail::OwnedMask))[m_index] &amp; asp_detail::CbMask) + 24) &amp; asp_detail::OwnedMask))}
-		</DisplayString>
+	<Type Name="gdul::small_vector&lt;*&gt;">
+		<DisplayString>{m_vec}</DisplayString>
 		<Expand>
-			<ExpandedItem Condition="!(m_index &lt; t_tl_container.m_items.m_capacity) || (t_tl_container.m_iteration &lt; m_iteration)">
-				(value_type*)((((((uint64_t*)((*(uint64_t*)((s_st_container.m_instanceTrackers.m_debugView.m_u64 &amp; asp_detail::CbMask) + 8)) &amp; asp_detail::OwnedMask))[m_index] &amp; asp_detail::CbMask) + 24) &amp; asp_detail::OwnedMask))
-			</ExpandedItem>
-			<ExpandedItem Condition="m_index &lt; t_tl_container.m_items.m_capacity &amp;&amp; !(t_tl_container.m_iteration &lt; m_iteration)">
-				(&amp;t_tl_container.m_items.m_arrayRef[m_index])
-			</ExpandedItem>
+			<ExpandedItem>m_vec</ExpandedItem>
 		</Expand>
 	</Type>
+
 </AutoVisualizer>
+
+

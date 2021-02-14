@@ -18,7 +18,7 @@ namespace gdul
 class thread_pool
 {
 public:
-	thread_pool(std::uint32_t coreMask);
+	thread_pool(std::uint32_t coreMask = std::numeric_limits<uint32_t>::max());
 	~thread_pool();
 
 	void add_task(std::function<void()> task);

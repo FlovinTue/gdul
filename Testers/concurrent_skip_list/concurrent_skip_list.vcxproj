@@ -12,10 +12,15 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="map_tester.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\source\gdul\containers\concurrent_skip_list.h" />
+    <ClInclude Include="..\..\source\gdul\containers\concurrent_map.h" />
     <ClInclude Include="..\..\source\gdul\containers\concurrent_skip_list_base.h" />
+    <ClInclude Include="map_tester.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="..\..\source\gdul\containers\concurrent_skip_list_base.natvis" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
@@ -23,6 +28,7 @@
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>concurrentskiplist</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <ProjectName>concurrent_map</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">

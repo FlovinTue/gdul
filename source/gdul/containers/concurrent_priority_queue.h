@@ -32,8 +32,8 @@
 namespace gdul {
 namespace cpq_detail {
 
-constexpr std::uint32_t Max_Version = (std::numeric_limits<std::uint32_t>::max() >> (16 - 3));
-constexpr std::uint32_t In_Range_Delta = Max_Version / 2;
+constexpr std::uint32_t MaxVersion = (std::numeric_limits<std::uint32_t>::max() >> (16 - 3));
+constexpr std::uint32_t InRangeDelta = MaxVersion / 2;
 
 enum exchange_link_result : std::uint8_t
 {
@@ -52,12 +52,12 @@ enum flag_node_result : std::uint8_t
 constexpr std::uint32_t version_delta(std::uint32_t from, std::uint32_t to)
 {
 	const std::uint32_t delta(to - from);
-	return delta & Max_Version;
+	return delta & MaxVersion;
 }
 constexpr std::uint32_t version_add_one(std::uint32_t from)
 {
 	const std::uint32_t next(from + 1);
-	const std::uint32_t masked(next & Max_Version);
+	const std::uint32_t masked(next & MaxVersion);
 	const std::uint32_t zeroAdjust(!(bool)masked);
 
 	return masked + zeroAdjust;
@@ -68,7 +68,7 @@ constexpr std::uint32_t version_sub_one(std::uint32_t from)
 	const std::uint32_t zeroAdjust(!(bool)next);
 	const std::uint32_t adjusted(next - zeroAdjust);
 
-	return adjusted & Max_Version;
+	return adjusted & MaxVersion;
 }
 constexpr std::uint32_t version_step(std::uint32_t from, std::uint8_t step)
 {
@@ -82,7 +82,7 @@ constexpr bool in_range(std::uint32_t version, std::uint32_t inRangeOf)
 {
 	// Zero special case
 	if (version != 0) {
-		return version_delta(version, inRangeOf) < In_Range_Delta;
+		return version_delta(version, inRangeOf) < InRangeDelta;
 	}
 
 	return true;

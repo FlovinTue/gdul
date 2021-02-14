@@ -148,7 +148,7 @@ struct callable_wrapper_impl_call_bind_alloc : public callable_wrapper_impl_call
 	Allocator m_allocator;
 };
 
-constexpr std::size_t Delegate_Storage = 56;
+constexpr std::size_t DelegateStorage = 56;
 
 template <class Ret, class ...Args>
 class alignas (alignof(std::max_align_t)) delegate_impl
@@ -156,7 +156,7 @@ class alignas (alignof(std::max_align_t)) delegate_impl
 public:
 	using return_type = Ret;
 
-	static constexpr std::size_t Num_Args = sizeof...(Args);
+	static constexpr std::size_t NumArgs = sizeof...(Args);
 
 	inline delegate_impl() noexcept;
 	inline ~delegate_impl() noexcept;
@@ -164,16 +164,16 @@ public:
 	inline Ret operator()(Args  ...args) const;
 
 protected:
-	template <class Callable, class Allocator, std::size_t Compare = sizeof(del_detail::callable_wrapper_impl_call<Ret, Callable, Args...>), std::enable_if_t<!(del_detail::Delegate_Storage < Compare)>* = nullptr>
+	template <class Callable, class Allocator, std::size_t Compare = sizeof(del_detail::callable_wrapper_impl_call<Ret, Callable, Args...>), std::enable_if_t<!(del_detail::DelegateStorage < Compare)>* = nullptr>
 	void construct_call(Callable && callable, Allocator);
 
-	template <class Callable, class Allocator, std::size_t Compare = sizeof(del_detail::callable_wrapper_impl_call<Ret, Callable, Args...>), std::enable_if_t<(del_detail::Delegate_Storage < Compare)> * = nullptr>
+	template <class Callable, class Allocator, std::size_t Compare = sizeof(del_detail::callable_wrapper_impl_call<Ret, Callable, Args...>), std::enable_if_t<(del_detail::DelegateStorage < Compare)> * = nullptr>
 	void construct_call(Callable && callable, Allocator alloc);
 
-	template <class Callable, class Allocator, class BindTuple, std::size_t Compare = sizeof(del_detail::callable_wrapper_impl_call_bind<Ret, Callable, BindTuple, Args...>), std::enable_if_t<!(del_detail::Delegate_Storage < Compare)> * = nullptr>
+	template <class Callable, class Allocator, class BindTuple, std::size_t Compare = sizeof(del_detail::callable_wrapper_impl_call_bind<Ret, Callable, BindTuple, Args...>), std::enable_if_t<!(del_detail::DelegateStorage < Compare)> * = nullptr>
 	void construct_call_bind(Callable && callable, Allocator, BindTuple&& args);
 
-	template <class Callable, class Allocator, class BindTuple, std::size_t Compare = sizeof(del_detail::callable_wrapper_impl_call_bind<Ret, Callable, BindTuple, Args...>), std::enable_if_t<(del_detail::Delegate_Storage < Compare)> * = nullptr>
+	template <class Callable, class Allocator, class BindTuple, std::size_t Compare = sizeof(del_detail::callable_wrapper_impl_call_bind<Ret, Callable, BindTuple, Args...>), std::enable_if_t<(del_detail::DelegateStorage < Compare)> * = nullptr>
 	void construct_call_bind(Callable && callable, Allocator alloc, BindTuple && args);
 
 	void copy_from(const delegate_impl<Ret, Args...> & other);
@@ -188,7 +188,7 @@ private:
 private:
 	bool has_allocated() const;
 	
-	std::uint8_t m_storage[del_detail::Delegate_Storage];
+	std::uint8_t m_storage[del_detail::DelegateStorage];
 
 	del_detail::callable_wrapper_base<Ret, Args...>* m_callable;
 };
@@ -245,29 +245,29 @@ inline void delegate_impl<Ret, Args...>::move_from(delegate_impl<Ret, Args...>& 
 template<class Ret, class ...Args>
 inline bool delegate_impl<Ret, Args...>::has_allocated() const
 {
-	return ((std::uint8_t*)m_callable < &m_storage[0]) | (&m_storage[del_detail::Delegate_Storage - 1] < (std::uint8_t*)m_callable);
+	return ((std::uint8_t*)m_callable < &m_storage[0]) | (&m_storage[del_detail::DelegateStorage - 1] < (std::uint8_t*)m_callable);
 }
 template<class Ret, class ...Args>
-template<class Callable, class Allocator, std::size_t Compare, std::enable_if_t<!(del_detail::Delegate_Storage < Compare)>*>
+template<class Callable, class Allocator, std::size_t Compare, std::enable_if_t<!(del_detail::DelegateStorage < Compare)>*>
 void delegate_impl<Ret, Args...>::construct_call(Callable&& callable, Allocator)
 {
 	using type = del_detail::callable_wrapper_impl_call<Ret, Callable, Args...>;
 	m_callable = new (&m_storage[0]) type((std::forward<Callable>(callable)));
 }
 template<class Ret, class ...Args>
-template<class Callable, class Allocator, std::size_t Compare, std::enable_if_t<(del_detail::Delegate_Storage < Compare)>*>
+template<class Callable, class Allocator, std::size_t Compare, std::enable_if_t<(del_detail::DelegateStorage < Compare)>*>
 void delegate_impl<Ret, Args...>::construct_call(Callable&& callable, Allocator alloc)
 {
 	construct_call_alloc(std::forward<Callable>(callable), alloc);
 }
 template<class Ret, class ...Args>
-template<class Callable, class Allocator, class BindTuple, std::size_t Compare, std::enable_if_t<(del_detail::Delegate_Storage < Compare)>* >
+template<class Callable, class Allocator, class BindTuple, std::size_t Compare, std::enable_if_t<(del_detail::DelegateStorage < Compare)>* >
 inline void delegate_impl<Ret, Args...>::construct_call_bind(Callable&& callable, Allocator alloc, BindTuple&& bind)
 {
 	construct_call_bind_alloc(std::forward<Callable>(callable), alloc, std::forward<BindTuple>(bind));
 }
 template<class Ret, class ...Args>
-template<class Callable, class Allocator, class BindTuple, std::size_t Compare, std::enable_if_t<!(del_detail::Delegate_Storage < Compare)>* >
+template<class Callable, class Allocator, class BindTuple, std::size_t Compare, std::enable_if_t<!(del_detail::DelegateStorage < Compare)>* >
 inline void delegate_impl<Ret, Args...>::construct_call_bind(Callable&& callable, Allocator, BindTuple&& bound)
 {
 	using type = del_detail::callable_wrapper_impl_call_bind<Ret, Callable, BindTuple, Args...>;

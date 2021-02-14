@@ -6,15 +6,15 @@
 #include <gdul/memory/concurrent_object_pool.h>
 #include <gdul/memory/concurrent_guard_pool.h>
 #include <gdul/memory/pool_allocator.h>
-#include <gdul/WIP/scratch_allocator.h>
-#include <gdul/WIP/small_vector.h>
+#include <gdul/memory/scratch_pad.h>
+#include <gdul/containers/small_vector.h>
 
 #include <vld.h>
 
 void test_small_vector()
 {
 	gdul::scratch_pad<64> pad;
-	gdul::scratch_allocator<int> sall(pad.create_allocator<int>());
+	std::pmr::polymorphic_allocator<int> sall(&pad);
 
 	int* a = sall.allocate(10);
 	int* b = sall.allocate(5);

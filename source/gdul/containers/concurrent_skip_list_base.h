@@ -33,9 +33,9 @@ namespace csl_detail {
 
 using size_type = std::size_t;
 
-constexpr std::uintptr_t Bottom_Bits = ~(std::uintptr_t(std::numeric_limits<std::uintptr_t>::max()) << 3);
-constexpr std::uintptr_t Pointer_Mask = (std::numeric_limits<std::uintptr_t>::max() >> 16) & ~Bottom_Bits;
-constexpr std::uintptr_t Version_Mask = ~Pointer_Mask;
+constexpr std::uintptr_t BottomBits = ~(std::uintptr_t(std::numeric_limits<std::uintptr_t>::max()) << 3);
+constexpr std::uintptr_t PointerMask = (std::numeric_limits<std::uintptr_t>::max() >> 16) & ~BottomBits;
+constexpr std::uintptr_t VersionMask = ~PointerMask;
 
 constexpr size_type log2_ceil(size_type value)
 {
@@ -324,11 +324,11 @@ struct node
 
 		operator node_type* ()
 		{
-			return (node_type*)(m_value & Pointer_Mask);
+			return (node_type*)(m_value & PointerMask);
 		}
 		operator const node_type* () const
 		{
-			return (const node_type*)(m_value & Pointer_Mask);
+			return (const node_type*)(m_value & PointerMask);
 		}
 
 		operator std::uintptr_t() = delete;
@@ -347,12 +347,12 @@ struct node
 		}
 		bool has_version() const
 		{
-			return m_value & Version_Mask;
+			return m_value & VersionMask;
 		}
 		std::uint32_t get_version() const
 		{
-			const std::uint64_t pointerValue(m_value & Version_Mask);
-			const std::uint64_t lower(pointerValue & Bottom_Bits);
+			const std::uint64_t pointerValue(m_value & VersionMask);
+			const std::uint64_t lower(pointerValue & BottomBits);
 			const std::uint64_t upper(pointerValue >> 45);
 			const std::uint64_t conc(lower + upper);
 
@@ -361,10 +361,10 @@ struct node
 		void set_version(std::uint32_t v)
 		{
 			const std::uint64_t v64(v);
-			const std::uint64_t lower(v64 & Bottom_Bits);
-			const std::uint64_t upper((v64 << 45) & ~Pointer_Mask);
+			const std::uint64_t lower(v64 & BottomBits);
+			const std::uint64_t upper((v64 << 45) & ~PointerMask);
 			const std::uint64_t versionValue(upper | lower);
-			const std::uint64_t pointerValue(m_value & Pointer_Mask);
+			const std::uint64_t pointerValue(m_value & PointerMask);
 
 			m_value = (versionValue | pointerValue);
 		}
@@ -378,8 +378,11 @@ struct node
 	node(const std::pair<Key, Value>& item) : m_kv(item), m_linkViews{}, m_height(LinkTowerHeight){}
 
 
-
-	std::atomic<node_view> m_linkViews[LinkTowerHeight];
+	union
+	{
+		std::atomic<node_view> m_linkViews[LinkTowerHeight];
+		const std::uintptr_t _dbgViews[LinkTowerHeight];
+	};
 	std::uint8_t m_height;
 	std::pair<Key, Value> m_kv;
 };

@@ -23,7 +23,7 @@
 #include <gdul/execution/job_handler/globals.h>
 #include <gdul/execution/job_handler/tracking/job_info.h>
 
-#include <gdul/containers/concurrent_skip_list.h>
+#include <gdul/containers/concurrent_unordered_map.h>
 
 namespace gdul {
 namespace jh_detail {
@@ -47,7 +47,7 @@ public:
 #endif
 
 private:
-	concurrent_skip_list<std::uint64_t, job_info> m_map;
+	concurrent_unordered_map<std::uint64_t, job_info> m_map;
 };
 }
 }

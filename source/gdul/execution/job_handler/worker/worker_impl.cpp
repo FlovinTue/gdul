@@ -138,7 +138,7 @@ void worker_impl::set_run_on_disable(delegate<void()>&& toCall)
 void worker_impl::add_assignment(job_queue* queue)
 {
 	const std::uint8_t ix(m_queuePushSync++);
-	assert(ix < Max_Worker_Targets && "Max worker targets exceeded");
+	assert(ix < MaxWorkerTargets && "Max worker targets exceeded");
 
 	m_targets[ix] = queue;
 

@@ -36,8 +36,8 @@ namespace csp_detail {
 using size_type = std::size_t;
 
 
-constexpr size_type Default_Scratch_Size = 128;
-constexpr size_type Default_Tl_Cache_Size = 32;
+constexpr size_type DefaultScratchSize = 128;
+constexpr size_type DefaultTlCacheSize = 32;
 }
 
 /// <summary>
@@ -130,13 +130,13 @@ private:
 
 template<class T, class Allocator>
 inline concurrent_scratch_pool<T, Allocator>::concurrent_scratch_pool()
-	: concurrent_scratch_pool(csp_detail::Default_Scratch_Size, csp_detail::Default_Tl_Cache_Size, Allocator())
+	: concurrent_scratch_pool(csp_detail::DefaultScratchSize, csp_detail::DefaultTlCacheSize, Allocator())
 {
 }
 
 template<class T, class Allocator>
 inline concurrent_scratch_pool<T, Allocator>::concurrent_scratch_pool(Allocator alloc)
-	: concurrent_scratch_pool(csp_detail::Default_Scratch_Size, csp_detail::Default_Tl_Cache_Size, alloc)
+	: concurrent_scratch_pool(csp_detail::DefaultScratchSize, csp_detail::DefaultTlCacheSize, alloc)
 {
 }
 
@@ -174,7 +174,7 @@ inline T* concurrent_scratch_pool<T, Allocator>::get()
 		return &tl.localScratch[tl.localScratchIndex++];
 	}
 
-	if (!(tl.localScratchIndex < csp_detail::Default_Tl_Cache_Size)) {
+	if (!(tl.localScratchIndex < csp_detail::DefaultTlCacheSize)) {
 		reset_tl_scratch(tl);
 	}
 
@@ -221,14 +221,14 @@ inline void concurrent_scratch_pool<T, Allocator>::reset_tl_scratch(tl_container
 template<class T, class Allocator>
 inline T* concurrent_scratch_pool<T, Allocator>::acquire_tl_scratch()
 {
-	const size_type index(m_indexClaim.fetch_add(csp_detail::Default_Tl_Cache_Size, std::memory_order_relaxed));
+	const size_type index(m_indexClaim.fetch_add(csp_detail::DefaultTlCacheSize, std::memory_order_relaxed));
 
 	if (index < m_block.item_count()) {
 		return &m_block[index];
 	}
 
 	shared_ptr<excess_block> node(gdul::allocate_shared<excess_block>(m_allocator));
-	node->m_items = gdul::allocate_shared<T[]>(csp_detail::Default_Tl_Cache_Size, m_allocator);
+	node->m_items = gdul::allocate_shared<T[]>(csp_detail::DefaultTlCacheSize, m_allocator);
 
 	T* const ret(node->m_items.get());
 

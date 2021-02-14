@@ -4,12 +4,11 @@
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\source\gdul\WIP\concurrent_hash_map.h" />
-    <ClInclude Include="..\..\source\gdul\WIP\concurrent_hash_map_v2.h" />
     <ClInclude Include="..\..\source\gdul\utility\packed_ptr.h" />
+    <ClInclude Include="..\..\source\gdul\containers\concurrent_unordered_map.h" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="..\..\source\gdul\utility\packed_ptr.natvis" />
-    <Natvis Include="..\..\source\gdul\WIP\concurrent_hash_map.natvis" />
+    <Natvis Include="..\..\source\gdul\containers\concurrent_unordered_map.natvis" />
   </ItemGroup>
 </Project>
