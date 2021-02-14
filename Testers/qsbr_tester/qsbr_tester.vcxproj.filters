@@ -2,8 +2,9 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="..\..\source\gdul\WIP\qsbr.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\source\gdul\WIP\ebr.h" />
+    <ClInclude Include="..\..\source\gdul\WIP\qsbr.h" />
   </ItemGroup>
 </Project>
