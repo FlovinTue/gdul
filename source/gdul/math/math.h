@@ -44,22 +44,21 @@ constexpr bool is_prime(std::size_t value)
 		return false;
 	}
 
+	// Skip multiples of 2, 3, 5. We already know they aren't interesting from checks at top
+	constexpr std::uint8_t offsets[]{
+			0,
+			4,
+			6,
+			10,
+			12,
+			16,
+			22,
+			24
+	};
+
 	for (std::size_t div(7); !(value < div * div); div += 30) {
-
-		// Skip multiples of 2, 3, 5. We already know they aren't interesting from checks at top
-		const std::size_t divChecks[]{
-			div,
-			div + 4,
-			div + 6,
-			div + 10,
-			div + 12,
-			div + 16,
-			div + 22,
-			div + 24
-		};
-
-		for (auto& n : divChecks) {
-			if (value % n == 0) {
+		for (auto& offset : offsets) {
+			if (value % (div + offset) == 0) {
 				return false;
 			}
 		}

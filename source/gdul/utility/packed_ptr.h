@@ -36,19 +36,19 @@ constexpr std::uint8_t max_bottom_bits()
 	return i - 1;
 }
 
-constexpr std::uintptr_t Lower_Mask = alignof(std::max_align_t) - 1;
-constexpr std::uintptr_t Upper_Mask = ~(std::numeric_limits<std::uintptr_t>::max() >> 16);
-constexpr std::uintptr_t Ptr_Mask = ~Upper_Mask & ~Lower_Mask;
+constexpr std::uintptr_t LowerMask = alignof(std::max_align_t) - 1;
+constexpr std::uintptr_t UpperMask = ~(std::numeric_limits<std::uintptr_t>::max() >> 16);
+constexpr std::uintptr_t PtrMask = ~UpperMask & ~LowerMask;
 
 class packed_ptr_base
 {
 public:
-	static constexpr std::uint8_t Max_Extra_Bits = 16 + max_bottom_bits();
+	static constexpr std::uint8_t MaxExtraBits = 16 + max_bottom_bits();
 };
 }
 
 /// <summary>
-/// Packed ptr wrapper to store value in Max_Extra_Bits (16 + whatever bottom bits are avaliable). Assumes pointer at least std::max_align_t alignment
+/// Packed ptr wrapper to store value in MaxExtraBits (16 + whatever bottom bits are avaliable). Assumes pointer at least std::max_align_t alignment
 /// </summary>
 /// <typeparam name="P">Pointer type</typeparam>
 /// <typeparam name="ExtraBits">Extra value type, enum int etc</typeparam>
@@ -102,18 +102,18 @@ inline packed_ptr<P, ExtraBits>::packed_ptr(P* p, ExtraBits extraValue) noexcept
 template<class P, class ExtraBits>
 inline P* packed_ptr<P, ExtraBits>::ptr() noexcept
 {
-	return (P*)(m_storage & pp_detail::Ptr_Mask);
+	return (P*)(m_storage & pp_detail::PtrMask);
 }
 template<class P, class ExtraBits>
 inline const P* packed_ptr<P, ExtraBits>::ptr() const noexcept
 {
-	return (const P*)(m_storage & pp_detail::Ptr_Mask);
+	return (const P*)(m_storage & pp_detail::PtrMask);
 }
 template<class P, class ExtraBits>
 inline ExtraBits packed_ptr<P, ExtraBits>::extra() const noexcept
 {
-	const std::uintptr_t lower(m_storage & pp_detail::Lower_Mask);
-	const std::uintptr_t upper(m_storage & pp_detail::Upper_Mask);
+	const std::uintptr_t lower(m_storage & pp_detail::LowerMask);
+	const std::uintptr_t upper(m_storage & pp_detail::UpperMask);
 	const std::uintptr_t upperShift(upper >> (48 - pp_detail::max_bottom_bits()));
 
 	return (ExtraBits)(lower | upperShift);
@@ -122,10 +122,10 @@ template<class P, class ExtraBits>
 inline void packed_ptr<P, ExtraBits>::set_extra(ExtraBits value) noexcept
 {
 	const std::uintptr_t ivalue((std::uintptr_t)value);
-	const std::uintptr_t lower(ivalue & pp_detail::Lower_Mask);
+	const std::uintptr_t lower(ivalue & pp_detail::LowerMask);
 	const std::uintptr_t upper(ivalue << (48 - pp_detail::max_bottom_bits()));
-	const std::uintptr_t upperMasked(upper & pp_detail::Upper_Mask);
-	const std::uintptr_t ptr(m_storage & pp_detail::Ptr_Mask);
+	const std::uintptr_t upperMasked(upper & pp_detail::UpperMask);
+	const std::uintptr_t ptr(m_storage & pp_detail::PtrMask);
 
 	m_storage = (lower | ptr | upperMasked);
 }
@@ -134,7 +134,7 @@ inline void packed_ptr<P, ExtraBits>::set_ptr(P* p) noexcept
 {
 	const std::uintptr_t iptr((std::uintptr_t)p);
 	const std::uintptr_t existing(m_storage);
-	const std::uintptr_t existingCleaned(existing & ~pp_detail::Ptr_Mask);
+	const std::uintptr_t existingCleaned(existing & ~pp_detail::PtrMask);
 
 	m_storage = existingCleaned | iptr;
 }

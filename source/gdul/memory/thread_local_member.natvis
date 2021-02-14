@@ -26,11 +26,11 @@
 	<Type Name="gdul::thread_local_member&lt;*&gt;">
 		<DisplayString Condition="m_index &lt; t_tl_container.m_items.m_capacity &amp;&amp; !(t_tl_container.m_iteration &lt; m_iteration)">{t_tl_container.m_items.m_arrayRef[m_index]}</DisplayString>
 		<DisplayString Condition="!(m_index &lt; t_tl_container.m_items.m_capacity) || (t_tl_container.m_iteration &lt; m_iteration)">
-			{*(value_type*)((((((uint64_t*)((*(uint64_t*)((s_st_container.m_instanceTrackers.m_debugView.m_u64 &amp; asp_detail::Cb_Mask) + 8)) &amp; asp_detail::Owned_Mask))[m_index] &amp; asp_detail::Cb_Mask) + 24) &amp; asp_detail::Owned_Mask))}
+			{*(value_type*)((((((uint64_t*)((*(uint64_t*)((s_st_container.m_instanceTrackers.m_debugView.m_u64 &amp; asp_detail::CbMask) + 8)) &amp; asp_detail::OwnedMask))[m_index] &amp; asp_detail::CbMask) + 24) &amp; asp_detail::OwnedMask))}
 		</DisplayString>
 		<Expand>
 			<ExpandedItem Condition="!(m_index &lt; t_tl_container.m_items.m_capacity) || (t_tl_container.m_iteration &lt; m_iteration)">
-				(value_type*)((((((uint64_t*)((*(uint64_t*)((s_st_container.m_instanceTrackers.m_debugView.m_u64 &amp; asp_detail::Cb_Mask) + 8)) &amp; asp_detail::Owned_Mask))[m_index] &amp; asp_detail::Cb_Mask) + 24) &amp; asp_detail::Owned_Mask))
+				(value_type*)((((((uint64_t*)((*(uint64_t*)((s_st_container.m_instanceTrackers.m_debugView.m_u64 &amp; asp_detail::CbMask) + 8)) &amp; asp_detail::OwnedMask))[m_index] &amp; asp_detail::CbMask) + 24) &amp; asp_detail::OwnedMask))
 			</ExpandedItem>
 			<ExpandedItem Condition="m_index &lt; t_tl_container.m_items.m_capacity &amp;&amp; !(t_tl_container.m_iteration &lt; m_iteration)">
 				(&amp;t_tl_container.m_items.m_arrayRef[m_index])

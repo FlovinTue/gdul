@@ -20,7 +20,7 @@
 
 #pragma once
 
-#include <gdul/memory/scratch_allocator.h>
+#include <gdul/memory/scratch_pad.h>
 #include <gdul/utility/type_traits.h>
 
 #include <memory>
@@ -33,7 +33,7 @@ namespace gdul {
 namespace sv_detail {
 
 // Arbitrary small value
-constexpr std::size_t Default_Local_Storage = 6;
+constexpr std::size_t DefaultLocalStorage = 6;
 }
 
 /// <summary>
@@ -42,10 +42,10 @@ constexpr std::size_t Default_Local_Storage = 6;
 /// <typeparam name="T">Value type</typeparam>
 /// <typeparam name="LocalStorage">Items in local storage. If debug iterators are enabled, they may consume some of this space</typeparam>
 /// <typeparam name="Allocator">Allocator to use if capacity goes beyond local storage</typeparam>
-template <class T, std::size_t LocalStorage = sv_detail::Default_Local_Storage, class Allocator = std::allocator<T>>
+template <class T, std::size_t LocalStorage = sv_detail::DefaultLocalStorage, class Allocator = std::allocator<T>>
 class small_vector
 {
-	using internal_vector_type = std::vector<T, scratch_allocator<T, Allocator>>;
+	using internal_vector_type = std::vector<T, std::pmr::polymorphic_allocator<T>>;
 public:
 	using value_type = T;
 	using size_type = std::size_t;
@@ -157,76 +157,87 @@ public:
 	inline void pop_back() noexcept { m_vec.pop_back(); }
 
 private:
-	scratch_pad<LocalStorage * sizeof(T)> m_scratchPad;
+	scratch_pad<LocalStorage * sizeof(T), allocator_type> m_scratchPad;
 	internal_vector_type m_vec;
 };
 template<class T, std::size_t LocalStorage, class Allocator>
 inline small_vector<T, LocalStorage, Allocator>::small_vector() noexcept(false)
-	: m_vec(m_scratchPad.create_allocator<T, Allocator>())
+	: m_scratchPad()
+	, m_vec(std::pmr::polymorphic_allocator<T>(&m_scratchPad))
 {
 	m_vec.reserve(m_scratchPad.unused_storage() / sizeof(T));
 }
 template<class T, std::size_t LocalStorage, class Allocator>
 inline small_vector<T, LocalStorage, Allocator>::small_vector(const Allocator& alloc) noexcept(false)
-	: m_vec(m_scratchPad.create_allocator<T, Allocator>(alloc))
+	: m_scratchPad(alloc)
+	, m_vec(std::pmr::polymorphic_allocator<T>(&m_scratchPad))
 {
 	m_vec.reserve(m_scratchPad.unused_storage() / sizeof(T));
 }
 template<class T, std::size_t LocalStorage, class Allocator>
 inline small_vector<T, LocalStorage, Allocator>::small_vector(size_type count, const T& value, const Allocator& alloc)
-	: m_vec(count, value, m_scratchPad.create_allocator<T, Allocator>(alloc))
+	: m_scratchPad(alloc)
+	, m_vec(count, value, std::pmr::polymorphic_allocator<T>(&m_scratchPad))
 {
 }
 template<class T, std::size_t LocalStorage, class Allocator>
 inline small_vector<T, LocalStorage, Allocator>::small_vector(size_type count, const Allocator& alloc)
-	: m_vec(count, m_scratchPad.create_allocator<T, Allocator>(alloc))
+	: m_scratchPad(alloc)
+	, m_vec(count, std::pmr::polymorphic_allocator<T>(&m_scratchPad))
 {
 }
 template<class T, std::size_t LocalStorage, class Allocator>
 inline small_vector<T, LocalStorage, Allocator>::small_vector(const small_vector& other)
-	: m_vec(other.m_vec, m_scratchPad.create_allocator<T, Allocator>())
+	: m_scratchPad()
+	, m_vec(other.m_vec, std::pmr::polymorphic_allocator<T>(&m_scratchPad))
 {
 }
 template<class T, std::size_t LocalStorage, class Allocator>
 inline small_vector<T, LocalStorage, Allocator>::small_vector(const small_vector& other, const Allocator& alloc)
-	: m_vec(other.m_vec, m_scratchPad.create_allocator<T, Allocator>(alloc))
+	: m_scratchPad(alloc)
+	, m_vec(other.m_vec, std::pmr::polymorphic_allocator<T>(&m_scratchPad))
 {
 }
 template<class T, std::size_t LocalStorage, class Allocator>
 inline small_vector<T, LocalStorage, Allocator>::small_vector(small_vector&& other) noexcept(false)
-	: m_vec(other.m_scratchPad.owns(other.m_vec.data()) ? other.m_vec : std::move(other.m_vec), m_scratchPad.create_allocator<T, Allocator>())
+	: m_scratchPad()
+	, m_vec(other.m_scratchPad.owns(other.m_vec.data()) ? other.m_vec : std::move(other.m_vec), std::pmr::polymorphic_allocator<T>(&m_scratchPad))
 {
 }
 template<class T, std::size_t LocalStorage, class Allocator>
 inline small_vector<T, LocalStorage, Allocator>::small_vector(small_vector&& other, const Allocator& alloc) noexcept(false)
-	: m_vec(other.m_scratchPad.owns(other.m_vec.data()) ? other.m_vec : std::move(other.m_vec), m_scratchPad.create_allocator<T, Allocator>(alloc))
+	: m_scratchPad(alloc)
+	, m_vec(other.m_scratchPad.owns(other.m_vec.data()) ? other.m_vec : std::move(other.m_vec), std::pmr::polymorphic_allocator<T>(&m_scratchPad))
 {
 }
 template<class T, std::size_t LocalStorage, class Allocator>
 inline small_vector<T, LocalStorage, Allocator>::small_vector(std::initializer_list<T> init, const Allocator& alloc)
-	: m_vec(init, m_scratchPad.create_allocator<T, Allocator>(alloc))
+	: m_scratchPad(alloc)
+	, m_vec(init, std::pmr::polymorphic_allocator<T>(&m_scratchPad))
 {
 }
 template<class T, std::size_t LocalStorage, class Allocator>
 inline small_vector<T, LocalStorage, Allocator>::small_vector(std::vector<T, Allocator>&& vector) noexcept(false)
-	: m_vec(vector.begin(), vector.end(), m_scratchPad.create_allocator<T, Allocator>(vector.get_allocator()))
+	: m_scratchPad()
+	, m_vec(vector.begin(), vector.end(), std::pmr::polymorphic_allocator<T>(&m_scratchPad))
+{
+}
+template<class T, std::size_t LocalStorage, class Allocator>
+template<class InputIt>
+inline small_vector<T, LocalStorage, Allocator>::small_vector(InputIt first, InputIt last, const Allocator& alloc)
+	: m_scratchPad(alloc)
+	, m_vec(first, last, std::pmr::polymorphic_allocator<T>(&m_scratchPad))
 {
 }
 template<class T, std::size_t LocalStorage, class Allocator>
 inline small_vector<T, LocalStorage, Allocator>::small_vector(const std::vector<T, Allocator>& vector)
-	: m_vec(vector.begin(), vector.end(), m_scratchPad.create_allocator<T, Allocator>(vector.get_allocator()))
+	: m_vec(vector.begin(), vector.end(), std::pmr::polymorphic_allocator<T>(&m_scratchPad))
 {
 }
 template<class T, std::size_t LocalStorage, class Allocator>
 inline small_vector<T, LocalStorage, Allocator>::operator std::vector<T, Allocator>() const
 {
-	return std::vector<T, Allocator>(m_vec.begin(), m_vec.end(), m_vec.get_allocator().get_parent());
-}
-template<class T, std::size_t LocalStorage, class Allocator>
-template<class InputIt>
-inline small_vector<T, LocalStorage, Allocator>::small_vector(InputIt first, InputIt last, const Allocator& alloc)
-	: m_vec(first, last, m_scratchPad.create_allocator<T, Allocator>(alloc))
-{
+	return std::vector<T, Allocator>(m_vec.begin(), m_vec.end(), Allocator(m_scratchPad.get_parent_allocator()));
 }
 template<class T, std::size_t LocalStorage, class Allocator>
 inline small_vector<T, LocalStorage, Allocator>& small_vector<T, LocalStorage, Allocator>::operator=(const small_vector& right)
@@ -252,6 +263,6 @@ inline void small_vector<T, LocalStorage, Allocator>::swap(small_vector& other) 
 template<class T, std::size_t LocalStorage, class Allocator>
 inline typename small_vector<T, LocalStorage, Allocator>::allocator_type small_vector<T, LocalStorage, Allocator>::get_allocator() const noexcept
 {
-	return m_vec.get_allocator().get_parent();
+	return m_scratchPad.get_parent_allocator();
 }
 }

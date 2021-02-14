@@ -91,7 +91,7 @@ private:
 
 	job_graph m_jobGraph;
 
-	std::array<worker_impl, Max_Workers> m_workers;
+	std::array<worker_impl, MaxWorkers> m_workers;
 
 	std::atomic<std::uint16_t> m_workerIndices;
 

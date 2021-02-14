@@ -11,7 +11,7 @@
     <ClInclude Include="..\..\source\gdul\memory\concurrent_scratch_pool.h" />
     <ClInclude Include="..\..\source\gdul\memory\concurrent_guard_pool.h" />
     <ClInclude Include="..\..\source\gdul\containers\small_vector.h" />
-    <ClInclude Include="..\..\source\gdul\memory\scratch_allocator.h" />
+    <ClInclude Include="..\..\source\gdul\memory\scratch_pad.h" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="..\..\source\gdul\containers\small_vector.natvis" />

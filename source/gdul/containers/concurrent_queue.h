@@ -99,33 +99,30 @@ class buffer_deleter;
 
 enum class item_state : std::uint8_t
 {
-	Empty,
-	Valid,
-	Failed,
-	Dummy
+	empty,
+	valid,
+	failed,
+	dummy
 };
-
-template <class Dummy>
-constexpr std::size_t aligned_size(std::size_t byteSize, std::size_t align);
 
 template <class T, class Allocator>
 class shared_ptr_allocator_adaptor;
 
 // The maximum allowed consumption from a producer per visit
-static constexpr std::uint16_t Consumer_Force_Relocation_Pop_Count = 24;
+static constexpr std::uint16_t ConsumerForceRelocationPopCount = 24;
 // Maximum number of times the producer slot array can grow
-static constexpr std::uint8_t Producer_Slots_Max_Growth_Count = 15;
+static constexpr std::uint8_t ProducerSlotsMaxGrowthCount = 15;
 
-static constexpr std::size_t Initial_Producer_Capacity = 8;
+static constexpr std::size_t InitialProducerCapacity = 8;
 
-static constexpr std::uint16_t Max_Producers = std::numeric_limits<int16_t>::max() - 1;
+static constexpr std::uint16_t MaxProducers = std::numeric_limits<int16_t>::max() - 1;
 
 // Not quite size_type max because we need some leaway in case we
 // need to throw consumers out of a buffer whilst repairing it
-static constexpr size_type Buffer_Capacity_Max = ~(std::numeric_limits<size_type>::max() >> 3) / 2;
+static constexpr size_type BufferCapacityMax = ~(std::numeric_limits<size_type>::max() >> 3) / 2;
 
-static constexpr std::uint64_t Ptr_Mask = (std::uint64_t(std::numeric_limits<std::uint32_t>::max()) << 16 | std::uint64_t(std::numeric_limits<std::uint16_t>::max()));
-static constexpr size_type Buffer_Lock_Offset = Buffer_Capacity_Max + Max_Producers;
+static constexpr std::uint64_t PtrMask = (std::uint64_t(std::numeric_limits<std::uint32_t>::max()) << 16 | std::uint64_t(std::numeric_limits<std::uint16_t>::max()));
+static constexpr size_type BufferLockOffset = BufferCapacityMax + MaxProducers;
 
 }
 // MPMC unbounded lock-free queue. FIFO is respected within the context of single producers.
@@ -262,7 +259,7 @@ inline void concurrent_queue<T, Allocator>::push_internal(In&& in)
 			add_producer_buffer();
 		}
 		else {
-			init_producer(cqdetail::Initial_Producer_Capacity);
+			init_producer(cqdetail::InitialProducerCapacity);
 		}
 
 		refresh_cached_producer();
@@ -279,7 +276,7 @@ bool concurrent_queue<T, Allocator>::try_pop(T& out)
 		}
 	}
 
-	if ((1 < m_producerCount.load(std::memory_order_relaxed)) && !(++t_cachedAccesses.m_lastConsumer.m_counter < cqdetail::Consumer_Force_Relocation_Pop_Count)) {
+	if ((1 < m_producerCount.load(std::memory_order_relaxed)) && !(++t_cachedAccesses.m_lastConsumer.m_counter < cqdetail::ConsumerForceRelocationPopCount)) {
 		relocate_consumer();
 		t_cachedAccesses.m_lastConsumer.m_counter = 0;
 	}
@@ -295,7 +292,7 @@ inline void concurrent_queue<T, Allocator>::reserve(typename concurrent_queue<T,
 		init_producer(capacity);
 	}
 	else if (producer->get_capacity() < capacity) {
-		const size_type log2Capacity(align_value_pow2(capacity, cqdetail::Buffer_Capacity_Max));
+		const size_type log2Capacity(align_value_pow2(capacity, cqdetail::BufferCapacityMax));
 		shared_ptr_slot_type buffer(create_producer_buffer(log2Capacity));
 		producer->push_front(buffer);
 		producer = std::move(buffer);
@@ -431,7 +428,7 @@ inline bool concurrent_queue<T, Allocator>::relocate_consumer()
 template<class T, class Allocator>
 inline typename concurrent_queue<T, Allocator>::shared_ptr_slot_type concurrent_queue<T, Allocator>::create_producer_buffer(std::size_t withSize)
 {
-	const std::size_t log2size(align_value_pow2(withSize, cqdetail::Buffer_Capacity_Max));
+	const std::size_t log2size(align_value_pow2(withSize, cqdetail::BufferCapacityMax));
 
 	const std::size_t alignOfData(alignof(T));
 
@@ -587,7 +584,7 @@ inline void concurrent_queue<T, Allocator>::try_swap_producer_count(std::uint16_
 template<class T, class Allocator>
 inline typename concurrent_queue<T, Allocator>::buffer_type* concurrent_queue<T, Allocator>::this_producer_cached()
 {
-	if ((t_cachedAccesses.m_lastProducer.m_addrBlock & cqdetail::Ptr_Mask) ^ reinterpret_cast<std::uintptr_t>(this)) {
+	if ((t_cachedAccesses.m_lastProducer.m_addrBlock & cqdetail::PtrMask) ^ reinterpret_cast<std::uintptr_t>(this)) {
 		refresh_cached_producer();
 	}
 	return t_cachedAccesses.m_lastProducer.m_buffer;
@@ -596,7 +593,7 @@ inline typename concurrent_queue<T, Allocator>::buffer_type* concurrent_queue<T,
 template<class T, class Allocator>
 inline typename concurrent_queue<T, Allocator>::buffer_type* concurrent_queue<T, Allocator>::this_consumer_cached()
 {
-	if ((t_cachedAccesses.m_lastConsumer.m_addrBlock & cqdetail::Ptr_Mask) ^ reinterpret_cast<std::uintptr_t>(this)) {
+	if ((t_cachedAccesses.m_lastConsumer.m_addrBlock & cqdetail::PtrMask) ^ reinterpret_cast<std::uintptr_t>(this)) {
 		refresh_cached_consumer();
 	}
 	return t_cachedAccesses.m_lastConsumer.m_buffer;
@@ -751,12 +748,12 @@ inline bool producer_buffer<T, Allocator>::is_active() const
 template<class T, class Allocator>
 inline bool producer_buffer<T, Allocator>::is_valid() const
 {
-	return m_dataBlock[m_writeSlot % m_capacity].get_state_local() != item_state::Dummy;
+	return m_dataBlock[m_writeSlot % m_capacity].get_state_local() != item_state::dummy;
 }
 template<class T, class Allocator>
 inline void producer_buffer<T, Allocator>::invalidate()
 {
-	m_dataBlock[m_writeSlot % m_capacity].set_state(item_state::Dummy);
+	m_dataBlock[m_writeSlot % m_capacity].set_state(item_state::dummy);
 	if (m_next) {
 		m_next.unsafe_get()->invalidate();
 	}
@@ -827,7 +824,7 @@ inline bool producer_buffer<T, Allocator>::verify_successor(const shared_ptr_slo
 		for (size_type i = 0; i < inspect->m_capacity; ++i) {
 			const size_type index((preRead - i) % inspect->m_capacity);
 
-			if (inspect->m_dataBlock[index].get_state_local() != item_state::Empty) {
+			if (inspect->m_dataBlock[index].get_state_local() != item_state::empty) {
 				return false;
 			}
 		}
@@ -853,7 +850,7 @@ inline void producer_buffer<T, Allocator>::check_for_damage()
 {
 #ifdef GDUL_EXCEPTIONS
 	const size_type preRead(m_preReadSync.load(std::memory_order_acquire));
-	const size_type preReadLockOffset(preRead - Buffer_Lock_Offset);
+	const size_type preReadLockOffset(preRead - BufferLockOffset);
 	if (preReadLockOffset != m_read.load(std::memory_order_acquire)) {
 		return;
 	}
@@ -863,7 +860,7 @@ inline void producer_buffer<T, Allocator>::check_for_damage()
 	const std::uint16_t difference(failiureCount - failiureIndex);
 
 	const bool failCheckA(0 == difference);
-	const bool failCheckB(!(difference < cqdetail::Max_Producers));
+	const bool failCheckB(!(difference < cqdetail::MaxProducers));
 	if (failCheckA | failCheckB) {
 		return;
 	}
@@ -877,7 +874,7 @@ inline void producer_buffer<T, Allocator>::check_for_damage()
 
 		m_read.fetch_sub(toReintegrate);
 		m_readSlot.fetch_sub(toReintegrate);
-		m_preReadSync.fetch_sub(Buffer_Lock_Offset + toReintegrate);
+		m_preReadSync.fetch_sub(BufferLockOffset + toReintegrate);
 	}
 #endif
 }
@@ -901,7 +898,7 @@ inline void producer_buffer<T, Allocator>::unsafe_clear()
 	m_readSlot.store(written, std::memory_order_relaxed);
 
 	for (size_type i = 0; i < m_capacity; ++i) {
-		m_dataBlock[i].set_state_local(item_state::Empty);
+		m_dataBlock[i].set_state_local(item_state::empty);
 	}
 
 #ifdef GDUL_EXCEPTIONS
@@ -921,14 +918,14 @@ inline bool producer_buffer<T, Allocator>::try_push(In&& in)
 	const size_type slotTotal(m_writeSlot++);
 	const size_type slot(slotTotal % m_capacity);
 
-	if (m_dataBlock[slot].get_state_local() != item_state::Empty) {
+	if (m_dataBlock[slot].get_state_local() != item_state::empty) {
 		--m_writeSlot;
 		return false;
 	}
 
 	write_in(slot, std::forward<In>(in));
 
-	m_dataBlock[slot].set_state_local(item_state::Valid);
+	m_dataBlock[slot].set_state_local(item_state::valid);
 
 	std::atomic_thread_fence(std::memory_order_release);
 
@@ -1008,13 +1005,13 @@ template<class T, class Allocator>
 template <class U, std::enable_if_t<GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) || GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>*>
 inline void producer_buffer<T, Allocator>::post_pop_cleanup(typename producer_buffer<T, Allocator>::size_type readSlot)
 {
-	m_dataBlock[readSlot].set_state(item_state::Empty);
+	m_dataBlock[readSlot].set_state(item_state::empty);
 }
 template<class T, class Allocator>
 template <class U, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) && !GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>*>
 inline void producer_buffer<T, Allocator>::post_pop_cleanup(typename producer_buffer<T, Allocator>::size_type readSlot)
 {
-	m_dataBlock[readSlot].set_state(item_state::Empty);
+	m_dataBlock[readSlot].set_state(item_state::empty);
 #ifdef GDUL_EXCEPTIONS
 	m_dataBlock[readSlot].reset_ref();
 	m_read.fetch_add(1, std::memory_order_acq_rel);
@@ -1038,9 +1035,9 @@ inline void producer_buffer<T, Allocator>::write_out(typename producer_buffer<T,
 	}
 	catch (...) {
 		if (m_failureCount.fetch_add(1, std::memory_order_acq_rel) == m_failureIndex.load(std::memory_order_acq_rel)) {
-			m_preReadSync.fetch_add(Buffer_Lock_Offset, std::memory_order_acq_rel);
+			m_preReadSync.fetch_add(BufferLockOffset, std::memory_order_acq_rel);
 		}
-		m_dataBlock[slot].set_state(item_state::Failed);
+		m_dataBlock[slot].set_state(item_state::failed);
 		m_read.fetch_add(1, std::memory_order_acq_rel);
 		throw;
 	}
@@ -1061,12 +1058,12 @@ inline void producer_buffer<T, Allocator>::reintegrate_failed_entries(typename p
 		item_container<T>& currentItem(m_dataBlock[currentIndex]);
 		const item_state currentState(currentItem.get_state_local());
 
-		if (currentState == item_state::Failed) {
+		if (currentState == item_state::failed) {
 			const size_type toRedirectIndex((startIndex - numRedirected) % m_capacity);
 			item_container<T>& toRedirect(m_dataBlock[toRedirectIndex]);
 
 			toRedirect.redirect(currentItem);
-			currentItem.set_state_local(item_state::Valid);
+			currentItem.set_state_local(item_state::valid);
 			++numRedirected;
 		}
 	}
@@ -1130,7 +1127,7 @@ inline item_container<T>::item_container()
 #ifdef GDUL_EXCEPTIONS
 	, m_reference(this)
 #else
-	, m_state(item_state::Empty)
+	, m_state(item_state::empty)
 #endif
 {
 }
@@ -1156,8 +1153,8 @@ inline void item_container<T>::store(T&& in)
 template<class T>
 inline void item_container<T>::redirect(item_container<T>& to)
 {
-	const std::uint64_t otherPtrBlock(to.m_stateBlock & Ptr_Mask);
-	m_stateBlock &= ~Ptr_Mask;
+	const std::uint64_t otherPtrBlock(to.m_stateBlock & PtrMask);
+	m_stateBlock &= ~PtrMask;
 	m_stateBlock |= otherPtrBlock;
 }
 #endif
@@ -1210,7 +1207,7 @@ inline item_state item_container<T>::get_state_local() const
 template<class T>
 inline item_container<T>& item_container<T>::reference() const
 {
-	return *reinterpret_cast<item_container<T>*>(m_stateBlock & Ptr_Mask);
+	return *reinterpret_cast<item_container<T>*>(m_stateBlock & PtrMask);
 }
 #endif
 template<class T>
@@ -1338,7 +1335,7 @@ public:
 };
 template<class T, class Allocator>
 inline dummy_container<T, Allocator>::dummy_container()
-	: m_dummyItem(item_state::Dummy)
+	: m_dummyItem(item_state::dummy)
 	, m_dummyRawBuffer(1, &m_dummyItem)
 {
 	Allocator alloc;

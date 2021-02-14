@@ -42,7 +42,7 @@ using size_type = std::uint32_t;
 // The max instances of one tlm type placed directly in the thread_local storage space (tlm->thread_local). 
 // Beyond this count, new objects are instead allocated on an array (tlm->thread_local->array).
 // May be altered.
-static constexpr size_type Static_Alloc_Size = 3;
+static constexpr size_type StaticAllocSize = 3;
 
 template <class T, class Allocator>
 class alignas(alignof(T) < alignof(std::max_align_t) ? alignof(std::max_align_t) : alignof(T)) flexible_storage;
@@ -162,7 +162,7 @@ constexpr std::array<T, ArraySize> make_array(Args&&... args);
 // Abstraction to enable members to be thread local. Internally, fast path contains 1 integer 
 // comparison, and is potentially invalidated when the accessing thread sees a not-before seen object. 
 // If the number of tlm instances of the same type (e.g tlm<int> != tlm<float>)
-// does not exceed gdul::tlm_detail::Static_Alloc_Size, objects will be located in the corresponding
+// does not exceed gdul::tlm_detail::StaticAllocSize, objects will be located in the corresponding
 // thread's thread_local storage block(local->thread_local) else it will be mapped to an external
 // array (local->thread_local->array). 
 template <class T, class Allocator>
@@ -572,12 +572,12 @@ private:
 	void destroy_static() noexcept;
 	void destroy_dynamic() noexcept;
 
-	std::array<T, tlm_detail::Static_Alloc_Size>& get_static() noexcept;
+	std::array<T, tlm_detail::StaticAllocSize>& get_static() noexcept;
 	std::vector<T, Allocator>& get_dynamic() noexcept;
 
 	union
 	{
-		std::uint8_t m_staticStorage[sizeof(std::array<T, tlm_detail::Static_Alloc_Size>)];
+		std::uint8_t m_staticStorage[sizeof(std::array<T, tlm_detail::StaticAllocSize>)];
 		std::uint8_t m_dynamicStorage[sizeof(std::vector<T, Allocator>)];
 	};
 	T* m_arrayRef;
@@ -594,7 +594,7 @@ inline flexible_storage<T, Allocator>::flexible_storage() noexcept
 template<class T, class Allocator>
 inline flexible_storage<T, Allocator>::~flexible_storage() noexcept
 {
-	if (!(Static_Alloc_Size < m_capacity)) {
+	if (!(StaticAllocSize < m_capacity)) {
 		destroy_static();
 	}
 	else {
@@ -628,7 +628,7 @@ inline size_type flexible_storage<T, Allocator>::capacity() const noexcept
 template<class T, class Allocator>
 inline T* flexible_storage<T, Allocator>::get_array_ref() noexcept
 {
-	if (!(Static_Alloc_Size < m_capacity)) {
+	if (!(StaticAllocSize < m_capacity)) {
 		return &get_static()[0];
 	}
 
@@ -637,13 +637,13 @@ inline T* flexible_storage<T, Allocator>::get_array_ref() noexcept
 template<class T, class Allocator>
 inline void flexible_storage<T, Allocator>::grow_to_size(size_type capacity, Allocator& allocator)
 {
-	if (!(Static_Alloc_Size < capacity)) {
+	if (!(StaticAllocSize < capacity)) {
 		if (!m_capacity) {
 			construct_static();
 		}
 	}
 	else {
-		if (!(Static_Alloc_Size < m_capacity)) {
+		if (!(StaticAllocSize < m_capacity)) {
 			construct_dynamic(capacity, allocator);
 		}
 
@@ -655,7 +655,7 @@ inline void flexible_storage<T, Allocator>::grow_to_size(size_type capacity, All
 template<class T, class Allocator>
 inline void flexible_storage<T, Allocator>::construct_static()
 {
-	new ((std::array<T, Static_Alloc_Size>*) & m_staticStorage[0]) std::array<T, Static_Alloc_Size>();
+	new ((std::array<T, StaticAllocSize>*) & m_staticStorage[0]) std::array<T, StaticAllocSize>();
 
 }
 template<class T, class Allocator>
@@ -684,9 +684,9 @@ inline void flexible_storage<T, Allocator>::destroy_dynamic() noexcept
 	get_dynamic().~vector();
 }
 template<class T, class Allocator>
-inline std::array<T, tlm_detail::Static_Alloc_Size>& flexible_storage<T, Allocator>::get_static() noexcept
+inline std::array<T, tlm_detail::StaticAllocSize>& flexible_storage<T, Allocator>::get_static() noexcept
 {
-	return *reinterpret_cast<std::array<T, Static_Alloc_Size>*>(&m_staticStorage[0]);
+	return *reinterpret_cast<std::array<T, StaticAllocSize>*>(&m_staticStorage[0]);
 }
 template<class T, class Allocator>
 inline std::vector<T, Allocator>& flexible_storage<T, Allocator>::get_dynamic() noexcept

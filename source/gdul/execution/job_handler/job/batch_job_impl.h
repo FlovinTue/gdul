@@ -83,9 +83,9 @@ public:
 	std::size_t get_output_size() const noexcept override final;
 
 private:
-	static constexpr bool Specialize_Input_Output = std::is_same_v<bool, typename process_type::return_type> && process_type::Num_Args == 2;
-	static constexpr bool Specialize_Input = std::is_same_v<bool, typename process_type::return_type> && process_type::Num_Args == 1;
-	static constexpr bool Specialize_Update = (!std::is_same_v<bool, typename process_type::return_type>) && process_type::Num_Args == 1;
+	static constexpr bool SpecializeInputOutput = std::is_same_v<bool, typename process_type::return_type> && process_type::NumArgs == 2;
+	static constexpr bool SpecializeInput = std::is_same_v<bool, typename process_type::return_type> && process_type::NumArgs == 1;
+	static constexpr bool SpecializeUpdate = (!std::is_same_v<bool, typename process_type::return_type>) && process_type::NumArgs == 1;
 
 	std::size_t to_batch_begin(std::size_t batchIndex) const;
 	std::size_t to_batch_end(std::size_t batchIndex) const;
@@ -95,23 +95,23 @@ private:
 	template <class Fun>
 	job make_work_slice(Fun fun, std::size_t batchIndex, std::size_t variationId, const std::string_view& name);
 
-	template <class U = batch_job_impl, std::enable_if_t<U::Specialize_Input_Output>* = nullptr>
+	template <class U = batch_job_impl, std::enable_if_t<U::SpecializeInputOutput>* = nullptr>
 	void work_process(std::size_t batchIndex);
-	template <class U = batch_job_impl, std::enable_if_t<U::Specialize_Input>* = nullptr>
+	template <class U = batch_job_impl, std::enable_if_t<U::SpecializeInput>* = nullptr>
 	void work_process(std::size_t batchIndex);
-	template <class U = batch_job_impl, std::enable_if_t<U::Specialize_Update>* = nullptr>
+	template <class U = batch_job_impl, std::enable_if_t<U::SpecializeUpdate>* = nullptr>
 	void work_process(std::size_t batchIndex);
 
-	template <class U = batch_job_impl, std::enable_if_t<!U::Specialize_Update>* = nullptr>
+	template <class U = batch_job_impl, std::enable_if_t<!U::SpecializeUpdate>* = nullptr>
 	void make_jobs();
-	template <class U = batch_job_impl, std::enable_if_t<U::Specialize_Update>* = nullptr>
+	template <class U = batch_job_impl, std::enable_if_t<U::SpecializeUpdate>* = nullptr>
 	void make_jobs();
 
 	void initialize();
 
-	template <class U = batch_job_impl, std::enable_if_t<!U::Specialize_Update>* = nullptr>
+	template <class U = batch_job_impl, std::enable_if_t<!U::SpecializeUpdate>* = nullptr>
 	void finalize();
-	template <class U = batch_job_impl, std::enable_if_t<U::Specialize_Update>* = nullptr>
+	template <class U = batch_job_impl, std::enable_if_t<U::SpecializeUpdate>* = nullptr>
 	void finalize();
 
 	void work_pack(std::size_t batchIndex);
@@ -121,7 +121,7 @@ private:
 	GDUL_JOB_DEBUG_CONDTIONAL(timer m_completionTimer)
 	GDUL_JOB_DEBUG_CONDTIONAL(timer m_enqueueTimer)
 
-	std::array<std::uint32_t, Batch_Job_Max_Slices> m_batchTracker;
+	std::array<std::uint32_t, BatchJobMaxSlices> m_batchTracker;
 
 	process_type m_process;
 
@@ -185,7 +185,7 @@ inline std::uint32_t batch_job_impl<InContainer, OutContainer, Process>::clamp_b
 {
 	const std::size_t resultantBatchCount(m_input.size() / desired + ((bool)(m_input.size() % desired)));
 	const float resultF((float)resultantBatchCount);
-	const float maxBatchCount((float)Batch_Job_Max_Slices);
+	const float maxBatchCount((float)BatchJobMaxSlices);
 
 	const float div(resultF / maxBatchCount);
 
@@ -290,7 +290,7 @@ inline job batch_job_impl<InContainer, OutContainer, Process>::make_work_slice(F
 	return _redirect_make_job(m_handler, delegate<void()>(fun, this, batchIndex), m_target, m_info->id(), variationId, name);
 }
 template<class InContainer, class OutContainer, class Process>
-template <class U, std::enable_if_t<U::Specialize_Input>*>
+template <class U, std::enable_if_t<U::SpecializeInput>*>
 inline void batch_job_impl<InContainer, OutContainer, Process>::work_process(std::size_t batchIndex)
 {
 	const std::size_t inputBegin(to_batch_begin(batchIndex));
@@ -315,7 +315,7 @@ inline void batch_job_impl<InContainer, OutContainer, Process>::work_process(std
 	m_batchTracker[batchIndex] = (std::uint32_t)batchOutputSize;
 }
 template<class InContainer, class OutContainer, class Process>
-template <class U, std::enable_if_t<U::Specialize_Update>*>
+template <class U, std::enable_if_t<U::SpecializeUpdate>*>
 inline void batch_job_impl<InContainer, OutContainer, Process>::work_process(std::size_t batchIndex)
 {
 	const std::size_t inputBegin(to_batch_begin(batchIndex));
@@ -328,7 +328,7 @@ inline void batch_job_impl<InContainer, OutContainer, Process>::work_process(std
 	}
 }
 template<class InContainer, class OutContainer, class Process>
-template <class U, std::enable_if_t<U::Specialize_Input_Output>*>
+template <class U, std::enable_if_t<U::SpecializeInputOutput>*>
 inline void batch_job_impl<InContainer, OutContainer, Process>::work_process(std::size_t batchIndex)
 {
 	const std::size_t inputBegin(to_batch_begin(batchIndex));
@@ -351,7 +351,7 @@ inline void batch_job_impl<InContainer, OutContainer, Process>::work_process(std
 	m_batchTracker[batchIndex] = (std::uint32_t)batchOutputSize;
 }
 template<class InContainer, class OutContainer, class Process>
-template <class U, std::enable_if_t<!U::Specialize_Update>*>
+template <class U, std::enable_if_t<!U::SpecializeUpdate>*>
 inline void batch_job_impl<InContainer, OutContainer, Process>::make_jobs()
 {
 	std::size_t variationCounter(2);
@@ -387,7 +387,7 @@ inline void batch_job_impl<InContainer, OutContainer, Process>::make_jobs()
 	std::invoke(m_enableFunc, &m_end);
 }
 template<class InContainer, class OutContainer, class Process>
-template <class U, std::enable_if_t<U::Specialize_Update>*>
+template <class U, std::enable_if_t<U::SpecializeUpdate>*>
 inline void batch_job_impl<InContainer, OutContainer, Process>::make_jobs()
 {
 	std::size_t variationCounter(2);
@@ -436,7 +436,7 @@ inline void batch_job_impl<InContainer, OutContainer, Process>::work_pack(std::s
 	m_batchTracker[batchIndex] = (std::uint32_t)(lastBatchEnd + batchSize);
 }
 template<class InContainer, class OutContainer, class Process>
-template <class U, std::enable_if_t<!U::Specialize_Update>*>
+template <class U, std::enable_if_t<!U::SpecializeUpdate>*>
 inline void batch_job_impl<InContainer, OutContainer, Process>::finalize()
 {
 	if (1 < m_batchCount) {
@@ -450,7 +450,7 @@ inline void batch_job_impl<InContainer, OutContainer, Process>::finalize()
 	const shared_ptr<batch_job_impl_interface> selfRef(m_selfRef.unsafe_exchange(shared_ptr<batch_job_impl_interface>(nullptr), std::memory_order_relaxed));
 }
 template<class InContainer, class OutContainer, class Process>
-template <class U, std::enable_if_t<U::Specialize_Update>*>
+template <class U, std::enable_if_t<U::SpecializeUpdate>*>
 inline void batch_job_impl<InContainer, OutContainer, Process>::finalize()
 {
 	GDUL_JOB_DEBUG_CONDTIONAL(if (m_info)m_info->m_completionTimeSet.log_time(m_completionTimer.elapsed()))

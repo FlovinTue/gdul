@@ -46,10 +46,10 @@ namespace cgp_detail {
 using size_type = std::size_t;
 using defaul_allocator = std::allocator<std::uint8_t>;
 
-constexpr size_type Defaul_Block_Size = 16;
-constexpr size_type Defaul_Tl_Cache_Size = 4;
-constexpr size_type Max_Users = 16;
-constexpr std::uint8_t Capacity_Bits = 19;
+constexpr size_type DefaulBlockSize = 16;
+constexpr size_type DefaulTlCacheSize = 4;
+constexpr size_type MaxUsers = 16;
+constexpr std::uint8_t CapacityBits = 19;
 
 struct critical_sec;
 
@@ -67,7 +67,7 @@ public:
 	using size_type = typename cgp_detail::size_type;
 	using allocator_type = Allocator;
 
-	constexpr static size_type Max_Capacity = size_type(std::numeric_limits<std::uint16_t>::max() << 3) | size_type(1 | 2 | 4);
+	constexpr static size_type MaxCapacity = size_type(std::numeric_limits<std::uint16_t>::max() << 3) | size_type(1 | 2 | 4);
 
 	/// <summary>
 	/// constructor
@@ -151,7 +151,7 @@ private:
 		std::uintptr_t m_blockKey = 0;
 
 		std::atomic<size_type> m_pushSync = 0;
-		std::atomic<size_type> m_livingItems = Max_Capacity;
+		std::atomic<size_type> m_livingItems = MaxCapacity;
 	};
 
 	using tl_cache = shared_ptr<T* []>;
@@ -173,12 +173,12 @@ private:
 		tl_cache m_cache;
 		tl_cache m_deferredReclaimCache;
 
-		size_type m_cacheIndex = Max_Capacity;
-		size_type m_reclaimCacheIndex = Max_Capacity;
+		size_type m_cacheIndex = MaxCapacity;
+		size_type m_reclaimCacheIndex = MaxCapacity;
 
 		size_type m_userIndex = std::numeric_limits<size_type>::max();
 
-		std::array<size_type, cgp_detail::Max_Users> m_indexCache{};
+		std::array<size_type, cgp_detail::MaxUsers> m_indexCache{};
 
 		std::vector<std::pair<size_type, tl_cache>> m_deferredReclaimCaches;
 
@@ -210,9 +210,9 @@ private:
 
 	alignas(std::hardware_destructive_interference_size) concurrent_queue<tl_cache, Allocator> m_fullCaches;
 	alignas(std::hardware_destructive_interference_size) concurrent_queue<tl_cache, Allocator> m_emptyCaches;
-	alignas(std::hardware_destructive_interference_size) std::array<cgp_detail::user_index, cgp_detail::Max_Users> m_indices;
+	alignas(std::hardware_destructive_interference_size) std::array<cgp_detail::user_index, cgp_detail::MaxUsers> m_indices;
 
-	block_node m_blocks[cgp_detail::Capacity_Bits];
+	block_node m_blocks[cgp_detail::CapacityBits];
 
 	// Shameless reuse of index pool from tlm
 	shared_ptr<tlm_detail::index_pool<void>> m_indexPool;
@@ -228,12 +228,12 @@ private:
 
 template<class T, class Allocator>
 inline concurrent_guard_pool<T, Allocator>::concurrent_guard_pool()
-	: concurrent_guard_pool(cgp_detail::Defaul_Block_Size, cgp_detail::Defaul_Tl_Cache_Size, Allocator())
+	: concurrent_guard_pool(cgp_detail::DefaulBlockSize, cgp_detail::DefaulTlCacheSize, Allocator())
 {
 }
 template<class T, class Allocator>
 inline concurrent_guard_pool<T, Allocator>::concurrent_guard_pool(Allocator allocator)
-	: concurrent_guard_pool(cgp_detail::Defaul_Block_Size, cgp_detail::Defaul_Tl_Cache_Size, allocator)
+	: concurrent_guard_pool(cgp_detail::DefaulBlockSize, cgp_detail::DefaulTlCacheSize, allocator)
 {
 }
 template<class T, class Allocator>
@@ -266,10 +266,10 @@ inline concurrent_guard_pool<T, Allocator>::concurrent_guard_pool(size_type base
 {
 	assert(baseCapacity && tlCacheSize && "Cannot instantiate pool with zero sizes");
 
-	for (std::uint8_t i = 0; i < cgp_detail::Capacity_Bits; ++i)
+	for (std::uint8_t i = 0; i < cgp_detail::CapacityBits; ++i)
 		m_blocks[i].m_livingItems.store((size_type)std::pow(2.f, (float)(i + 1)), std::memory_order_relaxed);
 
-	const size_type alignedSize(align_value_pow2(baseCapacity, Max_Capacity));
+	const size_type alignedSize(align_value_pow2(baseCapacity, MaxCapacity));
 	m_tlCacheSize = (size_type)align_value_pow2(tlCacheSize, alignedSize);
 
 	const std::uint8_t blockIndex((std::uint8_t)std::log2f((float)alignedSize) - 1);
@@ -356,7 +356,7 @@ inline bool concurrent_guard_pool<T, Allocator>::is_up_to_date(const T* item) co
 	if (is_contained_within(item, m_blocks[lastBlock].m_blockKey)) {
 		return true;
 	}
-	if (is_contained_within(item, m_blocks[nextBlock].m_blockKey) && blocksEnd < cgp_detail::Capacity_Bits) {
+	if (is_contained_within(item, m_blocks[nextBlock].m_blockKey) && blocksEnd < cgp_detail::CapacityBits) {
 		return true;
 	}
 	return false;
@@ -442,7 +442,7 @@ inline typename concurrent_guard_pool<T, Allocator>::size_type concurrent_guard_
 {
 	const size_type userIndex(tl.m_userIndex);
 
-	assert(userIndex < cgp_detail::Max_Users && "Too many active threads accessing this structure");
+	assert(userIndex < cgp_detail::MaxUsers && "Too many active threads accessing this structure");
 
 	return userIndex;
 }
@@ -483,7 +483,7 @@ inline bool concurrent_guard_pool<T, Allocator>::is_contained_within(const T* it
 template<class T, class Allocator>
 inline typename concurrent_guard_pool<T, Allocator>::size_type concurrent_guard_pool<T, Allocator>::to_capacity(std::uintptr_t blockKey)
 {
-	constexpr std::uintptr_t toShift(64 - cgp_detail::Capacity_Bits);
+	constexpr std::uintptr_t toShift(64 - cgp_detail::CapacityBits);
 	const std::uintptr_t capacity(blockKey >> toShift);
 
 	return (size_type)capacity;
@@ -491,7 +491,7 @@ inline typename concurrent_guard_pool<T, Allocator>::size_type concurrent_guard_
 template<class T, class Allocator>
 inline const T* concurrent_guard_pool<T, Allocator>::to_begin(std::uintptr_t blockKey)
 {
-	const std::uintptr_t noCapacity(blockKey << cgp_detail::Capacity_Bits);
+	const std::uintptr_t noCapacity(blockKey << cgp_detail::CapacityBits);
 	const std::uintptr_t ptrBlock(noCapacity >> 16);
 
 	return (const T*)ptrBlock;
@@ -499,7 +499,7 @@ inline const T* concurrent_guard_pool<T, Allocator>::to_begin(std::uintptr_t blo
 template<class T, class Allocator>
 inline std::uintptr_t concurrent_guard_pool<T, Allocator>::to_block_key(const T* begin, size_type capacity)
 {
-	constexpr std::uintptr_t toShift((sizeof(std::uintptr_t) * 8) - cgp_detail::Capacity_Bits);
+	constexpr std::uintptr_t toShift((sizeof(std::uintptr_t) * 8) - cgp_detail::CapacityBits);
 	const std::uintptr_t capacityBase(capacity);
 	const std::uintptr_t capacityShift(capacityBase << toShift);
 	const std::uintptr_t ptrBase((std::uintptr_t)begin);
@@ -526,9 +526,9 @@ inline void concurrent_guard_pool<T, Allocator>::discard_item(const T* item)
 template<class T, class Allocator>
 inline void concurrent_guard_pool<T, Allocator>::try_alloc_block(std::uint8_t blockIndex)
 {
-	assert((blockIndex < cgp_detail::Capacity_Bits) && "Capacity overflow");
+	assert((blockIndex < cgp_detail::CapacityBits) && "Capacity overflow");
 
-	if (!(blockIndex < cgp_detail::Capacity_Bits))
+	if (!(blockIndex < cgp_detail::CapacityBits))
 		return;
 
 	shared_ptr<T[]> expected(m_blocks[blockIndex].m_items.load(std::memory_order_relaxed));

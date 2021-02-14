@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|x64">
@@ -96,7 +96,7 @@
     <ClInclude Include="..\..\source\gdul\memory\concurrent_object_pool.h" />
     <ClInclude Include="..\..\source\gdul\memory\concurrent_scratch_pool.h" />
     <ClInclude Include="..\..\source\gdul\memory\pool_allocator.h" />
-    <ClInclude Include="..\..\source\gdul\memory\scratch_allocator.h" />
+    <ClInclude Include="..\..\source\gdul\memory\scratch_pad.h" />
     <ClInclude Include="pch.h" />
   </ItemGroup>
   <ItemGroup>

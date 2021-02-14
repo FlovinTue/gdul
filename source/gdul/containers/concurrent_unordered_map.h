@@ -39,12 +39,12 @@ namespace gdul {
 namespace chm_detail {
 using size_type = std::size_t;
 
-constexpr size_type Default_Capacity = 32;
-constexpr std::uint8_t Growth_Multiple = 2;
+constexpr size_type DefaultCapacity = 32;
+constexpr std::uint8_t GrowthMultiple = (std::uint8_t)2;
 
 constexpr size_type to_bucket_count(size_type desiredCapacity)
 {
-	return desiredCapacity * Growth_Multiple;
+	return desiredCapacity * GrowthMultiple;
 }
 
 template <class Map>
@@ -334,13 +334,13 @@ private:
 };
 template<class Key, class Value, class Hash, class Allocator>
 inline concurrent_unordered_map<Key, Value, Hash, Allocator>::concurrent_unordered_map()
-	: concurrent_unordered_map<Key, Value, Hash, Allocator>::concurrent_unordered_map(chm_detail::Default_Capacity, Allocator())
+	: concurrent_unordered_map<Key, Value, Hash, Allocator>::concurrent_unordered_map(chm_detail::DefaultCapacity, Allocator())
 {
 }
 
 template<class Key, class Value, class Hash, class Allocator>
 inline concurrent_unordered_map<Key, Value, Hash, Allocator>::concurrent_unordered_map(Allocator alloc)
-	: concurrent_unordered_map<Key, Value, Hash, Allocator>::concurrent_unordered_map(chm_detail::Default_Capacity, alloc)
+	: concurrent_unordered_map<Key, Value, Hash, Allocator>::concurrent_unordered_map(chm_detail::DefaultCapacity, alloc)
 {
 }
 
@@ -419,7 +419,7 @@ inline bool concurrent_unordered_map<Key, Value, Hash, Allocator>::empty() const
 template<class Key, class Value, class Hash, class Allocator>
 inline typename concurrent_unordered_map<Key, Value, Hash, Allocator>::size_type concurrent_unordered_map<Key, Value, Hash, Allocator>::capacity() const noexcept
 {
-	return bucket_count() / chm_detail::Growth_Multiple;
+	return bucket_count() / chm_detail::GrowthMultiple;
 }
 
 template<class Key, class Value, class Hash, class Allocator>
@@ -525,7 +525,7 @@ inline void concurrent_unordered_map<Key, Value, Hash, Allocator>::reserve(size_
 template<class Key, class Value, class Hash, class Allocator>
 inline float concurrent_unordered_map<Key, Value, Hash, Allocator>::max_load_factor() const noexcept
 {
-	return 1.f / static_cast<float>(chm_detail::Growth_Multiple);
+	return 1.f / static_cast<float>(chm_detail::GrowthMultiple);
 }
 
 template<class Key, class Value, class Hash, class Allocator>
@@ -585,7 +585,7 @@ inline std::pair<typename concurrent_unordered_map<Key, Value, Hash, Allocator>:
 		if (result.first != end()) {
 
 			if (result.second) {
-				if (!((m_size++ * chm_detail::Growth_Multiple) < tl.bucketCount)) {
+				if (!((m_size++ * chm_detail::GrowthMultiple) < tl.bucketCount)) {
 					grow_buckets(tl);
 				}
 			}

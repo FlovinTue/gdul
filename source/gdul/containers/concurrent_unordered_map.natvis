@@ -39,7 +39,7 @@
 		<DisplayString>{m_size}</DisplayString>
 		<Expand>
 			<CustomListItems MaxItemsPerView="500">
-				<Variable Name="pNode" InitialValue="(bucket*)((*(uint64_t*)(8 + (m_items.m_debugView.m_u64 &amp; gdul::asp_detail::Cb_Mask))) &amp; gdul::asp_detail::Cb_Mask)"/>
+				<Variable Name="pNode" InitialValue="(bucket*)((*(uint64_t*)(8 + (m_items.m_debugView.m_u64 &amp; gdul::asp_detail::CbMask))) &amp; gdul::asp_detail::CbMask)"/>
 				<Variable Name="ix" InitialValue="0"/>
 				<Variable Name="found" InitialValue="0"/>
 				
