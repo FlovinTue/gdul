@@ -167,7 +167,7 @@ int main()
 Abstraction to enable members to be thread local. Internally, fast path contains only 1 integer comparison before returning object reference. Fast path is potentially invalidated when the accessed object is not-before seen by the accessing thread (Frequently
 recreating and destroying tlm objects may yield poor performance).
 
-If the number of tlm instances of one type does not exceed gdul::tlm_detail::Static_Alloc_Size, objects will be located in the corresponding thread's thread_local storage block and thus contain one level of indirection(tlm->thread_local) else it will be mapped to an external array and contain two levels of indirection(tlm->thread_local->external array). 
+If the number of tlm instances of one type does not exceed gdul::tlm_detail::StaticAllocSize, objects will be located in the corresponding thread's thread_local storage block and thus contain one level of indirection(tlm->thread_local) else it will be mapped to an external array and contain two levels of indirection(tlm->thread_local->external array). 
  
 For sanity's sake, use alias tlm<T> instead of thread_local_member<T>
 
@@ -177,7 +177,7 @@ New operators may be added to the interface using the get() accessors.
 ## delegate
 A simple delegate class
 
-Supports (partial or full) binding of arguments in its constructor. The amount of of local storage (used to avoid allocations) may be changed by altering the Delegate_Storage variable
+Supports (partial or full) binding of arguments in its constructor. The amount of of local storage (used to avoid allocations) may be changed by altering the DelegateStorage variable
 
 -------------------------------------------------------------------------------------------------------------------------------------------
 ## job_handler
