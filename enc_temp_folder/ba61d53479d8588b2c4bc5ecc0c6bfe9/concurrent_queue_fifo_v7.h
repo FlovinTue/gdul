@@ -416,8 +416,7 @@ private:
 
 	T* const m_items;
 
-	// Can this even be used for this purpose? Perhaps something together with a flip-buffer.. Increase push-roof? 
-	// That'd make it possible to only track critical sections around pops
+	// Can this even be used for this purpose? We would like for 
 	qsbr::item m_accessControl;
 
 	std::atomic<buffer_state> m_state;

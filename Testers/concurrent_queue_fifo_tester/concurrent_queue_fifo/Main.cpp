@@ -1,6 +1,5 @@
 #pragma warning(disable:4530)
 
-#include "pch.h"
 #include <vld.h>
 #include <random>
 
@@ -56,6 +55,8 @@ public:
 
 int main()
 {
+	gdul::qsbr::register_thread();
+
 	gdul::concurrent_queue_fifo<uint32_t> que;
 
 	for (uint32_t i = 0; i < 9; ++i) {

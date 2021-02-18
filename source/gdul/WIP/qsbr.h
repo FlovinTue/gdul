@@ -2,27 +2,13 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <atomic>
 
-namespace gdul::qsb {
+namespace gdul::qsbr {
 
 constexpr std::uint8_t MaxThreads = 64;
 
-class qs_item;
-
-namespace qsb_detail {
-bool update_item(qs_item&);
-}
-
-class qs_item
-{
-public:
-	qs_item();
-	
-private:
-	friend bool qsb_detail::update_item(qs_item&);
-
-	std::size_t m_mask;
-};
+using access_state = std::atomic<std::size_t>;
 
 class critical_section
 {
@@ -34,6 +20,14 @@ public:
 void register_thread();
 void unregister_thread();
 
-bool update_item(qs_item& item);
+/// <summary>
+/// Reset item to 'unsafe' state
+/// </summary>
+/// <param name="item">Access state item</param>
+/// 
+void reset_state(access_state& item);
+bool initialize_state(access_state& item);
+bool update_state(access_state& item);
+bool check_state(const access_state& item);
 
 }

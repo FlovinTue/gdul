@@ -6,6 +6,7 @@
 #include <concurrent_queue.h>
 #include <gdul/containers/concurrent_queue.h>
 #include <vector>
+#include <gdul/WIP/qsbr.h>
 
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
@@ -87,6 +88,8 @@ bool thread_pool::has_unfinished_tasks() const
 void thread_pool::idle(std::uint64_t affinityMask)
 {
 	uint64_t result(0);
+
+	qsbr::register_thread();
 
 	do
 	{

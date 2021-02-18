@@ -9,9 +9,11 @@
 // Alignment padding
 #pragma warning(disable:4324)
 
-namespace gdul::qsb {
+namespace gdul::qsbr {
 
-namespace qsb_detail {
+static_assert(!((sizeof(std::size_t) * 8) < MaxThreads), "Max threads cannot exceed bits in std::size_t");
+
+namespace qsbr_detail {
 
 struct alignas(std::hardware_destructive_interference_size) qsb_tracker
 {
@@ -31,80 +33,86 @@ struct t_container
 	std::int8_t index = -1;
 };
 
-g_container g_items;
-thread_local t_container t_items;
+g_container g_states;
+thread_local t_container t_states;
 
-std::size_t create_initial_mask(std::size_t checkMask)
+std::size_t update_mask(std::size_t existingMask)
 {
-	std::size_t changeMask(0);
-	for (std::size_t maskProbe = checkMask, i = 0; maskProbe; maskProbe >>= 1, ++i) {
+	std::size_t mask(0);
+	for (std::size_t maskProbe = existingMask, i = 0; maskProbe; maskProbe >>= 1, ++i) {
 		if (maskProbe & 1) {
-			const std::size_t current(g_items.trackers[i].iteration);
-			const std::size_t even(current % 2);
-			const std::size_t evenBit(even << i);
-
-			t_items.viewedIterations[i] = current;
-
-			changeMask |= evenBit;
-		}
-	}
-
-	return changeMask;
-}
-
-std::size_t update_mask(std::size_t checkMask)
-{
-	std::size_t changeMask(0);
-	for (std::size_t maskProbe = checkMask, i = 0; maskProbe; maskProbe >>= 1, ++i) {
-		if (maskProbe & 1) {
-			const std::size_t previous(t_items.viewedIterations[i]);
-			const std::size_t current(g_items.trackers[i].iteration);
+			const std::size_t previous(t_states.viewedIterations[i]);
+			const std::size_t current(g_states.trackers[i].iteration);
 			const std::size_t even(current % 2);
 			const std::size_t changed(previous == current);
 			const std::size_t evenBit(even << i);
 			const std::size_t changeBit(changed << i);
 
-			t_items.viewedIterations[i] = current;
+			t_states.viewedIterations[i] = current;
 
-			changeMask |= (changeBit & evenBit);
+			mask |= (changeBit & evenBit);
 		}
 	}
 
-	return changeMask;
+	return mask;
+}
+
+std::size_t create_new_mask()
+{
+	const std::uint8_t lastTrackerIndex(g_states.lastTrackerIndex.load(std::memory_order_acquire));
+	const std::uint8_t lastTrackedBit(std::size_t(lastTrackerIndex) + 1);
+	std::size_t initialTrackingMask(std::numeric_limits<std::size_t>::max());
+	initialTrackingMask >>= (sizeof(std::size_t) * 8 /*shift away all unused bits*/) - lastTrackedBit;
+	initialTrackingMask &= ~(std::size_t(1) << t_states.index);
+
+	std::size_t mask(0);
+	for (std::size_t maskProbe = initialTrackingMask, i = 0; maskProbe; maskProbe >>= 1, ++i) {
+		if (maskProbe & 1) {
+			const std::size_t current(g_states.trackers[i].iteration);
+			const std::size_t even(current % 2);
+			const std::size_t evenBit(even << i);
+
+			t_states.viewedIterations[i] = current;
+
+			mask |= evenBit;
+		}
+	}
+
+	return mask;
 }
 
 void quiescent_state()
 {
-	const std::int8_t index(t_items.index);
+	const std::int8_t index(t_states.index);
 
 	assert(index != -1 && "Thread not registered");
 
-	++g_items.trackers[index].iteration;
+	++g_states.trackers[index].iteration;
 }
 
 void register_thread()
 {
-	if (t_items.index != -1) {
+	if (t_states.index != -1) {
 		return;
 	}
 
 	// Find unused tracker slot
 	for (std::int8_t i = 0; i < MaxThreads; ++i) {
-		if (!g_items.trackers[i].inUse.load(std::memory_order_acquire)) {
-			if (!g_items.trackers[i].inUse.exchange(true, std::memory_order_release)) {
-				t_items.index = i;
+		if (!g_states.trackers[i].inUse.load(std::memory_order_acquire)) {
+			if (!g_states.trackers[i].inUse.exchange(true, std::memory_order_release)) {
+				t_states.index = i;
 				break;
 			}
 		}
 	}
 
-	assert(t_items.index != -1 && "Max threads exceeded");
+	assert(t_states.index != -1 && "Max threads exceeded");
 
 	// Update last tracker index
-	std::int8_t lastTrackerIndex(g_items.lastTrackerIndex.load(std::memory_order_acquire));
+	std::int8_t lastTrackerIndex(g_states.lastTrackerIndex.load(std::memory_order_acquire));
 
-	while (lastTrackerIndex < t_items.index) {
-		if (g_items.lastTrackerIndex.compare_exchange_weak(lastTrackerIndex, t_items.index, std::memory_order_release, std::memory_order_acquire)) {
+	while (lastTrackerIndex < t_states.index) {
+		if (g_states.lastTrackerIndex.compare_exchange_weak(lastTrackerIndex, t_states.index, std::memory_order_release, std::memory_order_acquire)) {
 			break;
 		}
 	}
@@ -112,73 +120,89 @@ void register_thread()
 
 void unregister_thread()
 {
-	const std::int8_t index(t_items.index);
+	const std::int8_t index(t_states.index);
 
-	assert(g_items.trackers[index].iteration % 2 == 0 && "Cannot unregister thread from within critical section");
+	assert(g_states.trackers[index].iteration % 2 == 0 && "Cannot unregister thread from within critical section");
 
 	if (index == -1) {
 		return;
 	}
 
-	g_items.trackers[index].inUse.store(false, std::memory_order_relaxed);
+	g_states.trackers[index].inUse.store(false, std::memory_order_relaxed);
 
-	t_items.index = -1;
+	t_states.index = -1;
 }
 
-std::size_t create_new_mask()
+bool update_state(access_state& item)
 {
-	const std::uint8_t lastTrackerIndex(g_items.lastTrackerIndex.load(std::memory_order_acquire));
-	const std::uint8_t lastTrackedBit(std::size_t(lastTrackerIndex) + 1);
-	std::size_t initialTrackingMask(std::numeric_limits<std::size_t>::max());
-	initialTrackingMask >>= (sizeof(std::size_t) * 8 /*shift away all unused bits*/) - lastTrackedBit;
-	//initialTrackingMask &= ~(std::size_t(1) << t_items.index);
-
-	const std::size_t mask(create_initial_mask(initialTrackingMask));
-
-	return mask;
-}
-
-bool update_item(qs_item& item)
-{
-	if (!item.m_mask) {
+	if (!item.load(std::memory_order_acquire)) {
 		return true;
 	}
 
-	std::atomic_thread_fence(std::memory_order_acquire);
+	const std::size_t newMask(update_mask(item));
 
-	item.m_mask = update_mask(item.m_mask);
+	item.fetch_and(newMask, std::memory_order_release);
 
-	return !item.m_mask;
+	return !newMask;
 }
+
+bool initialize_state(access_state& item)
+{
+	const std::size_t mask(create_new_mask());
+	item.store(mask, std::memory_order_release);
+	return !mask;
+}
+
+bool check_state(const access_state& item)
+{
+	return item.load(std::memory_order_acquire);
+}
+
+void reset_state(access_state& item)
+{
+	item.store(std::numeric_limits<std::size_t>::max(), std::memory_order_relaxed);
+}
+
 }
 
 void register_thread()
 {
-	qsb_detail::register_thread();
+	qsbr_detail::register_thread();
 }
 
 void unregister_thread()
 {
-	qsb_detail::unregister_thread();
+	qsbr_detail::unregister_thread();
 }
 
-bool update_item(qs_item& item)
+bool initialize_state(access_state& item)
 {
-	return qsb_detail::update_item(item);
+	return qsbr_detail::initialize_state(item);
+}
+
+bool update_state(access_state& item)
+{
+	return qsbr_detail::update_state(item);
+}
+
+bool check_state(const access_state& item)
+{
+	return qsbr_detail::check_state(item);
+}
+
+void reset_state(access_state& item)
+{
+	qsbr_detail::reset_state(item);
 }
 
 critical_section::critical_section()
 {
-	assert(qsb_detail::g_items.trackers[qsb_detail::t_items.index].iteration % 2 == 0 && "Cannot create critical section inside another critical section");
-	qsb_detail::quiescent_state();
+	assert(qsbr_detail::g_states.trackers[qsbr_detail::t_states.index].iteration % 2 == 0 && "Cannot create critical section inside another critical section");
+	qsbr_detail::quiescent_state();
 }
 critical_section::~critical_section()
 {
-	qsb_detail::quiescent_state();
-}
-qs_item::qs_item()
-	: m_mask(qsb_detail::create_new_mask())
-{
+	qsbr_detail::quiescent_state();
 }
 }
 #pragma warning(pop)
