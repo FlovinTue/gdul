@@ -11,24 +11,19 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\source\gdul\WIP\qsbr.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="map_tester.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\source\gdul\containers\concurrent_map.h" />
-    <ClInclude Include="..\..\source\gdul\containers\concurrent_skip_list_base.h" />
-    <ClInclude Include="map_tester.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <Natvis Include="..\..\source\gdul\containers\concurrent_skip_list_base.natvis" />
+    <ClInclude Include="..\..\source\gdul\WIP\qsbr.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
-    <ProjectGuid>{9A52AFB5-3696-4CC9-9291-54A62CA43993}</ProjectGuid>
+    <ProjectGuid>{9AA37222-AB45-4C08-AC3D-7DC95F151DED}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>concurrentskiplist</RootNamespace>
+    <RootNamespace>qsbr</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
-    <ProjectName>concurrent_map</ProjectName>
+    <ProjectName>qsbr_tester</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">

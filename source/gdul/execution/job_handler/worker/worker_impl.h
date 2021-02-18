@@ -89,7 +89,7 @@ private:
 	std::chrono::high_resolution_clock::time_point m_lastJobTimepoint;
 	std::chrono::high_resolution_clock m_sleepTimer;
 
-	job_queue* m_targets[Max_Worker_Targets];
+	job_queue* m_targets[MaxWorkerTargets];
 
 	std::uint16_t m_sleepThreshhold;
 

@@ -20,9 +20,52 @@
 
 #pragma once
 
+#include <cstdint>
 #include <limits>
+#include <algorithm>
+#include <cmath>
 
 namespace gdul {
+constexpr bool is_prime(std::size_t value)
+{
+	if (value < 2) {
+		return false;
+	}
+	if (value < 4) {
+		return true;
+	}
+	if (value % 5 == 0 && value != 5) {
+		return false;
+	}
+
+	// Non bottom primes only at multiples of 6 +-1
+	const std::uint8_t mod6(value % 6);
+	if (mod6 != 1 && mod6 != 5) {
+		return false;
+	}
+
+	// Skip multiples of 2, 3, 5. We already know they aren't interesting from checks at top
+	constexpr std::uint8_t offsets[]{
+			0,
+			4,
+			6,
+			10,
+			12,
+			16,
+			22,
+			24
+	};
+
+	for (std::size_t div(7); !(value < div * div); div += 30) {
+		for (auto& offset : offsets) {
+			if (value % (div + offset) == 0) {
+				return false;
+			}
+		}
+	}
+
+	return true;
+}
 
 constexpr std::size_t align_value_pow2(std::size_t from)
 {
@@ -36,10 +79,12 @@ constexpr std::size_t align_value_pow2(std::size_t from)
 
 	return std::size_t(1ull << lastBit);
 }
+
 constexpr std::size_t align_value_pow2(std::size_t from, std::size_t max)
 {
 	return std::min<std::size_t>(align_value_pow2(from), max);
 }
+
 constexpr std::size_t align_value(std::size_t value, std::size_t align)
 {
 	const std::size_t mod(value % align);
@@ -48,5 +93,35 @@ constexpr std::size_t align_value(std::size_t value, std::size_t align)
 	const std::size_t offset(diff * multi);
 
 	return value + offset;
+}
+
+constexpr std::size_t align_value_prime(std::size_t value)
+{
+	if (value < 3) {
+		return 2;
+	}
+
+	if (is_prime(value)) {
+		return value;
+	}
+
+	if (is_prime(value + 1)) {
+		return value + 1;
+	}
+
+	std::size_t result(0);
+
+	for (std::size_t probe(align_value(value + 1, 6));;probe += 6) {
+		if (is_prime(probe - 1)) {
+			result = probe - 1;
+			break;
+		}
+		if (is_prime(probe + 1)) {
+			result = probe + 1;
+			break;
+		}
+	}
+
+	return result;
 }
 }

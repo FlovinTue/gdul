@@ -22,19 +22,32 @@
 
 <AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
 
-	<Type Name="gdul::chm_detail::iterator&lt;*&gt;">
-		<DisplayString>{m_at->second}</DisplayString>
+	<Type Name="gdul::csl_detail::concurrent_skip_list_base&lt;*&gt;">
+		<DisplayString Condition="(node_type*)m_head._dbgViews[0] != &amp; m_head">{((node_type*)(m_head._dbgViews[0] &amp; gdul::csl_detail::PointerMask))->m_kv}</DisplayString>
 		<Expand>
-			<Item Name="Value">m_at->second</Item>
-		</Expand>
-	</Type>
-	<Type Name="gdul::chm_detail::const_iterator&lt;*&gt;">
-		<DisplayString>{m_at->second}</DisplayString>
-		<Expand>
-			<Item Name="Value">m_at->second</Item>
-		</Expand>
-	</Type>
+			<CustomListItems MaxItemsPerView="500">
+				<Variable Name="pNode" InitialValue="(node_type*)(m_head._dbgViews[0] &amp; gdul::csl_detail::PointerMask)"/>
+				<Variable Name="iSize" InitialValue="0"/>
+				
+				<Loop>
+					<Break Condition="pNode == &amp;m_head"/>
+					<Exec>pNode = (node_type*)(pNode->_dbgViews[0] &amp; gdul::csl_detail::PointerMask)</Exec>
+					<Exec>++iSize</Exec>
+				</Loop>
+				
+				<Item Name="size">iSize</Item>
 
+				<Exec>pNode = (node_type*)(m_head._dbgViews[0] &amp; gdul::csl_detail::PointerMask)</Exec>
+				<Loop>
+					<Break Condition="pNode == &amp;m_head"/>
+					<Item>pNode->m_kv</Item>
+					<Exec>pNode = (node_type*)(pNode->_dbgViews[0] &amp; gdul::csl_detail::PointerMask)</Exec>
+				</Loop>
+				
+			</CustomListItems>
+		</Expand>
+
+	</Type>
 </AutoVisualizer>
 
 

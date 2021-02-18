@@ -34,10 +34,10 @@ namespace gdul
 
 namespace jh_detail
 {
-constexpr std::uint16_t Job_Pool_Init_Size = 128;
-constexpr std::uint16_t Max_Workers = 32;
-constexpr std::uint16_t Batch_Job_Pool_Init_Size = 16;
-constexpr std::uint16_t Batch_Job_Max_Slices = Max_Workers * 2;
-constexpr std::uint8_t Max_Worker_Targets = 2;
+constexpr std::uint16_t JobPoolInitSize = 128;
+constexpr std::uint16_t MaxWorkers = 32;
+constexpr std::uint16_t BatchJobPoolInitSize = 16;
+constexpr std::uint16_t BatchJobMaxSlices = MaxWorkers * 2;
+constexpr std::uint8_t MaxWorkerTargets = 2;
 }
 }
