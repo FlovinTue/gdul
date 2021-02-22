@@ -352,8 +352,8 @@ inline concurrent_unordered_map<Key, Value, Hash, Allocator>::concurrent_unorder
 
 template<class Key, class Value, class Hash, class Allocator>
 inline concurrent_unordered_map<Key, Value, Hash, Allocator>::concurrent_unordered_map(size_type capacity, Allocator alloc)
-	: m_itemAllocator(create_pool_allocator(align_value_prime(chm_detail::to_bucket_count(capacity)), alloc))
-	, m_items(gdul::allocate_shared<atomic_128<bucket>[]>(align_value_prime(chm_detail::to_bucket_count(capacity)), alloc))
+	: m_itemAllocator(create_pool_allocator(align_value_pow2(chm_detail::to_bucket_count(capacity)), alloc))
+	, m_items(gdul::allocate_shared<atomic_128<bucket>[]>(align_value_pow2(chm_detail::to_bucket_count(capacity)), alloc))
 	, t_items(alloc, m_items.load(std::memory_order_relaxed))
 	, m_size(0)
 	, m_allocator(alloc)
@@ -606,11 +606,13 @@ inline std::pair<typename concurrent_unordered_map<Key, Value, Hash, Allocator>:
 template<class Key, class Value, class Hash, class Allocator>
 inline typename concurrent_unordered_map<Key, Value, Hash, Allocator>::size_type concurrent_unordered_map<Key, Value, Hash, Allocator>::find_bucket(const bucket_array& buckets, size_type bucketCount, typename concurrent_unordered_map<Key, Value, Hash, Allocator>::size_type hash)
 {
+	const size_type mask(bucketCount - 1);
+
 	std::int8_t sign(1);
 	for (size_type probe(0); probe < bucketCount; ++probe, sign *= -1) {
 		const std::int64_t offset((probe * probe) * sign);
 
-		const size_type index((hash + offset) % bucketCount);
+		const size_type index((hash + offset) & mask);
 
 		// Cheap peek at hash value
 		const std::size_t thisHash(buckets[index].my_val().hash);
@@ -630,11 +632,13 @@ inline typename concurrent_unordered_map<Key, Value, Hash, Allocator>::size_type
 template<class Key, class Value, class Hash, class Allocator>
 inline std::pair<typename concurrent_unordered_map<Key, Value, Hash, Allocator>::size_type, typename concurrent_unordered_map<Key, Value, Hash, Allocator>::bucket> concurrent_unordered_map<Key, Value, Hash, Allocator>::find_slot_or_bucket(const bucket_array& buckets, size_type bucketCount, typename concurrent_unordered_map<Key, Value, Hash, Allocator>::size_type hash)
 {
+	const size_type mask(bucketCount - 1);
+
 	std::int8_t sign(1);
 	for (size_type probe(0); probe < bucketCount; ++probe, sign *= -1) {
 		const std::int64_t offset((probe * probe) * sign);
 
-		const size_type index((hash + offset) % bucketCount);
+		const size_type index((hash + offset) & mask);
 
 		const bucket b(buckets[index].load());
 
@@ -724,7 +728,7 @@ inline void concurrent_unordered_map<Key, Value, Hash, Allocator>::grow_buckets(
 template<class Key, class Value, class Hash, class Allocator>
 inline void concurrent_unordered_map<Key, Value, Hash, Allocator>::reserve_internal(size_type desiredBucketCount)
 {
-	const size_type primeAlignedBucketCount(align_value_prime(desiredBucketCount));
+	const size_type primeAlignedBucketCount(align_value_pow2(desiredBucketCount));
 	
 	bucket_array expected(m_items.load(std::memory_order_relaxed));
 	bucket_array desired;
