@@ -292,8 +292,8 @@ inline void concurrent_queue<T, Allocator>::reserve(typename concurrent_queue<T,
 		init_producer(capacity);
 	}
 	else if (producer->get_capacity() < capacity) {
-		const size_type log2Capacity(align_value_pow2(capacity, cqdetail::BufferCapacityMax));
-		shared_ptr_slot_type buffer(create_producer_buffer(log2Capacity));
+		const size_type pow2Capacity(align_value_pow2(capacity, cqdetail::BufferCapacityMax));
+		shared_ptr_slot_type buffer(create_producer_buffer(pow2Capacity));
 		producer->push_front(buffer);
 		producer = std::move(buffer);
 	}
@@ -428,12 +428,12 @@ inline bool concurrent_queue<T, Allocator>::relocate_consumer()
 template<class T, class Allocator>
 inline typename concurrent_queue<T, Allocator>::shared_ptr_slot_type concurrent_queue<T, Allocator>::create_producer_buffer(std::size_t withSize)
 {
-	const std::size_t log2size(align_value_pow2(withSize, cqdetail::BufferCapacityMax));
+	const std::size_t pow2size(align_value_pow2(withSize, cqdetail::BufferCapacityMax));
 
 	const std::size_t alignOfData(alignof(T));
 
 	const std::size_t bufferByteSize(sizeof(buffer_type));
-	const std::size_t dataBlockByteSize(sizeof(cqdetail::item_container<T>) * log2size);
+	const std::size_t dataBlockByteSize(sizeof(cqdetail::item_container<T>) * pow2size);
 
 	constexpr std::size_t controlBlockByteSize(gdul::sp_claim_size_custom_delete<buffer_type, allocator_adapter_type, cqdetail::buffer_deleter<buffer_type, allocator_adapter_type>>());
 
@@ -465,9 +465,9 @@ inline typename concurrent_queue<T, Allocator>::shared_ptr_slot_type concurrent_
 
 	data = reinterpret_cast<cqdetail::item_container<T>*>(totalBlock + dataOffset);
 
-	std::uninitialized_default_construct(data, data + log2size);
+	std::uninitialized_default_construct(data, data + pow2size);
 
-	buffer = new(totalBlock + bufferOffset) buffer_type(static_cast<size_type>(log2size), data);
+	buffer = new(totalBlock + bufferOffset) buffer_type(static_cast<size_type>(pow2size), data);
 
 	allocator_adapter_type allocAdaptor(totalBlock, totalBlockSize);
 
