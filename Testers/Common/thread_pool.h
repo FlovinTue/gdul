@@ -89,7 +89,7 @@ void thread_pool::idle(std::uint64_t affinityMask)
 {
 	uint64_t result(0);
 
-	qsbr::register_thread();
+	//qsbr::register_thread();
 
 	do
 	{
