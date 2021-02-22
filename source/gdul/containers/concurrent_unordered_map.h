@@ -40,12 +40,7 @@ namespace chm_detail {
 using size_type = std::size_t;
 
 constexpr size_type DefaultCapacity = 32;
-constexpr std::uint8_t GrowthMultiple = (std::uint8_t)2;
-
-constexpr size_type to_bucket_count(size_type desiredCapacity)
-{
-	return desiredCapacity * GrowthMultiple;
-}
+constexpr float MaxLoadFactor = 1.f;
 
 template <class Map>
 struct iterator;
@@ -352,8 +347,8 @@ inline concurrent_unordered_map<Key, Value, Hash, Allocator>::concurrent_unorder
 
 template<class Key, class Value, class Hash, class Allocator>
 inline concurrent_unordered_map<Key, Value, Hash, Allocator>::concurrent_unordered_map(size_type capacity, Allocator alloc)
-	: m_itemAllocator(create_pool_allocator(align_value_pow2(chm_detail::to_bucket_count(capacity)), alloc))
-	, m_items(gdul::allocate_shared<atomic_128<bucket>[]>(align_value_pow2(chm_detail::to_bucket_count(capacity)), alloc))
+	: m_itemAllocator(create_pool_allocator(align_value_pow2((size_type)(capacity / max_load_factor())), alloc))
+	, m_items(gdul::allocate_shared<atomic_128<bucket>[]>(align_value_pow2((size_type)(capacity / max_load_factor())), alloc))
 	, t_items(alloc, m_items.load(std::memory_order_relaxed))
 	, m_size(0)
 	, m_allocator(alloc)
@@ -419,7 +414,7 @@ inline bool concurrent_unordered_map<Key, Value, Hash, Allocator>::empty() const
 template<class Key, class Value, class Hash, class Allocator>
 inline typename concurrent_unordered_map<Key, Value, Hash, Allocator>::size_type concurrent_unordered_map<Key, Value, Hash, Allocator>::capacity() const noexcept
 {
-	return bucket_count() / chm_detail::GrowthMultiple;
+	return (size_type)(bucket_count() * max_load_factor());
 }
 
 template<class Key, class Value, class Hash, class Allocator>
@@ -519,13 +514,13 @@ inline typename concurrent_unordered_map<Key, Value, Hash, Allocator>::size_type
 template<class Key, class Value, class Hash, class Allocator>
 inline void concurrent_unordered_map<Key, Value, Hash, Allocator>::reserve(size_type newCapacity)
 {
-	reserve_internal(chm_detail::to_bucket_count(newCapacity));
+	reserve_internal((size_type)(newCapacity / max_load_factor()));
 }
 
 template<class Key, class Value, class Hash, class Allocator>
 inline float concurrent_unordered_map<Key, Value, Hash, Allocator>::max_load_factor() const noexcept
 {
-	return 1.f / static_cast<float>(chm_detail::GrowthMultiple);
+	return chm_detail::MaxLoadFactor;
 }
 
 template<class Key, class Value, class Hash, class Allocator>
@@ -585,7 +580,7 @@ inline std::pair<typename concurrent_unordered_map<Key, Value, Hash, Allocator>:
 		if (result.first != end()) {
 
 			if (result.second) {
-				if (!((m_size++ * chm_detail::GrowthMultiple) < tl.bucketCount)) {
+				if (!(m_size++ < tl.bucketCount * max_load_factor())) {
 					grow_buckets(tl);
 				}
 			}
