@@ -291,7 +291,7 @@ inline void concurrent_queue<T, Allocator>::reserve(typename concurrent_queue<T,
 	if (!producer->is_valid()) {
 		init_producer(capacity);
 	}
-	else if (producer->get_capacity() < capacity) {
+	else if (producer->capacity() < capacity) {
 		const size_type pow2Capacity(align_value_pow2(capacity, cqdetail::BufferCapacityMax));
 		shared_ptr_slot_type buffer(create_producer_buffer(pow2Capacity));
 		producer->push_front(buffer);
@@ -367,7 +367,7 @@ template<class T, class Allocator>
 inline void concurrent_queue<T, Allocator>::add_producer_buffer()
 {
 	buffer_type* const cachedProducer(this_producer_cached());
-	shared_ptr_slot_type next(create_producer_buffer(std::size_t(cachedProducer->get_capacity()) * 2));
+	shared_ptr_slot_type next(create_producer_buffer(std::size_t(cachedProducer->capacity()) * 2));
 	cachedProducer->push_front(next);
 	t_producer = std::move(next);
 }
@@ -636,7 +636,7 @@ public:
 	inline bool try_pop(T& out);
 
 	inline size_type size() const;
-	inline size_type get_capacity() const;
+	inline size_type capacity() const noexcept;
 
 	// Makes sure that it is entirely safe to replace this buffer with a successor
 	template <class U = T, std::enable_if_t<GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) || GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>* = nullptr>
@@ -711,8 +711,9 @@ private:
 	GDUL_CQ_PADDING(std::hardware_destructive_interference_size - sizeof(size_type) * 2);
 	atomic_shared_ptr_slot_type m_next;
 
+	// Capacity pow2 aligned, so we can do away with modulus and use AND instead
+	const size_type m_capacityMask;
 
-	const size_type m_capacity;
 	item_container<T>* const m_dataBlock;
 };
 
@@ -720,7 +721,7 @@ template<class T, class Allocator>
 inline producer_buffer<T, Allocator>::producer_buffer(typename producer_buffer<T, Allocator>::size_type capacity, item_container<T>* dataBlock)
 	: m_next(nullptr)
 	, m_dataBlock(dataBlock)
-	, m_capacity(capacity)
+	, m_capacityMask(capacity - 1)
 	, m_readSlot(0)
 	, m_preReadSync(0)
 	, m_writeSlot(0)
@@ -736,7 +737,7 @@ inline producer_buffer<T, Allocator>::producer_buffer(typename producer_buffer<T
 template<class T, class Allocator>
 inline producer_buffer<T, Allocator>::~producer_buffer()
 {
-	for (size_type i = 0; i < m_capacity; ++i) {
+	for (size_type i = 0; i < capacity(); ++i) {
 		m_dataBlock[i].~item_container<T>();
 	}
 }
@@ -748,12 +749,12 @@ inline bool producer_buffer<T, Allocator>::is_active() const
 template<class T, class Allocator>
 inline bool producer_buffer<T, Allocator>::is_valid() const
 {
-	return m_dataBlock[m_writeSlot % m_capacity].get_state_local() != item_state::dummy;
+	return m_dataBlock[m_writeSlot & m_capacityMask].get_state_local() != item_state::dummy;
 }
 template<class T, class Allocator>
 inline void producer_buffer<T, Allocator>::invalidate()
 {
-	m_dataBlock[m_writeSlot % m_capacity].set_state(item_state::dummy);
+	m_dataBlock[m_writeSlot & m_capacityMask].set_state(item_state::dummy);
 	if (m_next) {
 		m_next.unsafe_get()->invalidate();
 	}
@@ -798,9 +799,9 @@ inline typename producer_buffer<T, Allocator>::size_type producer_buffer<T, Allo
 }
 
 template<class T, class Allocator>
-inline typename producer_buffer<T, Allocator>::size_type producer_buffer<T, Allocator>::get_capacity() const
+inline typename producer_buffer<T, Allocator>::size_type producer_buffer<T, Allocator>::capacity() const noexcept
 {
-	return m_capacity;
+	return m_capacityMask + 1;
 }
 template<class T, class Allocator>
 template <class U, std::enable_if_t<GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) || GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>*>
@@ -821,8 +822,8 @@ inline bool producer_buffer<T, Allocator>::verify_successor(const shared_ptr_slo
 
 	do {
 		const size_type preRead(inspect->m_preReadSync.load(std::memory_order_acquire));
-		for (size_type i = 0; i < inspect->m_capacity; ++i) {
-			const size_type index((preRead - i) % inspect->m_capacity);
+		for (size_type i = 0; i < inspect->capacity(); ++i) {
+			const size_type index((preRead - i) & inspect->m_capacityMask);
 
 			if (inspect->m_dataBlock[index].get_state_local() != item_state::empty) {
 				return false;
@@ -897,7 +898,7 @@ inline void producer_buffer<T, Allocator>::unsafe_clear()
 	m_preReadSync.store(written, std::memory_order_relaxed);
 	m_readSlot.store(written, std::memory_order_relaxed);
 
-	for (size_type i = 0; i < m_capacity; ++i) {
+	for (size_type i = 0; i < capacity(); ++i) {
 		m_dataBlock[i].set_state_local(item_state::empty);
 	}
 
@@ -916,7 +917,7 @@ template<class In>
 inline bool producer_buffer<T, Allocator>::try_push(In&& in)
 {
 	const size_type slotTotal(m_writeSlot++);
-	const size_type slot(slotTotal % m_capacity);
+	const size_type slot(slotTotal & m_capacityMask);
 
 	if (m_dataBlock[slot].get_state_local() != item_state::empty) {
 		--m_writeSlot;
@@ -943,7 +944,7 @@ inline bool producer_buffer<T, Allocator>::try_pop(T& out)
 	const size_type slotReserved(m_preReadSync.fetch_add(1, std::memory_order_relaxed) + 1);
 	const size_type avaliable(lastWritten - slotReserved);
 
-	if (m_capacity < avaliable) {
+	if (capacity() < avaliable) {
 		m_preReadSync.fetch_sub(1, std::memory_order_relaxed);
 #ifdef GDUL_EXCEPTIONS
 		check_for_damage();
@@ -951,7 +952,7 @@ inline bool producer_buffer<T, Allocator>::try_pop(T& out)
 		return false;
 	}
 	const size_type readSlotTotal(m_readSlot.fetch_add(1, std::memory_order_relaxed));
-	const size_type readSlot(readSlotTotal % m_capacity);
+	const size_type readSlot(readSlotTotal & m_capacityMask);
 
 	write_out(readSlot, out);
 
@@ -1048,18 +1049,18 @@ inline void producer_buffer<T, Allocator>::reintegrate_failed_entries(typename p
 {
 #ifdef GDUL_EXCEPTIONS
 	const size_type readSlotTotal(m_readSlot.load(std::memory_order_acquire));
-	const size_type readSlotTotalOffset(readSlotTotal + m_capacity);
+	const size_type readSlotTotalOffset(readSlotTotal + capacity());
 
 	const size_type startIndex(readSlotTotalOffset - 1);
 
 	size_type numRedirected(0);
 	for (size_type i = 0, j = startIndex; numRedirected != failCount; ++i, --j) {
-		const size_type currentIndex((startIndex - i) % m_capacity);
+		const size_type currentIndex((startIndex - i) & m_capacityMask);
 		item_container<T>& currentItem(m_dataBlock[currentIndex]);
 		const item_state currentState(currentItem.get_state_local());
 
 		if (currentState == item_state::failed) {
-			const size_type toRedirectIndex((startIndex - numRedirected) % m_capacity);
+			const size_type toRedirectIndex((startIndex - numRedirected) & m_capacityMask);
 			item_container<T>& toRedirect(m_dataBlock[toRedirectIndex]);
 
 			toRedirect.redirect(currentItem);
