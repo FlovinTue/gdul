@@ -40,7 +40,7 @@ namespace chm_detail {
 using size_type = std::size_t;
 
 constexpr size_type DefaultCapacity = 32;
-constexpr float MaxLoadFactor = 1.f;
+constexpr float MaxLoadFactor = 0.5f;
 
 template <class Map>
 struct iterator;
