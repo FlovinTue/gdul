@@ -43,7 +43,7 @@ std::size_t update_mask(std::size_t existingMask)
 		if (maskProbe & 1) {
 			const std::size_t previous(t_states.viewedIterations[i]);
 			const std::size_t current(g_states.trackers[i].iteration);
-			const std::size_t even(current % 2);
+			const std::size_t even(current & 1ull);
 			const std::size_t changed(previous == current);
 			const std::size_t evenBit(even << i);
 			const std::size_t changeBit(changed << i);
@@ -69,7 +69,7 @@ std::size_t create_new_mask()
 	for (std::size_t maskProbe = initialTrackingMask, i = 0; maskProbe; maskProbe >>= 1, ++i) {
 		if (maskProbe & 1) {
 			const std::size_t current(g_states.trackers[i].iteration);
-			const std::size_t even(current % 2);
+			const std::size_t even(current & 1ull);
 			const std::size_t evenBit(even << i);
 
 			t_states.viewedIterations[i] = current;
@@ -122,7 +122,7 @@ void unregister_thread()
 {
 	const std::int8_t index(t_states.index);
 
-	assert(g_states.trackers[index].iteration % 2 == 0 && "Cannot unregister thread from within critical section");
+	assert(g_states.trackers[index].iteration & 1ull == 0 && "Cannot unregister thread from within critical section");
 
 	if (index == -1) {
 		return;
@@ -197,7 +197,7 @@ void reset_state(access_state& item)
 
 critical_section::critical_section()
 {
-	assert(qsbr_detail::g_states.trackers[qsbr_detail::t_states.index].iteration % 2 == 0 && "Cannot create critical section inside another critical section");
+	assert(qsbr_detail::g_states.trackers[qsbr_detail::t_states.index].iteration & 1ull == 0 && "Cannot create critical section inside another critical section");
 	qsbr_detail::quiescent_state();
 }
 critical_section::~critical_section()
