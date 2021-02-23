@@ -740,9 +740,13 @@ inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class AllocationStrategy, class Compare>
 inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::needs_version_lag_check(std::uint32_t versionBase, std::uint32_t versionStep)
 {
-	const size_type versionPart(versionBase % csl_detail::to_expected_list_size(LinkTowerHeight));
+	// Every time version crosses the boundary of expected list size (a handy point to do so) we want to check for version lag
+
+	// At version % mod expected list size
+	const size_type versionPart(versionBase & (csl_detail::to_expected_list_size(LinkTowerHeight) - 1));
 	const size_type edgeCheck(versionPart + versionStep);
 
+	// Are we just on the threshhold?
 	return !(edgeCheck < csl_detail::to_expected_list_size(LinkTowerHeight));
 }
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class AllocationStrategy, class Compare>
