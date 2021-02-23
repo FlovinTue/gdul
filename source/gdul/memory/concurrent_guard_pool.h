@@ -454,7 +454,7 @@ inline std::pair<typename concurrent_guard_pool<T, Allocator>::size_type, typena
 	for (size_type i = 0; i < m_indices.size(); ++i) {
 		const size_type previous(tl.m_indexCache[i]);
 		const size_type current(m_indices[i].i);
-		const size_type even(current % 2);
+		const size_type even(current & 1);
 		const size_type changed(previous == current);
 		const size_type evenBit(even << i);
 		const size_type changeBit(changed << i);
