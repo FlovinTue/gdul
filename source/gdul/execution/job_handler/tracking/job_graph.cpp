@@ -58,7 +58,8 @@ constexpr std::size_t VariationOffset = 1;
 void write_dgml_node(const job_info& node, const std::unordered_map<std::uint64_t, std::size_t>& childCounter, std::string& outNodes, std::string& outLinks);
 #endif 
 
-job_graph::job_graph()
+job_graph::job_graph(allocator_type alloc)
+	: m_map(alloc)
 {
 	auto itr = m_map.insert(std::make_pair(0, job_info()));
 	itr.first->second.m_id = 0;

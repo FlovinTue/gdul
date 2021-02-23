@@ -359,7 +359,8 @@ GDUL_INLINE_PRAGMA(warning(push)) \
 GDUL_INLINE_PRAGMA(warning(disable : 4307)) \
 gdul::jh_detail::constexp_str_hash(__FILE__) \
 GDUL_INLINE_PRAGMA(warning(pop)) \
-* std::size_t(__LINE__) \
++ std::size_t(__LINE__) \
++ std::size_t(__COUNTER__) \
 , __FILE__, __LINE__, __VA_ARGS__)
 
 
@@ -374,5 +375,6 @@ GDUL_INLINE_PRAGMA(warning(push)) \
 GDUL_INLINE_PRAGMA(warning(disable : 4307)) \
 gdul::jh_detail::constexp_str_hash(__FILE__) \
 GDUL_INLINE_PRAGMA(warning(pop)) \
-* std::size_t(__LINE__) \
++ std::size_t(__LINE__) \
++ std::size_t(__COUNTER__) \
 , __FILE__, __LINE__, __VA_ARGS__)

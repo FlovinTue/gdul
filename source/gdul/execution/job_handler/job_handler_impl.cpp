@@ -40,7 +40,7 @@ job_handler_impl::job_handler_impl(allocator_type allocator)
 	: m_jobImplMemPool()
 	, m_jobNodeMemPool()
 	, m_batchJobMemPool()
-	, m_jobGraph()
+	, m_jobGraph(allocator)
 	, m_workers{}
 	, m_workerIndices(0)
 	, m_mainAllocator(allocator)
