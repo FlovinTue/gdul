@@ -293,7 +293,7 @@ std::uint8_t random_height(std::uint8_t maxHeight)
 	std::uint8_t result(1);
 
 	for (std::uint8_t i = 0; i < maxHeight - 1; ++i, ++result) {
-		if ((t_rng() % 4u) != 0) {
+		if ((t_rng() & 3u) != 0) {
 			break;
 		}
 	}
