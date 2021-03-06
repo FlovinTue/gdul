@@ -563,7 +563,8 @@ struct critical_sec
 		: ix(tlIndex)
 		, at(last + 1)
 	{
-		ix.store(at, std::memory_order_acquire);
+		ix.store(at, std::memory_order_relaxed);
+		std::atomic_thread_fence(std::memory_order_acquire);
 	}
 	~critical_sec()
 	{
