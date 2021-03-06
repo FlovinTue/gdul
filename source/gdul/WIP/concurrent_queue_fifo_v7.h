@@ -353,6 +353,19 @@ enum buffer_state : std::uint8_t
 	buffer_state_valid,
 	buffer_state_invalid,
 };
+
+template<class T>
+void move(T& from, T& to)
+{
+	to = std::move(from);
+}
+
+template<class T>
+void assign(T& a, T& b)
+{
+	to = from;
+}
+
 template <class T, class Allocator>
 class item_buffer
 {
@@ -399,11 +412,16 @@ public:
 private:
 	void destroy_items() noexcept;
 
+	bool try_raise_push_ceil(size_type minimum);
+
+	void move_or_assign(T& from, T& to);
+
 	std::atomic<size_type> m_preReadSync;
 	GDUL_CACHE_PAD;
 	GDUL_ATOMIC_WITH_VIEW(size_type, m_readAt);
 	GDUL_CACHE_PAD;
 	std::atomic<size_type> m_writeAt;
+	std::atomic<size_type> m_pushCeil;
 	GDUL_CACHE_PAD;
 	GDUL_ATOMIC_WITH_VIEW(size_type, m_postWriteSync);
 	GDUL_CACHE_PAD;
@@ -416,9 +434,9 @@ private:
 
 	T* const m_items;
 
-	// Can this even be used for this purpose? Perhaps something together with a flip-buffer.. Increase push-roof? 
-	// That'd make it possible to only track critical sections around pops
-	qsbr::item m_accessControl;
+	//// Can this even be used for this purpose? Perhaps something together with a flip-buffer.. Increase push-roof? 
+	//// That'd make it possible to only track critical sections around pops
+	//qsbr::item m_accessControl;
 
 	std::atomic<buffer_state> m_state;
 };
@@ -428,6 +446,7 @@ inline item_buffer<T, Allocator>::item_buffer(T* dataBlock, typename item_buffer
 	: m_preReadSync(0)
 	, m_readAt(0)
 	, m_writeAt(0)
+	, m_pushCeil(capacity)
 	, m_postWriteSync(0)
 	, m_written(0)
 	, m_next(nullptr)
@@ -530,6 +549,22 @@ inline void item_buffer<T, Allocator>::destroy_items() noexcept
 	std::destroy(m_items + from, m_items + to);
 }
 template<class T, class Allocator>
+inline bool item_buffer<T, Allocator>::try_raise_push_ceil(size_type minimum)
+{
+	// Has all consumers finished.  No outstanding references to... a qsb item ?
+	return true;
+}
+template<class T, class Allocator>
+inline void item_buffer<T, Allocator>::move_or_assign(T& from, T& to)
+{
+	if constexpr (std::is_move_assignable_v<T>) {
+		cq_fifo_detail::move(from, to);
+	}
+	else {
+		cq_fifo_detail::assign(from, to);
+	}
+}
+template<class T, class Allocator>
 inline void item_buffer<T, Allocator>::unsafe_clear()
 {
 	destroy_items();
@@ -554,7 +589,9 @@ inline bool item_buffer<T, Allocator>::try_emplace(Args&& ... args)
 	size_type at(m_writeAt.fetch_add(1, std::memory_order_relaxed));
 
 	if (!(at < m_capacity)) {
-		return false;
+		if (!try_raise_push_ceil()) {
+			return false;
+		}
 	}
 
 	new (&m_items[at]) T(std::forward<Args>(args)...);
@@ -586,10 +623,9 @@ inline bool item_buffer<T, Allocator>::try_pop(T& out)
 	
 	const size_type at(m_readAt.fetch_add(1, std::memory_order_relaxed));
 
-	// May need to look over this fence.. 
 	std::atomic_thread_fence(std::memory_order_acquire);
 
-	out = std::move(m_items[at]);
+	move_or_assign(m_items[at], out);
 
 	std::destroy_at(&m_items[at]);
 
