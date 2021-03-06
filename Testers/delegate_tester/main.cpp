@@ -19,6 +19,11 @@ public:
 	void member_arg(float f, int i) { std::cout << "called member with args " << f << " and " << i << std::endl; };
 };
 
+void voidFunc()
+{
+
+}
+
 int main()
 {
 	using namespace gdul;
@@ -88,9 +93,9 @@ int main()
 	delegate<void()> assignStatic;
 	assignStatic = constructStatic;
 
-	delegate<void()> makeDel(make_delegate<void()>(largeCallArg, 1.f, 1));
+	delegate<void()> makeDel(make_delegate(largeCallArg, 1.f, 1));
 	makeDel();
-	delegate<void()> allocDel(alloc_delegate<void()>(largeCallArg, customAlloc, 1.f, 1));
+	delegate<void()> allocDel(allocate_delegate(largeCallArg, customAlloc, 1.f, 1));
 	allocDel();
 
 	struct destructible

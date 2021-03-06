@@ -36,7 +36,7 @@ time_set::time_set()
 	, m_minTimepoint(0.f)
 	, m_maxTimepoint(0.f)
 	, m_completionCount(0)
-	, m_lock{ATOMIC_FLAG_INIT}
+	, m_lock()
 {}
 time_set::time_set(const time_set & other)
 {

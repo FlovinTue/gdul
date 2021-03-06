@@ -53,9 +53,9 @@ public:
 	job_handler();
 
 	/// <summary>
-	/// Constructor
+	/// Constructor with allocator instance
 	/// </summary>
-	/// <param name="allocator">Allocator. Instance is propagated for use within job handler</param>
+	/// <param name="allocator">Allocator instance is propagated for use within job handler</param>
 	job_handler(jh_detail::allocator_type allocator);
 
 	/// <summary>
@@ -104,7 +104,6 @@ public:
 	/// <returns>New job</returns>
 	job make_job(delegate<void()> workUnit, job_queue* target, std::size_t variationId, const std::string_view& dbgName = "") { workUnit; target; variationId; dbgName; /* See make_job macro definition */ }
 
-
 	/// <summary>
 	/// Creates a batch job for splitting up processing of container elements. Basically a parallel std::for_each utilizing jobs
 	/// </summary>
@@ -115,10 +114,7 @@ public:
 	/// <param name="dbgName">Job debug name</param>
 	/// <returns>New batch job</returns>
 	template <class InContainer>
-	batch_job make_batch_job(InContainer& input, delegate<void(typename InContainer::value_type&)> process, job_queue* target, const std::string_view& dbgName = "")
-	{
-		input; process; target; dbgName; /* See make_batch_job macro definition */
-	}
+	batch_job make_batch_job(InContainer& input, delegate<void(typename InContainer::value_type&)> process, job_queue* target, const std::string_view& dbgName = ""){ input; process; target; dbgName; /* See make_batch_job macro definition */ }
 
 	/// <summary>
 	/// Creates a batch job for splitting up processing of container elements. Basically a parallel std::for_each utilizing jobs
@@ -131,10 +127,7 @@ public:
 	/// <param name="dbgName">Job debug name</param>
 	/// <returns>New batch job</returns>
 	template <class InContainer>
-	batch_job make_batch_job(InContainer& input, delegate<void(typename InContainer::value_type&)> process, job_queue* target, std::size_t variationId, const std::string_view& dbgName = "")
-	{
-		input; process; target; variationId; dbgName; /* See make_batch_job macro definition */
-	}
+	batch_job make_batch_job(InContainer& input, delegate<void(typename InContainer::value_type&)> process, job_queue* target, std::size_t variationId, const std::string_view& dbgName = ""){ input; process; target; variationId; dbgName; /* See make_batch_job macro definition */ }
 
 	/// <summary>
 	/// Creates a batch job for splitting up processing of container elements. Reduces the input container based on processor returnvalue
@@ -146,10 +139,7 @@ public:
 	/// <param name="dbgName">Job debug name</param>
 	/// <returns>New batch job</returns>
 	template <class InOutContainer>
-	batch_job make_batch_job(InOutContainer& inputOutput, delegate<bool(typename InOutContainer::value_type&)> process, job_queue* target, const std::string_view& dbgName = "")
-	{
-		inputOutput; process; target; dbgName; /* See make_batch_job macro definition */
-	}
+	batch_job make_batch_job(InOutContainer& inputOutput, delegate<bool(typename InOutContainer::value_type&)> process, job_queue* target, const std::string_view& dbgName = ""){ inputOutput; process; target; dbgName; /* See make_batch_job macro definition */ }
 
 	/// <summary>
 	/// Creates a batch job for splitting up processing of container elements. Reduces the input container based on processor returnvalue
@@ -162,10 +152,7 @@ public:
 	/// <param name="dbgName">Job debug name</param>
 	/// <returns>New batch job</returns>
 	template <class InOutContainer>
-	batch_job make_batch_job(InOutContainer& inputOutput, delegate<bool(typename InOutContainer::value_type&)> process, job_queue* target, std::size_t variationId, const std::string_view& dbgName = "")
-	{
-		inputOutput; process; target; variationId; dbgName; /* See make_batch_job macro definition */
-	};
+	batch_job make_batch_job(InOutContainer& inputOutput, delegate<bool(typename InOutContainer::value_type&)> process, job_queue* target, std::size_t variationId, const std::string_view& dbgName = ""){ inputOutput; process; target; variationId; dbgName; /* See make_batch_job macro definition */ };
 
 	/// <summary>
 	/// Creates a batch job for splitting up processing of container elements. Outputs the (potentially reduced) set of input items to a separate output container
@@ -179,10 +166,7 @@ public:
 	/// <param name="dbgName">Job debug name</param>
 	/// <returns>New batch job</returns>
 	template <class InContainer, class OutContainer>
-	batch_job make_batch_job(InContainer& input, OutContainer& output, delegate<bool(typename InContainer::value_type&, typename OutContainer::value_type&)> process, job_queue* target, const std::string_view& dbgName = "")
-	{
-		input; output; process; target; dbgName; /* See make_batch_job macro definition */
-	}
+	batch_job make_batch_job(InContainer& input, OutContainer& output, delegate<bool(typename InContainer::value_type&, typename OutContainer::value_type&)> process, job_queue* target, const std::string_view& dbgName = ""){	input; output; process; target; dbgName; /* See make_batch_job macro definition */ }
 
 	/// <summary>
 	/// Creates a batch job for splitting up processing of container elements. Outputs the (potentially reduced) set of input items to a separate output container
@@ -197,11 +181,7 @@ public:
 	/// <param name="dbgName">Job debug name</param>
 	/// <returns>New batch job</returns>
 	template <class InContainer, class OutContainer>
-	batch_job make_batch_job(InContainer& input, OutContainer& output, delegate<bool(typename InContainer::value_type&, typename OutContainer::value_type&)> process, job_queue* target, std::size_t variationId, const std::string_view& dbgName = "")
-
-	{
-		input; output; process; target; variationId; dbgName; /* See make_batch_job macro definition */
-	}
+	batch_job make_batch_job(InContainer& input, OutContainer& output, delegate<bool(typename InContainer::value_type&, typename OutContainer::value_type&)> process, job_queue* target, std::size_t variationId, const std::string_view& dbgName = ""){ input; output; process; target; variationId; dbgName; /* See make_batch_job macro definition */ }
 
 #if defined (GDUL_JOB_DEBUG)
 	/// <summary>
@@ -227,33 +207,27 @@ public:
 	void dump_job_time_sets(const std::string_view& location);
 #endif
 
-	//// Not for direct use
-	//job _redirect_make_job(delegate<void()> workUnit, job_queue* target, std::size_t variationId, const std::string_view& dbgName, std::size_t physicalId, const std::string_view& dbgFile, std::uint32_t line);
-	//// Not for direct use
-	//job _redirect_make_job(delegate<void()> workUnit, job_queue* target, std::size_t variationId, std::size_t physicalId, const std::string_view& dbgFile, std::uint32_t line);
-	//// Not for direct use
-	//job _redirect_make_job(delegate<void()> workUnit, job_queue* target, const std::string_view& dbgName, std::size_t physicalId, const std::string_view& dbgFile, std::uint32_t line);
-	//// Not for direct use
-	//job _redirect_make_job(delegate<void()> workUnit, job_queue* target, std::size_t physicalId, const std::string_view& dbgFile, std::uint32_t line);
-
-
 	// Not for direct use
 	job _redirect_make_job(std::size_t physicalId, const std::string_view& dbgFile, std::uint32_t line, delegate<void()> workUnit, job_queue* target, std::size_t variationId, const std::string_view& dbgName = "");
 	// Not for direct use
 	job _redirect_make_job(std::size_t physicalId, const std::string_view& dbgFile, std::uint32_t line, delegate<void()> workUnit, job_queue* target, const std::string_view& dbgName = "");
 
-
 	// Not for direct use
 	template <class InContainer>
 	batch_job _redirect_make_batch_job(std::size_t physicalId, const std::string_view& dbgFile, std::uint32_t line, InContainer& input, delegate<void(typename InContainer::value_type&)> process, job_queue* target, const std::string_view& dbgName = "");
+	// Not for direct use
 	template <class InContainer>
 	batch_job _redirect_make_batch_job(std::size_t physicalId, const std::string_view& dbgFile, std::uint32_t line, InContainer& input, delegate<void(typename InContainer::value_type&)> process, job_queue* target, std::size_t variationId, const std::string_view& dbgName = "");
+	// Not for direct use
 	template <class InOutContainer>
 	batch_job _redirect_make_batch_job(std::size_t physicalId, const std::string_view& dbgFile, std::uint32_t line, InOutContainer& inputOutput, delegate<bool(typename InOutContainer::value_type&)> process, job_queue* target, const std::string_view& dbgName = "");
+	// Not for direct use
 	template <class InOutContainer>
 	batch_job _redirect_make_batch_job(std::size_t physicalId, const std::string_view& dbgFile, std::uint32_t line, InOutContainer& inputOutput, delegate<bool(typename InOutContainer::value_type&)> process, job_queue* target, std::size_t variationId, const std::string_view& dbgName = "");
+	// Not for direct use
 	template <class InContainer, class OutContainer>
 	batch_job _redirect_make_batch_job(std::size_t physicalId, const std::string_view& dbgFile, std::uint32_t line, InContainer& input, OutContainer& output, delegate<bool(typename InContainer::value_type&, typename OutContainer::value_type&)> process, job_queue* target, const std::string_view& dbgName = "");
+	// Not for direct use
 	template <class InContainer, class OutContainer>
 	batch_job _redirect_make_batch_job(std::size_t physicalId, const std::string_view& dbgFile, std::uint32_t line, InContainer& input, OutContainer& output, delegate<bool(typename InContainer::value_type&, typename OutContainer::value_type&)> process, job_queue* target, std::size_t variationId, const std::string_view& dbgName = "");
 
@@ -359,7 +333,8 @@ GDUL_INLINE_PRAGMA(warning(push)) \
 GDUL_INLINE_PRAGMA(warning(disable : 4307)) \
 gdul::jh_detail::constexp_str_hash(__FILE__) \
 GDUL_INLINE_PRAGMA(warning(pop)) \
-* std::size_t(__LINE__) \
++ std::size_t(__LINE__) \
++ std::size_t(__COUNTER__) \
 , __FILE__, __LINE__, __VA_ARGS__)
 
 
@@ -374,5 +349,6 @@ GDUL_INLINE_PRAGMA(warning(push)) \
 GDUL_INLINE_PRAGMA(warning(disable : 4307)) \
 gdul::jh_detail::constexp_str_hash(__FILE__) \
 GDUL_INLINE_PRAGMA(warning(pop)) \
-* std::size_t(__LINE__) \
++ std::size_t(__LINE__) \
++ std::size_t(__COUNTER__) \
 , __FILE__, __LINE__, __VA_ARGS__)

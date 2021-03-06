@@ -13,7 +13,7 @@ class map_tester
 public:
 
 	void perform_tests(int iterations);
-
+	void perform_speed_tests(int iterations);
 
 
 private:
@@ -21,6 +21,10 @@ private:
 
 	void do_insertions(int inserts);
 	void verify_insertions();
+
+	void check_insertion_speed(int inserts);
+	void check_lookup_speed(int inserts);
+
 
 	concurrent_map<int, int> m_sl;
 	concurrent_unordered_map<int, int> m_hm;

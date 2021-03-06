@@ -177,7 +177,9 @@ New operators may be added to the interface using the get() accessors.
 ## delegate
 A simple delegate class
 
-Supports (partial or full) binding of arguments in its constructor. The amount of of local storage (used to avoid allocations) may be changed by altering the DelegateStorage variable
+Supports (partial or full) binding of arguments in its constructor. The amount of of local storage (used to avoid allocations) may be changed by altering the DelegateStorage variable. 
+
+Also two helper functions: make_delegate and allocate_delegate with support for signature evaluation along with partial or full binding of arguments
 
 -------------------------------------------------------------------------------------------------------------------------------------------
 ## job_handler
