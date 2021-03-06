@@ -363,7 +363,7 @@ inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 	do {
 		node_view_set frontSet{};
 
-		frontSet[0] = m_head.m_linkViews[0].load(std::memory_order_seq_cst);
+		frontSet[0] = m_head.m_linkViews[0].load(std::memory_order_acquire);
 		mynode = frontSet[0];
 
 		if (at_end(mynode)) {
@@ -420,7 +420,7 @@ inline void concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 	node_type* frontNode(nullptr);
 
 	do {
-		frontSet[0] = (m_head.m_linkViews[0].load(std::memory_order_seq_cst));
+		frontSet[0] = (m_head.m_linkViews[0].load(std::memory_order_acquire));
 		frontNode = frontSet[0];
 
 		if (at_end(frontNode)) {
@@ -469,7 +469,7 @@ inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 
 		for (;;) {
 
-			nextSet[layer] = ((node_type*)atSet[layer])->m_linkViews[layer].load(std::memory_order_seq_cst);
+			nextSet[layer] = ((node_type*)atSet[layer])->m_linkViews[layer].load(std::memory_order_acquire);
 			node_type* const nextNode(nextSet[layer]);
 
 			if (at_end(nextNode)) {
@@ -676,7 +676,7 @@ template<class Key, class Value, std::uint8_t LinkTowerHeight, class AllocationS
 inline void concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::load_set(typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view_set& outSet, const node_type* at, std::uint8_t offset, std::uint8_t max)
 {
 	for (std::uint8_t i = offset; i < max; ++i) {
-		outSet[i] = at->m_linkViews[i].load(std::memory_order_seq_cst);
+		outSet[i] = at->m_linkViews[i].load(std::memory_order_acquire);
 	}
 }
 
@@ -843,7 +843,7 @@ inline cpq_detail::exchange_link_result concurrent_priority_queue_impl<Key, Valu
 			result = cpq_detail::exchange_link_outside_range;
 			break;
 		}
-	} while (!link->compare_exchange_strong(expected, desired, std::memory_order_seq_cst, std::memory_order_relaxed));
+	} while (!link->compare_exchange_strong(expected, desired, std::memory_order_release, std::memory_order_relaxed));
 
 	return result;
 }
@@ -854,7 +854,7 @@ inline cpq_detail::exchange_link_result concurrent_priority_queue_impl<Key, Valu
 
 	cpq_detail::exchange_link_result result(cpq_detail::exchange_link_outside_range);
 
-	if (link->compare_exchange_strong(expected, desired, std::memory_order_seq_cst, std::memory_order_relaxed)) {
+	if (link->compare_exchange_strong(expected, desired, std::memory_order_release, std::memory_order_relaxed)) {
 		result = cpq_detail::exchange_link_success;
 	}
 
