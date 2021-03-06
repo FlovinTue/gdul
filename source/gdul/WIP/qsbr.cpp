@@ -17,7 +17,7 @@ namespace qsbr_detail {
 
 struct alignas(std::hardware_destructive_interference_size) qsb_tracker
 {
-	std::size_t iteration = 0;
+	std::atomic<std::size_t> ix = 0;
 	std::atomic<bool> inUse = 0;
 };
 
@@ -30,6 +30,7 @@ struct g_container
 struct t_container
 {
 	std::size_t viewedIterations[MaxThreads]{};
+	std::size_t lastIx = 0;
 	std::int8_t index = -1;
 };
 
@@ -42,7 +43,7 @@ std::size_t update_mask(std::size_t existingMask)
 	for (std::size_t maskProbe = existingMask, i = 0; maskProbe; maskProbe >>= 1, ++i) {
 		if (maskProbe & 1) {
 			const std::size_t previous(t_states.viewedIterations[i]);
-			const std::size_t current(g_states.trackers[i].iteration);
+			const std::size_t current(g_states.trackers[i].ix.load(std::memory_order_acquire));
 			const std::size_t even(current & 1ull);
 			const std::size_t changed(previous == current);
 			const std::size_t evenBit(even << i);
@@ -68,7 +69,7 @@ std::size_t create_new_mask()
 	std::size_t mask(0);
 	for (std::size_t maskProbe = initialTrackingMask, i = 0; maskProbe; maskProbe >>= 1, ++i) {
 		if (maskProbe & 1) {
-			const std::size_t current(g_states.trackers[i].iteration);
+			const std::size_t current(g_states.trackers[i].ix);
 			const std::size_t even(current & 1ull);
 			const std::size_t evenBit(even << i);
 
@@ -79,15 +80,6 @@ std::size_t create_new_mask()
 	}
 
 	return mask;
-}
-
-void quiescent_state()
-{
-	const std::int8_t index(t_states.index);
-
-	assert(index != -1 && "Thread not registered");
-
-	++g_states.trackers[index].iteration;
 }
 
 void register_thread()
@@ -106,13 +98,13 @@ void register_thread()
 		}
 	}
 
-	assert(t_states.index != -1 && "Max threads exceeded");
+	assert(t_states.index != -1 && "Could not find slot for thread. Max threads exceeded?");
 
 	// Update last tracker index
-	std::int8_t lastTrackerIndex(g_states.lastTrackerIndex.load(std::memory_order_acquire));
+	std::int8_t lastTrackerIndex(g_states.lastTrackerIndex.load(std::memory_order_relaxed));
 
 	while (lastTrackerIndex < t_states.index) {
-		if (g_states.lastTrackerIndex.compare_exchange_weak(lastTrackerIndex, t_states.index, std::memory_order_release, std::memory_order_acquire)) {
+		if (g_states.lastTrackerIndex.compare_exchange_weak(lastTrackerIndex, t_states.index, std::memory_order_relaxed)) {
 			break;
 		}
 	}
@@ -122,7 +114,7 @@ void unregister_thread()
 {
 	const std::int8_t index(t_states.index);
 
-	assert(g_states.trackers[index].iteration & 1ull == 0 && "Cannot unregister thread from within critical section");
+	assert((g_states.trackers[index].ix & 1ull) == 0 && "Cannot unregister thread from within critical section");
 
 	if (index == -1) {
 		return;
@@ -133,32 +125,34 @@ void unregister_thread()
 	t_states.index = -1;
 }
 
-bool update_state(access_state& item)
+bool update(qsb_item& item)
 {
-	if (!item.load(std::memory_order_acquire)) {
+	const std::size_t mask(item.load(std::memory_order_relaxed));
+
+	if (!mask) {
 		return true;
 	}
 
-	const std::size_t newMask(update_mask(item));
+	const std::size_t newMask(update_mask(mask));
 
-	item.fetch_and(newMask, std::memory_order_release);
+	item.fetch_and(newMask, std::memory_order_relaxed);
 
 	return !newMask;
 }
 
-bool initialize_state(access_state& item)
+bool set(qsb_item& item)
 {
 	const std::size_t mask(create_new_mask());
 	item.store(mask, std::memory_order_release);
 	return !mask;
 }
 
-bool check_state(const access_state& item)
+bool is_safe(const qsb_item& item)
 {
-	return item.load(std::memory_order_acquire);
+	return !item.load(std::memory_order_relaxed);
 }
 
-void reset_state(access_state& item)
+void reset(qsb_item& item)
 {
 	item.store(std::numeric_limits<std::size_t>::max(), std::memory_order_relaxed);
 }
@@ -175,34 +169,41 @@ void unregister_thread()
 	qsbr_detail::unregister_thread();
 }
 
-bool initialize_state(access_state& item)
+bool set(qsb_item& item)
 {
-	return qsbr_detail::initialize_state(item);
+	return qsbr_detail::set(item);
 }
 
-bool update_state(access_state& item)
+bool update(qsb_item& item)
 {
-	return qsbr_detail::update_state(item);
+	return qsbr_detail::update(item);
 }
 
-bool check_state(const access_state& item)
+bool is_safe(const qsb_item& item)
 {
-	return qsbr_detail::check_state(item);
+	return qsbr_detail::is_safe(item);
 }
 
-void reset_state(access_state& item)
+void reset(qsb_item& item)
 {
-	qsbr_detail::reset_state(item);
+	qsbr_detail::reset(item);
 }
 
 critical_section::critical_section()
+	: m_nextIx(qsbr_detail::t_states.lastIx += 2)
+	, m_globalIndex(qsbr_detail::t_states.index)
+	, m_tracker(qsbr_detail::g_states.trackers[m_globalIndex].ix)
 {
-	assert(qsbr_detail::g_states.trackers[qsbr_detail::t_states.index].iteration & 1ull == 0 && "Cannot create critical section inside another critical section");
-	qsbr_detail::quiescent_state();
+	assert((qsbr_detail::g_states.trackers[qsbr_detail::t_states.index].ix & 1ull) == 0 && "Cannot create critical section inside another critical section");
+	assert(m_globalIndex != -1 && "Thread not registered");
+
+	m_tracker.store(m_nextIx - 1, std::memory_order_relaxed);
+	std::atomic_thread_fence(std::memory_order_acq_rel);
+
 }
 critical_section::~critical_section()
 {
-	qsbr_detail::quiescent_state();
+	m_tracker.store(m_nextIx, std::memory_order_release);
 }
 }
 #pragma warning(pop)

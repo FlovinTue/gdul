@@ -44,6 +44,22 @@ typedef struct tagTHREADNAME_INFO
 #pragma pack(pop)  
 };
 
+thread::thread()
+	: std::thread()
+{
+}
+
+thread::thread(thread&& other)
+	: std::thread(std::move(other))
+{
+
+}
+
+thread::~thread()
+{
+	qsbr::unregister_thread();
+}
+
 void thread::set_name(const std::string& name)
 {
 	assert(valid() && "Cannot set name to invalid thread");
@@ -81,4 +97,5 @@ bool thread::valid() const noexcept
 {
 	return get_id() != std::thread().get_id();
 }
+
 }
