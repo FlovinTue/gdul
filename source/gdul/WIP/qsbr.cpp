@@ -63,7 +63,7 @@ std::size_t create_new_mask()
 	const std::uint8_t lastTrackerIndex(g_states.lastTrackerIndex.load(std::memory_order_acquire));
 	const std::uint8_t lastTrackedBit(std::size_t(lastTrackerIndex) + 1);
 	std::size_t initialTrackingMask(std::numeric_limits<std::size_t>::max());
-	initialTrackingMask >>= (sizeof(std::size_t) * 8 /*shift away all unused bits*/) - lastTrackedBit;
+	initialTrackingMask >>= (sizeof(qsb_item) * 8 /*shift away all unused bits*/) - lastTrackedBit;
 	initialTrackingMask &= ~(std::size_t(1) << t_states.index);
 
 	std::size_t mask(0);

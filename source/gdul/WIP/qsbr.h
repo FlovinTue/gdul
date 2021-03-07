@@ -6,7 +6,7 @@
 
 namespace gdul::qsbr {
 
-constexpr std::uint8_t MaxThreads = 64;
+constexpr std::uint8_t MaxThreads = sizeof(std::size_t) * 8;
 
 /// <summary>
 /// Used to track
@@ -14,7 +14,7 @@ constexpr std::uint8_t MaxThreads = 64;
 using qsb_item = std::atomic<std::size_t>;
 
 /// <summary>
-/// Use this to track presence of a thread within a critical section. Critical sections
+/// Use this to track critical section presence of this thread. Critical sections
 /// distinguish from one another temporally so that each construction of the same critical section
 /// will be uniquely identified
 /// </summary>
