@@ -32,31 +32,7 @@ namespace gdul {
 class thread : public std::thread
 {
 public:
-	/// <summary>
-	/// Default constructor
-	/// </summary>
-	thread() noexcept;
-
-	/// <summary>
-	/// Construct with entrypoint
-	/// </summary>
-	/// <typeparam name="Fn">Entrypoint type</typeparam>
-	/// <typeparam name="...Args">Entrypoint argument types</typeparam>
-	/// <param name="entryPoint">Entrypoint</param>
-	/// <param name="...args">Entrypoint arguments</param>
-	template <class Fn, class ...Args>
-	thread(Fn&& entryPoint, Args&& ... args);
-
-	/// <summary>
-	/// Move constructor
-	/// </summary>
-	/// <param name="other">Move from</param>
-	thread(thread&& other) noexcept;
-
-	/// <summary>
-	/// Destructor
-	/// </summary>
-	~thread();
+	using std::thread::thread;
 
 	/// <summary>
 	/// Set thread name as for debugging
@@ -84,10 +60,4 @@ public:
 
 	operator std::thread() = delete;
 };
-template<class Fn, class ...Args>
-inline thread::thread(Fn&& entryPoint, Args && ...args)
-	: std::thread::thread(std::forward<Fn>(entryPoint), std::forward<Args>(args)...)
-{
-	qsbr::register_thread();
-}
 }

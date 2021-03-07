@@ -164,8 +164,6 @@ template<class T, class Allocator>
 template<class ...Args>
 inline void concurrent_queue_fifo<T, Allocator>::emplace(Args&&... args)
 {
-	const qsbr::critical_section cs;
-
 	while (!t_producer.get()->try_emplace(std::forward<Args>(args)...)) {
 		if (t_producer.get()->is_valid()) {
 			refresh_producer();

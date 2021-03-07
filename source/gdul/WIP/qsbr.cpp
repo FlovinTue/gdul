@@ -206,5 +206,6 @@ critical_section::~critical_section()
 {
 	m_tracker.store(m_nextIx, std::memory_order_release);
 }
+constexpr size_t blah = 2 & 1;
 }
 #pragma warning(pop)

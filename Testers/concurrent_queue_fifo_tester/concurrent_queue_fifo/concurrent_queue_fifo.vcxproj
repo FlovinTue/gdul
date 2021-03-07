@@ -106,6 +106,7 @@
     <ClInclude Include="..\..\..\source\gdul\WIP\concurrent_queue_fifo_v8.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\..\source\gdul\execution\thread\thread.cpp" />
     <ClCompile Include="..\..\..\source\gdul\WIP\qsbr.cpp" />
     <ClCompile Include="Main.cpp" />
   </ItemGroup>
