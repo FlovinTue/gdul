@@ -11,7 +11,7 @@ constexpr std::uint8_t MaxThreads = sizeof(std::size_t) * 8;
 /// <summary>
 /// Used to track
 /// </summary>
-using qsb_item = std::atomic<std::size_t>;
+using item = std::atomic<std::size_t>;
 
 /// <summary>
 /// Use this to track critical section presence of this thread. Critical sections
@@ -43,27 +43,27 @@ void unregister_thread();
 /// Resets an item to unverified state
 /// </summary>
 /// <param name="item">Item state</param>
-void reset(qsb_item& item);
+void reset(item& item);
 
 /// <summary>
 /// Initialize item
 /// </summary>
 /// <param name="item">Item state</param>
 /// <returns>True if no threads are inside critical sections</returns>
-bool set(qsb_item& item);
+bool set(item& item);
 
 /// <summary>
 /// Update item state
 /// </summary>
 /// <param name="item">Item state</param>
 /// <returns>True if no threads are inside critical sections or if they have left the critical section they were in at item initialization</returns>
-bool update(qsb_item& item);
+bool update(item& item);
 
 /// <summary>
 /// Check item state
 /// </summary>
 /// <param name="item">Item state</param>
 /// <returns>True if no threads are inside critical sections or if they have left the critical section they were in at item initialization</returns>
-bool is_safe(const qsb_item& item);
+bool is_safe(const item& item);
 
 }
