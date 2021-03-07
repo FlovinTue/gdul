@@ -63,7 +63,7 @@ std::size_t create_new_mask()
 	const std::uint8_t lastTrackerIndex(g_states.lastTrackerIndex.load(std::memory_order_acquire));
 	const std::uint8_t lastTrackedBit(std::size_t(lastTrackerIndex) + 1);
 	std::size_t initialTrackingMask(std::numeric_limits<std::size_t>::max());
-	initialTrackingMask >>= (sizeof(qsb_item) * 8 /*shift away all unused bits*/) - lastTrackedBit;
+	initialTrackingMask >>= (sizeof(item) * 8 /*shift away all unused bits*/) - lastTrackedBit;
 	initialTrackingMask &= ~(std::size_t(1) << t_states.index);
 
 	std::size_t mask(0);
@@ -125,7 +125,7 @@ void unregister_thread()
 	t_states.index = -1;
 }
 
-bool update(qsb_item& item)
+bool update(item& item)
 {
 	const std::size_t mask(item.load(std::memory_order_relaxed));
 
@@ -140,19 +140,19 @@ bool update(qsb_item& item)
 	return !newMask;
 }
 
-bool set(qsb_item& item)
+bool set(item& item)
 {
 	const std::size_t mask(create_new_mask());
 	item.store(mask, std::memory_order_release);
 	return !mask;
 }
 
-bool is_safe(const qsb_item& item)
+bool is_safe(const item& item)
 {
 	return !item.load(std::memory_order_relaxed);
 }
 
-void reset(qsb_item& item)
+void reset(item& item)
 {
 	item.store(std::numeric_limits<std::size_t>::max(), std::memory_order_relaxed);
 }
@@ -169,22 +169,22 @@ void unregister_thread()
 	qsbr_detail::unregister_thread();
 }
 
-bool set(qsb_item& item)
+bool set(item& item)
 {
 	return qsbr_detail::set(item);
 }
 
-bool update(qsb_item& item)
+bool update(item& item)
 {
 	return qsbr_detail::update(item);
 }
 
-bool is_safe(const qsb_item& item)
+bool is_safe(const item& item)
 {
 	return qsbr_detail::is_safe(item);
 }
 
-void reset(qsb_item& item)
+void reset(item& item)
 {
 	qsbr_detail::reset(item);
 }

@@ -103,6 +103,7 @@
     <ClInclude Include="..\..\..\source\gdul\WIP\concurrent_queue_fifo_v5.h" />
     <ClInclude Include="..\..\..\source\gdul\WIP\concurrent_queue_fifo_v6.h" />
     <ClInclude Include="..\..\..\source\gdul\WIP\concurrent_queue_fifo_v7.h" />
+    <ClInclude Include="..\..\..\source\gdul\WIP\concurrent_queue_fifo_v8.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\source\gdul\WIP\qsbr.cpp" />
