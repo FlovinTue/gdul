@@ -12,7 +12,7 @@ int main()
 		gdul::qsbr::critical_section cs;
 		gdul::qsbr::item qsCheck;
 
-		gdul::qsbr::reset(qsCheck);
+		gdul::qsbr::invalidate(qsCheck);
 		gdul::qsbr::set(qsCheck);
 
 		if (gdul::qsbr::update(qsCheck)) {

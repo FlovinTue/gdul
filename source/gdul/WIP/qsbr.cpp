@@ -11,9 +11,9 @@
 
 namespace gdul::qsbr {
 
-static_assert(!((sizeof(std::size_t) * 8) < MaxThreads), "Max threads cannot exceed bits in std::size_t");
-
 namespace qsbr_detail {
+
+constexpr std::size_t InvalidMask(1ull << 63);
 
 struct alignas(std::hardware_destructive_interference_size) qsb_tracker
 {
@@ -39,7 +39,8 @@ thread_local t_container t_states;
 
 std::size_t update_mask(std::size_t existingMask)
 {
-	std::size_t mask(0);
+	std::size_t mask(existingMask & InvalidMask);
+
 	for (std::size_t maskProbe = existingMask, i = 0; maskProbe; maskProbe >>= 1, ++i) {
 		if (maskProbe & 1) {
 			const std::size_t previous(t_states.viewedIterations[i]);
@@ -152,9 +153,9 @@ bool is_safe(const item& item)
 	return !item.load(std::memory_order_relaxed);
 }
 
-void reset(item& item)
+void invalidate(item& item)
 {
-	item.store(std::numeric_limits<std::size_t>::max(), std::memory_order_relaxed);
+	item.store(InvalidMask, std::memory_order_relaxed);
 }
 
 }
@@ -184,9 +185,9 @@ bool is_safe(const item& item)
 	return qsbr_detail::is_safe(item);
 }
 
-void reset(item& item)
+void invalidate(item& item)
 {
-	qsbr_detail::reset(item);
+	qsbr_detail::invalidate(item);
 }
 
 critical_section::critical_section()

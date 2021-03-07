@@ -361,7 +361,7 @@ void move(T& from, T& to)
 }
 
 template<class T>
-void assign(T& a, T& b)
+void assign(T& from, T& to)
 {
 	to = from;
 }
@@ -447,9 +447,8 @@ template<class T, class Allocator>
 inline item_buffer<T, Allocator>::item_buffer(T* dataBlock, typename item_buffer<T, Allocator>::size_type capacity)
 	: m_preReadSync(0)
 	, m_readAt(0)
-	, m_read(capacity)
+	, m_read(capacity / 2)
 	, m_writeAt(0)
-	, m_pushCeil(capacity)
 	, m_postWriteSync(0)
 	, m_written(0)
 	, m_next(nullptr)
@@ -457,7 +456,7 @@ inline item_buffer<T, Allocator>::item_buffer(T* dataBlock, typename item_buffer
 	, m_items(dataBlock)
 	, m_state(buffer_state_valid)
 {
-	qsbr::reset(m_readControl);
+	qsbr::invalidate(m_readControl);
 }
 
 template<class T, class Allocator>
@@ -563,10 +562,20 @@ inline bool item_buffer<T, Allocator>::try_inc_read(size_type minimum)
 	// That means we can effectively update as much as we want here. So long as all the current writers 
 	// we can (?) also reset m_readControl. Tricky, though. Need to ensure there won't be any updating performed
 	// once it's been reset. Perhaps force all updaters to reset after? 
+
+
 	if (qsbr::update(m_readControl)) {
-		m_read.fetch_add(m_capacity / 2, std::memory_order_relaxed);
+		const size_type halfCapacity(m_capacity / 2);
+		size_type expected((minimum / halfCapacity) * halfCapacity);
+		const size_type desired(expected + halfCapacity);
+
+		m_read.compare_exchange_strong(expected, desired, std::memory_order_relaxed);
+
+		qsbr::invalidate(m_readControl);
 	}
-	return true;
+
+
+	return minimum < m_read.load(std::memory_order_acquire);
 }
 template<class T, class Allocator>
 inline void item_buffer<T, Allocator>::move_or_assign(T& from, T& to)

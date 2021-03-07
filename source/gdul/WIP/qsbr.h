@@ -6,10 +6,10 @@
 
 namespace gdul::qsbr {
 
-constexpr std::uint8_t MaxThreads = sizeof(std::size_t) * 8;
+constexpr std::uint8_t MaxThreads = sizeof(std::size_t) * 8 - 1 /* Reserve last bit for invalid state */;
 
 /// <summary>
-/// Used to track
+/// Once set, may be updated & queried using update and is_safe
 /// </summary>
 using item = std::atomic<std::size_t>;
 
@@ -24,6 +24,7 @@ public:
 	critical_section();
 	~critical_section();
 
+private:
 	const std::size_t m_nextIx;
 	const std::int8_t m_globalIndex;
 	std::atomic<std::size_t>& m_tracker;
@@ -40,10 +41,10 @@ void register_thread();
 void unregister_thread();
 
 /// <summary>
-/// Resets an item to unverified state
+/// Set an item to invalid state. Must be set to transition out of invalid state
 /// </summary>
 /// <param name="item">Item state</param>
-void reset(item& item);
+void invalidate(item& item);
 
 /// <summary>
 /// Initialize item
