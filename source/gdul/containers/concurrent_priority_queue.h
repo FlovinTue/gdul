@@ -196,7 +196,7 @@ public:
 	/// <summary>
 	/// Attempt to dequeue the top item
 	/// </summary>
-	/// <param name="out">Item to be written. Will be remain unmodified in case of failure</param>
+	/// <param name="out">Item to be written. Remains unmodified in case of failure</param>
 	/// <returns>True on success</returns>
 	bool try_pop(input_type& out);
 
