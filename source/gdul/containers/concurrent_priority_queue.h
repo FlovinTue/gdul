@@ -179,7 +179,7 @@ public:
 	/// <summary>
 	/// Destructor
 	/// </summary>
-	~concurrent_priority_queue_impl() noexcept;
+	~concurrent_priority_queue_impl();
 
 	/// <summary>
 	/// Enqueue an item

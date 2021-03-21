@@ -10,8 +10,6 @@
 #include <gdul/../../Testers/Common/tracking_allocator.h>
 #include <gdul/../../Testers/queue_tester/tester.h>
 
-//#include <vld.h>
-
 
 #pragma warning(disable : 4324)
 

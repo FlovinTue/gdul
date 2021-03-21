@@ -103,7 +103,7 @@ public:
 	/// <summary>
 	/// Destructor
 	/// </summary>
-	~concurrent_skip_list_base() noexcept;
+	~concurrent_skip_list_base();
 
 	/// <summary>
 	/// Query for items

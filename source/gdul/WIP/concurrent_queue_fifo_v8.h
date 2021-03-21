@@ -564,14 +564,13 @@ inline void item_buffer<T, Allocator>::destroy_items() noexcept
 template<class T, class Allocator>
 inline bool item_buffer<T, Allocator>::try_inc_read(size_type minimum, size_type expectedRead)
 {
-
 	size_type _expectedRead(expectedRead);
 	while (true) {
 		if (qsbr::update(m_readControl)) {
 			const size_type halfCapacity(m_capacity / 2);
 			const size_type desired(_expectedRead + halfCapacity);
 
-			if (m_read.compare_exchange_strong(_expectedRead, desired, std::memory_order_relaxed)) {
+			if (m_read.compare_exchange_strong(_expectedRead, desired, std::memory_order_release, std::memory_order_relaxed)) {
 				_expectedRead = desired;
 			}
 
@@ -587,63 +586,13 @@ inline bool item_buffer<T, Allocator>::try_inc_read(size_type minimum, size_type
 			return true;
 		}
 
-		if (BufferBlockOffset < toReadDelta) {
-			return false;
-		}
-
-		const size_type desired(_expectedRead + BufferBlockOffset);
-		if (m_read.compare_exchange_strong(_expectedRead, desired, std::memory_order_relaxed)) {
+		const size_type blockage(_expectedRead + BufferBlockOffset);
+		if (m_read.compare_exchange_weak(_expectedRead, blockage, std::memory_order_release, std::memory_order_relaxed)) {
 			return false;
 		}
 	}
 
-	// We probably need to use m_read for blocking writers.. 
-
-
-	// So can we have loop around with one writer stalling here? No I think if we are to pass in to the
-	// next cycle all writes must be performed.. 
-
-	// That means we can effectively update as much as we want here. So long as all the current writers 
-	// we can (?) also reset m_readControl. Tricky, though. Need to ensure there won't be any updating performed
-	// once it's been reset. Perhaps force all updaters to reset after? 
-
-
-	//size_type _expectedRead(expectedRead);
-	//
-	//do {
-	//	if (qsbr::update(m_readControl)) {
-	//		const size_type halfCapacity(m_capacity / 2);
-	//		const size_type desired(_expectedRead + halfCapacity);
-	//
-	//		if (m_read.compare_exchange_strong(_expectedRead, desired, std::memory_order_relaxed)) {
-	//			return true;
-	//		}
-	//	}
-	//
-	//
-	//
-	//} while (!(minimum < _expectedRead));
-	//
-	//if (qsbr::update(m_readControl)) {
-	//	const size_type halfCapacity(m_capacity / 2);
-	//	size_type expected((minimum / halfCapacity) * halfCapacity);
-	//	const size_type desired(expected + halfCapacity);
-	//
-	//	
-	//
-	//	qsbr::invalidate(m_readControl);
-	//}
-	//
-	//if (!(minimum < m_read.load(std::memory_order_acquire))) {
-	//	// Block writers?
-	//	// Or should we put qsbr::update in a retry loop? 
-	//	// And if we fail to update we try to block writing.. :O
-	//
-	//	// So we need to guarantee that pushes are continuous. So if we exit here with a 
-	//	// false result we need to have a guarantee there is no later indexes being pushed..
-	//}
-	//
-	//return minimum < m_read.load(std::memory_order_acquire);
+	return true;
 }
 template<class T, class Allocator>
 inline void item_buffer<T, Allocator>::move_or_assign(T& from, T& to)
