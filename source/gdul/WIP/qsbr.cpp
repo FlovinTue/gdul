@@ -63,7 +63,7 @@ std::size_t create_new_mask()
 	const std::uint8_t lastTrackerIndex(g_states.lastTrackerIndex.load(std::memory_order_acquire));
 	const std::uint8_t lastTrackedBit(std::size_t(lastTrackerIndex) + 1);
 	std::size_t initialTrackingMask(std::numeric_limits<std::size_t>::max());
-	initialTrackingMask >>= (sizeof(qsb_item) * 8 /*shift away all unused bits*/) - lastTrackedBit;
+	initialTrackingMask >>= (sizeof(shared_snapshot) * 8 /*shift away all unused bits*/) - lastTrackedBit;
 	initialTrackingMask &= ~(std::size_t(1) << t_states.index);
 
 	std::size_t mask(0);
@@ -100,7 +100,7 @@ void register_thread()
 
 	assert(t_states.index != -1 && "Could not find slot for thread. Max threads exceeded?");
 
-	// Update last tracker index
+	// query_and_update last tracker index
 	std::int8_t lastTrackerIndex(g_states.lastTrackerIndex.load(std::memory_order_relaxed));
 
 	while (lastTrackerIndex < t_states.index) {
@@ -125,9 +125,9 @@ void unregister_thread()
 	t_states.index = -1;
 }
 
-bool update(qsb_item& item)
+bool query_and_update(shared_snapshot& item)
 {
-	const std::size_t mask(item.load(std::memory_order_relaxed));
+	const std::size_t mask(item.m_state.load(std::memory_order_relaxed));
 
 	if (!mask) {
 		return true;
@@ -135,26 +135,26 @@ bool update(qsb_item& item)
 
 	const std::size_t newMask(update_mask(mask));
 
-	item.fetch_and(newMask, std::memory_order_relaxed);
+	item.m_state.fetch_and(newMask, std::memory_order_relaxed);
 
 	return !newMask;
 }
 
-bool set(qsb_item& item)
+bool initialize(shared_snapshot& item)
 {
 	const std::size_t mask(create_new_mask());
-	item.store(mask, std::memory_order_release);
+	item.m_state.store(mask, std::memory_order_release);
 	return !mask;
 }
 
-bool is_safe(const qsb_item& item)
+bool query(const shared_snapshot& item)
 {
-	return !item.load(std::memory_order_relaxed);
+	return !item.m_state.load(std::memory_order_relaxed);
 }
 
-void reset(qsb_item& item)
+void reset(shared_snapshot& item)
 {
-	item.store(std::numeric_limits<std::size_t>::max(), std::memory_order_relaxed);
+	item.m_state.store(std::numeric_limits<std::size_t>::max(), std::memory_order_relaxed);
 }
 
 }
@@ -169,22 +169,22 @@ void unregister_thread()
 	qsbr_detail::unregister_thread();
 }
 
-bool set(qsb_item& item)
+bool initialize(shared_snapshot& item)
 {
-	return qsbr_detail::set(item);
+	return qsbr_detail::initialize(item);
 }
 
-bool update(qsb_item& item)
+bool query_and_update(shared_snapshot& item)
 {
-	return qsbr_detail::update(item);
+	return qsbr_detail::query_and_update(item);
 }
 
-bool is_safe(const qsb_item& item)
+bool query(const shared_snapshot& item)
 {
-	return qsbr_detail::is_safe(item);
+	return qsbr_detail::query(item);
 }
 
-void reset(qsb_item& item)
+void reset(shared_snapshot& item)
 {
 	qsbr_detail::reset(item);
 }

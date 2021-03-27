@@ -10,12 +10,12 @@ int main()
 	gdul::qsbr::register_thread();
 	{
 		gdul::qsbr::critical_section cs;
-		gdul::qsbr::qsb_item qsCheck;
+		gdul::qsbr::shared_snapshot qsCheck;
 
 		gdul::qsbr::reset(qsCheck);
-		gdul::qsbr::set(qsCheck);
+		gdul::qsbr::initialize(qsCheck);
 
-		if (gdul::qsbr::update(qsCheck)) {
+		if (gdul::qsbr::query_and_update(qsCheck)) {
 			std::cout << "Safe" << std::endl;
 		}
 		else {

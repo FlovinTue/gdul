@@ -11,7 +11,17 @@ constexpr std::uint8_t MaxThreads = sizeof(std::size_t) * 8;
 /// <summary>
 /// Used to track
 /// </summary>
-using qsb_item = std::atomic<std::size_t>;
+class snapshot
+{
+public:
+	std::size_t m_state;
+};
+
+class shared_snapshot
+{
+public:
+	std::atomic<std::size_t> m_state;
+};
 
 /// <summary>
 /// Use this to track critical section presence of this thread. Critical sections
@@ -40,30 +50,30 @@ void register_thread();
 void unregister_thread();
 
 /// <summary>
-/// Resets an item to unverified state
+/// Resets a snapshot to unverified state
 /// </summary>
-/// <param name="item">Item state</param>
-void reset(qsb_item& item);
+/// <param name="snapshot">snapshot item</param>
+void reset(shared_snapshot& snapshot);
 
 /// <summary>
-/// Initialize item
+/// Initialize snapshot
 /// </summary>
-/// <param name="item">Item state</param>
+/// <param name="snapshot">snapshot item</param>
 /// <returns>True if no threads are inside critical sections</returns>
-bool set(qsb_item& item);
+bool initialize(shared_snapshot& snapshot);
 
 /// <summary>
-/// Update item state
+/// Query other threads's state in relation to a snapshot and update it's state
 /// </summary>
-/// <param name="item">Item state</param>
-/// <returns>True if no threads are inside critical sections or if they have left the critical section they were in at item initialization</returns>
-bool update(qsb_item& item);
+/// <param name="snapshot">snapshot item</param>
+/// <returns>True if no threads are inside critical sections or if they have left the critical section they were in at snapshot initialization</returns>
+bool query_and_update(shared_snapshot& snapshot);
 
 /// <summary>
-/// Check item state
+/// Query other threads's state in relation to a snapshot
 /// </summary>
-/// <param name="item">Item state</param>
-/// <returns>True if no threads are inside critical sections or if they have left the critical section they were in at item initialization</returns>
-bool is_safe(const qsb_item& item);
+/// <param name="snapshot">snapshot item</param>
+/// <returns>True if no threads are inside critical sections or if they have left the critical section they were in at snapshot initialization</returns>
+bool query(const shared_snapshot& snapshot);
 
 }
