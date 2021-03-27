@@ -1,6 +1,7 @@
 // concurrent_priority_queue.cpp : This file contains the 'main' function. Program execution begins and ends there.
 //
 #include <gdul/containers/concurrent_priority_queue.h>
+#include <vld.h>
 
 #define GDUL_CPQ
 //#define MS_CPQ
@@ -88,7 +89,7 @@ int main()
 
 	// At this point we need to test for correctness of values. Or. Perhaps multi-layer first.
 	gdul::queue_testrun<test_type, gdul::tracking_allocator<std::pair<int, float>>>(
-		1000000,
+		4,
 		gdul::tracking_allocator<std::pair<int, float>>());
 
 

@@ -35,7 +35,7 @@ void map_tester::perform_tests(int iterations)
 
 void map_tester::perform_speed_tests(int iterations)
 {
-	int inserts(400);
+	int inserts(10);
 	for (int i = 0; i < iterations; ++i) {
 		check_insertion_speed(inserts);
 		check_lookup_speed(inserts);

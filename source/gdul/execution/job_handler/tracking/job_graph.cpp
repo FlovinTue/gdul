@@ -61,7 +61,7 @@ void write_dgml_node(const job_info& node, const std::unordered_map<std::uint64_
 job_graph::job_graph(allocator_type alloc)
 	: m_map(alloc)
 {
-	auto itr = m_map.insert(std::make_pair(0, job_info()));
+	auto itr = m_map.insert(std::make_pair(1, job_info()));
 	itr.first->second.m_id = 0;
 
 #if defined(GDUL_JOB_DEBUG)

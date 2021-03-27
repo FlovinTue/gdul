@@ -41,7 +41,7 @@ int main()
 			std::cout << "Performing predictive scheduling test" << std::endl;
 
 			std::uint32_t high(0);
-			const float above(10.f);
+			const float above(20.f);
 			float predictiveMin(FLT_MAX);
 			float predictiveMax(-FLT_MAX);
 			float predictiveAccum(0.f);

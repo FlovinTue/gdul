@@ -48,7 +48,7 @@ using defaul_allocator = std::allocator<std::uint8_t>;
 
 constexpr size_type DefaulBlockSize = 16;
 constexpr size_type DefaulTlCacheSize = 4;
-constexpr size_type MaxUsers = 16;
+constexpr size_type MaxUsers = 32;
 constexpr std::uint8_t CapacityBits = 19;
 
 struct critical_sec;

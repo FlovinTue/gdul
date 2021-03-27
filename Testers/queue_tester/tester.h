@@ -231,8 +231,8 @@ inline tester<T, Allocator>::tester(Allocator&
 #endif
 ) :
 	m_isRunning(false),
-	m_writer((1 << 0) | (1 << 2) | (1 << 4) | (1 << 6)),
-	m_reader((1 << 1) | (1 << 3) | (1 << 5) | (1 << 7)),
+	m_writer((1 << 0) | (1 << 2) | (1 << 4) | (1 << 6) | (1 << 1) | (1 << 3) | (1 << 5) | (1 << 7)),
+	m_reader((1 << 8) | (1 << 9) | (1 << 10) | (1 << 11) | (1 << 12) | (1 << 13) | (1 << 14) | (1 << 15)),
 	m_writtenSum(0),
 	m_readSum(0),
 	m_thrown(0),
