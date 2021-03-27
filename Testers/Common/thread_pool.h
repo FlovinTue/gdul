@@ -3,7 +3,6 @@
 #include <functional>
 #include <atomic>
 #include <concurrent_queue.h>
-#include <gdul/containers/concurrent_queue.h>
 #include <vector>
 #include <gdul/WIP/qsbr.h>
 #include <gdul/execution/thread/thread.h>
@@ -36,7 +35,7 @@ private:
 
 	std::vector<gdul::thread> m_threads;
 
-	gdul::concurrent_queue<std::function<void()>> m_taskQueue;
+	concurrency::concurrent_queue<std::function<void()>> m_taskQueue;
 
 	std::atomic<bool> m_inCommission;
 

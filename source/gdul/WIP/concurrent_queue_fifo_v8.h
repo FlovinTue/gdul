@@ -411,7 +411,7 @@ public:
 private:
 	void destroy_items() noexcept;
 
-	bool try_inc_read(size_type minimum, size_type expectedRead);
+	bool try_inc_read(size_type minimum, size_type& outRead);
 
 	void move_or_assign(T& from, T& to);
 
@@ -466,34 +466,33 @@ inline item_buffer<T, Allocator>::~item_buffer()
 template<class T, class Allocator>
 inline bool item_buffer<T, Allocator>::is_active() const
 {
-	assert(false && "not implemented");
+	if (!m_next) {
+		return true;
+	}
 
-	//if (!m_next) {
-	//	return true;
-	//}
+	const size_type readAt(m_readAt.load(std::memory_order_acquire));
+	const size_type writeAt(m_writeAt.load(std::memory_order_relaxed));
 
-	//if (m_readAt.load(std::memory_order_acquire) < m_capacity) {
-	//	return true;
-	//}
+	if (readAt < writeAt) {
+		return true;
+	}
 
 	return false;
 }
 template<class T, class Allocator>
 inline bool item_buffer<T, Allocator>::is_valid() const
 {
-	return m_state.load(std::memory_order_acquire) != buffer_state_invalid;
+	return m_state.load(std::memory_order_relaxed) == buffer_state_valid;
 }
 template<class T, class Allocator>
 inline void item_buffer<T, Allocator>::unsafe_invalidate()
 {
-	assert(false && "not implemented");
+	m_state.store(buffer_state_invalid, std::memory_order_relaxed);
+	m_writeAt.store(m_read.load(std::memory_order_relaxed), std::memory_order_relaxed);
 
-	//m_state.store(buffer_state_invalid, std::memory_order_relaxed);
-	//m_writeAt.store(m_capacity, std::memory_order_relaxed);
-
-	//if (m_next) {
-	//	m_next.unsafe_get()->unsafe_invalidate();
-	//}
+	if (m_next) {
+		m_next.unsafe_get()->unsafe_invalidate();
+	}
 }
 template<class T, class Allocator>
 inline typename item_buffer<T, Allocator>::shared_ptr_buffer_type item_buffer<T, Allocator>::find_front()
@@ -562,32 +561,31 @@ inline void item_buffer<T, Allocator>::destroy_items() noexcept
 	}
 }
 template<class T, class Allocator>
-inline bool item_buffer<T, Allocator>::try_inc_read(size_type minimum, size_type expectedRead)
+inline bool item_buffer<T, Allocator>::try_inc_read(size_type minimum, size_type& outRead)
 {
-	size_type _expectedRead(expectedRead);
 	while (true) {
 		if (qsbr::update(m_readControl)) {
 			const size_type halfCapacity(m_capacity / 2);
-			const size_type desired(_expectedRead + halfCapacity);
+			const size_type desired(outRead + halfCapacity);
 
-			if (m_read.compare_exchange_strong(_expectedRead, desired, std::memory_order_release, std::memory_order_relaxed)) {
-				_expectedRead = desired;
+			if (m_read.compare_exchange_strong(outRead, desired, std::memory_order_release, std::memory_order_relaxed)) {
+				outRead = desired;
 			}
 
 			qsbr::invalidate(m_readControl);
 		}
 		else {
-			_expectedRead = m_read.load(std::memory_order_acquire);
+			outRead = m_read.load(std::memory_order_acquire);
 		}
 
-		const size_type toReadDelta(_expectedRead - minimum);
+		const size_type toReadDelta(outRead - minimum);
 
 		if (toReadDelta < m_capacity) {
 			return true;
 		}
 
-		const size_type blockage(_expectedRead + BufferBlockOffset);
-		if (m_read.compare_exchange_weak(_expectedRead, blockage, std::memory_order_release, std::memory_order_relaxed)) {
+		const size_type blockage(outRead + BufferBlockOffset);
+		if (m_read.compare_exchange_weak(outRead, blockage, std::memory_order_release, std::memory_order_relaxed)) {
 			return false;
 		}
 	}
@@ -626,14 +624,11 @@ template<class T, class Allocator>
 template<class ...Args>
 inline bool item_buffer<T, Allocator>::try_emplace(Args&& ... args)
 {
-	size_type at(m_writeAt.fetch_add(1, std::memory_order_relaxed));
-	const size_type read(m_read.load(std::memory_order_relaxed));
-	const size_type delta(read - at);
+	const size_type at(m_writeAt.fetch_add(1, std::memory_order_relaxed));
+	size_type read(m_read.load(std::memory_order_relaxed));
 
-	if (!(delta < m_capacity)) {
+	if (!(at < read)) {
 		if (!try_inc_read(at, read)) {
-
-			// Will we need to block writers here ? 
 			return false;
 		}
 	}
@@ -642,6 +637,8 @@ inline bool item_buffer<T, Allocator>::try_emplace(Args&& ... args)
 
 	//Move this entire block to method, and force in case of failed inc_read ? 
 	const size_type postSync(m_postWriteSync.fetch_add(1, std::memory_order_acq_rel));
+
+	// Clamp should still work here, since if m_read is increased, 
 	const size_type postAt(std::clamp<size_type>(m_writeAt.load(std::memory_order_relaxed), 0, read));
 
 	if ((postSync + 1) == postAt) {
