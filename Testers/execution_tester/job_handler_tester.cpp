@@ -4,7 +4,7 @@
 #include <algorithm>
 #include <thread>
 #include "../Common/Timer.h"
-#include <gdul/delegate/delegate.h>
+#include <gdul/utility/delegate.h>
 #include <array>
 #include "../Common/util.h"
 #include <gdul/execution/job_handler/tracking/job_graph.h>
@@ -264,7 +264,7 @@ float job_handler_tester::run_predictive_scheduling_test()
 	timer<float> time;
 
 	for (std::size_t i = 0; i < parallelSplit; ++i) {
-		job jb(m_handler.make_job(make_delegate<void()>(spinFor, serialExecutionTime), &m_syncQueue, i, "Predictive Scheduling Parallel"));
+		job jb(m_handler.make_job(make_delegate(spinFor, serialExecutionTime), &m_syncQueue, i, "Predictive Scheduling Parallel"));
 		//jb.depends_on(root);
 		jb.enable();
 		dependant.depends_on(jb);
@@ -275,7 +275,7 @@ float job_handler_tester::run_predictive_scheduling_test()
 
 	job previous;
 	for (std::size_t i = 0; i < parallelSplit; ++i) {
-		job jb(m_handler.make_job(make_delegate<void()>(spinFor, serialExecutionTime), &m_syncQueue, i, std::string("Predictive Scheduling Serial# " + std::to_string(i)).c_str()));
+		job jb(m_handler.make_job(make_delegate(spinFor, serialExecutionTime), &m_syncQueue, i, std::string("Predictive Scheduling Serial# " + std::to_string(i)).c_str()));
 		jb.depends_on(previous);
 		//jb.depends_on(root);
 		dependant.depends_on(jb);

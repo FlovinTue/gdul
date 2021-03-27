@@ -52,13 +52,14 @@ std::string executable_name()
 namespace gdul {
 namespace jh_detail {
 
-constexpr std::size_t Variation_Offset = 1;
+constexpr std::size_t VariationOffset = 1;
 
 #if defined (GDUL_JOB_DEBUG)
 void write_dgml_node(const job_info& node, const std::unordered_map<std::uint64_t, std::size_t>& childCounter, std::string& outNodes, std::string& outLinks);
 #endif 
 
-job_graph::job_graph()
+job_graph::job_graph(allocator_type alloc)
+	: m_map(alloc)
 {
 	auto itr = m_map.insert(std::make_pair(0, job_info()));
 	itr.first->second.m_id = 0;
@@ -77,7 +78,7 @@ job_info* job_graph::get_job_info(std::size_t physicalId, std::size_t variationI
 {
 	const std::size_t physicalJobParent(job::this_job.get_id());
 	const std::size_t physicalJob(physicalJobParent + physicalId);
-	const std::size_t physicalJobVariation(physicalJob + Variation_Offset + variationId );
+	const std::size_t physicalJobVariation(physicalJob + VariationOffset + variationId );
 
 	decltype(m_map)::iterator itr(m_map.find(physicalJobVariation));
 
@@ -130,7 +131,7 @@ job_info* job_graph::get_sub_job_info(std::size_t batchId, std::size_t variation
 job_info* job_graph::get_sub_job_info(std::size_t batchId, std::size_t variationId)
 #endif
 {
-	const std::size_t batchSubJobVariation(batchId + Variation_Offset + variationId);
+	const std::size_t batchSubJobVariation(batchId + VariationOffset + variationId);
 
 	decltype(m_map)::iterator itr(m_map.find(batchSubJobVariation));
 

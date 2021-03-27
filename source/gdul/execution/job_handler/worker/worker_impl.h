@@ -23,15 +23,16 @@
 #pragma warning(push)
 #pragma warning(disable : 4324)
 
-#include <chrono>
-#include <atomic>
-#include <thread>
-
 #include <gdul/execution/job_handler/job_handler_utility.h>
-#include <gdul/delegate/delegate.h>
+#include <gdul/utility/delegate.h>
 #include <gdul/execution/job_handler/worker/worker.h>
 #include <gdul/execution/job_handler/job/job.h>
 #include <gdul/execution/thread/thread.h>
+
+#include <chrono>
+#include <atomic>
+#include <thread>
+#include <array>
 
 namespace gdul {
 namespace jh_detail
@@ -89,7 +90,7 @@ private:
 	std::chrono::high_resolution_clock::time_point m_lastJobTimepoint;
 	std::chrono::high_resolution_clock m_sleepTimer;
 
-	job_queue* m_targets[Max_Worker_Targets];
+	std::array<job_queue*, MaxWorkerTargets> m_targets;
 
 	std::uint16_t m_sleepThreshhold;
 

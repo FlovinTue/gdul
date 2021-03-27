@@ -25,7 +25,7 @@
 
 
 #include <gdul/memory/pool_allocator.h>
-#include <gdul/delegate/delegate.h>
+#include <gdul/utility/delegate.h>
 #include <gdul/execution/job_handler/job/job.h>
 #include <gdul/execution/job_handler/job/job_impl.h>
 #include <gdul/execution/job_handler/job/batch_job_impl.h>
@@ -91,7 +91,7 @@ private:
 
 	job_graph m_jobGraph;
 
-	std::array<worker_impl, Max_Workers> m_workers;
+	std::array<worker_impl, MaxWorkers> m_workers;
 
 	std::atomic<std::uint16_t> m_workerIndices;
 

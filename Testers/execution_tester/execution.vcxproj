@@ -129,6 +129,7 @@
     <ClCompile Include="..\..\source\gdul\execution\job_handler\worker\worker.cpp" />
     <ClCompile Include="..\..\source\gdul\execution\job_handler\worker\worker_impl.cpp" />
     <ClCompile Include="..\..\source\gdul\execution\thread\thread.cpp" />
+    <ClCompile Include="..\..\source\gdul\WIP\qsbr.cpp" />
     <ClCompile Include="work_tracker.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="job_handler_tester.cpp" />

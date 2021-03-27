@@ -6,8 +6,50 @@
 #include <gdul/memory/concurrent_object_pool.h>
 #include <gdul/memory/concurrent_guard_pool.h>
 #include <gdul/memory/pool_allocator.h>
+#include <gdul/memory/scratch_pad.h>
+#include <gdul/containers/small_vector.h>
+
 #include <vld.h>
-#include <vector>
+
+void test_small_vector()
+{
+	gdul::scratch_pad<64> pad;
+	std::pmr::polymorphic_allocator<int> sall(&pad);
+
+	int* a = sall.allocate(10);
+	int* b = sall.allocate(5);
+	sall.deallocate(a, 10);
+	sall.deallocate(b, 5);
+
+	std::array<int, 5> collection{ 1, 2, 3, 4, 5 };
+
+	gdul::small_vector<int> c1;
+	gdul::small_vector<int> c2 = gdul::small_vector<int>(std::allocator<int>());
+	gdul::small_vector<int> c3(5, 5);
+	gdul::small_vector<int> c4 = gdul::small_vector<int>(5, std::allocator<int>());
+	gdul::small_vector<int> c5(collection.begin(), collection.end());
+	gdul::small_vector<int> c6(c5);
+	gdul::small_vector<int> c7(c5, std::allocator<int>());
+	gdul::small_vector<int> c8(std::move(c5));
+	gdul::small_vector<int> c9(std::move(c6), std::allocator<int>());
+	gdul::small_vector<int> c10({ 1, 2, 3, 4, 5 });
+	std::vector<int> vec({ 1, 2, 3, 4, 5 });
+	gdul::small_vector<int> c11(vec);
+	gdul::small_vector<int> c12(std::vector<int>({ 1, 2, 3, 4, 5 }));
+
+	gdul::small_vector<int> assign;
+	assign = c10;
+	gdul::small_vector<int> move;
+	move = std::move(assign);
+
+	gdul::small_vector<int> swap;
+	swap.swap(move);
+
+	std::vector<int> convert(swap);
+
+	std::allocator<int> alloc(c1.get_allocator());
+}
+
 
 float func(int arg)
 {
@@ -58,6 +100,13 @@ int main()
 	mpAlloc.deallocate(items2);
 	mpAlloc.deallocate(items3);
 	mpAlloc.deallocate(items4);
+
+	constexpr gdul::least_unsigned_integer_t<5> ch(5);
+	constexpr gdul::least_unsigned_integer_t<257> sh(5);
+	constexpr gdul::least_unsigned_integer_t<std::numeric_limits<int>::max()> ui(5);
+	constexpr gdul::least_unsigned_integer_t<std::numeric_limits<long long int>::max()> uli(5);
+
+	test_small_vector();
 
     std::cout << "Hello World!\n";
 }

@@ -20,7 +20,7 @@
 
 #pragma once
 
-#include <gdul/concurrent_skip_list/concurrent_skip_list_base.h>
+#include <gdul/containers/concurrent_skip_list_base.h>
 #include <gdul/memory/concurrent_scratch_pool.h>
 #include <gdul/memory/concurrent_guard_pool.h>
 
@@ -32,8 +32,8 @@
 namespace gdul {
 namespace cpq_detail {
 
-constexpr std::uint32_t Max_Version = (std::numeric_limits<std::uint32_t>::max() >> (16 - 3));
-constexpr std::uint32_t In_Range_Delta = Max_Version / 2;
+constexpr std::uint32_t MaxVersion = (std::numeric_limits<std::uint32_t>::max() >> (16 - 3));
+constexpr std::uint32_t InRangeDelta = MaxVersion / 2;
 
 enum exchange_link_result : std::uint8_t
 {
@@ -52,12 +52,12 @@ enum flag_node_result : std::uint8_t
 constexpr std::uint32_t version_delta(std::uint32_t from, std::uint32_t to)
 {
 	const std::uint32_t delta(to - from);
-	return delta & Max_Version;
+	return delta & MaxVersion;
 }
 constexpr std::uint32_t version_add_one(std::uint32_t from)
 {
 	const std::uint32_t next(from + 1);
-	const std::uint32_t masked(next & Max_Version);
+	const std::uint32_t masked(next & MaxVersion);
 	const std::uint32_t zeroAdjust(!(bool)masked);
 
 	return masked + zeroAdjust;
@@ -68,7 +68,7 @@ constexpr std::uint32_t version_sub_one(std::uint32_t from)
 	const std::uint32_t zeroAdjust(!(bool)next);
 	const std::uint32_t adjusted(next - zeroAdjust);
 
-	return adjusted & Max_Version;
+	return adjusted & MaxVersion;
 }
 constexpr std::uint32_t version_step(std::uint32_t from, std::uint8_t step)
 {
@@ -82,7 +82,7 @@ constexpr bool in_range(std::uint32_t version, std::uint32_t inRangeOf)
 {
 	// Zero special case
 	if (version != 0) {
-		return version_delta(version, inRangeOf) < In_Range_Delta;
+		return version_delta(version, inRangeOf) < InRangeDelta;
 	}
 
 	return true;
@@ -179,7 +179,7 @@ public:
 	/// <summary>
 	/// Destructor
 	/// </summary>
-	~concurrent_priority_queue_impl() noexcept;
+	~concurrent_priority_queue_impl();
 
 	/// <summary>
 	/// Enqueue an item
@@ -196,7 +196,7 @@ public:
 	/// <summary>
 	/// Attempt to dequeue the top item
 	/// </summary>
-	/// <param name="out">Item to be written. Will be remain unmodified in case of failure</param>
+	/// <param name="out">Item to be written. Remains unmodified in case of failure</param>
 	/// <returns>True on success</returns>
 	bool try_pop(input_type& out);
 
@@ -363,7 +363,7 @@ inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 	do {
 		node_view_set frontSet{};
 
-		frontSet[0] = m_head.m_linkViews[0].load(std::memory_order_seq_cst);
+		frontSet[0] = m_head.m_linkViews[0].load(std::memory_order_acquire);
 		mynode = frontSet[0];
 
 		if (at_end(mynode)) {
@@ -420,7 +420,7 @@ inline void concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 	node_type* frontNode(nullptr);
 
 	do {
-		frontSet[0] = (m_head.m_linkViews[0].load(std::memory_order_seq_cst));
+		frontSet[0] = (m_head.m_linkViews[0].load(std::memory_order_acquire));
 		frontNode = frontSet[0];
 
 		if (at_end(frontNode)) {
@@ -469,7 +469,7 @@ inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 
 		for (;;) {
 
-			nextSet[layer] = ((node_type*)atSet[layer])->m_linkViews[layer].load(std::memory_order_seq_cst);
+			nextSet[layer] = ((node_type*)atSet[layer])->m_linkViews[layer].load(std::memory_order_acquire);
 			node_type* const nextNode(nextSet[layer]);
 
 			if (at_end(nextNode)) {
@@ -676,7 +676,7 @@ template<class Key, class Value, std::uint8_t LinkTowerHeight, class AllocationS
 inline void concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::load_set(typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view_set& outSet, const node_type* at, std::uint8_t offset, std::uint8_t max)
 {
 	for (std::uint8_t i = offset; i < max; ++i) {
-		outSet[i] = at->m_linkViews[i].load(std::memory_order_seq_cst);
+		outSet[i] = at->m_linkViews[i].load(std::memory_order_acquire);
 	}
 }
 
@@ -740,9 +740,13 @@ inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class AllocationStrategy, class Compare>
 inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::needs_version_lag_check(std::uint32_t versionBase, std::uint32_t versionStep)
 {
-	const size_type versionPart(versionBase % csl_detail::to_expected_list_size(LinkTowerHeight));
+	// Every time version crosses the boundary of expected list size (a handy point to do so) we want to check for version lag
+
+	// At version % mod expected list size
+	const size_type versionPart(versionBase & (csl_detail::to_expected_list_size(LinkTowerHeight) - 1));
 	const size_type edgeCheck(versionPart + versionStep);
 
+	// Are we just on the threshhold?
 	return !(edgeCheck < csl_detail::to_expected_list_size(LinkTowerHeight));
 }
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class AllocationStrategy, class Compare>
@@ -839,7 +843,7 @@ inline cpq_detail::exchange_link_result concurrent_priority_queue_impl<Key, Valu
 			result = cpq_detail::exchange_link_outside_range;
 			break;
 		}
-	} while (!link->compare_exchange_strong(expected, desired, std::memory_order_seq_cst, std::memory_order_relaxed));
+	} while (!link->compare_exchange_strong(expected, desired, std::memory_order_release, std::memory_order_relaxed));
 
 	return result;
 }
@@ -850,7 +854,7 @@ inline cpq_detail::exchange_link_result concurrent_priority_queue_impl<Key, Valu
 
 	cpq_detail::exchange_link_result result(cpq_detail::exchange_link_outside_range);
 
-	if (link->compare_exchange_strong(expected, desired, std::memory_order_seq_cst, std::memory_order_relaxed)) {
+	if (link->compare_exchange_strong(expected, desired, std::memory_order_release, std::memory_order_relaxed)) {
 		result = cpq_detail::exchange_link_success;
 	}
 

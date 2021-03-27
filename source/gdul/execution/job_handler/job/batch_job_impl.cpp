@@ -19,7 +19,7 @@
 // SOFTWARE.
 
 #include "batch_job_impl.h"
-#include <gdul/delegate/delegate.h>
+#include <gdul/utility/delegate.h>
 #include <gdul/execution/job_handler/job_handler.h>
 #include <gdul/execution/job_handler/job_handler_impl.h>
 #include <gdul/execution/job_handler/job/job.h>

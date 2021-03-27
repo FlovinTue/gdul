@@ -1,6 +1,6 @@
 // concurrent_priority_queue.cpp : This file contains the 'main' function. Program execution begins and ends there.
 //
-#include <gdul/concurrent_priority_queue/concurrent_priority_queue.h>
+#include <gdul/containers/concurrent_priority_queue.h>
 
 #define GDUL_CPQ
 //#define MS_CPQ

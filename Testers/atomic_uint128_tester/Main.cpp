@@ -1,6 +1,6 @@
 
 #include "pch.h"
-#include <gdul\atomic_128\atomic_128.h>
+#include <gdul/memory/atomic_128.h>
 
 
 struct custom_struct

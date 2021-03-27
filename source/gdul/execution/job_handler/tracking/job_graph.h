@@ -22,16 +22,22 @@
 
 #include <gdul/execution/job_handler/globals.h>
 #include <gdul/execution/job_handler/tracking/job_info.h>
-
-#include <gdul/concurrent_skip_list/concurrent_skip_list.h>
+#include <gdul/execution/job_handler/job_handler_utility.h>
+#include <gdul/containers/concurrent_unordered_map.h>
 
 namespace gdul {
 namespace jh_detail {
 
+// Our keys should already be unique hashes
+struct dummy_hasher
+{
+	std::uint64_t operator()(std::uint64_t k) { return k; }
+};
+
 class job_graph
 {
 public:
-	job_graph();
+	job_graph(allocator_type alloc);
 
 	job_info* fetch_job_info(std::size_t id);
 
@@ -47,7 +53,7 @@ public:
 #endif
 
 private:
-	concurrent_skip_list<std::uint64_t, job_info> m_map;
+	concurrent_unordered_map<std::uint64_t, job_info, dummy_hasher, allocator_type> m_map;
 };
 }
 }

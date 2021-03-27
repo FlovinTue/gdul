@@ -1,4 +1,4 @@
-// Copyright(c) 2020 Flovin Michaelsen
+// Copyright(c) 2021 Flovin Michaelsen
 // 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files(the "Software"), to deal
@@ -20,10 +20,11 @@
 
 #pragma once
 
-#include <memory>
+#include <gdul/memory/thread_local_member.h>
+#include <gdul/math/math.h>
+
 #include <atomic>
-#include <cmath>
-#include <gdul/thread_local_member/thread_local_member.h>
+#include <memory>
 
 #pragma warning(push)
 // Anonymous struct
@@ -34,10 +35,9 @@ namespace gdul {
 namespace csp_detail {
 using size_type = std::size_t;
 
-static inline size_type pow2_align(size_type from, size_type clamp = std::numeric_limits<size_type>::max());
 
-constexpr size_type Default_Scratch_Size = 128;
-constexpr size_type Default_Tl_Cache_Size = 32;
+constexpr size_type DefaultScratchSize = 128;
+constexpr size_type DefaultTlCacheSize = 32;
 }
 
 /// <summary>
@@ -130,13 +130,13 @@ private:
 
 template<class T, class Allocator>
 inline concurrent_scratch_pool<T, Allocator>::concurrent_scratch_pool()
-	: concurrent_scratch_pool(csp_detail::Default_Scratch_Size, csp_detail::Default_Tl_Cache_Size, Allocator())
+	: concurrent_scratch_pool(csp_detail::DefaultScratchSize, csp_detail::DefaultTlCacheSize, Allocator())
 {
 }
 
 template<class T, class Allocator>
 inline concurrent_scratch_pool<T, Allocator>::concurrent_scratch_pool(Allocator alloc)
-	: concurrent_scratch_pool(csp_detail::Default_Scratch_Size, csp_detail::Default_Tl_Cache_Size, alloc)
+	: concurrent_scratch_pool(csp_detail::DefaultScratchSize, csp_detail::DefaultTlCacheSize, alloc)
 {
 }
 
@@ -149,9 +149,9 @@ inline concurrent_scratch_pool<T, Allocator>::concurrent_scratch_pool(size_type 
 template<class T, class Allocator>
 inline concurrent_scratch_pool<T, Allocator>::concurrent_scratch_pool(size_type initialScratchSize, size_type tlCacheSize, Allocator alloc)
 	: t_details(alloc, tl_container{ 0, 0, nullptr })
-	, m_block(allocate_shared<T[]>(csp_detail::pow2_align(initialScratchSize), alloc))
+	, m_block(allocate_shared<T[]>(align_value_pow2(initialScratchSize), alloc))
 	, m_iteration(1)
-	, m_tlCacheSize(csp_detail::pow2_align(tlCacheSize, csp_detail::pow2_align(initialScratchSize)))
+	, m_tlCacheSize(align_value_pow2(tlCacheSize, align_value_pow2(initialScratchSize)))
 	, m_allocator(alloc)
 {
 	assert(tlCacheSize && initialScratchSize && "Cannot instantiate pool with zero sizes");
@@ -174,7 +174,7 @@ inline T* concurrent_scratch_pool<T, Allocator>::get()
 		return &tl.localScratch[tl.localScratchIndex++];
 	}
 
-	if (!(tl.localScratchIndex < csp_detail::Default_Tl_Cache_Size)) {
+	if (!(tl.localScratchIndex < csp_detail::DefaultTlCacheSize)) {
 		reset_tl_scratch(tl);
 	}
 
@@ -221,14 +221,14 @@ inline void concurrent_scratch_pool<T, Allocator>::reset_tl_scratch(tl_container
 template<class T, class Allocator>
 inline T* concurrent_scratch_pool<T, Allocator>::acquire_tl_scratch()
 {
-	const size_type index(m_indexClaim.fetch_add(csp_detail::Default_Tl_Cache_Size, std::memory_order_relaxed));
+	const size_type index(m_indexClaim.fetch_add(csp_detail::DefaultTlCacheSize, std::memory_order_relaxed));
 
 	if (index < m_block.item_count()) {
 		return &m_block[index];
 	}
 
 	shared_ptr<excess_block> node(gdul::allocate_shared<excess_block>(m_allocator));
-	node->m_items = gdul::allocate_shared<T[]>(csp_detail::Default_Tl_Cache_Size, m_allocator);
+	node->m_items = gdul::allocate_shared<T[]>(csp_detail::DefaultTlCacheSize, m_allocator);
 
 	T* const ret(node->m_items.get());
 
@@ -239,22 +239,6 @@ inline T* concurrent_scratch_pool<T, Allocator>::acquire_tl_scratch()
 	} while (!m_excessBlocks.compare_exchange_strong(expected, std::move(node), std::memory_order_relaxed));
 
 	return ret;
-}
-
-namespace csp_detail {
-inline size_type pow2_align(size_type from, size_type clamp)
-{
-	const size_type from_(from < 2 ? 2 : from);
-
-	const float flog2(std::log2f(static_cast<float>(from_)));
-	const float nextLog2(std::ceil(flog2));
-	const float fNextVal(powf(2.f, nextLog2));
-
-	const size_type nextVal(static_cast<size_t>(fNextVal));
-	const size_type clampedNextVal((clamp < nextVal) ? clamp : nextVal);
-
-	return clampedNextVal;
-}
 }
 }
 #pragma warning(pop)

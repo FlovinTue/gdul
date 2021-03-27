@@ -90,7 +90,7 @@ worker_impl & worker_impl::operator=(worker_impl && other) noexcept
 	m_lastJobTimepoint = other.m_lastJobTimepoint;
 	m_isActive.store(other.m_isActive.load(std::memory_order_relaxed), std::memory_order_release);
 	m_queueIndex = other.m_queueIndex;
-	std::copy(std::begin(other.m_targets), std::end(other.m_targets), m_targets);
+	std::copy(other.m_targets.begin(), other.m_targets.end(), m_targets.begin());
 
 	return *this;
 }
@@ -137,12 +137,12 @@ void worker_impl::set_run_on_disable(delegate<void()>&& toCall)
 }
 void worker_impl::add_assignment(job_queue* queue)
 {
-	const std::uint8_t ix(m_queuePushSync++);
-	assert(ix < Max_Worker_Targets && "Max worker targets exceeded");
+	const std::uint8_t ix(m_queuePushSync.fetch_add(1, std::memory_order_acq_rel));
+	assert(ix < MaxWorkerTargets && "Max worker targets exceeded");
 
 	m_targets[ix] = queue;
 
-	m_queueCount++;
+	m_queueCount.fetch_add(1,std::memory_order_release);
 
 	queue->m_assignees.fetch_add(1, std::memory_order_relaxed);
 }
@@ -206,7 +206,7 @@ void worker_impl::consume_job(job_impl_shared_ptr&& jb)
 }
 typename worker_impl::job_impl_shared_ptr worker_impl::fetch_job()
 {
-	const std::uint8_t queueCount(m_queueCount.load(std::memory_order_relaxed));
+	const std::uint8_t queueCount(m_queueCount.load(std::memory_order_acquire));
 
 	for (std::uint8_t i = 0; i < queueCount; ++i) {
 		const std::uint8_t ix(m_queueIndex++ % queueCount);

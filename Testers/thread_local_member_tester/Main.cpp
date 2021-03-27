@@ -1,10 +1,10 @@
 
 #include "pch.h"
 #include <iostream>
-#include <gdul\thread_local_member\thread_local_member.h>
+#include <gdul/memory/thread_local_member.h>
 #include <thread>
 #include <vld.h>
-#include <gdul\atomic_shared_ptr\atomic_shared_ptr.h>
+#include <gdul/memory/atomic_shared_ptr.h>
 #include <functional>
 #include <vector>
 #include "tester.h"

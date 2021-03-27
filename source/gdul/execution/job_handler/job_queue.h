@@ -22,8 +22,8 @@
 
 #include <gdul/execution/job_handler/job/job.h>
 #include <gdul/execution/job_handler/globals.h>
-#include <gdul/concurrent_priority_queue/concurrent_priority_queue.h>
-#include <gdul/concurrent_queue/concurrent_queue.h>
+#include <gdul/containers/concurrent_priority_queue.h>
+#include <gdul/containers/concurrent_queue.h>
 
 namespace gdul {
 	
@@ -88,6 +88,6 @@ private:
 	void submit_job(jh_detail::job_impl_shared_ptr jb) override final;
 	jh_detail::job_impl_shared_ptr fetch_job() override final;
 
-	concurrent_priority_queue<float, jh_detail::job_impl_shared_ptr, jh_detail::Job_Pool_Init_Size, cpq_allocation_strategy_pool<jh_detail::allocator_type>, std::greater<float>> m_queue;
+	concurrent_priority_queue<float, jh_detail::job_impl_shared_ptr, jh_detail::JobPoolInitSize, cpq_allocation_strategy_pool<jh_detail::allocator_type>, std::greater<float>> m_queue;
 };
 }
