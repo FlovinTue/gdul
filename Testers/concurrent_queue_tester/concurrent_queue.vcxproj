@@ -48,13 +48,13 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)External\source;$(SolutionDir)Include;$(SolutionDir)Source</IncludePath>
-    <LibraryPath>$(SolutionDir)External\Lib;$(LibraryPath)</LibraryPath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)External\source;$(SolutionDir)Include;$(SolutionDir)Source;C:\Program Files (x86)\Visual Leak Detector\include</IncludePath>
+    <LibraryPath>$(SolutionDir)External\Lib;$(LibraryPath);C:\Program Files (x86)\Visual Leak Detector\lib\Win64</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)External\source;$(SolutionDir)Include;$(SolutionDir)Source</IncludePath>
-    <LibraryPath>$(SolutionDir)External\Lib;$(LibraryPath)</LibraryPath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)External\source;$(SolutionDir)Include;$(SolutionDir)Source;C:\Program Files (x86)\Visual Leak Detector\include</IncludePath>
+    <LibraryPath>$(SolutionDir)External\Lib;$(LibraryPath);C:\Program Files (x86)\Visual Leak Detector\lib\Win64</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>

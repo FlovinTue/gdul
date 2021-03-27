@@ -36,7 +36,7 @@ private:
 
 	std::vector<gdul::thread> m_threads;
 
-	gdul::concurrent_queue<std::function<void()>> m_taskQueue;
+	concurrency::concurrent_queue<std::function<void()>> m_taskQueue;
 
 	std::atomic<bool> m_inCommission;
 
@@ -87,7 +87,7 @@ bool thread_pool::has_unfinished_tasks() const
 }
 void thread_pool::idle(std::uint64_t affinityMask)
 {
-	qsbr::register_thread();
+	//qsbr::register_thread();
 
 	uint64_t result(0);
 
@@ -111,6 +111,6 @@ void thread_pool::idle(std::uint64_t affinityMask)
 		}
 	}
 
-	qsbr::unregister_thread();
+	//qsbr::unregister_thread();
 }
 }

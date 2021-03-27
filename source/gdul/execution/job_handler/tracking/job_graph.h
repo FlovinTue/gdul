@@ -31,12 +31,13 @@ namespace jh_detail {
 // Our keys should already be unique hashes
 struct dummy_hasher
 {
-	std::uint64_t operator()(std::uint64_t k) { return k; }
+	std::uint64_t operator()(std::uint64_t k) const { return k; }
 };
 
 class job_graph
 {
 public:
+
 	job_graph(allocator_type alloc);
 
 	job_info* fetch_job_info(std::size_t id);
