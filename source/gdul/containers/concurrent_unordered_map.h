@@ -100,7 +100,13 @@ public:
 	/// </summary>
 	/// <param name="capacity">Initial capacity</param>
 	/// <param name="alloc">Allocator for array and items</param>
+	/// 
 	concurrent_unordered_map(size_type capacity, Allocator alloc);
+
+	/// <summary>
+	/// Destructor
+	/// </summary>
+	~concurrent_unordered_map();
 
 	/// <summary>
 	/// Insert an item
@@ -353,6 +359,12 @@ inline concurrent_unordered_map<Key, Value, Hash, Allocator>::concurrent_unorder
 	, m_size(0)
 	, m_allocator(alloc)
 {
+}
+
+template<class Key, class Value, class Hash, class Allocator>
+inline concurrent_unordered_map<Key, Value, Hash, Allocator>::~concurrent_unordered_map()
+{
+	unsafe_clear();
 }
 
 template<class Key, class Value, class Hash, class Allocator>
