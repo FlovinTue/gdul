@@ -66,8 +66,8 @@ template <class T, class Allocator>
 class shared_ptr_allocator_adapter;
 
 constexpr size_type DefaultBufferCapacity = 8;
-constexpr size_type BufferBlockOffset = std::numeric_limits<size_type>::max() / 2;
-
+constexpr size_type BufferBlockThreshhold = std::numeric_limits<size_type>::max() / 2;
+constexpr size_type BufferBlockOffset = BufferBlockThreshhold + std::numeric_limits<std::uint32_t>::max();
 }
 // MPMC unbounded lock-free queue.
 template <class T, class Allocator = std::allocator<std::uint8_t>>
@@ -365,6 +365,11 @@ void assign(T& from, T& to)
 	to = from;
 }
 
+constexpr size_type delta_unwritten(size_type unwritten, size_type minimum)
+{
+	return unwritten - minimum - 1;
+}
+
 template <class T, class Allocator>
 class item_buffer
 {
@@ -411,15 +416,17 @@ public:
 private:
 	void destroy_items() noexcept;
 
-	bool try_inc_read(size_type minimum, size_type& outRead);
+	bool try_inc_unwritten(size_type minimum, size_type& outUnwritten);
 
 	void move_or_assign(T& from, T& to);
+
+	void try_update_written(size_type postWriteSync, size_type writeAt);
 
 	std::atomic<size_type> m_preReadSync;
 	GDUL_CACHE_PAD;
 	GDUL_ATOMIC_WITH_VIEW(size_type, m_readAt);
 	GDUL_CACHE_PAD;
-	std::atomic<size_type> m_read;
+	std::atomic<size_type> m_unwritten;
 	std::atomic<size_type> m_writeAt;
 	GDUL_CACHE_PAD;
 	GDUL_ATOMIC_WITH_VIEW(size_type, m_postWriteSync);
@@ -435,10 +442,6 @@ private:
 
 	T* const m_items;
 
-	//// Can this even be used for this purpose? Perhaps something together with a flip-buffer.. Increase push-roof? 
-	//// That'd make it possible to only track critical sections around pops
-	//qsbr::item m_accessControl;
-
 	std::atomic<buffer_state> m_state;
 };
 
@@ -446,7 +449,7 @@ template<class T, class Allocator>
 inline item_buffer<T, Allocator>::item_buffer(T* dataBlock, typename item_buffer<T, Allocator>::size_type capacity)
 	: m_preReadSync(0)
 	, m_readAt(0)
-	, m_read(capacity / 2)
+	, m_unwritten(capacity / 2)
 	, m_writeAt(0)
 	, m_postWriteSync(0)
 	, m_written(0)
@@ -488,7 +491,7 @@ template<class T, class Allocator>
 inline void item_buffer<T, Allocator>::unsafe_invalidate()
 {
 	m_state.store(buffer_state_invalid, std::memory_order_relaxed);
-	m_writeAt.store(m_read.load(std::memory_order_relaxed), std::memory_order_relaxed);
+	m_unwritten.store(m_unwritten.load(std::memory_order_relaxed) + BufferBlockOffset, std::memory_order_relaxed);
 
 	if (m_next) {
 		m_next.unsafe_get()->unsafe_invalidate();
@@ -524,19 +527,18 @@ inline typename item_buffer<T, Allocator>::shared_ptr_buffer_type item_buffer<T,
 template<class T, class Allocator>
 inline typename item_buffer<T, Allocator>::size_type item_buffer<T, Allocator>::size() const
 {
-	//const size_type readSlot(m_readAt.load(std::memory_order_relaxed));
-	//const size_type read(!(m_capacity < readSlot) ? readSlot : m_capacity);
-	//size_type accumulatedSize(m_written.load(std::memory_order_relaxed));
-	//accumulatedSize -= read;
+	const size_type readSlot(m_readAt.load(std::memory_order_acquire));
+	size_type written(m_written.load(std::memory_order_acquire));
+	const size_type unwritten(m_unwritten.load(std::memory_order_acquire));
+	written = std::clamp(written, 0, unwritten);
 
-	//if (m_next) {
-	//	accumulatedSize += m_next.unsafe_get()->size();
-	//}
-	//return accumulatedSize;
+	size_type sizeAccum(written - readSlot);
 
-	assert(false && "not implemented");
+	if (m_next) {
+		sizeAccum += m_next.unsafe_get()->size();
+	}
 
-	return 0;
+	return sizeAccum;
 }
 
 template<class T, class Allocator>
@@ -561,36 +563,54 @@ inline void item_buffer<T, Allocator>::destroy_items() noexcept
 	}
 }
 template<class T, class Allocator>
-inline bool item_buffer<T, Allocator>::try_inc_read(size_type minimum, size_type& outRead)
+inline bool item_buffer<T, Allocator>::try_inc_unwritten(size_type minimum, size_type& outUnwritten)
 {
 	while (true) {
+		const size_type toUnwrittenDelta(delta_unwritten(outUnwritten, minimum));
+
+		if (toUnwrittenDelta < m_capacity) {
+			break;
+		}
+
+		if (toUnwrittenDelta < BufferBlockThreshhold) {
+			return false;
+		}
+
 		if (qsbr::update(m_readControl)) {
 			const size_type halfCapacity(m_capacity / 2);
-			const size_type desired(outRead + halfCapacity);
+			const size_type desired(outUnwritten + halfCapacity);
 
-			if (m_read.compare_exchange_strong(outRead, desired, std::memory_order_release, std::memory_order_relaxed)) {
-				outRead = desired;
+			if (m_unwritten.compare_exchange_strong(outUnwritten, desired, std::memory_order_release, std::memory_order_relaxed)) {
+				outUnwritten = desired;
 			}
 
 			qsbr::invalidate(m_readControl);
 		}
 		else {
-			outRead = m_read.load(std::memory_order_acquire);
+			outUnwritten = m_unwritten.load(std::memory_order_acquire);
 		}
 
-		const size_type toReadDelta(outRead - minimum);
-
-		if (toReadDelta < m_capacity) {
-			return true;
+		if (delta_unwritten(outUnwritten, minimum) < m_capacity) {
+			break;
 		}
 
-		const size_type blockage(outRead + BufferBlockOffset);
-		if (m_read.compare_exchange_weak(outRead, blockage, std::memory_order_release, std::memory_order_relaxed)) {
-			return false;
-		}
+		const size_type blockage(outUnwritten + BufferBlockOffset);
+		m_unwritten.compare_exchange_weak(outUnwritten, blockage, std::memory_order_release, std::memory_order_relaxed);
 	}
 
 	return true;
+}
+template<class T, class Allocator>
+inline void item_buffer<T, Allocator>::try_update_written(size_type postWriteSync, size_type writeAt)
+{
+	if ((postWriteSync + 1) == writeAt) {
+		size_type xchg(writeAt);
+		size_type target;
+		do {
+			target = xchg;
+			xchg = m_written.exchange(target, std::memory_order_relaxed);
+		} while (target < xchg);
+	}
 }
 template<class T, class Allocator>
 inline void item_buffer<T, Allocator>::move_or_assign(T& from, T& to)
@@ -624,31 +644,39 @@ template<class T, class Allocator>
 template<class ...Args>
 inline bool item_buffer<T, Allocator>::try_emplace(Args&& ... args)
 {
-	const size_type at(m_writeAt.fetch_add(1, std::memory_order_relaxed));
-	size_type read(m_read.load(std::memory_order_relaxed));
+	size_type unwritten(m_unwritten.load(std::memory_order_relaxed));
+	const size_type at(m_writeAt.fetch_add(1, std::memory_order_acq_rel));
+	const size_type toUnwrittenDelta(delta_unwritten(unwritten, at));
 
-	if (!(at < read)) {
-		if (!try_inc_read(at, read)) {
+	if (!(toUnwrittenDelta < m_capacity)) {
+		if (!try_inc_unwritten(at, unwritten)) {
+			// So this value can shift, no doubt. But if we arrive here, we should know
+			// where to clamp it. .! ? 
+			// Can we though ? 
+			// Unless we have a high enough capacity there might be crossover 
+			// So we need to know, where to clamp. 
+			// When we arrive here we know.
+			// How about applying blockage to writeAt ? 
+			// It should have the same effect. So what mechanics do we have in play? 
+			// Can we have both a/b in view at the same time ? 
+			// Do we have any guarantees as to what span we're in or rather, was in upon blockage?
+			const size_type postAt = m_writeAt.fetch_sub(1, std::memory_order_relaxed);
+			try_update_written()
 			return false;
 		}
 	}
 
-	new (&m_items[at]) T(std::forward<Args>(args)...);
+	const size_type atItem(at & (m_capacity - 1));
 
-	//Move this entire block to method, and force in case of failed inc_read ? 
+	new (&m_items[atItem]) T(std::forward<Args>(args)...);
+
 	const size_type postSync(m_postWriteSync.fetch_add(1, std::memory_order_acq_rel));
 
-	// Clamp should still work here, since if m_read is increased, 
-	const size_type postAt(std::clamp<size_type>(m_writeAt.load(std::memory_order_relaxed), 0, read));
+	// Clamp is probably bad here. So what do we want clamp to do in this case? 
+	// Can we observe a blocked unwritten value? If we go in to inc unwritten
+	const size_type postAt(m_writeAt.load(std::memory_order_relaxed));
 
-	if ((postSync + 1) == postAt) {
-		size_type xchg(postAt);
-		size_type target;
-		do {
-			target = xchg;
-			xchg = m_written.exchange(target, std::memory_order_relaxed);
-		} while (target < xchg);
-	}
+	try_update_written(postSync, postAt);
 
 	return true;
 }
@@ -667,9 +695,12 @@ inline bool item_buffer<T, Allocator>::try_pop(T& out)
 
 	std::atomic_thread_fence(std::memory_order_acquire);
 
-	move_or_assign(m_items[at], out);
+	const size_type mask(m_capacity - 1);
+	const size_type atItem(at & mask);
 
-	std::destroy_at(&m_items[at]);
+	move_or_assign(m_items[atItem], out);
+
+	std::destroy_at(&m_items[atItem]);
 
 	// So in case we are at half capacity or full capacity we need to initialize *a* item
 	// Optimally, we should do it with a single item. My tingly sense is telling me that using two
@@ -683,15 +714,15 @@ inline bool item_buffer<T, Allocator>::try_pop(T& out)
 	// This should all sequence I believe so that only one item may live at a time.
 
 	// How to handle resetting? That's more tricky.
-	// The sequencing with increasing m_read and item. If m_read is increased before item is reset. There's a chance of loop around and 
+	// The sequencing with increasing m_unwritten and item. If m_unwritten is increased before item is reset. There's a chance of loop around and 
 	// then we'll have a bunch of races going on and blah blah.
-	// If we reset the item and then increase m_read that means other writers may not compete to increase m_read.. (We want that).
+	// If we reset the item and then increase m_unwritten that means other writers may not compete to increase m_unwritten.. (We want that).
 
 	// Hmm! Perhaps we can force . .No. 
 	// So in the initial scenario, by the time written passes to capacity +1, the item must be reset.
 
-	const size_type mask(m_capacity - 1);
-	const size_type a(m_capacity / 2 + 1);
+	const size_type halfCapacity(m_capacity >> 1);
+	const size_type a(halfCapacity + 1);
 	const size_type b(1);
 
 	const size_type masked((at + 1) & mask);

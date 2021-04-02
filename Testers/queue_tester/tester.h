@@ -647,6 +647,8 @@ inline void tester<T, Allocator>::Write(std::uint32_t writes) {
 	/*m_queue.unsafe_reserve(Writes);*/
 #endif
 
+	std::this_thread::set_name("Writer");
+
 	++m_waiting;
 
 	while (m_waiting < (Writers + Readers)) {
@@ -707,6 +709,9 @@ inline void tester<T, Allocator>::Write(std::uint32_t writes) {
 
 template<class T, class Allocator>
 inline void tester<T, Allocator>::Read(std::uint32_t reads) {
+
+	std::this_thread::set_name("Reader");
+
 	++m_waiting;
 
 	while (m_waiting < (Writers + Readers)) {
