@@ -566,14 +566,17 @@ template<class T, class Allocator>
 inline bool item_buffer<T, Allocator>::try_inc_unwritten(size_type minimum, size_type& outUnwritten)
 {
 	while (true) {
-		const size_type toUnwrittenDelta(delta_unwritten(outUnwritten, minimum));
 
-		if (toUnwrittenDelta < m_capacity) {
-			break;
-		}
+		{
+			const size_type toUnwrittenDelta(delta_unwritten(outUnwritten, minimum));
 
-		if (toUnwrittenDelta < BufferBlockThreshhold) {
-			return false;
+			if (toUnwrittenDelta < m_capacity) {
+				break;
+			}
+
+			if (toUnwrittenDelta < BufferBlockThreshhold) {
+				return false;
+			}
 		}
 
 		if (qsbr::update(m_readControl)) {
@@ -590,8 +593,16 @@ inline bool item_buffer<T, Allocator>::try_inc_unwritten(size_type minimum, size
 			outUnwritten = m_unwritten.load(std::memory_order_acquire);
 		}
 
-		if (delta_unwritten(outUnwritten, minimum) < m_capacity) {
-			break;
+		{
+			const size_type toUnwrittenDelta(delta_unwritten(outUnwritten, minimum));
+
+			if (toUnwrittenDelta < m_capacity) {
+				break;
+			}
+
+			if (toUnwrittenDelta < BufferBlockThreshhold) {
+				return false;
+			}
 		}
 
 		const size_type blockage(outUnwritten + BufferBlockOffset);
@@ -660,8 +671,27 @@ inline bool item_buffer<T, Allocator>::try_emplace(Args&& ... args)
 			// It should have the same effect. So what mechanics do we have in play? 
 			// Can we have both a/b in view at the same time ? 
 			// Do we have any guarantees as to what span we're in or rather, was in upon blockage?
-			const size_type postAt = m_writeAt.fetch_sub(1, std::memory_order_relaxed);
-			try_update_written()
+			// Right. So blockage sync of the first section will be set to lift when the last item of
+			// the first section is removed. Second section should be open by then. This means
+			// during the first round we'll have both sections open. From there on, sections will...
+			// be open possibly two at a time. Hmm yeah.
+			// So arriving here, hmm. We know we'll have failed to increase unwritten.
+			// And unwritten will be blocked. 
+			// Hmm. No wait, so sync for first section will be set once first item of second section
+			// has been removed. So. Hmm yeah that still means we could have two sections active
+			// at a time. So we get here, the last section will not be set to unblock. 
+
+			// Still need to sort post write sync.... Do we have a guarantee of something when we get here? 
+			const size_type postAt(m_writeAt.fetch_sub(1, std::memory_order_acq_rel));
+			// Uh. Here.
+			// So, if, say, we are the last one out here and come through here. We can either see a to low postWriteSync
+			// or one spot on. If it's spot on, then we can update written. If it's too low
+			// another thread should catch it! Maybe. Hopefully, I think. ! : - ) 
+
+			const size_type postSync(m_postWriteSync.load(std::memory_order_relaxed));
+			
+			try_update_written(postSync - 1, postAt - 1);
+
 			return false;
 		}
 	}
