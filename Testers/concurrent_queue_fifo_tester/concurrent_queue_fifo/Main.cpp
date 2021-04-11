@@ -44,7 +44,15 @@ public:
 	}
 #endif
 
+	~Thrower()
+	{
+		alive = false;
+	}
+
+	operator bool() const { return alive; }
+
 	uint32_t count = 0;
+	bool alive = true;
 #ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
 	uint32_t throwTarget = gdul::rng() % 50000;
 #endif

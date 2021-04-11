@@ -699,14 +699,11 @@ inline bool item_buffer<T, Allocator>::try_pop(T& out)
 	const size_type mask(m_capacity - 1);
 	const size_type atItem(at & mask);
 
+	assert(m_items[atItem]);
+
 	move_or_assign(m_items[atItem], out);
 
 	std::destroy_at(&m_items[atItem]);
-
-	if constexpr (std::is_integral_v<T>) {
-		assert(m_items[at]);
-		m_items[atItem] = 0;
-	}
 
 	const size_type halfCapacity(m_capacity >> 1);
 	const size_type a(halfCapacity + 1);
