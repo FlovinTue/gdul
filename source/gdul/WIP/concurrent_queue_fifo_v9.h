@@ -566,7 +566,6 @@ template<class T, class Allocator>
 inline bool item_buffer<T, Allocator>::try_inc_unwritten(size_type minimum, size_type& outUnwritten)
 {
 	while (true) {
-
 		{
 			const size_type toUnwrittenDelta(delta_unwritten(outUnwritten, minimum));
 
@@ -614,7 +613,7 @@ inline bool item_buffer<T, Allocator>::try_inc_unwritten(size_type minimum, size
 template<class T, class Allocator>
 inline void item_buffer<T, Allocator>::try_update_written(size_type postWriteSync, size_type writeAt)
 {
-	if ((postWriteSync + 1) == writeAt) {
+	if (postWriteSync == writeAt) {
 		size_type xchg(writeAt);
 		size_type target;
 		do {
@@ -661,36 +660,11 @@ inline bool item_buffer<T, Allocator>::try_emplace(Args&& ... args)
 
 	if (!(toUnwrittenDelta < m_capacity)) {
 		if (!try_inc_unwritten(at, unwritten)) {
-			// So this value can shift, no doubt. But if we arrive here, we should know
-			// where to clamp it. .! ? 
-			// Can we though ? 
-			// Unless we have a high enough capacity there might be crossover 
-			// So we need to know, where to clamp. 
-			// When we arrive here we know.
-			// How about applying blockage to writeAt ? 
-			// It should have the same effect. So what mechanics do we have in play? 
-			// Can we have both a/b in view at the same time ? 
-			// Do we have any guarantees as to what span we're in or rather, was in upon blockage?
-			// Right. So blockage sync of the first section will be set to lift when the last item of
-			// the first section is removed. Second section should be open by then. This means
-			// during the first round we'll have both sections open. From there on, sections will...
-			// be open possibly two at a time. Hmm yeah.
-			// So arriving here, hmm. We know we'll have failed to increase unwritten.
-			// And unwritten will be blocked. 
-			// Hmm. No wait, so sync for first section will be set once first item of second section
-			// has been removed. So. Hmm yeah that still means we could have two sections active
-			// at a time. So we get here, the last section will not be set to unblock. 
-
-			// Still need to sort post write sync.... Do we have a guarantee of something when we get here? 
-			const size_type postAt(m_writeAt.fetch_sub(1, std::memory_order_acq_rel));
-			// Uh. Here.
-			// So, if, say, we are the last one out here and come through here. We can either see a to low postWriteSync
-			// or one spot on. If it's spot on, then we can update written. If it's too low
-			// another thread should catch it! Maybe. Hopefully, I think. ! : - ) 
-
 			const size_type postSync(m_postWriteSync.load(std::memory_order_relaxed));
-			
-			try_update_written(postSync - 1, postAt - 1);
+
+			const size_type postAt(m_writeAt.fetch_sub(1, std::memory_order_acq_rel) - 1);
+
+			try_update_written(postSync, postAt);
 
 			return false;
 		}
@@ -700,10 +674,7 @@ inline bool item_buffer<T, Allocator>::try_emplace(Args&& ... args)
 
 	new (&m_items[atItem]) T(std::forward<Args>(args)...);
 
-	const size_type postSync(m_postWriteSync.fetch_add(1, std::memory_order_acq_rel));
-
-	// Clamp is probably bad here. So what do we want clamp to do in this case? 
-	// Can we observe a blocked unwritten value? If we go in to inc unwritten
+	const size_type postSync(m_postWriteSync.fetch_add(1, std::memory_order_acq_rel) + 1);
 	const size_type postAt(m_writeAt.load(std::memory_order_relaxed));
 
 	try_update_written(postSync, postAt);
@@ -732,24 +703,10 @@ inline bool item_buffer<T, Allocator>::try_pop(T& out)
 
 	std::destroy_at(&m_items[atItem]);
 
-	// So in case we are at half capacity or full capacity we need to initialize *a* item
-	// Optimally, we should do it with a single item. My tingly sense is telling me that using two
-	// will vastly overcomplicate things. 
-
-	// So in case we write half capacity and proceed to pop it. Then we want to initialize this item.
-
-	// Perhaps if we use (half)capacity + 1 for item initialization? 
-	// Setting up the initial scenario of having full capacity to work with. The initial item would be created once halfcapacity + 1
-	// is reached. Then the next item could not be created until at least capacity + 1 had been written. And next one until capacity + halfcapcity + 1
-	// This should all sequence I believe so that only one item may live at a time.
-
-	// How to handle resetting? That's more tricky.
-	// The sequencing with increasing m_unwritten and item. If m_unwritten is increased before item is reset. There's a chance of loop around and 
-	// then we'll have a bunch of races going on and blah blah.
-	// If we reset the item and then increase m_unwritten that means other writers may not compete to increase m_unwritten.. (We want that).
-
-	// Hmm! Perhaps we can force . .No. 
-	// So in the initial scenario, by the time written passes to capacity +1, the item must be reset.
+	if constexpr (std::is_integral_v<T>) {
+		assert(m_items[at]);
+		m_items[atItem] = 0;
+	}
 
 	const size_type halfCapacity(m_capacity >> 1);
 	const size_type a(halfCapacity + 1);

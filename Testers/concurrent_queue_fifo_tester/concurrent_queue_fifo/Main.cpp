@@ -3,14 +3,12 @@
 #include <vld.h>
 #include <random>
 
-#include <gdul/WIP/concurrent_queue_fifo_v8.h>
+#include <gdul/WIP/concurrent_queue_fifo_v9.h>
 
 #define GDUL_FIFO
 
 #include <gdul/../../Testers/Common/tracking_allocator.h>
 #include <gdul/../../Testers/queue_tester/tester.h>
-
-//#include <vld.h>
 
 
 #pragma warning(disable : 4324)

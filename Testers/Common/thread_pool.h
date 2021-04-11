@@ -3,7 +3,6 @@
 #include <functional>
 #include <atomic>
 #include <concurrent_queue.h>
-#include <gdul/containers/concurrent_queue.h>
 #include <vector>
 #include <gdul/WIP/qsbr.h>
 #include <gdul/execution/thread/thread.h>
@@ -87,7 +86,7 @@ bool thread_pool::has_unfinished_tasks() const
 }
 void thread_pool::idle(std::uint64_t affinityMask)
 {
-	//qsbr::register_thread();
+	qsbr::register_thread();
 
 	uint64_t result(0);
 
@@ -111,6 +110,6 @@ void thread_pool::idle(std::uint64_t affinityMask)
 		}
 	}
 
-	//qsbr::unregister_thread();
+	qsbr::unregister_thread();
 }
 }

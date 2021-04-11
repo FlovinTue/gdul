@@ -13,7 +13,7 @@
 #include <string>
 
 #if defined(GDUL_FIFO)
-#include <gdul/WIP/concurrent_queue_fifo_v8.h>
+#include <gdul/WIP/concurrent_queue_fifo_v9.h>
 #elif defined(GDUL_CPQ)
 #include <gdul/containers/concurrent_priority_queue.h>
 #elif defined(RIGTORP)
@@ -647,6 +647,8 @@ inline void tester<T, Allocator>::Write(std::uint32_t writes) {
 	/*m_queue.unsafe_reserve(Writes);*/
 #endif
 
+	std::this_thread::set_name("Writer");
+
 	++m_waiting;
 
 	while (m_waiting < (Writers + Readers)) {
@@ -707,6 +709,9 @@ inline void tester<T, Allocator>::Write(std::uint32_t writes) {
 
 template<class T, class Allocator>
 inline void tester<T, Allocator>::Read(std::uint32_t reads) {
+
+	std::this_thread::set_name("Reader");
+
 	++m_waiting;
 
 	while (m_waiting < (Writers + Readers)) {

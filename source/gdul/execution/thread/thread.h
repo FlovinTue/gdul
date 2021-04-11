@@ -24,6 +24,13 @@
 #include <string>
 #include <gdul/WIP/qsbr.h>
 
+namespace std::this_thread {
+void set_name(const std::string& name);
+void set_core_affinity(std::uint8_t core);
+void set_execution_priority(std::int32_t core);
+bool valid() noexcept;
+}
+
 namespace gdul {
 
 /// <summary>
@@ -51,7 +58,7 @@ public:
 	/// </summary>
 	/// <param name="priority">Priority value</param>
 	void set_execution_priority(std::int32_t priority);
-	
+
 	/// <summary>
 	/// Check against thread id for validity
 	/// </summary>
@@ -59,5 +66,14 @@ public:
 	bool valid() const noexcept;
 
 	operator std::thread() = delete;
+
+private:
+	friend void std::this_thread::set_name(const std::string&);
+	friend void std::this_thread::set_core_affinity(std::uint8_t);
+	friend void std::this_thread::set_execution_priority(std::int32_t);
+
+	static void set_name(const std::string& name, void* handle);
+	static void set_core_affinity(std::uint8_t core, void* handle);
+	static void set_execution_priority(std::int32_t priority, void* handle);
 };
 }
