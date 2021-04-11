@@ -28,7 +28,10 @@ namespace std::this_thread {
 void set_name(const std::string& name);
 void set_core_affinity(std::uint8_t core);
 void set_execution_priority(std::int32_t core);
+
 bool valid() noexcept;
+
+std::thread::native_handle_type native_handle();
 }
 
 namespace gdul {
@@ -72,8 +75,8 @@ private:
 	friend void std::this_thread::set_core_affinity(std::uint8_t);
 	friend void std::this_thread::set_execution_priority(std::int32_t);
 
-	static void set_name(const std::string& name, void* handle);
-	static void set_core_affinity(std::uint8_t core, void* handle);
-	static void set_execution_priority(std::int32_t priority, void* handle);
+	static void set_name(const std::string& name, std::thread::native_handle_type handle);
+	static void set_core_affinity(std::uint8_t core, std::thread::native_handle_type handle);
+	static void set_execution_priority(std::int32_t priority, std::thread::native_handle_type handle);
 };
 }
