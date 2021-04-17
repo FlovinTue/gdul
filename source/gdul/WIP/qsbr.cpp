@@ -63,7 +63,7 @@ std::size_t create_new_mask()
 	const std::uint8_t lastTrackerIndex(g_states.lastTrackerIndex.load(std::memory_order_acquire));
 	const std::uint8_t lastTrackedBit(std::size_t(lastTrackerIndex) + 1);
 	std::size_t initialTrackingMask(std::numeric_limits<std::size_t>::max());
-	initialTrackingMask >>= (sizeof(shared_snapshot) * 8 /*shift away all unused bits*/) - lastTrackedBit;
+	initialTrackingMask >>= (sizeof(snapshot) * 8 /*shift away all unused bits*/) - lastTrackedBit;
 	initialTrackingMask &= ~(std::size_t(1) << t_states.index);
 
 	std::size_t mask(0);
@@ -125,7 +125,7 @@ void unregister_thread()
 	t_states.index = -1;
 }
 
-bool query_and_update(shared_snapshot& item)
+bool query_and_update(snapshot& item)
 {
 	const std::size_t mask(item.m_state.load(std::memory_order_relaxed));
 
@@ -140,19 +140,19 @@ bool query_and_update(shared_snapshot& item)
 	return !newMask;
 }
 
-bool initialize(shared_snapshot& item)
+bool initialize(snapshot& item)
 {
 	const std::size_t mask(create_new_mask());
 	item.m_state.store(mask, std::memory_order_release);
 	return !mask;
 }
 
-bool query(const shared_snapshot& item)
+bool query(const snapshot& item)
 {
 	return !item.m_state.load(std::memory_order_relaxed);
 }
 
-void reset(shared_snapshot& item)
+void reset(snapshot& item)
 {
 	item.m_state.store(std::numeric_limits<std::size_t>::max(), std::memory_order_relaxed);
 }
@@ -169,22 +169,22 @@ void unregister_thread()
 	qsbr_detail::unregister_thread();
 }
 
-bool initialize(shared_snapshot& item)
+bool initialize(snapshot& item)
 {
 	return qsbr_detail::initialize(item);
 }
 
-bool query_and_update(shared_snapshot& item)
+bool query_and_update(snapshot& item)
 {
 	return qsbr_detail::query_and_update(item);
 }
 
-bool query(const shared_snapshot& item)
+bool query(const snapshot& item)
 {
 	return qsbr_detail::query(item);
 }
 
-void reset(shared_snapshot& item)
+void reset(snapshot& item)
 {
 	qsbr_detail::reset(item);
 }

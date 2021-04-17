@@ -10,7 +10,7 @@ int main()
 	gdul::qsbr::register_thread();
 	{
 		gdul::qsbr::critical_section cs;
-		gdul::qsbr::shared_snapshot qsCheck;
+		gdul::qsbr::snapshot qsCheck;
 
 		gdul::qsbr::reset(qsCheck);
 		gdul::qsbr::initialize(qsCheck);

@@ -11,13 +11,8 @@ constexpr std::uint8_t MaxThreads = sizeof(std::size_t) * 8;
 /// <summary>
 /// Used to track
 /// </summary>
-class snapshot
-{
-public:
-	std::size_t m_state;
-};
 
-class shared_snapshot
+class snapshot
 {
 public:
 	std::atomic<std::size_t> m_state;
@@ -53,27 +48,27 @@ void unregister_thread();
 /// Resets a snapshot to unverified state
 /// </summary>
 /// <param name="snapshot">snapshot item</param>
-void reset(shared_snapshot& snapshot);
+void reset(snapshot& snapshot);
 
 /// <summary>
 /// Initialize snapshot
 /// </summary>
 /// <param name="snapshot">snapshot item</param>
 /// <returns>True if no threads are inside critical sections</returns>
-bool initialize(shared_snapshot& snapshot);
+bool initialize(snapshot& snapshot);
 
 /// <summary>
 /// Query other threads's state in relation to a snapshot and update it's state
 /// </summary>
 /// <param name="snapshot">snapshot item</param>
 /// <returns>True if no threads are inside critical sections or if they have left the critical section they were in at snapshot initialization</returns>
-bool query_and_update(shared_snapshot& snapshot);
+bool query_and_update(snapshot& snapshot);
 
 /// <summary>
 /// Query other threads's state in relation to a snapshot
 /// </summary>
 /// <param name="snapshot">snapshot item</param>
 /// <returns>True if no threads are inside critical sections or if they have left the critical section they were in at snapshot initialization</returns>
-bool query(const shared_snapshot& snapshot);
+bool query(const snapshot& snapshot);
 
 }
