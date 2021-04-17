@@ -11,9 +11,9 @@
 
 namespace gdul::qsbr {
 
-namespace qsbr_detail {
+static_assert(!((sizeof(std::size_t) * 8) < MaxThreads), "Max threads cannot exceed bits in std::size_t");
 
-constexpr std::size_t InvalidMask(1ull << 63);
+namespace qsbr_detail {
 
 struct alignas(std::hardware_destructive_interference_size) qsb_tracker
 {
@@ -39,8 +39,7 @@ thread_local t_container t_states;
 
 std::size_t update_mask(std::size_t existingMask)
 {
-	std::size_t mask(existingMask & InvalidMask);
-
+	std::size_t mask(0);
 	for (std::size_t maskProbe = existingMask, i = 0; maskProbe; maskProbe >>= 1, ++i) {
 		if (maskProbe & 1) {
 			const std::size_t previous(t_states.viewedIterations[i]);
@@ -64,7 +63,7 @@ std::size_t create_new_mask()
 	const std::uint8_t lastTrackerIndex(g_states.lastTrackerIndex.load(std::memory_order_acquire));
 	const std::uint8_t lastTrackedBit(std::size_t(lastTrackerIndex) + 1);
 	std::size_t initialTrackingMask(std::numeric_limits<std::size_t>::max());
-	initialTrackingMask >>= (sizeof(item) * 8 /*shift away all unused bits*/) - lastTrackedBit;
+	initialTrackingMask >>= (sizeof(snapshot) * 8 /*shift away all unused bits*/) - lastTrackedBit;
 	initialTrackingMask &= ~(std::size_t(1) << t_states.index);
 
 	std::size_t mask(0);
@@ -101,7 +100,7 @@ void register_thread()
 
 	assert(t_states.index != -1 && "Could not find slot for thread. Max threads exceeded?");
 
-	// Update last tracker index
+	// query_and_update last tracker index
 	std::int8_t lastTrackerIndex(g_states.lastTrackerIndex.load(std::memory_order_relaxed));
 
 	while (lastTrackerIndex < t_states.index) {
@@ -126,9 +125,9 @@ void unregister_thread()
 	t_states.index = -1;
 }
 
-bool update(item& item)
+bool query_and_update(snapshot& item)
 {
-	const std::size_t mask(item.load(std::memory_order_relaxed));
+	const std::size_t mask(item.m_state.load(std::memory_order_relaxed));
 
 	if (!mask) {
 		return true;
@@ -136,26 +135,26 @@ bool update(item& item)
 
 	const std::size_t newMask(update_mask(mask));
 
-	item.fetch_and(newMask, std::memory_order_relaxed);
+	item.m_state.fetch_and(newMask, std::memory_order_relaxed);
 
 	return !newMask;
 }
 
-bool set(item& item)
+bool initialize(snapshot& item)
 {
 	const std::size_t mask(create_new_mask());
-	item.store(mask, std::memory_order_release);
+	item.m_state.store(mask, std::memory_order_release);
 	return !mask;
 }
 
-bool is_safe(const item& item)
+bool query(const snapshot& item)
 {
-	return !item.load(std::memory_order_relaxed);
+	return !item.m_state.load(std::memory_order_relaxed);
 }
 
-void invalidate(item& item)
+void reset(snapshot& item)
 {
-	item.store(InvalidMask, std::memory_order_relaxed);
+	item.m_state.store(std::numeric_limits<std::size_t>::max(), std::memory_order_relaxed);
 }
 
 }
@@ -170,24 +169,24 @@ void unregister_thread()
 	qsbr_detail::unregister_thread();
 }
 
-bool set(item& item)
+bool initialize(snapshot& item)
 {
-	return qsbr_detail::set(item);
+	return qsbr_detail::initialize(item);
 }
 
-bool update(item& item)
+bool query_and_update(snapshot& item)
 {
-	return qsbr_detail::update(item);
+	return qsbr_detail::query_and_update(item);
 }
 
-bool is_safe(const item& item)
+bool query(const snapshot& item)
 {
-	return qsbr_detail::is_safe(item);
+	return qsbr_detail::query(item);
 }
 
-void invalidate(item& item)
+void reset(snapshot& item)
 {
-	qsbr_detail::invalidate(item);
+	qsbr_detail::reset(item);
 }
 
 critical_section::critical_section()
@@ -206,6 +205,5 @@ critical_section::~critical_section()
 {
 	m_tracker.store(m_nextIx, std::memory_order_release);
 }
-constexpr size_t blah = 2 & 1;
 }
 #pragma warning(pop)

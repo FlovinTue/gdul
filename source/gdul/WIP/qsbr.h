@@ -6,12 +6,17 @@
 
 namespace gdul::qsbr {
 
-constexpr std::uint8_t MaxThreads = sizeof(std::size_t) * 8 - 1 /* Reserve last bit for invalid state */;
+constexpr std::uint8_t MaxThreads = sizeof(std::size_t) * 8;
 
 /// <summary>
-/// Once set, may be updated & queried using update and is_safe
+/// Used to track
 /// </summary>
-using item = std::atomic<std::size_t>;
+
+class snapshot
+{
+public:
+	std::atomic<std::size_t> m_state;
+};
 
 /// <summary>
 /// Use this to track critical section presence of this thread. Critical sections
@@ -24,7 +29,6 @@ public:
 	critical_section();
 	~critical_section();
 
-private:
 	const std::size_t m_nextIx;
 	const std::int8_t m_globalIndex;
 	std::atomic<std::size_t>& m_tracker;
@@ -41,30 +45,30 @@ void register_thread();
 void unregister_thread();
 
 /// <summary>
-/// Set an item to invalid state. Must be set to transition out of invalid state
+/// Resets a snapshot to unverified state
 /// </summary>
-/// <param name="item">Item state</param>
-void invalidate(item& item);
+/// <param name="snapshot">snapshot item</param>
+void reset(snapshot& snapshot);
 
 /// <summary>
-/// Initialize item
+/// Initialize snapshot
 /// </summary>
-/// <param name="item">Item state</param>
+/// <param name="snapshot">snapshot item</param>
 /// <returns>True if no threads are inside critical sections</returns>
-bool set(item& item);
+bool initialize(snapshot& snapshot);
 
 /// <summary>
-/// Update item state
+/// Query other threads's state in relation to a snapshot and update it's state
 /// </summary>
-/// <param name="item">Item state</param>
-/// <returns>True if no threads are inside critical sections or if they have left the critical section they were in at item initialization</returns>
-bool update(item& item);
+/// <param name="snapshot">snapshot item</param>
+/// <returns>True if no threads are inside critical sections or if they have left the critical section they were in at snapshot initialization</returns>
+bool query_and_update(snapshot& snapshot);
 
 /// <summary>
-/// Check item state
+/// Query other threads's state in relation to a snapshot
 /// </summary>
-/// <param name="item">Item state</param>
-/// <returns>True if no threads are inside critical sections or if they have left the critical section they were in at item initialization</returns>
-bool is_safe(const item& item);
+/// <param name="snapshot">snapshot item</param>
+/// <returns>True if no threads are inside critical sections or if they have left the critical section they were in at snapshot initialization</returns>
+bool query(const snapshot& snapshot);
 
 }
