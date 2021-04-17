@@ -416,7 +416,7 @@ public:
 private:
 	void destroy_items() noexcept;
 
-	bool try_inc_unwritten(size_type minimum, size_type& outUnwritten);
+	bool try_claim_write_slot(size_type& outAt);
 
 	void move_or_assign(T& from, T& to);
 
@@ -434,15 +434,13 @@ private:
 	GDUL_ATOMIC_WITH_VIEW(size_type, m_written);
 	GDUL_CACHE_PAD;
 
-	qsbr::item m_readControl;
+	qsbr::item m_readersSnapshot;
 
 	atomic_shared_ptr_buffer_type m_next;
 
 	const size_type m_capacity;
 
 	T* const m_items;
-
-	std::atomic<size_type> outer = 0;
 
 	std::atomic<buffer_state> m_state;
 };
@@ -460,7 +458,7 @@ inline item_buffer<T, Allocator>::item_buffer(T* dataBlock, typename item_buffer
 	, m_items(dataBlock)
 	, m_state(buffer_state_valid)
 {
-	qsbr::invalidate(m_readControl);
+	qsbr::invalidate(m_readersSnapshot);
 }
 
 template<class T, class Allocator>
@@ -565,52 +563,105 @@ inline void item_buffer<T, Allocator>::destroy_items() noexcept
 	}
 }
 template<class T, class Allocator>
-inline bool item_buffer<T, Allocator>::try_inc_unwritten(size_type minimum, size_type& outUnwritten)
+inline bool item_buffer<T, Allocator>::try_claim_write_slot(size_type& outAt)
 {
-	while (true) {
-		{
-			const size_type toUnwrittenDelta(delta_unwritten(outUnwritten, minimum));
+	size_type unwritten(m_unwritten.load(std::memory_order_relaxed));
+	size_type at(m_writeAt.fetch_add(1, std::memory_order_acq_rel));
 
-			if (toUnwrittenDelta < m_capacity) {
-				break;
-			}
+	do {
+		const size_type toUnwrittenDelta(delta_unwritten(unwritten, at));
 
-			if (toUnwrittenDelta < BufferBlockThreshhold) {
-				return false;
-			}
+		if (toUnwrittenDelta < m_capacity) {
+			outAt = at;
+			return true;
 		}
 
-		if (qsbr::update(m_readControl)) {
-			const size_type halfCapacity(m_capacity / 2);
-			const size_type desired(outUnwritten + halfCapacity);
+		if (BufferBlockThreshhold < toUnwrittenDelta) {
+			break;
+		}
 
-			if (m_unwritten.compare_exchange_strong(outUnwritten, desired, std::memory_order_release, std::memory_order_relaxed)) {
+		// This is suspect. Do we have a well defined set of states this can exist in at this point? 
+		// What we want happening within this scope is:
+		// This snapshot should only affect whichever capacity increase we're looking for here. The neatest thing
+		// would be to carry a payload within the snapshot. Or perhaps not. 
+		if (qsbr::update(m_readersSnapshot)) {
+			// So we will arrive here only if the snapshot is cleared.
+
+			const size_type halfCapacity(m_capacity / 2);
+			const size_type desired(unwritten + halfCapacity);
+
+			if (m_unwritten.compare_exchange_strong(unwritten, desired, std::memory_order_release, std::memory_order_relaxed)) {
 				outUnwritten = desired;
 			}
+			
+			// So say we have a size 4 buffer
+			// A thread tries to pop item ix[2], 
+			// it will then have to increase m_unwritten. 
+			// It succeeds in doing so and arrives here.
+			// It stalls.
+			// Other producers continue on.
+			// The post sync step should not be able to complete until this thread has exited..!
+			// Which should mean that no consumer will be able to create a new snapshot. 
 
-			qsbr::invalidate(m_readControl);
+			// What about other producer states? 
+			// What if a producer in this scenario arrives at virtual ix 4
+			// Comes in here, fails CAS
+			// Arrives here, stalls
+			// First thread invalidates, resumes
+			// Consumer creates new snapshot
+			// Producer resumes, invalidates. Hmm. Yeah.
+
+			// Hmm this invalidation business. Is there a better way to design this snapshot business?
+			qsbr::invalidate(m_readersSnapshot);
 		}
-		else {
-			outUnwritten = m_unwritten.load(std::memory_order_acquire);
-		}
 
-		{
-			const size_type toUnwrittenDelta(delta_unwritten(outUnwritten, minimum));
+	} while (true);
 
-			if (toUnwrittenDelta < m_capacity) {
-				break;
-			}
 
-			if (toUnwrittenDelta < BufferBlockThreshhold) {
-				return false;
-			}
-		}
+	//while (true) {
+	//	{
+	//		const size_type toUnwrittenDelta(delta_unwritten(outUnwritten, minimum));
 
-		const size_type blockage(outUnwritten + BufferBlockOffset);
-		m_unwritten.compare_exchange_weak(outUnwritten, blockage, std::memory_order_release, std::memory_order_relaxed);
-	}
+	//		if (toUnwrittenDelta < m_capacity) {
+	//			break;
+	//		}
 
-	return true;
+	//		if (toUnwrittenDelta < BufferBlockThreshhold) {
+	//			return false;
+	//		}
+	//	}
+
+	//	if (qsbr::update(m_readersSnapshot)) {
+	//		const size_type halfCapacity(m_capacity / 2);
+	//		const size_type desired(outUnwritten + halfCapacity);
+
+	//		if (m_unwritten.compare_exchange_strong(outUnwritten, desired, std::memory_order_release, std::memory_order_relaxed)) {
+	//			outUnwritten = desired;
+	//		}
+
+	//		qsbr::invalidate(m_readersSnapshot);
+	//	}
+	//	else {
+	//		outUnwritten = m_unwritten.load(std::memory_order_acquire);
+	//	}
+
+	//	{
+	//		const size_type toUnwrittenDelta(delta_unwritten(outUnwritten, minimum));
+
+	//		if (toUnwrittenDelta < m_capacity) {
+	//			break;
+	//		}
+
+	//		if (toUnwrittenDelta < BufferBlockThreshhold) {
+	//			return false;
+	//		}
+	//	}
+
+	//	const size_type blockage(outUnwritten + BufferBlockOffset);
+	//	m_unwritten.compare_exchange_weak(outUnwritten, blockage, std::memory_order_release, std::memory_order_relaxed);
+	//}
+
+	//return true;
 }
 template<class T, class Allocator>
 inline void item_buffer<T, Allocator>::try_update_written(size_type postWriteSync, size_type writeAt)
@@ -656,26 +707,17 @@ template<class T, class Allocator>
 template<class ...Args>
 inline bool item_buffer<T, Allocator>::try_emplace(Args&& ... args)
 {
-	size_type unwritten(m_unwritten.load(std::memory_order_relaxed));
-	const size_type at(m_writeAt.fetch_add(1, std::memory_order_acq_rel));
-	const size_type toUnwrittenDelta(delta_unwritten(unwritten, at));
+	size_type at;
 
-	// So there's a way for a producer to fail here. And then for others to keep going.
-	// It looked like it failed to update unwritten, then after it fell through another thread updated
-	// it anyway. 
-	if (!(toUnwrittenDelta < m_capacity)) {
-		if (!try_inc_unwritten(at, unwritten)) {
-			size_type exp(0);
-			outer.compare_exchange_strong(exp, at);
+	if (!try_claim_write_slot(at)) {
 
-			const size_type postSync(m_postWriteSync.load(std::memory_order_relaxed));
+		const size_type postSync(m_postWriteSync.load(std::memory_order_relaxed));
 
-			const size_type postAt(m_writeAt.fetch_sub(1, std::memory_order_acq_rel) - 1);
+		const size_type postAt(m_writeAt.fetch_sub(1, std::memory_order_acq_rel) - 1);
 
-			try_update_written(postSync, postAt);
+		try_update_written(postSync, postAt);
 
-			return false;
-		}
+		return false;
 	}
 
 	const size_type atItem(at & (m_capacity - 1));
@@ -711,24 +753,12 @@ inline bool item_buffer<T, Allocator>::try_pop(T& out)
 	const size_type atItem(at & mask);
 
 	uint16_t test(-1);
-	
+
 	if constexpr (std::is_convertible_v<T, uint16_t>) {
 		test = m_items[atItem];
 	}
 
 	m_items[atItem];
-
-	/*So we have items that end up being dequeued twice. What would cause this?
-It's so strange. m_readAt should always distribute perfectly. In fact, it is guaranteed to distribute.
-Iteration seems to be intact. So what if a 
-
-
-So 129 would convert iteration to 2...
-
-
-So it seems that iteration is not in line. This simply means we have a valid index on our hands, however
-It has obviously not been assigned! Yeah most likely the issue is that a producer was forced to bail
-while others were allowed to continue!*/
 
 	assert(m_items[atItem]);
 
@@ -743,7 +773,7 @@ while others were allowed to continue!*/
 	const size_type masked((at + 1) & mask);
 
 	if (masked == a || masked == b) {
-		qsbr::set(m_readControl);
+		qsbr::set(m_readersSnapshot);
 	}
 
 	return true;

@@ -3,7 +3,7 @@
 #include <vld.h>
 #include <random>
 
-#include <gdul/WIP/concurrent_queue_fifo_v9.h>
+#include <gdul/WIP/concurrent_queue_fifo_v10.h>
 
 #define GDUL_FIFO
 
