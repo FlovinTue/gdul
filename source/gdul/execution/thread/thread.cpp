@@ -48,13 +48,13 @@ void thread::set_name(const std::string& name)
 {
 	assert(valid() && "Cannot set name to invalid thread");
 
-	set_name(name, native_handle());
+	set_name(name, this->native_handle());
 }
 void thread::set_core_affinity(std::uint8_t core)
 {
 	assert(valid() && "Cannot set affinity to invalid thread");
 
-	set_core_affinity(core, native_handle());
+	set_core_affinity(core, this->native_handle());
 }
 void thread::set_execution_priority(std::int32_t priority)
 {
@@ -62,7 +62,7 @@ void thread::set_execution_priority(std::int32_t priority)
 
 	set_execution_priority(priority, this->native_handle());
 }
-void thread::set_name(const std::string& name, void* handle)
+void thread::set_name(const std::string& name, std::thread::native_handle_type handle)
 {
 	thread_naming::THREADNAME_INFO info;
 	info.dwType = 0x1000;
@@ -76,14 +76,14 @@ void thread::set_name(const std::string& name, void* handle)
 	__except (EXCEPTION_EXECUTE_HANDLER) {
 	}
 }
-void thread::set_core_affinity(std::uint8_t core, void* handle)
+void thread::set_core_affinity(std::uint8_t core, std::thread::native_handle_type handle)
 {
 	const uint8_t core_(core % std::thread::hardware_concurrency());
 
 	const uint64_t affinityMask(1ULL << core);
 	while (!SetThreadAffinityMask(handle, affinityMask));
 }
-void thread::set_execution_priority(std::int32_t priority, void* handle)
+void thread::set_execution_priority(std::int32_t priority, std::thread::native_handle_type handle)
 {
 	SetThreadPriority(handle, priority);
 }
@@ -98,19 +98,22 @@ bool thread::valid() const noexcept
 #if defined(_WIN64) | defined(_WIN32)
 void std::this_thread::set_name(const std::string& name)
 {
-	gdul::thread::set_name(name, GetCurrentThread());
+	gdul::thread::set_name(name, (std::thread::native_handle_type)GetCurrentThread());
 }
 
 void std::this_thread::set_core_affinity(std::uint8_t core)
 {
-	gdul::thread::set_core_affinity(core, GetCurrentThread());
+	gdul::thread::set_core_affinity(core, (std::thread::native_handle_type)GetCurrentThread());
 }
 
 void std::this_thread::set_execution_priority(std::int32_t priority)
 {
-	gdul::thread::set_execution_priority(priority, GetCurrentThread());
+	gdul::thread::set_execution_priority(priority, (std::thread::native_handle_type)GetCurrentThread());
 }
-
+std::thread::native_handle_type std::this_thread::native_handle()
+{
+	return (std::thread::native_handle_type)GetCurrentThread();
+}
 #else
 void std::this_thread::set_name(const std::string&)
 {
@@ -125,6 +128,11 @@ void std::this_thread::set_core_affinity(std::uint8_t)
 void std::this_thread::set_execution_priority(std::uint8_t)
 {
 	assert(false && "Not implemented")
+}
+std::thread::native_handle_type std::this_thread::native_handle()
+{
+	assert(false && "Not implemented")
+	return nullptr;
 }
 #endif
 bool std::this_thread::valid() noexcept
