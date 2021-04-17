@@ -672,7 +672,10 @@ inline bool item_buffer<T, Allocator>::try_emplace(Args&& ... args)
 
 	const size_type atItem(at & (m_capacity - 1));
 
-	new (&m_items[atItem]) T(std::forward<Args>(args)...);
+	//new (&m_items[atItem]) T(std::forward<Args>(args)...);
+
+	T temp(std::forward<Args>(args)...);
+	m_items[atItem] = temp;
 
 	const size_type postSync(m_postWriteSync.fetch_add(1, std::memory_order_acq_rel) + 1);
 	const size_type postAt(m_writeAt.load(std::memory_order_relaxed));
@@ -698,6 +701,26 @@ inline bool item_buffer<T, Allocator>::try_pop(T& out)
 
 	const size_type mask(m_capacity - 1);
 	const size_type atItem(at & mask);
+
+	uint16_t test(-1);
+	
+	if constexpr (std::is_convertible_v<T, uint16_t>) {
+		test = m_items[atItem];
+	}
+
+	m_items[atItem];
+
+	/*So we have items that end up being dequeued twice. What would cause this?
+It's so strange. m_readAt should always distribute perfectly. In fact, it is guaranteed to distribute.
+Iteration seems to be intact. So what if a 
+
+
+So 129 would convert iteration to 2...
+
+
+So it seems that iteration is not in line. This simply means we have a valid index on our hands, however
+It has obviously not been assigned! Yeah most likely the issue is that a producer was forced to bail
+while others were allowed to continue!*/
 
 	assert(m_items[atItem]);
 

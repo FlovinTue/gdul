@@ -42,16 +42,27 @@ public:
 		count += aCount;
 		return *this;
 	}
+#else
+	Thrower& operator=(const Thrower& other)
+	{
+		count = other.count;
+		alive = true;
+		return *this;
+	}
 #endif
 
 	~Thrower()
 	{
 		alive = false;
+		count = 0;
+		++iteration;
 	}
 
+	operator uint16_t() const { return iteration; }
 	operator bool() const { return alive; }
 
 	uint32_t count = 0;
+	uint16_t iteration = 0;
 	bool alive = true;
 #ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
 	uint32_t throwTarget = gdul::rng() % 50000;
