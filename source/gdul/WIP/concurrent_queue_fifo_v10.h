@@ -434,7 +434,7 @@ private:
 	GDUL_ATOMIC_WITH_VIEW(size_type, m_written);
 	GDUL_CACHE_PAD;
 
-	qsbr::item m_readersSnapshot;
+	qsbr::snapshot m_readersSnapshot;
 
 	atomic_shared_ptr_buffer_type m_next;
 
@@ -458,7 +458,7 @@ inline item_buffer<T, Allocator>::item_buffer(T* dataBlock, typename item_buffer
 	, m_items(dataBlock)
 	, m_state(buffer_state_valid)
 {
-	qsbr::invalidate(m_readersSnapshot);
+	qsbr::reset(m_readersSnapshot);
 }
 
 template<class T, class Allocator>
@@ -584,14 +584,14 @@ inline bool item_buffer<T, Allocator>::try_claim_write_slot(size_type& outAt)
 		// What we want happening within this scope is:
 		// This snapshot should only affect whichever capacity increase we're looking for here. The neatest thing
 		// would be to carry a payload within the snapshot. Or perhaps not. 
-		if (qsbr::update(m_readersSnapshot)) {
+		if (qsbr::query_and_update(m_readersSnapshot)) {
 			// So we will arrive here only if the snapshot is cleared.
 
 			const size_type halfCapacity(m_capacity / 2);
 			const size_type desired(unwritten + halfCapacity);
 
 			if (m_unwritten.compare_exchange_strong(unwritten, desired, std::memory_order_release, std::memory_order_relaxed)) {
-				outUnwritten = desired;
+				unwritten = desired;
 			}
 			
 			// So say we have a size 4 buffer
@@ -612,11 +612,12 @@ inline bool item_buffer<T, Allocator>::try_claim_write_slot(size_type& outAt)
 			// Producer resumes, invalidates. Hmm. Yeah.
 
 			// Hmm this invalidation business. Is there a better way to design this snapshot business?
-			qsbr::invalidate(m_readersSnapshot);
+			qsbr::reset(m_readersSnapshot);
 		}
 
 	} while (true);
 
+	return false;
 
 	//while (true) {
 	//	{
@@ -773,7 +774,7 @@ inline bool item_buffer<T, Allocator>::try_pop(T& out)
 	const size_type masked((at + 1) & mask);
 
 	if (masked == a || masked == b) {
-		qsbr::set(m_readersSnapshot);
+		qsbr::initialize(m_readersSnapshot);
 	}
 
 	return true;
