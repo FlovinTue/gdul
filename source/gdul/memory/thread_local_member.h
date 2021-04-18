@@ -23,11 +23,11 @@
 #include <vector>
 #include <array>
 #include <atomic>
+#include <optional>
 #include <gdul/memory/atomic_shared_ptr.h>
 #include <gdul/containers/small_vector.h>
 
 namespace gdul {
-
 template <class T, class Allocator = std::allocator<T>>
 class thread_local_member;
 
@@ -44,9 +44,9 @@ using size_type = std::uint32_t;
 static constexpr size_type StaticAllocSize = 3;
 
 template <class T>
-struct instance_tracker;
+class instance_constructor_base;
 template <class T, class ...Args>
-struct instance_tracker_constructor;
+class instance_constructor;
 
 template <class Dummy>
 class index_pool
@@ -245,50 +245,34 @@ public:
 	inline const deref_type& operator*() const;
 
 private:
-	using instance_tracker_entry = shared_ptr<tlm_detail::instance_tracker<T>>;
-	using instance_tracker_atomic_entry = atomic_shared_ptr<tlm_detail::instance_tracker<T>>;
+	using instance_constructor_entry = shared_ptr<tlm_detail::instance_constructor_base<T>>;
+	using instance_constructor_atomic_entry = atomic_shared_ptr<tlm_detail::instance_constructor_base<T>>;
 
-	using instance_tracker_array = shared_ptr<instance_tracker_atomic_entry[]>;
-	using instance_tracker_atomic_array = atomic_shared_ptr<instance_tracker_atomic_entry[]>;
+	using instance_constructor_array = shared_ptr<instance_constructor_atomic_entry[]>;
+	using instance_constructor_atomic_array = atomic_shared_ptr<instance_constructor_atomic_entry[]>;
 
 	using allocator_type = typename std::allocator_traits<Allocator>::template rebind_alloc<T>;
-	using allocator_instance_tracker_array = typename std::allocator_traits<Allocator>::template rebind_alloc<instance_tracker_atomic_entry[]>;
-	using allocator_instance_tracker_entry = typename std::allocator_traits<Allocator>::template rebind_alloc<tlm_detail::instance_tracker<T>>;
+	using allocator_instance_constructor_array = typename std::allocator_traits<Allocator>::template rebind_alloc<instance_constructor_atomic_entry[]>;
+	using allocator_instance_constructor_entry = typename std::allocator_traits<Allocator>::template rebind_alloc<tlm_detail::instance_constructor_base<T>>;
 
 	inline void check_for_invalidation() const;
 	inline void refresh() const;
 
 	template <class ...Args>
-	inline std::uint64_t initialize_instance_tracker(Args&& ...args) const;
-	inline void store_instance_tracker(instance_tracker_entry entry) const noexcept;
-	inline void grow_instance_tracker_array() const;
+	inline std::uint64_t initialize_instance_constructor(Args&& ...args) const;
+	inline void store_instance_constructor(instance_constructor_entry entry) const noexcept;
+	inline void grow_instance_constructor_array() const;
 
 	struct tl_container
 	{
 		tl_container()
-			: m_iteration(0)
+			: iteration(0)
 		{
 		}
-		~tl_container()
-		{
-			for (std::size_t i = 0; i < m_constructed.size(); ++i) {
-				if (m_constructed[i]) {
-					m_constructed[i] = false;
-					T* const item(reinterpret_cast<T*>(&m_items[i]));
-					std::destroy_at(item);
-				}
-			}
 
-			m_constructed.clear();
-			m_items.clear();
-		}
+		small_vector<std::optional<T>, tlm_detail::StaticAllocSize, allocator_type> items;
 
-		using t_rep = std::aligned_storage_t<sizeof(T), alignof(T)>;
-
-		small_vector<t_rep, tlm_detail::StaticAllocSize, allocator_type> m_items;
-		small_vector<bool, tlm_detail::StaticAllocSize, allocator_type> m_constructed;
-
-		std::uint64_t m_iteration;
+		std::uint64_t iteration;
 
 #if defined _DEBUG // For natvis viewing
 		const T* _dbgItemView = nullptr;
@@ -298,16 +282,16 @@ private:
 	struct st_container
 	{
 		st_container()
-			: m_nextIteration(0)
+			: nextIteration(0)
 		{
 		}
 
-		tlm_detail::index_pool<void> m_indexPool;
+		tlm_detail::index_pool<void> indexPool;
 
-		instance_tracker_atomic_array m_instanceTrackers;
-		instance_tracker_atomic_array m_swapArray;
+		instance_constructor_atomic_array instanceConstructors;
+		instance_constructor_atomic_array swapArray;
 
-		std::atomic<std::uint64_t> m_nextIteration;
+		std::atomic<std::uint64_t> nextIteration;
 	};
 
 	static thread_local tl_container t_container;
@@ -340,17 +324,16 @@ template<class T, class Allocator>
 template<class ...Args>
 inline thread_local_member<T, Allocator>::thread_local_member(Allocator allocator, Args&&... constructorArgs)
 	: m_allocator(allocator)
-	, m_index(s_container.m_indexPool.get(allocator))
-	, m_iteration(initialize_instance_tracker(std::forward<Args>(constructorArgs)...))
+	, m_index(s_container.indexPool.get(allocator))
+	, m_iteration(initialize_instance_constructor(std::forward<Args>(constructorArgs)...))
 {
-	static_assert(std::is_default_constructible_v<T>, "Type must be default constructible");
 }
 template<class T, class Allocator>
 inline thread_local_member<T, Allocator>::~thread_local_member() noexcept
 {
-	if (s_container.m_instanceTrackers) {
-		store_instance_tracker(instance_tracker_entry(nullptr));
-		s_container.m_indexPool.add(m_index);
+	if (s_container.instanceConstructors) {
+		store_instance_constructor(instance_constructor_entry(nullptr));
+		s_container.indexPool.add(m_index);
 	}
 }
 template<class T, class Allocator>
@@ -418,13 +401,13 @@ template<class T, class Allocator>
 inline T& thread_local_member<T, Allocator>::get()
 {
 	check_for_invalidation();
-	return *reinterpret_cast<T*>(&t_container.m_items[m_index]);
+	return t_container.items[m_index].value();
 }
 template<class T, class Allocator>
 inline const T& thread_local_member<T, Allocator>::get() const
 {
 	check_for_invalidation();
-	return *reinterpret_cast<const T*>(&t_container.m_items[m_index]);
+	return t_container.items[m_index].value();
 }
 template<class T, class Allocator>
 inline typename thread_local_member<T, Allocator>::deref_type* thread_local_member<T, Allocator>::operator->()
@@ -449,122 +432,119 @@ inline const typename thread_local_member<T, Allocator>::deref_type& thread_loca
 template<class T, class Allocator>
 inline void thread_local_member<T, Allocator>::check_for_invalidation() const
 {
-	if (t_container.m_iteration < m_iteration) {
+	if (t_container.iteration < m_iteration) {
 		refresh();
-		t_container.m_iteration = m_iteration;
+		t_container.iteration = m_iteration;
 	}
 }
 template<class T, class Allocator>
 template<class ...Args>
-inline std::uint64_t thread_local_member<T, Allocator>::initialize_instance_tracker(Args&& ...args) const
+inline std::uint64_t thread_local_member<T, Allocator>::initialize_instance_constructor(Args&& ...args) const
 {
-	grow_instance_tracker_array();
+	grow_instance_constructor_array();
 
-	allocator_instance_tracker_entry alloc(m_allocator);
-	instance_tracker_entry trackedEntry(gdul::allocate_shared<tlm_detail::instance_tracker_constructor<T, Args...>>(alloc, std::forward<Args>(args)...));
+	allocator_instance_constructor_entry alloc(m_allocator);
+	instance_constructor_entry instanceConstructor(gdul::allocate_shared<tlm_detail::instance_constructor<T, Args...>>(alloc, std::forward<Args>(args)...));
 
-	store_instance_tracker(trackedEntry);
+	store_instance_constructor(instanceConstructor);
 
-	trackedEntry->m_iteration = s_container.m_nextIteration.operator++();
+	instanceConstructor->set_iteration(s_container.nextIteration.operator++());
 
-	return trackedEntry->m_iteration;
+	return instanceConstructor->get_iteration();
 }
 template<class T, class Allocator>
-inline void thread_local_member<T, Allocator>::store_instance_tracker(instance_tracker_entry entry) const noexcept
+inline void thread_local_member<T, Allocator>::store_instance_constructor(instance_constructor_entry entry) const noexcept
 {
-	instance_tracker_array trackedInstances(nullptr);
-	instance_tracker_array swapArray(nullptr);
+	instance_constructor_array instanceConstructors(nullptr);
+	instance_constructor_array swapArray(nullptr);
 
 	do {
-		trackedInstances = s_container.m_instanceTrackers.load(std::memory_order_acquire);
-		swapArray = s_container.m_swapArray.load(std::memory_order_relaxed);
+		instanceConstructors = s_container.instanceConstructors.load(std::memory_order_acquire);
+		swapArray = s_container.swapArray.load(std::memory_order_relaxed);
 
 		if (m_index < swapArray.item_count() &&
 			swapArray[m_index] != entry) {
 			swapArray[m_index].store(entry, std::memory_order_release);
 		}
-		if (trackedInstances[m_index] != entry) {
-			trackedInstances[m_index].store(entry, std::memory_order_release);
+		if (instanceConstructors[m_index] != entry) {
+			instanceConstructors[m_index].store(entry, std::memory_order_release);
 		}
-		// Just keep re-storing until the relation between m_swapArray / m_instanceTrackers has stabilized
-	} while (s_container.m_swapArray != swapArray || s_container.m_instanceTrackers != trackedInstances);
+		// Just keep re-storing until the relation between swapArray / instanceConstructors has stabilized
+	} while (s_container.swapArray != swapArray || s_container.instanceConstructors != instanceConstructors);
 }
+
 template<class T, class Allocator>
 inline void thread_local_member<T, Allocator>::refresh() const
 {
-	const instance_tracker_array trackedInstances(s_container.m_instanceTrackers.load(std::memory_order_acquire));
-	const size_type items((size_type)trackedInstances.item_count());
-	t_container.m_items.resize(items);
-	t_container.m_constructed.resize(items, false);
+	const instance_constructor_array instanceConstructors(s_container.instanceConstructors.load(std::memory_order_acquire));
+	const size_type itemCount((size_type)instanceConstructors.item_count());
+
+	if (t_container.items.size() < itemCount) {
+		t_container.items.resize(itemCount);
+	}
 
 #if defined _DEBUG // For natvis viewing
-	t_container._dbgItemView = static_cast<const T*>(t_container.m_items.data());
-	t_container._dbgCapacity = t_container.m_items.capacity();
+	t_container._dbgItemView = static_cast<const T*>(t_container.items.data());
+	t_container._dbgCapacity = t_container.items.capacity();
 #endif
 
-	for (size_type i = 0; i < items; ++i) {
-		instance_tracker_entry instance(trackedInstances[i].load(std::memory_order_acquire));
+	for (size_type i = 0; i < itemCount; ++i) {
+		instance_constructor_entry instance(instanceConstructors[i].load(std::memory_order_acquire));
 
-		if (!instance && t_container.m_constructed[i]) {
-			T* const item(reinterpret_cast<T*>(&t_container.m_items[i]));
-			std::destroy_at(item);
-			t_container.m_constructed[i] = false;
+		if (!instance && t_container.items[i]) {
+			t_container.items[i].reset();
 		}
 
-		if (instance && ((t_container.m_iteration < instance->m_iteration) & !(m_iteration < instance->m_iteration))) {
-			T* const item(reinterpret_cast<T*>(&t_container.m_items[i]));
-
-			if (t_container.m_constructed[i]) {
-				std::destroy_at(item);
-				t_container.m_constructed[i] = false;
+		if (instance && ((t_container.iteration < instance->get_iteration()) & !(m_iteration < instance->get_iteration()))) {
+			if (t_container.items[i]) {
+				t_container.items[i].reset();
 			}
 
-			instance->construct_at(item);
-			t_container.m_constructed[i] = true;
+			instance->construct_at(t_container.items[i]);
 		}
 	}
 
 }
 template<class T, class Allocator>
-inline void thread_local_member<T, Allocator>::grow_instance_tracker_array() const
+inline void thread_local_member<T, Allocator>::grow_instance_constructor_array() const
 {
 	const size_type minimum(m_index + 1);
-	instance_tracker_array activeArray(nullptr);
-	instance_tracker_array swapArray(nullptr);
+	instance_constructor_array activeArray(nullptr);
+	instance_constructor_array swapArray(nullptr);
 	do {
-		activeArray = s_container.m_instanceTrackers.load();
+		activeArray = s_container.instanceConstructors.load();
 
 		if (!(activeArray.item_count() < minimum)) {
 			break;
 		}
 
-		swapArray = s_container.m_swapArray.load();
+		swapArray = s_container.swapArray.load();
 
 		if (swapArray.item_count() < minimum) {
 			const float growth(((float)minimum) * 1.4f);
 
-			allocator_instance_tracker_array arrayAlloc(m_allocator);
-			instance_tracker_array grown(gdul::allocate_shared<instance_tracker_atomic_entry[]>((size_type)growth, arrayAlloc));
+			allocator_instance_constructor_array arrayAlloc(m_allocator);
+			instance_constructor_array grown(gdul::allocate_shared<instance_constructor_atomic_entry[]>((size_type)growth, arrayAlloc));
 
-			raw_ptr<instance_tracker_atomic_entry[]> exp(swapArray);
-			s_container.m_swapArray.compare_exchange_strong(exp, std::move(grown));
+			raw_ptr<instance_constructor_atomic_entry[]> exp(swapArray);
+			s_container.swapArray.compare_exchange_strong(exp, std::move(grown));
 
 			continue;
 		}
 
 		for (size_type i = 0, itemCount((size_type)activeArray.item_count()); i < itemCount; ++i) {
-			raw_ptr<tlm_detail::instance_tracker<T>> exp(nullptr, 0);
+			raw_ptr<tlm_detail::instance_constructor_base<T>> exp(nullptr, 0);
 			swapArray[i].compare_exchange_strong(exp, activeArray[i].load());
 		}
 
-		if (s_container.m_instanceTrackers.compare_exchange_strong(activeArray, swapArray)) {
+		if (s_container.instanceConstructors.compare_exchange_strong(activeArray, swapArray)) {
 			break;
 		}
 	} while (activeArray.item_count() < minimum);
 
 	if (!(activeArray.item_count() < swapArray.item_count())) {
-		raw_ptr<instance_tracker_atomic_entry[]> expSwap(swapArray);
-		s_container.m_swapArray.compare_exchange_strong(expSwap, instance_tracker_array(nullptr));
+		raw_ptr<instance_constructor_atomic_entry[]> expSwap(swapArray);
+		s_container.swapArray.compare_exchange_strong(expSwap, instance_constructor_array(nullptr));
 	}
 }
 template<class T, class Allocator>
@@ -607,45 +587,53 @@ inline shared_ptr<typename index_pool<Dummy>::node> index_pool<Dummy>::get_poole
 	throw std::runtime_error("Pre allocated entries should be 1:1 to fetched indices");
 }
 template<class T, class Tuple, std::size_t ...IndexSeq>
-void construct_with_tuple_expansion(T* mem, Tuple&& tup, std::index_sequence<IndexSeq...>)
+void emplace_with_tuple_expansion(std::optional<T>& item, Tuple&& tup, std::index_sequence<IndexSeq...>)
 {
-	new (mem) T(std::get<IndexSeq>(std::forward<Tuple>(tup))...); tup;
+	item.emplace(std::get<IndexSeq>(std::forward<Tuple>(tup))...); tup;
 }
 template<class T, class Tuple>
-void construct_with_tuple(T* mem, Tuple&& tup)
+void emplace_with_tuple(std::optional<T>& item, Tuple&& tup)
 {
 	using Indices = std::make_index_sequence<std::tuple_size<std::decay_t<Tuple>>::value>;
-	construct_with_tuple_expansion(mem, std::forward<Tuple>(tup), Indices());
+	emplace_with_tuple_expansion(item, std::forward<Tuple>(tup), Indices());
 }
 template <class T>
-struct instance_tracker
+class instance_constructor_base
 {
-	instance_tracker()
+public:
+
+	instance_constructor_base()
 		: m_iteration(0)
 	{
 	}
 
-	virtual ~instance_tracker() = default;
-	virtual void construct_at(T* item) = 0;
+	virtual ~instance_constructor_base() = default;
+	virtual void construct_at(std::optional<T>& item) = 0;
 
+	std::uint64_t get_iteration() const { return m_iteration; }
+	void set_iteration(std::uint64_t iteration) { m_iteration = iteration; }
+
+private:
 	std::uint64_t m_iteration;
 };
 template <class T, class ...Args>
-struct instance_tracker_constructor : public instance_tracker<T>
+class instance_constructor : public instance_constructor_base<T>
 {
-	instance_tracker_constructor(Args&&... args)
-		: instance_tracker<T>::instance_tracker()
+public:
+	instance_constructor(Args&&... args)
+		: instance_constructor_base<T>::instance_constructor_base()
 		, m_init(std::forward<Args>(args)...)
 	{
 	}
 
-	~instance_tracker_constructor() = default;
+	~instance_constructor() = default;
 
-	void construct_at(T* item) override final
+	void construct_at(std::optional<T>& item) override final
 	{
-		construct_with_tuple(item, m_init);
+		emplace_with_tuple(item, m_init);
 	}
 
+private:
 	std::tuple<Args...> m_init;
 };
 }
