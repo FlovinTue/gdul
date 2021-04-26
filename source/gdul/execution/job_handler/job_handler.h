@@ -190,7 +190,7 @@ public:
 	void dump_job_graph();
 
 	/// <summary>
-	/// Write the current job graph to a dgml file
+	/// Write job timing sets to file
 	/// </summary>
 	void dump_job_time_sets();
 
