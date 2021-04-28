@@ -125,8 +125,8 @@ public:
 	inline void assign(std::initializer_list<T> ilist) { m_vec.assign(ilist); }
 	inline void assign(const T& val, size_type newSize) { m_vec.assign(val, newSize); }
 
-	inline const_reference at(size_type index) const { return m_vec.at; }
-	inline reference at(size_type index) { return m_vec.at; }
+	inline const_reference at(size_type index) const { return m_vec.at(index);}
+	inline reference at(size_type index) { return m_vec.at(index); }
 
 	inline size_type capacity() const noexcept { return m_vec.capacity(); }
 
