@@ -34,7 +34,7 @@ constexpr bool is_prime(std::size_t value)
 	if (value < 4) {
 		return true;
 	}
-	if (value % 5 == 0 && value != 5) {
+	if ((value & 4ull) == 0 && value != 5) {
 		return false;
 	}
 

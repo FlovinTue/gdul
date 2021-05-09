@@ -581,22 +581,28 @@ inline bool item_buffer<T, Allocator>::try_claim_write_slot(size_type& outAt)
 		}
 
 		if (qsbr::query_and_update(m_readersSnapshot)) {
-			// So we will arrive here only if the snapshot is cleared.
-
 			const size_type halfCapacity(m_capacity / 2);
 			const size_type desired(unwritten + halfCapacity);
 
 			// Once this succeeds, other writers will be free to go about their business
 			if (m_unwritten.compare_exchange_strong(unwritten, desired, std::memory_order_release, std::memory_order_relaxed)) {
-
-				// Remove this mechanism? Too complicated? 
-				qsbr::reset(m_readersSnapshot);
-				
 				unwritten = desired;
 			}
+
+			// This can't be good. 
+			qsbr::reset(m_readersSnapshot);
+
+			continue;
 		}
 		else {
-			unwritten = m_unwritten.load(std::memory_order_relaxed);
+			const size_type newUnwritten(m_unwritten.load(std::memory_order_relaxed));
+
+			if (newUnwritten != unwritten) {
+				unwritten = newUnwritten;
+				continue;
+			}
+
+			// Blockage
 		}
 
 	} while (true);
