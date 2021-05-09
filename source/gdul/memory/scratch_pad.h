@@ -39,7 +39,7 @@ template <std::size_t Bytes, class Allocator = std::allocator<std::uint8_t>>
 class scratch_pad : public std::pmr::memory_resource
 {
 public:
-	using size_type = least_unsigned_integer_t<Bytes>;
+	using least_size_type = least_unsigned_integer_t<Bytes>;
 	using allocator_type = typename std::allocator_traits<Allocator>::template rebind_alloc<std::uint8_t>;
 
 	scratch_pad();
@@ -62,8 +62,8 @@ private:
 
 	struct sizes
 	{
-		size_type at;
-		size_type used;
+		least_size_type at;
+		least_size_type used;
 	};
 
 	std::uint8_t alignas(alignof(std::max_align_t)) m_bytes[Bytes];
@@ -97,47 +97,46 @@ inline bool scratch_pad<Bytes, Allocator>::do_is_equal(const memory_resource& th
 template<std::size_t Bytes, class Allocator>
 inline void* scratch_pad<Bytes, Allocator>::do_allocate(std::size_t count, std::size_t align)
 {
-	const size_type _count(static_cast<size_type>(count));
-	const size_type _align(static_cast<size_type>(align));
-
 	sizes expected(m_sizes.load(std::memory_order_acquire));
 	sizes desired;
-	size_type alignedBegin(0);
+	std::size_t alignedLocalBegin(0);
 
 	do {
-		const size_type begin(expected.at);
-		const void* const addr(&m_bytes[begin]);
+		const std::size_t localBegin(expected.at);
+		const void* const addr(&m_bytes[localBegin]);
 		const std::uintptr_t addrValue(reinterpret_cast<std::size_t>(addr));
-		const std::uintptr_t addrAligned(align_value(addrValue, _align));
+		const std::uintptr_t addrAligned(align_value(addrValue, align));
 
-		const size_type offset(static_cast<size_type>(addrAligned - addrValue));
-		alignedBegin = begin + offset;
-		const size_type avaliable(Bytes - alignedBegin);
+		const std::uintptr_t offset(addrAligned - addrValue);
+		alignedLocalBegin = localBegin + offset;
+		const std::size_t avaliable(Bytes - alignedLocalBegin);
 
-		if (avaliable < _count) {
+		if (avaliable < count) {
 			return m_allocator.allocate(count);
 		}
 
-		const size_type alignedEnd = alignedBegin + _count;
+		if (Bytes < count) {
+			assert(false);
+		}
 
-		desired.at = alignedEnd;
-		desired.used = expected.used + _count;
+		const std::size_t alignedEnd = alignedLocalBegin + count;
+
+		desired.at = static_cast<least_size_type>(alignedEnd);
+		desired.used = expected.used + static_cast<least_size_type>(count);;
 
 	} while (!m_sizes.compare_exchange_weak(expected, desired, std::memory_order_release, std::memory_order_relaxed));
 
-	return &m_bytes[alignedBegin];
+	return &m_bytes[alignedLocalBegin];
 }
 template<std::size_t Bytes, class Allocator>
 inline void scratch_pad<Bytes, Allocator>::do_deallocate(void* p, std::size_t count, std::size_t /*align*/)
 {
 	if (owns(p)) {
-		const size_type _count(static_cast<size_type>(count));
-
 		sizes expected(m_sizes.load(std::memory_order_acquire));
 		sizes desired;
 		do {
 			desired = expected;
-			desired.used -= _count;
+			desired.used -= static_cast<least_size_type>(count);
 
 			if (desired.used == 0) {
 				desired.at = 0;
