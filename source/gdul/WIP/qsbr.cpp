@@ -169,7 +169,7 @@ void unregister_thread()
 	qsbr_detail::unregister_thread();
 }
 
-bool initialize(snapshot& item)
+bool take_snapshot(snapshot& item)
 {
 	return qsbr_detail::initialize(item);
 }

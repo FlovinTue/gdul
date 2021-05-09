@@ -566,12 +566,12 @@ template<class T, class Allocator>
 inline bool item_buffer<T, Allocator>::try_claim_write_slot(size_type& outAt)
 {
 	size_type unwritten(m_unwritten.load(std::memory_order_relaxed));
-	size_type at(m_writeAt.fetch_add(1, std::memory_order_acq_rel));
+	const size_type at(m_writeAt.fetch_add(1, std::memory_order_acq_rel));
 
 	do {
 		const size_type toUnwrittenDelta(delta_unwritten(unwritten, at));
 
-		if (toUnwrittenDelta < m_capacity) {
+		if (!(m_capacity < toUnwrittenDelta)) {
 			outAt = at;
 			return true;
 		}
@@ -580,89 +580,30 @@ inline bool item_buffer<T, Allocator>::try_claim_write_slot(size_type& outAt)
 			break;
 		}
 
-		// This is suspect. Do we have a well defined set of states this can exist in at this point? 
-		// What we want happening within this scope is:
-		// This snapshot should only affect whichever capacity increase we're looking for here. The neatest thing
-		// would be to carry a payload within the snapshot. Or perhaps not. 
 		if (qsbr::query_and_update(m_readersSnapshot)) {
 			// So we will arrive here only if the snapshot is cleared.
 
 			const size_type halfCapacity(m_capacity / 2);
 			const size_type desired(unwritten + halfCapacity);
 
+			// Once this succeeds, other writers will be free to go about their business
 			if (m_unwritten.compare_exchange_strong(unwritten, desired, std::memory_order_release, std::memory_order_relaxed)) {
+
+				// Remove this mechanism? Too complicated? 
+				qsbr::reset(m_readersSnapshot);
+				
 				unwritten = desired;
 			}
-			
-			// So say we have a size 4 buffer
-			// A thread tries to pop item ix[2], 
-			// it will then have to increase m_unwritten. 
-			// It succeeds in doing so and arrives here.
-			// It stalls.
-			// Other producers continue on.
-			// The post sync step should not be able to complete until this thread has exited..!
-			// Which should mean that no consumer will be able to create a new snapshot. 
-
-			// What about other producer states? 
-			// What if a producer in this scenario arrives at virtual ix 4
-			// Comes in here, fails CAS
-			// Arrives here, stalls
-			// First thread invalidates, resumes
-			// Consumer creates new snapshot
-			// Producer resumes, invalidates. Hmm. Yeah.
-
-			// Hmm this invalidation business. Is there a better way to design this snapshot business?
-			qsbr::reset(m_readersSnapshot);
+		}
+		else {
+			unwritten = m_unwritten.load(std::memory_order_relaxed);
 		}
 
 	} while (true);
 
+	outAt = m_writeAt.fetch_sub(1, std::memory_order_acq_rel) - 1;
+
 	return false;
-
-	//while (true) {
-	//	{
-	//		const size_type toUnwrittenDelta(delta_unwritten(outUnwritten, minimum));
-
-	//		if (toUnwrittenDelta < m_capacity) {
-	//			break;
-	//		}
-
-	//		if (toUnwrittenDelta < BufferBlockThreshhold) {
-	//			return false;
-	//		}
-	//	}
-
-	//	if (qsbr::update(m_readersSnapshot)) {
-	//		const size_type halfCapacity(m_capacity / 2);
-	//		const size_type desired(outUnwritten + halfCapacity);
-
-	//		if (m_unwritten.compare_exchange_strong(outUnwritten, desired, std::memory_order_release, std::memory_order_relaxed)) {
-	//			outUnwritten = desired;
-	//		}
-
-	//		qsbr::invalidate(m_readersSnapshot);
-	//	}
-	//	else {
-	//		outUnwritten = m_unwritten.load(std::memory_order_acquire);
-	//	}
-
-	//	{
-	//		const size_type toUnwrittenDelta(delta_unwritten(outUnwritten, minimum));
-
-	//		if (toUnwrittenDelta < m_capacity) {
-	//			break;
-	//		}
-
-	//		if (toUnwrittenDelta < BufferBlockThreshhold) {
-	//			return false;
-	//		}
-	//	}
-
-	//	const size_type blockage(outUnwritten + BufferBlockOffset);
-	//	m_unwritten.compare_exchange_weak(outUnwritten, blockage, std::memory_order_release, std::memory_order_relaxed);
-	//}
-
-	//return true;
 }
 template<class T, class Allocator>
 inline void item_buffer<T, Allocator>::try_update_written(size_type postWriteSync, size_type writeAt)
@@ -711,22 +652,16 @@ inline bool item_buffer<T, Allocator>::try_emplace(Args&& ... args)
 	size_type at;
 
 	if (!try_claim_write_slot(at)) {
-
 		const size_type postSync(m_postWriteSync.load(std::memory_order_relaxed));
 
-		const size_type postAt(m_writeAt.fetch_sub(1, std::memory_order_acq_rel) - 1);
-
-		try_update_written(postSync, postAt);
+		try_update_written(postSync, at);
 
 		return false;
 	}
 
 	const size_type atItem(at & (m_capacity - 1));
 
-	//new (&m_items[atItem]) T(std::forward<Args>(args)...);
-
-	T temp(std::forward<Args>(args)...);
-	m_items[atItem] = temp;
+	new (&m_items[atItem]) T(std::forward<Args>(args)...);
 
 	const size_type postSync(m_postWriteSync.fetch_add(1, std::memory_order_acq_rel) + 1);
 	const size_type postAt(m_writeAt.load(std::memory_order_relaxed));
@@ -753,16 +688,6 @@ inline bool item_buffer<T, Allocator>::try_pop(T& out)
 	const size_type mask(m_capacity - 1);
 	const size_type atItem(at & mask);
 
-	uint16_t test(-1);
-
-	if constexpr (std::is_convertible_v<T, uint16_t>) {
-		test = m_items[atItem];
-	}
-
-	m_items[atItem];
-
-	assert(m_items[atItem]);
-
 	move_or_assign(m_items[atItem], out);
 
 	std::destroy_at(&m_items[atItem]);
@@ -774,7 +699,7 @@ inline bool item_buffer<T, Allocator>::try_pop(T& out)
 	const size_type masked((at + 1) & mask);
 
 	if (masked == a || masked == b) {
-		qsbr::initialize(m_readersSnapshot);
+		qsbr::take_snapshot(m_readersSnapshot);
 	}
 
 	return true;
@@ -845,3 +770,81 @@ inline void buffer_deleter<T, Allocator>::operator()(T* obj, Allocator&) noexcep
 }
 }
 #pragma warning(pop)
+
+
+
+
+
+// This is suspect. Do we have a well defined set of states this can exist in at this point? 
+// What we want happening within this scope is:
+// This snapshot should only affect whichever capacity increase we're looking for here. The neatest thing
+// would be to carry a payload within the snapshot. Or perhaps not. 
+
+
+// So say we have a size 4 buffer
+// A thread tries to pop item ix[2], 
+// it will then have to increase m_unwritten. 
+// It succeeds in doing so and arrives here.
+// It stalls.
+// Other producers continue on.
+// The post sync step should not be able to complete until this thread has exited..!
+// Which should mean that no consumer will be able to create a new snapshot. 
+
+// What about other producer states? 
+// What if a producer in this scenario arrives at virtual ix 4
+// Comes in here, fails CAS
+// Arrives here, stalls
+// First thread invalidates, resumes
+// Consumer creates new snapshot
+// Producer resumes, invalidates. Hmm. Yeah.
+
+// Hmm this invalidation business. Is there a better way to design this snapshot business?
+
+
+
+
+
+	//while (true) {
+	//	{
+	//		const size_type toUnwrittenDelta(delta_unwritten(outUnwritten, minimum));
+
+	//		if (toUnwrittenDelta < m_capacity) {
+	//			break;
+	//		}
+
+	//		if (toUnwrittenDelta < BufferBlockThreshhold) {
+	//			return false;
+	//		}
+	//	}
+
+	//	if (qsbr::update(m_readersSnapshot)) {
+	//		const size_type halfCapacity(m_capacity / 2);
+	//		const size_type desired(outUnwritten + halfCapacity);
+
+	//		if (m_unwritten.compare_exchange_strong(outUnwritten, desired, std::memory_order_release, std::memory_order_relaxed)) {
+	//			outUnwritten = desired;
+	//		}
+
+	//		qsbr::invalidate(m_readersSnapshot);
+	//	}
+	//	else {
+	//		outUnwritten = m_unwritten.load(std::memory_order_acquire);
+	//	}
+
+	//	{
+	//		const size_type toUnwrittenDelta(delta_unwritten(outUnwritten, minimum));
+
+	//		if (toUnwrittenDelta < m_capacity) {
+	//			break;
+	//		}
+
+	//		if (toUnwrittenDelta < BufferBlockThreshhold) {
+	//			return false;
+	//		}
+	//	}
+
+	//	const size_type blockage(outUnwritten + BufferBlockOffset);
+	//	m_unwritten.compare_exchange_weak(outUnwritten, blockage, std::memory_order_release, std::memory_order_relaxed);
+	//}
+
+	//return true;
