@@ -5,7 +5,7 @@
 
 #include <gdul/WIP/concurrent_queue_fifo_v10.h>
 
-#define GDUL_FIFO
+#define MSC_RUNTIME
 
 #include <gdul/../../Testers/Common/tracking_allocator.h>
 #include <gdul/../../Testers/queue_tester/tester.h>
@@ -99,7 +99,7 @@ int main()
 	}
 
 	gdul::tracking_allocator<std::uint8_t> alloc;
-	gdul::queue_testrun<Thrower>(100, alloc);
+	gdul::queue_testrun<Thrower>(10000, alloc);
 
 
 	std::cout << "\nAfter runs finished, the allocated value is: " << gdul::s_allocated << '\n' << std::endl;

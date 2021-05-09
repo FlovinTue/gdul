@@ -35,7 +35,7 @@
 // be dequeued out-of-order as some consumers may already be halfway through a
 // pop operation before reintegration efforts are started.
 
-#ifdef GDUL_EXCEPTIONS
+#if GDUL_EXCEPTIONS
 #define GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(type) (std::is_nothrow_move_assignable<type>::value)
 #define GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(type) (!GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(type) && (std::is_nothrow_copy_assignable<type>::value))
 #define GDUL_CQ_BUFFER_NOTHROW_PUSH_MOVE(type) (std::is_nothrow_move_assignable<type>::value)
@@ -696,7 +696,7 @@ private:
 	std::atomic<size_type> m_preReadSync;
 	GDUL_ATOMIC_WITH_VIEW(size_type, m_readSlot);
 
-#ifdef GDUL_EXCEPTIONS
+#if GDUL_EXCEPTIONS
 	std::atomic<size_type> m_read;
 	std::atomic<std::uint16_t> m_failureCount;
 	std::atomic<std::uint16_t> m_failureIndex;
@@ -726,7 +726,7 @@ inline producer_buffer<T, Allocator>::producer_buffer(typename producer_buffer<T
 	, m_preReadSync(0)
 	, m_writeSlot(0)
 	, m_written(0)
-#ifdef GDUL_EXCEPTIONS
+#if GDUL_EXCEPTIONS
 	, m_failureIndex(0)
 	, m_failureCount(0)
 	, m_read(0)
@@ -766,14 +766,15 @@ inline typename producer_buffer<T, Allocator>::shared_ptr_slot_type producer_buf
 	producer_buffer<T, allocator_type>* inspect(this);
 
 	while (inspect) {
-		const size_type readSlot(inspect->m_readSlot.load(std::memory_order_acquire));
+		const size_type readSlot(inspect->m_readSlot.load(std::memory_order_relaxed));
+		const size_type writeSlot(inspect->m_written.load(std::memory_order_acquire));
 
-		const bool thisBufferEmpty(readSlot == inspect->m_written.load(std::memory_order_acquire));
-#ifdef GDUL_EXCEPTIONS
-		const bool veto(inspect->m_failureCount.load(std::memory_order_acquire) != inspect->m_failureIndex.load(std::memory_order_acquire));
-		const bool valid(!thisBufferEmpty | veto);
+		const bool empty(readSlot == writeSlot);
+#if GDUL_EXCEPTIONS
+		const bool containsFailedItems(inspect->m_failureCount.load(std::memory_order_acquire) != inspect->m_failureIndex.load(std::memory_order_acquire));
+		const bool valid(!empty | containsFailedItems);
 #else
-		const bool valid(!thisBufferEmpty);
+		const bool valid(!empty);
 #endif
 		if (valid) {
 			break;
@@ -849,7 +850,7 @@ template<class T, class Allocator>
 template <class U, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) && !GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>*>
 inline void producer_buffer<T, Allocator>::check_for_damage()
 {
-#ifdef GDUL_EXCEPTIONS
+#if GDUL_EXCEPTIONS
 	const size_type preRead(m_preReadSync.load(std::memory_order_acquire));
 	const size_type preReadLockOffset(preRead - BufferLockOffset);
 	if (preReadLockOffset != m_read.load(std::memory_order_acquire)) {
@@ -902,7 +903,7 @@ inline void producer_buffer<T, Allocator>::unsafe_clear()
 		m_dataBlock[i].set_state_local(item_state::empty);
 	}
 
-#ifdef GDUL_EXCEPTIONS
+#if GDUL_EXCEPTIONS
 	m_failureCount.store(0, std::memory_order_relaxed);
 	m_failureIndex.store(0, std::memory_order_relaxed);
 
@@ -946,7 +947,7 @@ inline bool producer_buffer<T, Allocator>::try_pop(T& out)
 
 	if (capacity() < avaliable) {
 		m_preReadSync.fetch_sub(1, std::memory_order_relaxed);
-#ifdef GDUL_EXCEPTIONS
+#if GDUL_EXCEPTIONS
 		check_for_damage();
 #endif
 		return false;
@@ -1013,7 +1014,7 @@ template <class U, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) && !GDUL
 inline void producer_buffer<T, Allocator>::post_pop_cleanup(typename producer_buffer<T, Allocator>::size_type readSlot)
 {
 	m_dataBlock[readSlot].set_state(item_state::empty);
-#ifdef GDUL_EXCEPTIONS
+#if GDUL_EXCEPTIONS
 	m_dataBlock[readSlot].reset_ref();
 	m_read.fetch_add(1, std::memory_order_acq_rel);
 #endif
@@ -1028,11 +1029,11 @@ template <class T, class Allocator>
 template <class U, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) && !GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>*>
 inline void producer_buffer<T, Allocator>::write_out(typename producer_buffer<T, Allocator>::size_type slot, U& out)
 {
-#ifdef GDUL_EXCEPTIONS
+#if GDUL_EXCEPTIONS
 	try {
 #endif
 		m_dataBlock[slot].try_move(out);
-#ifdef GDUL_EXCEPTIONS
+#if GDUL_EXCEPTIONS
 	}
 	catch (...) {
 		if (m_failureCount.fetch_add(1, std::memory_order_acq_rel) == m_failureIndex.load(std::memory_order_acq_rel)) {
@@ -1047,7 +1048,7 @@ inline void producer_buffer<T, Allocator>::write_out(typename producer_buffer<T,
 template<class T, class Allocator>
 inline void producer_buffer<T, Allocator>::reintegrate_failed_entries(typename producer_buffer<T, Allocator>::size_type failCount)
 {
-#ifdef GDUL_EXCEPTIONS
+#if GDUL_EXCEPTIONS
 	const size_type readSlotTotal(m_readSlot.load(std::memory_order_acquire));
 	const size_type readSlotTotalOffset(readSlotTotal + capacity());
 
@@ -1085,7 +1086,7 @@ public:
 
 	inline void store(const T& in);
 	inline void store(T&& in);
-#ifdef GDUL_EXCEPTIONS
+#if GDUL_EXCEPTIONS
 	inline void redirect(item_container<T>& to);
 #endif
 	template<class U = T, std::enable_if_t<std::is_move_assignable<U>::value>* = nullptr>
@@ -1104,7 +1105,7 @@ public:
 
 private:
 	T m_data;
-#ifdef GDUL_EXCEPTIONS
+#if GDUL_EXCEPTIONS
 	// May or may not reference this continer
 	inline item_container<T>& reference() const;
 
@@ -1125,7 +1126,7 @@ private:
 template<class T>
 inline item_container<T>::item_container()
 	: m_data()
-#ifdef GDUL_EXCEPTIONS
+#if GDUL_EXCEPTIONS
 	, m_reference(this)
 #else
 	, m_state(item_state::empty)
@@ -1150,7 +1151,7 @@ inline void item_container<T>::store(T&& in)
 	m_data = std::move(in);
 	reset_ref();
 }
-#ifdef GDUL_EXCEPTIONS
+#if GDUL_EXCEPTIONS
 template<class T>
 inline void item_container<T>::redirect(item_container<T>& to)
 {
@@ -1162,7 +1163,7 @@ inline void item_container<T>::redirect(item_container<T>& to)
 template<class T>
 inline void item_container<T>::assign(T& out)
 {
-#ifdef GDUL_EXCEPTIONS
+#if GDUL_EXCEPTIONS
 	out = reference().m_data;
 #else
 	out = m_data;
@@ -1171,7 +1172,7 @@ inline void item_container<T>::assign(T& out)
 template<class T>
 inline void item_container<T>::move(T& out)
 {
-#ifdef GDUL_EXCEPTIONS
+#if GDUL_EXCEPTIONS
 	out = std::move(reference().m_data);
 #else
 	out = std::move(m_data);
@@ -1180,7 +1181,7 @@ inline void item_container<T>::move(T& out)
 template<class T>
 inline void item_container<T>::set_state(item_state state)
 {
-#ifdef GDUL_EXCEPTIONS
+#if GDUL_EXCEPTIONS
 	reference().m_state = state;
 #else
 	m_state = state;
@@ -1195,7 +1196,7 @@ inline void item_container<T>::set_state_local(item_state state)
 template<class T>
 inline void item_container<T>::reset_ref()
 {
-#ifdef GDUL_EXCEPTIONS
+#if GDUL_EXCEPTIONS
 	m_reference = this;
 #endif
 }
@@ -1204,7 +1205,7 @@ inline item_state item_container<T>::get_state_local() const
 {
 	return m_state;
 }
-#ifdef GDUL_EXCEPTIONS
+#if GDUL_EXCEPTIONS
 template<class T>
 inline item_container<T>& item_container<T>::reference() const
 {
@@ -1215,7 +1216,7 @@ template<class T>
 template<class U, std::enable_if_t<std::is_move_assignable<U>::value>*>
 inline void item_container<T>::try_move(U& out)
 {
-#ifdef GDUL_EXCEPTIONS
+#if GDUL_EXCEPTIONS
 	out = std::move(reference().m_data);
 #else
 	out = std::move(m_data);
@@ -1225,7 +1226,7 @@ template<class T>
 template<class U, std::enable_if_t<!std::is_move_assignable<U>::value>*>
 inline void item_container<T>::try_move(U& out)
 {
-#ifdef GDUL_EXCEPTIONS
+#if GDUL_EXCEPTIONS
 	out = reference().m_data;
 #else
 	out = m_data;
