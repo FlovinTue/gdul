@@ -32,22 +32,36 @@ namespace gdul
 namespace del_detail {
 
 template <class Callable>
-struct callable_full_signature2
+struct callable_full_signature3
 {
 	using type = void;
 };
 
 template <class Result, class Class, class ...Args>
-struct callable_full_signature2<Result(Class::*)(Args...) const>
+struct callable_full_signature3<Result(Class::*)(Args...) const>
 {
 	using type = Result(Args...);
 };
 
-// Extract full signature from callable operator()
+
+template <class Callable, class IsFunctionType>
+struct callable_full_signature2
+{
+	using type = Callable;
+};
+template <class Callable>
+struct callable_full_signature2<Callable, std::false_type>
+{
+	// Extract full signature from callable operator()
+	using type = typename callable_full_signature3<decltype(&Callable::operator())>::type;
+};
+
+
 template <class Callable>
 struct callable_full_signature
 {
-	using type = typename callable_full_signature2<decltype(&Callable::operator())>::type;
+	using eval_type = std::conditional_t<std::is_function_v<Callable> || std::is_member_function_pointer_v<Callable>, std::true_type, std::false_type>;
+	using type = typename callable_full_signature2<Callable, eval_type>::type;
 };
 
 template <std::size_t FirstArgument, class Result, class Tuple, class IndexSequence>
@@ -105,9 +119,8 @@ struct evaluate_partial_signature
 private:
 	using raw_callable_type = std::remove_pointer_t<std::remove_reference_t<Callable>>;
 
-	static constexpr bool ContainsFullSignature = std::is_function_v<raw_callable_type> || std::is_member_function_pointer_v<raw_callable_type>;
 public:
-	using full_signature = std::conditional_t<ContainsFullSignature, raw_callable_type, typename callable_full_signature<raw_callable_type>::type>;
+	using full_signature = typename callable_full_signature<raw_callable_type>::type;
 	using signature = typename evaluate_partial_signature2<std::tuple<BoundArgs...>, full_signature>::signature;
 };
 

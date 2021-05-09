@@ -22,7 +22,6 @@
 
 #include <thread>
 #include <string>
-#include <gdul/WIP/qsbr.h>
 
 namespace std::this_thread {
 void set_name(const std::string& name);
