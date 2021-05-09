@@ -51,11 +51,11 @@ void unregister_thread();
 void reset(snapshot& snapshot);
 
 /// <summary>
-/// Initialize snapshot
+/// Produce a snapshot of current threads states
 /// </summary>
 /// <param name="snapshot">snapshot item</param>
 /// <returns>True if no threads are inside critical sections</returns>
-bool initialize(snapshot& snapshot);
+bool take_snapshot(snapshot& snapshot);
 
 /// <summary>
 /// Query other threads's state in relation to a snapshot and update it's state

@@ -81,8 +81,9 @@
 		<Expand>
 			<CustomListItems MaxItemsPerView="512">
 				<Variable Name="pBuffer" InitialValue="this" />
+        <Variable Name="BufferCapacity" InitialValue="pBuffer->m_capacityMask + 1"/>
 				<Variable Name="itemCount" InitialValue="0"/>
-				<Variable Name="pItem" InitialValue="m_dataBlock + (uint64_t)(pBuffer->_m_readSlot - ((uint64_t)(pBuffer->_m_readSlot / pBuffer->m_capacity) * pBuffer->m_capacity))"/>
+				<Variable Name="pItem" InitialValue="m_dataBlock + (uint64_t)(pBuffer->_m_readSlot - ((uint64_t)(pBuffer->_m_readSlot / BufferCapacity) * BufferCapacity))"/>
 				<Variable Name="sizeAccumulator" InitialValue="0"/>
 
 				<Loop>
@@ -99,13 +100,14 @@
 					<If Condition="itemCount == ((uint64_t)pBuffer->_m_written - (uint64_t)pBuffer->_m_readSlot)">
 						<Break Condition="((pBuffer->m_next.m_debugView.m_u64 &amp; asp_detail::CbMask) == 0)" />
 						<Exec>pBuffer = *(buffer_type**)(8 + (pBuffer->m_next.m_debugView.m_u64 &amp; asp_detail::CbMask))</Exec>
-						<Exec>pItem = pBuffer->m_dataBlock + ((uint64_t)pBuffer->_m_readSlot - (((uint64_t)pBuffer->_m_readSlot / pBuffer->m_capacity) * pBuffer->m_capacity))</Exec>
+            <Exec>BufferCapacity = pBuffer->m_capacityMask + 1</Exec>
+						<Exec>pItem = pBuffer->m_dataBlock + ((uint64_t)pBuffer->_m_readSlot - (((uint64_t)pBuffer->_m_readSlot / BufferCapacity) * BufferCapacity))</Exec>
 						<Exec>itemCount = 0</Exec>
 					</If>
 					<If Condition="itemCount != ((uint64_t)pBuffer->_m_written - (uint64_t)pBuffer->_m_readSlot)">
 						<Item>pItem->m_data</Item>
 						<Exec>++pItem</Exec>
-            <If Condition="(pItem - pBuffer->m_capacity) == pBuffer->m_dataBlock">
+            <If Condition="(pItem - BufferCapacity) == pBuffer->m_dataBlock">
 							<Exec>pItem= pBuffer->m_dataBlock</Exec>
 						</If>
 						<Exec>++itemCount</Exec>
