@@ -22,7 +22,6 @@
 
 #include <gdul/memory/atomic_shared_ptr.h>
 #include <gdul/memory/thread_local_member.h>
-#include <gdul/utility/platform.h>
 #include <gdul/math/math.h>
 
 #include <limits>
@@ -35,26 +34,8 @@
 // be dequeued out-of-order as some consumers may already be halfway through a
 // pop operation before reintegration efforts are started.
 
-#if GDUL_EXCEPTIONS
-#define GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(type) (std::is_nothrow_move_assignable<type>::value)
-#define GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(type) (!GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(type) && (std::is_nothrow_copy_assignable<type>::value))
-#define GDUL_CQ_BUFFER_NOTHROW_PUSH_MOVE(type) (std::is_nothrow_move_assignable<type>::value)
-#define GDUL_CQ_BUFFER_NOTHROW_PUSH_ASSIGN(type) (std::is_nothrow_copy_assignable<type>::value)
-#else
-#define GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(type) (std::is_move_assignable<type>::value)
-#define GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(type) (!GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(type))
-#define GDUL_CQ_BUFFER_NOTHROW_PUSH_ASSIGN(type) (std::is_same<type, type>::value)
-#define GDUL_CQ_BUFFER_NOTHROW_PUSH_MOVE(type) (std::is_same<type, type>::value)
-#endif
-
-#if !defined(GDUL_DISABLE_VIEWABLE_ATOMICS)
 #ifndef GDUL_ATOMIC_WITH_VIEW
 #define GDUL_ATOMIC_WITH_VIEW(type, name) union{std::atomic<type> name; type _##name;}
-#endif
-#else
-#ifndef GDUL_ATOMIC_WITH_VIEW
-#define GDUL_ATOMIC_WITH_VIEW(type, name) std::atomic<type> name
-#endif
 #endif
 
 #ifndef MAKE_UNIQUE_NAME
@@ -69,9 +50,6 @@
 #pragma warning(push, 2)
 #pragma warning(disable : 4201)
 #pragma warning(disable : 4324)
-
-#undef min
-#undef max
 
 namespace gdul {
 
@@ -88,46 +66,25 @@ struct consumer_wrapper;
 template <class T, class Allocator>
 class producer_buffer;
 
-template <class T>
-class item_container;
-
 template <class T, class Allocator>
 class dummy_container;
 
 template <class T, class Allocator>
 class buffer_deleter;
 
-enum class item_state : std::uint8_t
-{
-	empty,
-	valid,
-	failed,
-	dummy
-};
-
 template <class T, class Allocator>
 class shared_ptr_allocator_adaptor;
 
 // The maximum allowed consumption from a producer per visit
 static constexpr std::uint16_t ConsumerForceRelocationPopCount = 24;
-// Maximum number of times the producer slot array can grow
-static constexpr std::uint8_t ProducerSlotsMaxGrowthCount = 15;
 
-static constexpr std::size_t InitialProducerCapacity = 8;
-
-static constexpr std::uint16_t MaxProducers = std::numeric_limits<int16_t>::max() - 1;
-
-// Not quite size_type max because we need some leaway in case we
-// need to throw consumers out of a buffer whilst repairing it
+static constexpr size_type InitialProducerCapacity = 8;
 static constexpr size_type BufferCapacityMax = ~(std::numeric_limits<size_type>::max() >> 3) / 2;
 
 static constexpr std::uint64_t PtrMask = (std::uint64_t(std::numeric_limits<std::uint32_t>::max()) << 16 | std::uint64_t(std::numeric_limits<std::uint16_t>::max()));
-static constexpr size_type BufferLockOffset = BufferCapacityMax + MaxProducers;
 
 }
 // MPMC unbounded lock-free queue. FIFO is respected within the context of single producers.
-// Basic exception safety may be enabled via define GDUL_EXCEPTIONS at
-// the price of a slight performance decrease.
 template <class T, class Allocator = std::allocator<std::uint8_t>>
 class concurrent_queue
 {
@@ -433,7 +390,7 @@ inline typename concurrent_queue<T, Allocator>::shared_ptr_slot_type concurrent_
 	const std::size_t alignOfData(alignof(T));
 
 	const std::size_t bufferByteSize(sizeof(buffer_type));
-	const std::size_t dataBlockByteSize(sizeof(cqdetail::item_container<T>) * pow2size);
+	const std::size_t dataBlockByteSize(sizeof(T) * pow2size);
 
 	constexpr std::size_t controlBlockByteSize(gdul::sp_claim_size_custom_delete<buffer_type, allocator_adapter_type, cqdetail::buffer_deleter<buffer_type, allocator_adapter_type>>());
 
@@ -446,7 +403,7 @@ inline typename concurrent_queue<T, Allocator>::shared_ptr_slot_type concurrent_
 	std::uint8_t* totalBlock(nullptr);
 
 	buffer_type* buffer(nullptr);
-	cqdetail::item_container<T>* data(nullptr);
+	T* data(nullptr);
 
 	std::size_t constructed(0);
 
@@ -463,7 +420,7 @@ inline typename concurrent_queue<T, Allocator>::shared_ptr_slot_type concurrent_
 	const std::size_t bufferOffset(bufferBegin - totalBlockBegin);
 	const std::size_t dataOffset(dataBegin - totalBlockBegin);
 
-	data = reinterpret_cast<cqdetail::item_container<T>*>(totalBlock + dataOffset);
+	data = reinterpret_cast<T*>(totalBlock + dataOffset);
 
 	std::uninitialized_default_construct(data, data + pow2size);
 
@@ -616,6 +573,13 @@ inline void concurrent_queue<T, Allocator>::refresh_cached_producer()
 
 namespace cqdetail {
 
+enum class item_state : std::uint8_t
+{
+	empty,
+	valid,
+	dummy
+};
+
 template <class T, class Allocator>
 class producer_buffer
 {
@@ -628,7 +592,7 @@ public:
 	typedef typename concurrent_queue<T, Allocator>::allocator_type allocator_type;
 	typedef producer_buffer<T, Allocator> buffer_type;
 
-	producer_buffer(size_type capacity, item_container<T>* dataBlock);
+	producer_buffer(size_type capacity, std::atomic<std::uint8_t>* stateBlock, T* dataBlock);
 	~producer_buffer();
 
 	template<class In>
@@ -637,12 +601,6 @@ public:
 
 	inline size_type size() const;
 	inline size_type capacity() const noexcept;
-
-	// Makes sure that it is entirely safe to replace this buffer with a successor
-	template <class U = T, std::enable_if_t<GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) || GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>* = nullptr>
-	inline bool verify_successor(const shared_ptr_slot_type&);
-	template <class U = T, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) && !GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>* = nullptr>
-	inline bool verify_successor(const shared_ptr_slot_type& successor);
 
 	// Contains entries and / or has no next buffer
 	inline bool is_active() const;
@@ -665,46 +623,11 @@ public:
 
 private:
 
-	template <class U = T, std::enable_if_t<GDUL_CQ_BUFFER_NOTHROW_PUSH_MOVE(U)>* = nullptr>
-	inline void write_in(size_type slot, U&& in);
-	template <class U = T, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_PUSH_MOVE(U)>* = nullptr>
-	inline void write_in(size_type slot, U&& in);
-	template <class U = T, std::enable_if_t<GDUL_CQ_BUFFER_NOTHROW_PUSH_ASSIGN(U)>* = nullptr>
-	inline void write_in(size_type slot, const U& in);
-	template <class U = T, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_PUSH_ASSIGN(U)>* = nullptr>
-	inline void write_in(size_type slot, const U& in);
-
-	template <class U = T, std::enable_if_t<GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U)>* = nullptr>
-	inline void write_out(size_type slot, U& out);
-	template <class U = T, std::enable_if_t<GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>* = nullptr>
-	inline void write_out(size_type slot, U& out);
-	template <class U = T, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) && !GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>* = nullptr>
-	inline void write_out(size_type slot, U& out);
-
-	template <class U = T, std::enable_if_t<GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) || GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>* = nullptr>
-	inline void post_pop_cleanup(size_type readSlot);
-	template <class U = T, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) && !GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>* = nullptr>
-	inline void post_pop_cleanup(size_type readSlot);
-
-	template <class U = T, std::enable_if_t<GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) || GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>* = nullptr>
-	inline void check_for_damage();
-	template <class U = T, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) && !GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>* = nullptr>
-	inline void check_for_damage();
-
-	inline void reintegrate_failed_entries(size_type failCount);
-
 	std::atomic<size_type> m_preReadSync;
 	GDUL_ATOMIC_WITH_VIEW(size_type, m_readSlot);
 
-#if GDUL_EXCEPTIONS
-	std::atomic<size_type> m_read;
-	std::atomic<std::uint16_t> m_failureCount;
-	std::atomic<std::uint16_t> m_failureIndex;
-	GDUL_CQ_PADDING((std::hardware_destructive_interference_size * 2) - ((sizeof(size_type) * 3) + (sizeof(std::uint16_t) * 2)));
-
-#else
 	GDUL_CQ_PADDING((std::hardware_destructive_interference_size * 2) - sizeof(size_type) * 2);
-#endif
+
 	GDUL_ATOMIC_WITH_VIEW(size_type, m_written);
 	size_type m_writeSlot;
 
@@ -714,23 +637,20 @@ private:
 	// Capacity pow2 aligned, so we can do away with modulus and use AND instead
 	const size_type m_capacityMask;
 
-	item_container<T>* const m_dataBlock;
+	std::atomic<std::uint8_t>* const m_stateBlock;
+	T* const m_dataBlock;
 };
 
 template<class T, class Allocator>
-inline producer_buffer<T, Allocator>::producer_buffer(typename producer_buffer<T, Allocator>::size_type capacity, item_container<T>* dataBlock)
-	: m_next(nullptr)
-	, m_dataBlock(dataBlock)
-	, m_capacityMask(capacity - 1)
+inline producer_buffer<T, Allocator>::producer_buffer(typename producer_buffer<T, Allocator>::size_type capacity, std::atomic<std::uint8_t>* stateBlock, T* dataBlock)
+	: m_preReadSync(0)
 	, m_readSlot(0)
-	, m_preReadSync(0)
-	, m_writeSlot(0)
 	, m_written(0)
-#if GDUL_EXCEPTIONS
-	, m_failureIndex(0)
-	, m_failureCount(0)
-	, m_read(0)
-#endif
+	, m_writeSlot(0)
+	, m_next(nullptr)
+	, m_capacityMask(capacity - 1)
+	, m_stateBlock(stateBlock)
+	, m_dataBlock(dataBlock)
 {
 }
 
@@ -738,7 +658,7 @@ template<class T, class Allocator>
 inline producer_buffer<T, Allocator>::~producer_buffer()
 {
 	for (size_type i = 0; i < capacity(); ++i) {
-		m_dataBlock[i].~item_container<T>();
+		std::destroy_at(&m_dataBlock[i]);
 	}
 }
 template<class T, class Allocator>
@@ -770,13 +690,8 @@ inline typename producer_buffer<T, Allocator>::shared_ptr_slot_type producer_buf
 		const size_type writeSlot(inspect->m_written.load(std::memory_order_acquire));
 
 		const bool empty(readSlot == writeSlot);
-#if GDUL_EXCEPTIONS
-		const bool containsFailedItems(inspect->m_failureCount.load(std::memory_order_acquire) != inspect->m_failureIndex.load(std::memory_order_acquire));
-		const bool valid(!empty | containsFailedItems);
-#else
-		const bool valid(!empty);
-#endif
-		if (valid) {
+
+		if (!empty) {
 			break;
 		}
 
@@ -804,82 +719,7 @@ inline typename producer_buffer<T, Allocator>::size_type producer_buffer<T, Allo
 {
 	return m_capacityMask + 1;
 }
-template<class T, class Allocator>
-template <class U, std::enable_if_t<GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) || GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>*>
-inline bool producer_buffer<T, Allocator>::verify_successor(const shared_ptr_slot_type&)
-{
-	return true;
-}
-template<class T, class Allocator>
-template <class U, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) && !GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>*>
-inline bool producer_buffer<T, Allocator>::verify_successor(const shared_ptr_slot_type& successor)
-{
-	if (!m_next) {
-		return false;
-	}
 
-	shared_ptr_slot_type next(nullptr);
-	producer_buffer<T, Allocator>* inspect(this);
-
-	do {
-		const size_type preRead(inspect->m_preReadSync.load(std::memory_order_acquire));
-		for (size_type i = 0; i < inspect->capacity(); ++i) {
-			const size_type index((preRead - i) & inspect->m_capacityMask);
-
-			if (inspect->m_dataBlock[index].get_state_local() != item_state::empty) {
-				return false;
-			}
-		}
-
-		next = inspect->m_next.load(std::memory_order_acquire);
-		inspect = next.get();
-
-		if (inspect == successor.get()) {
-			break;
-		}
-	} while (inspect->m_next);
-
-	return true;
-}
-template<class T, class Allocator>
-template <class U, std::enable_if_t<GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) || GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>*>
-inline void producer_buffer<T, Allocator>::check_for_damage()
-{
-}
-template<class T, class Allocator>
-template <class U, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) && !GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>*>
-inline void producer_buffer<T, Allocator>::check_for_damage()
-{
-#if GDUL_EXCEPTIONS
-	const size_type preRead(m_preReadSync.load(std::memory_order_acquire));
-	const size_type preReadLockOffset(preRead - BufferLockOffset);
-	if (preReadLockOffset != m_read.load(std::memory_order_acquire)) {
-		return;
-	}
-
-	const std::uint16_t failiureIndex(m_failureIndex.load(std::memory_order_acquire));
-	const std::uint16_t failiureCount(m_failureCount.load(std::memory_order_acquire));
-	const std::uint16_t difference(failiureCount - failiureIndex);
-
-	const bool failCheckA(0 == difference);
-	const bool failCheckB(!(difference < cqdetail::MaxProducers));
-	if (failCheckA | failCheckB) {
-		return;
-	}
-
-	const size_type toReintegrate(failiureCount - failiureIndex);
-
-	std::uint16_t expected(failiureIndex);
-	const std::uint16_t desired(failiureCount);
-	if (m_failureIndex.compare_exchange_strong(expected, desired, std::memory_order_release, std::memory_order_relaxed)) {
-		reintegrate_failed_entries(toReintegrate);
-
-		m_read.fetch_sub(toReintegrate);
-		m_readSlot.fetch_sub(toReintegrate);
-		m_preReadSync.fetch_sub(BufferLockOffset + toReintegrate);
-	}
-#endif
-}
 template<class T, class Allocator>
 inline void producer_buffer<T, Allocator>::push_front(shared_ptr_slot_type newBuffer)
 {
@@ -891,6 +731,7 @@ inline void producer_buffer<T, Allocator>::push_front(shared_ptr_slot_type newBu
 
 	last->m_next.store(std::move(newBuffer), std::memory_order_release);
 }
+
 template<class T, class Allocator>
 inline void producer_buffer<T, Allocator>::unsafe_clear()
 {
@@ -899,16 +740,6 @@ inline void producer_buffer<T, Allocator>::unsafe_clear()
 	m_preReadSync.store(written, std::memory_order_relaxed);
 	m_readSlot.store(written, std::memory_order_relaxed);
 
-	for (size_type i = 0; i < capacity(); ++i) {
-		m_dataBlock[i].set_state_local(item_state::empty);
-	}
-
-#if GDUL_EXCEPTIONS
-	m_failureCount.store(0, std::memory_order_relaxed);
-	m_failureIndex.store(0, std::memory_order_relaxed);
-
-	m_read.store(written, std::memory_order_relaxed);
-#endif
 	if (m_next) {
 		m_next.unsafe_get()->unsafe_clear();
 	}
@@ -947,9 +778,6 @@ inline bool producer_buffer<T, Allocator>::try_pop(T& out)
 
 	if (capacity() < avaliable) {
 		m_preReadSync.fetch_sub(1, std::memory_order_relaxed);
-#if GDUL_EXCEPTIONS
-		check_for_damage();
-#endif
 		return false;
 	}
 	const size_type readSlotTotal(m_readSlot.fetch_add(1, std::memory_order_relaxed));
@@ -961,277 +789,7 @@ inline bool producer_buffer<T, Allocator>::try_pop(T& out)
 
 	return true;
 }
-template <class T, class Allocator>
-template <class U, std::enable_if_t<GDUL_CQ_BUFFER_NOTHROW_PUSH_MOVE(U)>*>
-inline void producer_buffer<T, Allocator>::write_in(typename producer_buffer<T, Allocator>::size_type slot, U&& in)
-{
-	m_dataBlock[slot].store(std::move(in));
-}
-template <class T, class Allocator>
-template <class U, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_PUSH_MOVE(U)>*>
-inline void producer_buffer<T, Allocator>::write_in(typename producer_buffer<T, Allocator>::size_type slot, U&& in)
-{
-	try {
-		m_dataBlock[slot].store(std::move(in));
-	}
-	catch (...) {
-		--m_writeSlot;
-		throw;
-	}
-}
-template <class T, class Allocator>
-template <class U, std::enable_if_t<GDUL_CQ_BUFFER_NOTHROW_PUSH_ASSIGN(U)>*>
-inline void producer_buffer<T, Allocator>::write_in(typename producer_buffer<T, Allocator>::size_type slot, const U& in)
-{
-	m_dataBlock[slot].store(in);
-}
-template <class T, class Allocator>
-template <class U, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_PUSH_ASSIGN(U)>*>
-inline void producer_buffer<T, Allocator>::write_in(typename producer_buffer<T, Allocator>::size_type slot, const U& in)
-{
-	try {
-		m_dataBlock[slot].store(in);
-	}
-	catch (...) {
-		--m_writeSlot;
-		throw;
-	}
-}
-template <class T, class Allocator>
-template <class U, std::enable_if_t<GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U)>*>
-inline void producer_buffer<T, Allocator>::write_out(typename producer_buffer<T, Allocator>::size_type slot, U& out)
-{
-	m_dataBlock[slot].move(out);
-}
-template<class T, class Allocator>
-template <class U, std::enable_if_t<GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) || GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>*>
-inline void producer_buffer<T, Allocator>::post_pop_cleanup(typename producer_buffer<T, Allocator>::size_type readSlot)
-{
-	m_dataBlock[readSlot].set_state(item_state::empty);
-}
-template<class T, class Allocator>
-template <class U, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) && !GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>*>
-inline void producer_buffer<T, Allocator>::post_pop_cleanup(typename producer_buffer<T, Allocator>::size_type readSlot)
-{
-	m_dataBlock[readSlot].set_state(item_state::empty);
-#if GDUL_EXCEPTIONS
-	m_dataBlock[readSlot].reset_ref();
-	m_read.fetch_add(1, std::memory_order_acq_rel);
-#endif
-}
-template <class T, class Allocator>
-template <class U, std::enable_if_t<GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>*>
-inline void producer_buffer<T, Allocator>::write_out(typename producer_buffer<T, Allocator>::size_type slot, U& out)
-{
-	m_dataBlock[slot].assign(out);
-}
-template <class T, class Allocator>
-template <class U, std::enable_if_t<!GDUL_CQ_BUFFER_NOTHROW_POP_MOVE(U) && !GDUL_CQ_BUFFER_NOTHROW_POP_ASSIGN(U)>*>
-inline void producer_buffer<T, Allocator>::write_out(typename producer_buffer<T, Allocator>::size_type slot, U& out)
-{
-#if GDUL_EXCEPTIONS
-	try {
-#endif
-		m_dataBlock[slot].try_move(out);
-#if GDUL_EXCEPTIONS
-	}
-	catch (...) {
-		if (m_failureCount.fetch_add(1, std::memory_order_acq_rel) == m_failureIndex.load(std::memory_order_acq_rel)) {
-			m_preReadSync.fetch_add(BufferLockOffset, std::memory_order_acq_rel);
-		}
-		m_dataBlock[slot].set_state(item_state::failed);
-		m_read.fetch_add(1, std::memory_order_acq_rel);
-		throw;
-	}
-#endif
-}
-template<class T, class Allocator>
-inline void producer_buffer<T, Allocator>::reintegrate_failed_entries(typename producer_buffer<T, Allocator>::size_type failCount)
-{
-#if GDUL_EXCEPTIONS
-	const size_type readSlotTotal(m_readSlot.load(std::memory_order_acquire));
-	const size_type readSlotTotalOffset(readSlotTotal + capacity());
 
-	const size_type startIndex(readSlotTotalOffset - 1);
-
-	size_type numRedirected(0);
-	for (size_type i = 0, j = startIndex; numRedirected != failCount; ++i, --j) {
-		const size_type currentIndex((startIndex - i) & m_capacityMask);
-		item_container<T>& currentItem(m_dataBlock[currentIndex]);
-		const item_state currentState(currentItem.get_state_local());
-
-		if (currentState == item_state::failed) {
-			const size_type toRedirectIndex((startIndex - numRedirected) & m_capacityMask);
-			item_container<T>& toRedirect(m_dataBlock[toRedirectIndex]);
-
-			toRedirect.redirect(currentItem);
-			currentItem.set_state_local(item_state::valid);
-			++numRedirected;
-		}
-	}
-#else
-	failCount;
-#endif
-}
-
-template <class T>
-class item_container
-{
-public:
-	item_container<T>(const item_container<T>&) = delete;
-	item_container<T>& operator=(const item_container&) = delete;
-
-	inline item_container();
-	inline item_container(item_state state);
-
-	inline void store(const T& in);
-	inline void store(T&& in);
-#if GDUL_EXCEPTIONS
-	inline void redirect(item_container<T>& to);
-#endif
-	template<class U = T, std::enable_if_t<std::is_move_assignable<U>::value>* = nullptr>
-	inline void try_move(U& out);
-	template<class U = T, std::enable_if_t<!std::is_move_assignable<U>::value>* = nullptr>
-	inline void try_move(U& out);
-
-	inline void assign(T& out);
-	inline void move(T& out);
-
-	inline item_state get_state_local() const;
-	inline void set_state(item_state state);
-	inline void set_state_local(item_state state);
-
-	inline void reset_ref();
-
-private:
-	T m_data;
-#if GDUL_EXCEPTIONS
-	// May or may not reference this continer
-	inline item_container<T>& reference() const;
-
-	union
-	{
-		std::uint64_t m_stateBlock;
-		item_container<T>* m_reference;
-		struct
-		{
-			std::uint16_t trash[3];
-			item_state m_state;
-		};
-	};
-#else
-	item_state m_state;
-#endif
-};
-template<class T>
-inline item_container<T>::item_container()
-	: m_data()
-#if GDUL_EXCEPTIONS
-	, m_reference(this)
-#else
-	, m_state(item_state::empty)
-#endif
-{
-}
-template<class T>
-inline item_container<T>::item_container(item_state state)
-	: m_data()
-	, m_state(state)
-{
-}
-template<class T>
-inline void item_container<T>::store(const T& in)
-{
-	m_data = in;
-	reset_ref();
-}
-template<class T>
-inline void item_container<T>::store(T&& in)
-{
-	m_data = std::move(in);
-	reset_ref();
-}
-#if GDUL_EXCEPTIONS
-template<class T>
-inline void item_container<T>::redirect(item_container<T>& to)
-{
-	const std::uint64_t otherPtrBlock(to.m_stateBlock & PtrMask);
-	m_stateBlock &= ~PtrMask;
-	m_stateBlock |= otherPtrBlock;
-}
-#endif
-template<class T>
-inline void item_container<T>::assign(T& out)
-{
-#if GDUL_EXCEPTIONS
-	out = reference().m_data;
-#else
-	out = m_data;
-#endif
-}
-template<class T>
-inline void item_container<T>::move(T& out)
-{
-#if GDUL_EXCEPTIONS
-	out = std::move(reference().m_data);
-#else
-	out = std::move(m_data);
-#endif
-}
-template<class T>
-inline void item_container<T>::set_state(item_state state)
-{
-#if GDUL_EXCEPTIONS
-	reference().m_state = state;
-#else
-	m_state = state;
-#endif
-}
-
-template<class T>
-inline void item_container<T>::set_state_local(item_state state)
-{
-	m_state = state;
-}
-template<class T>
-inline void item_container<T>::reset_ref()
-{
-#if GDUL_EXCEPTIONS
-	m_reference = this;
-#endif
-}
-template<class T>
-inline item_state item_container<T>::get_state_local() const
-{
-	return m_state;
-}
-#if GDUL_EXCEPTIONS
-template<class T>
-inline item_container<T>& item_container<T>::reference() const
-{
-	return *reinterpret_cast<item_container<T>*>(m_stateBlock & PtrMask);
-}
-#endif
-template<class T>
-template<class U, std::enable_if_t<std::is_move_assignable<U>::value>*>
-inline void item_container<T>::try_move(U& out)
-{
-#if GDUL_EXCEPTIONS
-	out = std::move(reference().m_data);
-#else
-	out = std::move(m_data);
-#endif
-}
-template<class T>
-template<class U, std::enable_if_t<!std::is_move_assignable<U>::value>*>
-inline void item_container<T>::try_move(U& out)
-{
-#if GDUL_EXCEPTIONS
-	out = reference().m_data;
-#else
-	out = m_data;
-#endif
-}
 template <class SharedPtrSlotType, class SharedPtrArrayType>
 struct consumer_wrapper
 {
@@ -1332,13 +890,11 @@ public:
 	}
 
 	shared_ptr_slot_type m_dummyBuffer;
-	item_container<T> m_dummyItem;
 	buffer_type m_dummyRawBuffer;
 };
 template<class T, class Allocator>
 inline dummy_container<T, Allocator>::dummy_container()
-	: m_dummyItem(item_state::dummy)
-	, m_dummyRawBuffer(1, &m_dummyItem)
+	: m_dummyRawBuffer(1, nullptr)
 {
 	Allocator alloc;
 	m_dummyBuffer = shared_ptr_slot_type(&m_dummyRawBuffer, alloc, [](buffer_type*, Allocator&) {});
