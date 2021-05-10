@@ -47,7 +47,7 @@
 
 				<Loop>
 					<Break Condition="!(found &lt; _dbgSize)"/>
-					<Item Condition="pNode->item.m_storage &amp; chm_detail::item_flag_valid">*(item_type*)(pNode->item.m_storage &amp; pp_detail::Ptr_Mask)</Item>
+					<Item Condition="pNode->item.m_storage &amp; chm_detail::item_flag_valid">*(item_type*)(pNode->item.m_storage &amp; pp_detail::PtrMask)</Item>
 					<Exec Condition="pNode->item.m_storage">++found</Exec>
 					<Exec>++pNode</Exec>
 					<Exec>++ix</Exec>

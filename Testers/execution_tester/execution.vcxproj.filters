@@ -55,6 +55,7 @@
     <ClCompile Include="..\..\source\gdul\execution\thread\thread.cpp">
       <Filter>thread</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\source\gdul\WIP\qsbr.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="job_handler_tester.h">

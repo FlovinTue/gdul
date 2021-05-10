@@ -89,7 +89,7 @@ public:
 	/// <summary>
 	/// Destructor
 	/// </summary>
-	~concurrent_map_impl() noexcept;
+	~concurrent_map_impl();
 
 	/// <summary>
 	/// Insert an item

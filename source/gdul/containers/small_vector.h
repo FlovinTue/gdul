@@ -54,6 +54,8 @@ public:
 	using const_iterator = typename internal_vector_type::const_iterator;
 	using reverse_iterator = typename internal_vector_type::reverse_iterator;
 	using const_reverse_iterator = typename internal_vector_type::const_reverse_iterator;
+	using reference = typename internal_vector_type::reference;
+	using const_reference = typename internal_vector_type::const_reference;
 
 	small_vector() noexcept(false);
 	explicit small_vector(const Allocator& alloc) noexcept(false);
@@ -123,21 +125,21 @@ public:
 	inline void assign(std::initializer_list<T> ilist) { m_vec.assign(ilist); }
 	inline void assign(const T& val, size_type newSize) { m_vec.assign(val, newSize); }
 
-	inline const T& at(size_type index) const { return m_vec.at; }
-	inline T& at(size_type index) { return m_vec.at; }
+	inline const_reference at(size_type index) const { return m_vec.at(index);}
+	inline reference at(size_type index) { return m_vec.at(index); }
 
 	inline size_type capacity() const noexcept { return m_vec.capacity(); }
 
-	inline const T& back() const { return m_vec.back(); }
-	inline T& back() { return m_vec.back(); }
+	inline const_reference back() const { return m_vec.back(); }
+	inline reference back() { return m_vec.back(); }
 
-	inline const T& front() const { return m_vec.front(); }
-	inline T& front() { return m_vec.front(); }
+	inline const_reference front() const { return m_vec.front(); }
+	inline reference front() { return m_vec.front(); }
 
 	inline bool empty() const noexcept { return m_vec.empty(); }
 
-	inline T& operator[](size_type pos) { return m_vec[pos]; }
-	inline const T& operator[](size_type pos) const { return m_vec[pos]; }
+	inline reference operator[](size_type pos) { return m_vec[pos]; }
+	inline const_reference operator[](size_type pos) const { return m_vec[pos]; }
 
 	template <class Iterator, std::enable_if_t<is_iterator_v<Iterator>>* = nullptr>
 	inline iterator insert(const_iterator at, Iterator first, Iterator last) { m_vec.insert(at, first, last); }

@@ -13,7 +13,7 @@
 #include <string>
 
 #if defined(GDUL_FIFO)
-#include <gdul/WIP/concurrent_queue_fifo_v7.h>
+#include <gdul/WIP/concurrent_queue_fifo_v10.h>
 #elif defined(GDUL_CPQ)
 #include <gdul/containers/concurrent_priority_queue.h>
 #elif defined(RIGTORP)
@@ -231,8 +231,8 @@ inline tester<T, Allocator>::tester(Allocator&
 #endif
 ) :
 	m_isRunning(false),
-	m_writer((1 << 0) | (1 << 2) | (1 << 4) | (1 << 6)),
-	m_reader((1 << 1) | (1 << 3) | (1 << 5) | (1 << 7)),
+	m_writer((1 << 0) | (1 << 2) | (1 << 4) | (1 << 6) | (1 << 1) | (1 << 3) | (1 << 5) | (1 << 7)),
+	m_reader((1 << 8) | (1 << 9) | (1 << 10) | (1 << 11) | (1 << 12) | (1 << 13) | (1 << 14) | (1 << 15)),
 	m_writtenSum(0),
 	m_readSum(0),
 	m_thrown(0),
@@ -647,6 +647,8 @@ inline void tester<T, Allocator>::Write(std::uint32_t writes) {
 	/*m_queue.unsafe_reserve(Writes);*/
 #endif
 
+	std::this_thread::set_name("Writer");
+
 	++m_waiting;
 
 	while (m_waiting < (Writers + Readers)) {
@@ -707,6 +709,9 @@ inline void tester<T, Allocator>::Write(std::uint32_t writes) {
 
 template<class T, class Allocator>
 inline void tester<T, Allocator>::Read(std::uint32_t reads) {
+
+	std::this_thread::set_name("Reader");
+
 	++m_waiting;
 
 	while (m_waiting < (Writers + Readers)) {

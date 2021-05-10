@@ -22,7 +22,7 @@
 
 
 #if defined (__cpp_exceptions) && !defined (GDUL_EXCEPTIONS)
-#define GDUL_EXCEPTIONS 1
+#define GDUL_EXCEPTIONS 0
 #endif
 
 

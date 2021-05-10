@@ -1,12 +1,11 @@
 #pragma once
 
 #include <functional>
-#include <thread>
 #include <atomic>
 #include <concurrent_queue.h>
-#include <gdul/containers/concurrent_queue.h>
 #include <vector>
 #include <gdul/WIP/qsbr.h>
+#include <gdul/execution/thread/thread.h>
 
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
@@ -34,9 +33,9 @@ private:
 	uint32_t spin();
 	void release();
 
-	std::vector<std::thread> m_threads;
+	std::vector<gdul::thread> m_threads;
 
-	gdul::concurrent_queue<std::function<void()>> m_taskQueue;
+	concurrency::concurrent_queue<std::function<void()>> m_taskQueue;
 
 	std::atomic<bool> m_inCommission;
 
@@ -51,7 +50,7 @@ thread_pool::thread_pool(std::uint32_t coreMask) :
 		const std::uint64_t mask(1ull << i);
 
 		if (coreMask & mask) {
-			m_threads.push_back(std::thread(&thread_pool::idle, this, mask));
+			m_threads.push_back(gdul::thread(&thread_pool::idle, this, mask));
 		}
 	}
 }
@@ -87,9 +86,9 @@ bool thread_pool::has_unfinished_tasks() const
 }
 void thread_pool::idle(std::uint64_t affinityMask)
 {
-	uint64_t result(0);
-
 	qsbr::register_thread();
+
+	uint64_t result(0);
 
 	do
 	{
@@ -110,5 +109,7 @@ void thread_pool::idle(std::uint64_t affinityMask)
 			std::this_thread::yield();
 		}
 	}
+
+	qsbr::unregister_thread();
 }
 }

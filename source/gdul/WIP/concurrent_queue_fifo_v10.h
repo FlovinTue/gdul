@@ -65,8 +65,9 @@ class buffer_deleter;
 template <class T, class Allocator>
 class shared_ptr_allocator_adapter;
 
-constexpr size_type Buffer_Capacity_Default = 8;
-
+constexpr size_type DefaultBufferCapacity = 8;
+constexpr size_type BufferBlockThreshhold = std::numeric_limits<size_type>::max() / 2;
+constexpr size_type BufferBlockOffset = BufferBlockThreshhold + std::numeric_limits<std::uint32_t>::max();
 }
 // MPMC unbounded lock-free queue.
 template <class T, class Allocator = std::allocator<std::uint8_t>>
@@ -139,7 +140,7 @@ inline concurrent_queue_fifo<T, Allocator>::concurrent_queue_fifo()
 }
 template<class T, class Allocator>
 inline concurrent_queue_fifo<T, Allocator>::concurrent_queue_fifo(Allocator allocator)
-	: m_back(create_item_buffer(cq_fifo_detail::Buffer_Capacity_Default, allocator))
+	: m_back(create_item_buffer(cq_fifo_detail::DefaultBufferCapacity, allocator))
 	, m_front(m_back.load(std::memory_order_relaxed))
 	, t_producer(allocator, m_front.load(std::memory_order_relaxed))
 	, t_consumer(allocator, m_back.load(std::memory_order_relaxed))
@@ -164,8 +165,6 @@ template<class T, class Allocator>
 template<class ...Args>
 inline void concurrent_queue_fifo<T, Allocator>::emplace(Args&&... args)
 {
-	const qsbr::critical_section cs;
-
 	while (!t_producer.get()->try_emplace(std::forward<Args>(args)...)) {
 		if (t_producer.get()->is_valid()) {
 			refresh_producer();
@@ -229,7 +228,7 @@ template<class T, class Allocator>
 inline void concurrent_queue_fifo<T, Allocator>::unsafe_reset()
 {
 	m_back.unsafe_get()->unsafe_invalidate();
-	m_back.unsafe_store(create_item_buffer(cq_fifo_detail::Buffer_Capacity_Default, m_allocator), std::memory_order_relaxed);
+	m_back.unsafe_store(create_item_buffer(cq_fifo_detail::DefaultBufferCapacity, m_allocator), std::memory_order_relaxed);
 	m_front.unsafe_store(m_back.unsafe_load(std::memory_order_relaxed));
 
 	std::atomic_thread_fence(std::memory_order_release);
@@ -361,9 +360,14 @@ void move(T& from, T& to)
 }
 
 template<class T>
-void assign(T& a, T& b)
+void assign(T& from, T& to)
 {
 	to = from;
+}
+
+constexpr size_type delta_unwritten(size_type unwritten, size_type minimum)
+{
+	return unwritten - minimum - 1;
 }
 
 template <class T, class Allocator>
@@ -412,31 +416,31 @@ public:
 private:
 	void destroy_items() noexcept;
 
-	bool try_raise_push_ceil(size_type minimum);
+	bool try_claim_write_slot(size_type& outAt);
 
 	void move_or_assign(T& from, T& to);
+
+	void try_update_written(size_type postWriteSync, size_type writeAt);
 
 	std::atomic<size_type> m_preReadSync;
 	GDUL_CACHE_PAD;
 	GDUL_ATOMIC_WITH_VIEW(size_type, m_readAt);
 	GDUL_CACHE_PAD;
+	std::atomic<size_type> m_unwritten;
 	std::atomic<size_type> m_writeAt;
-	std::atomic<size_type> m_pushCeil;
 	GDUL_CACHE_PAD;
 	GDUL_ATOMIC_WITH_VIEW(size_type, m_postWriteSync);
 	GDUL_CACHE_PAD;
 	GDUL_ATOMIC_WITH_VIEW(size_type, m_written);
 	GDUL_CACHE_PAD;
 
+	qsbr::snapshot m_readersSnapshot;
+
 	atomic_shared_ptr_buffer_type m_next;
 
 	const size_type m_capacity;
 
 	T* const m_items;
-
-	//// Can this even be used for this purpose? Perhaps something together with a flip-buffer.. Increase push-roof? 
-	//// That'd make it possible to only track critical sections around pops
-	//qsbr::item m_accessControl;
 
 	std::atomic<buffer_state> m_state;
 };
@@ -445,8 +449,8 @@ template<class T, class Allocator>
 inline item_buffer<T, Allocator>::item_buffer(T* dataBlock, typename item_buffer<T, Allocator>::size_type capacity)
 	: m_preReadSync(0)
 	, m_readAt(0)
+	, m_unwritten(capacity / 2)
 	, m_writeAt(0)
-	, m_pushCeil(capacity)
 	, m_postWriteSync(0)
 	, m_written(0)
 	, m_next(nullptr)
@@ -454,6 +458,7 @@ inline item_buffer<T, Allocator>::item_buffer(T* dataBlock, typename item_buffer
 	, m_items(dataBlock)
 	, m_state(buffer_state_valid)
 {
+	qsbr::reset(m_readersSnapshot);
 }
 
 template<class T, class Allocator>
@@ -468,7 +473,10 @@ inline bool item_buffer<T, Allocator>::is_active() const
 		return true;
 	}
 
-	if (m_readAt.load(std::memory_order_acquire) < m_capacity) {
+	const size_type readAt(m_readAt.load(std::memory_order_acquire));
+	const size_type writeAt(m_writeAt.load(std::memory_order_relaxed));
+
+	if (readAt < writeAt) {
 		return true;
 	}
 
@@ -477,13 +485,13 @@ inline bool item_buffer<T, Allocator>::is_active() const
 template<class T, class Allocator>
 inline bool item_buffer<T, Allocator>::is_valid() const
 {
-	return m_state.load(std::memory_order_acquire) != buffer_state_invalid;
+	return m_state.load(std::memory_order_relaxed) == buffer_state_valid;
 }
 template<class T, class Allocator>
 inline void item_buffer<T, Allocator>::unsafe_invalidate()
 {
 	m_state.store(buffer_state_invalid, std::memory_order_relaxed);
-	m_writeAt.store(m_capacity, std::memory_order_relaxed);
+	m_unwritten.store(m_unwritten.load(std::memory_order_relaxed) + BufferBlockOffset, std::memory_order_relaxed);
 
 	if (m_next) {
 		m_next.unsafe_get()->unsafe_invalidate();
@@ -519,15 +527,18 @@ inline typename item_buffer<T, Allocator>::shared_ptr_buffer_type item_buffer<T,
 template<class T, class Allocator>
 inline typename item_buffer<T, Allocator>::size_type item_buffer<T, Allocator>::size() const
 {
-	const size_type readSlot(m_readAt.load(std::memory_order_relaxed));
-	const size_type read(!(m_capacity < readSlot) ? readSlot : m_capacity);
-	size_type accumulatedSize(m_written.load(std::memory_order_relaxed));
-	accumulatedSize -= read;
+	const size_type readSlot(m_readAt.load(std::memory_order_acquire));
+	size_type written(m_written.load(std::memory_order_acquire));
+	const size_type unwritten(m_unwritten.load(std::memory_order_acquire));
+	written = std::clamp(written, 0, unwritten);
+
+	size_type sizeAccum(written - readSlot);
 
 	if (m_next) {
-		accumulatedSize += m_next.unsafe_get()->size();
+		sizeAccum += m_next.unsafe_get()->size();
 	}
-	return accumulatedSize;
+
+	return sizeAccum;
 }
 
 template<class T, class Allocator>
@@ -545,14 +556,66 @@ inline void item_buffer<T, Allocator>::destroy_items() noexcept
 {
 	const size_type from(m_readAt.load(std::memory_order_acquire));
 	const size_type to(m_written.load(std::memory_order_relaxed));
+	const size_type capacityMask(m_capacity - 1);
 
-	std::destroy(m_items + from, m_items + to);
+	for (std::size_t i = from; i < to; ++i) {
+		std::destroy_at(&m_items[i & capacityMask]);
+	}
 }
 template<class T, class Allocator>
-inline bool item_buffer<T, Allocator>::try_raise_push_ceil(size_type minimum)
+inline bool item_buffer<T, Allocator>::try_claim_write_slot(size_type& outAt)
 {
-	// Has all consumers finished.  No outstanding references to... a qsb item ?
-	return true;
+	size_type unwritten(m_unwritten.load(std::memory_order_relaxed));
+	const size_type at(m_writeAt.fetch_add(1, std::memory_order_acq_rel));
+
+	do {
+		const size_type toUnwrittenDelta(delta_unwritten(unwritten, at));
+
+		if (!(m_capacity < toUnwrittenDelta)) {
+			outAt = at;
+			return true;
+		}
+
+		if (BufferBlockThreshhold < toUnwrittenDelta) {
+			break;
+		}
+
+		if (qsbr::query_and_update(m_readersSnapshot)) {
+			// So we will arrive here only if the snapshot is cleared.
+
+			const size_type halfCapacity(m_capacity / 2);
+			const size_type desired(unwritten + halfCapacity);
+
+			// Once this succeeds, other writers will be free to go about their business
+			if (m_unwritten.compare_exchange_strong(unwritten, desired, std::memory_order_release, std::memory_order_relaxed)) {
+
+				// Remove this mechanism? Too complicated? 
+				qsbr::reset(m_readersSnapshot);
+				
+				unwritten = desired;
+			}
+		}
+		else {
+			unwritten = m_unwritten.load(std::memory_order_relaxed);
+		}
+
+	} while (true);
+
+	outAt = m_writeAt.fetch_sub(1, std::memory_order_acq_rel) - 1;
+
+	return false;
+}
+template<class T, class Allocator>
+inline void item_buffer<T, Allocator>::try_update_written(size_type postWriteSync, size_type writeAt)
+{
+	if (postWriteSync == writeAt) {
+		size_type xchg(writeAt);
+		size_type target;
+		do {
+			target = xchg;
+			xchg = m_written.exchange(target, std::memory_order_relaxed);
+		} while (target < xchg);
+	}
 }
 template<class T, class Allocator>
 inline void item_buffer<T, Allocator>::move_or_assign(T& from, T& to)
@@ -586,27 +649,24 @@ template<class T, class Allocator>
 template<class ...Args>
 inline bool item_buffer<T, Allocator>::try_emplace(Args&& ... args)
 {
-	size_type at(m_writeAt.fetch_add(1, std::memory_order_relaxed));
+	size_type at;
 
-	if (!(at < m_capacity)) {
-		if (!try_raise_push_ceil()) {
-			return false;
-		}
+	if (!try_claim_write_slot(at)) {
+		const size_type postSync(m_postWriteSync.load(std::memory_order_relaxed));
+
+		try_update_written(postSync, at);
+
+		return false;
 	}
 
-	new (&m_items[at]) T(std::forward<Args>(args)...);
+	const size_type atItem(at & (m_capacity - 1));
 
-	const size_type postSync(m_postWriteSync.fetch_add(1, std::memory_order_acq_rel));
-	const size_type postAt(std::clamp<size_type>(m_writeAt.load(std::memory_order_relaxed), 0, m_capacity));
+	new (&m_items[atItem]) T(std::forward<Args>(args)...);
 
-	if ((postSync + 1) == postAt) {
-		size_type xchg(postAt);
-		size_type target;
-		do {
-			target = xchg;
-			xchg = m_written.exchange(target, std::memory_order_relaxed);
-		} while (target < xchg);
-	}
+	const size_type postSync(m_postWriteSync.fetch_add(1, std::memory_order_acq_rel) + 1);
+	const size_type postAt(m_writeAt.load(std::memory_order_relaxed));
+
+	try_update_written(postSync, postAt);
 
 	return true;
 }
@@ -615,22 +675,31 @@ inline bool item_buffer<T, Allocator>::try_pop(T& out)
 {
 	const size_type preReadSync(m_preReadSync.fetch_add(1, std::memory_order_relaxed));
 	const size_type written(m_written.load(std::memory_order_relaxed));
-	
+
 	if (!(preReadSync < written)) {
 		m_preReadSync.fetch_sub(1, std::memory_order_relaxed);
 		return false;
 	}
-	
+
 	const size_type at(m_readAt.fetch_add(1, std::memory_order_relaxed));
 
 	std::atomic_thread_fence(std::memory_order_acquire);
 
-	move_or_assign(m_items[at], out);
+	const size_type mask(m_capacity - 1);
+	const size_type atItem(at & mask);
 
-	std::destroy_at(&m_items[at]);
+	move_or_assign(m_items[atItem], out);
 
-	if (at + 1 == m_capacity) {
-		qsbr::initialize_item(m_accessControl);
+	std::destroy_at(&m_items[atItem]);
+
+	const size_type halfCapacity(m_capacity >> 1);
+	const size_type a(halfCapacity + 1);
+	const size_type b(1);
+
+	const size_type masked((at + 1) & mask);
+
+	if (masked == a || masked == b) {
+		qsbr::take_snapshot(m_readersSnapshot);
 	}
 
 	return true;
@@ -701,3 +770,81 @@ inline void buffer_deleter<T, Allocator>::operator()(T* obj, Allocator&) noexcep
 }
 }
 #pragma warning(pop)
+
+
+
+
+
+// This is suspect. Do we have a well defined set of states this can exist in at this point? 
+// What we want happening within this scope is:
+// This snapshot should only affect whichever capacity increase we're looking for here. The neatest thing
+// would be to carry a payload within the snapshot. Or perhaps not. 
+
+
+// So say we have a size 4 buffer
+// A thread tries to pop item ix[2], 
+// it will then have to increase m_unwritten. 
+// It succeeds in doing so and arrives here.
+// It stalls.
+// Other producers continue on.
+// The post sync step should not be able to complete until this thread has exited..!
+// Which should mean that no consumer will be able to create a new snapshot. 
+
+// What about other producer states? 
+// What if a producer in this scenario arrives at virtual ix 4
+// Comes in here, fails CAS
+// Arrives here, stalls
+// First thread invalidates, resumes
+// Consumer creates new snapshot
+// Producer resumes, invalidates. Hmm. Yeah.
+
+// Hmm this invalidation business. Is there a better way to design this snapshot business?
+
+
+
+
+
+	//while (true) {
+	//	{
+	//		const size_type toUnwrittenDelta(delta_unwritten(outUnwritten, minimum));
+
+	//		if (toUnwrittenDelta < m_capacity) {
+	//			break;
+	//		}
+
+	//		if (toUnwrittenDelta < BufferBlockThreshhold) {
+	//			return false;
+	//		}
+	//	}
+
+	//	if (qsbr::update(m_readersSnapshot)) {
+	//		const size_type halfCapacity(m_capacity / 2);
+	//		const size_type desired(outUnwritten + halfCapacity);
+
+	//		if (m_unwritten.compare_exchange_strong(outUnwritten, desired, std::memory_order_release, std::memory_order_relaxed)) {
+	//			outUnwritten = desired;
+	//		}
+
+	//		qsbr::invalidate(m_readersSnapshot);
+	//	}
+	//	else {
+	//		outUnwritten = m_unwritten.load(std::memory_order_acquire);
+	//	}
+
+	//	{
+	//		const size_type toUnwrittenDelta(delta_unwritten(outUnwritten, minimum));
+
+	//		if (toUnwrittenDelta < m_capacity) {
+	//			break;
+	//		}
+
+	//		if (toUnwrittenDelta < BufferBlockThreshhold) {
+	//			return false;
+	//		}
+	//	}
+
+	//	const size_type blockage(outUnwritten + BufferBlockOffset);
+	//	m_unwritten.compare_exchange_weak(outUnwritten, blockage, std::memory_order_release, std::memory_order_relaxed);
+	//}
+
+	//return true;

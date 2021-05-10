@@ -179,7 +179,7 @@ public:
 	/// <summary>
 	/// Destructor
 	/// </summary>
-	~concurrent_priority_queue_impl() noexcept;
+	~concurrent_priority_queue_impl();
 
 	/// <summary>
 	/// Enqueue an item
@@ -196,7 +196,7 @@ public:
 	/// <summary>
 	/// Attempt to dequeue the top item
 	/// </summary>
-	/// <param name="out">Item to be written. Will be remain unmodified in case of failure</param>
+	/// <param name="out">Item to be written. Remains unmodified in case of failure</param>
 	/// <returns>True on success</returns>
 	bool try_pop(input_type& out);
 
@@ -363,7 +363,7 @@ inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 	do {
 		node_view_set frontSet{};
 
-		frontSet[0] = m_head.m_linkViews[0].load(std::memory_order_seq_cst);
+		frontSet[0] = m_head.m_linkViews[0].load(std::memory_order_acquire);
 		mynode = frontSet[0];
 
 		if (at_end(mynode)) {
@@ -420,7 +420,7 @@ inline void concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 	node_type* frontNode(nullptr);
 
 	do {
-		frontSet[0] = (m_head.m_linkViews[0].load(std::memory_order_seq_cst));
+		frontSet[0] = (m_head.m_linkViews[0].load(std::memory_order_acquire));
 		frontNode = frontSet[0];
 
 		if (at_end(frontNode)) {
@@ -469,7 +469,7 @@ inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 
 		for (;;) {
 
-			nextSet[layer] = ((node_type*)atSet[layer])->m_linkViews[layer].load(std::memory_order_seq_cst);
+			nextSet[layer] = ((node_type*)atSet[layer])->m_linkViews[layer].load(std::memory_order_acquire);
 			node_type* const nextNode(nextSet[layer]);
 
 			if (at_end(nextNode)) {
@@ -676,7 +676,7 @@ template<class Key, class Value, std::uint8_t LinkTowerHeight, class AllocationS
 inline void concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::load_set(typename concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::node_view_set& outSet, const node_type* at, std::uint8_t offset, std::uint8_t max)
 {
 	for (std::uint8_t i = offset; i < max; ++i) {
-		outSet[i] = at->m_linkViews[i].load(std::memory_order_seq_cst);
+		outSet[i] = at->m_linkViews[i].load(std::memory_order_acquire);
 	}
 }
 
@@ -740,9 +740,13 @@ inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, Allocati
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class AllocationStrategy, class Compare>
 inline bool concurrent_priority_queue_impl<Key, Value, LinkTowerHeight, AllocationStrategy, Compare>::needs_version_lag_check(std::uint32_t versionBase, std::uint32_t versionStep)
 {
-	const size_type versionPart(versionBase % csl_detail::to_expected_list_size(LinkTowerHeight));
+	// Every time version crosses the boundary of expected list size (a handy point to do so) we want to check for version lag
+
+	// At version % mod expected list size
+	const size_type versionPart(versionBase & (csl_detail::to_expected_list_size(LinkTowerHeight) - 1));
 	const size_type edgeCheck(versionPart + versionStep);
 
+	// Are we just on the threshhold?
 	return !(edgeCheck < csl_detail::to_expected_list_size(LinkTowerHeight));
 }
 template<class Key, class Value, std::uint8_t LinkTowerHeight, class AllocationStrategy, class Compare>
@@ -839,7 +843,7 @@ inline cpq_detail::exchange_link_result concurrent_priority_queue_impl<Key, Valu
 			result = cpq_detail::exchange_link_outside_range;
 			break;
 		}
-	} while (!link->compare_exchange_strong(expected, desired, std::memory_order_seq_cst, std::memory_order_relaxed));
+	} while (!link->compare_exchange_strong(expected, desired, std::memory_order_release, std::memory_order_relaxed));
 
 	return result;
 }
@@ -850,7 +854,7 @@ inline cpq_detail::exchange_link_result concurrent_priority_queue_impl<Key, Valu
 
 	cpq_detail::exchange_link_result result(cpq_detail::exchange_link_outside_range);
 
-	if (link->compare_exchange_strong(expected, desired, std::memory_order_seq_cst, std::memory_order_relaxed)) {
+	if (link->compare_exchange_strong(expected, desired, std::memory_order_release, std::memory_order_relaxed)) {
 		result = cpq_detail::exchange_link_success;
 	}
 

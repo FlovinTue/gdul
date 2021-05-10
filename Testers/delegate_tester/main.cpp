@@ -19,6 +19,11 @@ public:
 	void member_arg(float f, int i) { std::cout << "called member with args " << f << " and " << i << std::endl; };
 };
 
+void voidFunc()
+{
+
+}
+
 int main()
 {
 	using namespace gdul;
@@ -88,10 +93,34 @@ int main()
 	delegate<void()> assignStatic;
 	assignStatic = constructStatic;
 
-	delegate<void()> makeDel(make_delegate<void()>(largeCallArg, 1.f, 1));
+	delegate<void()> makeDel(make_delegate(largeCallArg, 1.f, 1));
 	makeDel();
-	delegate<void()> allocDel(alloc_delegate<void()>(largeCallArg, customAlloc, 1.f, 1));
+
+
+	delegate<void()> makeDel2(make_delegate(&cls::member, &c));
+	makeDel2();
+
+	delegate<void(cls*)> makeDel3(make_delegate(&cls::member));
+	makeDel3(&c);
+
+	delegate<void(cls*, float, int)> makeDel4(make_delegate(&cls::member_arg));
+	makeDel4(&c, 1.f, 1);
+
+	delegate<void(int)> makeDel5(make_delegate(&cls::member_arg, &c, 1.f));
+	makeDel5(1);
+
+	delegate<void()> makeDel6(make_delegate(&cls::member_arg, &c, 1.f, 1));
+	makeDel6();
+
+	delegate<void()> makeDel7(make_delegate(argCall, 1.f, 1));
+	makeDel7();
+
+	delegate<void(float, int)> makeDel8(make_delegate(argCall));
+	makeDel8(1.f, 1);
+
+	delegate<void()> allocDel(allocate_delegate(largeCallArg, customAlloc, 1.f, 1));
 	allocDel();
+
 
 	struct destructible
 	{

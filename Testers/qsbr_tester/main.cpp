@@ -7,17 +7,20 @@
 int main()
 {
 
-	gdul::qsb::register_thread();
+	gdul::qsbr::register_thread();
 	{
-		gdul::qsb::critical_section cs;
-		gdul::qsb::qs_item qsCheck;
+		gdul::qsbr::critical_section cs;
+		gdul::qsbr::snapshot qsCheck;
 
-		if (gdul::qsb::update_item(qsCheck)) {
+		gdul::qsbr::reset(qsCheck);
+		gdul::qsbr::initialize(qsCheck);
+
+		if (gdul::qsbr::query_and_update(qsCheck)) {
 			std::cout << "Safe" << std::endl;
 		}
 		else {
 			std::cout << "Unsafe" << std::endl;
 		}
 	}
-	gdul::qsb::unregister_thread();
+	gdul::qsbr::unregister_thread();
 }
