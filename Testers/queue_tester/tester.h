@@ -681,9 +681,9 @@ inline void tester<T, Allocator>::Write(std::uint32_t writes) {
 		sum += in;
 #elif !defined(GDUL_CPQ)
 		T in;
-		in.count = seed % (j + 1);
+		in = seed % (j + 1);
 		//in.count = 1;
-		sum += in.count;
+		sum += in;
 #endif
 
 #if !defined(MOODYCAMEL) && !defined(GDUL_CPQ)
@@ -750,7 +750,7 @@ inline void tester<T, Allocator>::Read(std::uint32_t reads) {
 			if (m_queue.try_dequeue(out)) {
 #endif
 #if !defined(GDUL_CPQ) && ! defined(MS_CPQ)
-				sum += out.count;
+				sum += out;
 
 #elif defined (MS_CPQ)
 				sum += out;

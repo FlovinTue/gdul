@@ -18,57 +18,6 @@ std::random_device rd;
 std::mt19937 rng(rd());
 }
 
-class Thrower
-{
-public:
-#ifdef GDUL
-	Thrower() = default;
-	Thrower(std::uint32_t aCount) : count(aCount) {}
-	Thrower& operator=(Thrower&&) = default;
-	Thrower& operator=(const Thrower& aOther)
-	{
-		count = aOther.count;
-#ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
-		throwTarget = aOther.throwTarget;
-		if (!--throwTarget) {
-			throwTarget = gdul::rng() % 50000;
-			throw std::runtime_error("Test");
-		}
-#endif
-		return *this;
-	}
-	Thrower& operator+=(std::uint32_t aCount)
-	{
-		count += aCount;
-		return *this;
-	}
-#else
-	Thrower& operator=(const Thrower& other)
-	{
-		count = other.count;
-		alive = true;
-		return *this;
-	}
-#endif
-
-	~Thrower()
-	{
-		alive = false;
-		count = 0;
-		++iteration;
-	}
-
-	operator uint16_t() const { return iteration; }
-	operator bool() const { return alive; }
-
-	uint32_t count = 0;
-	uint16_t iteration = 0;
-	bool alive = true;
-#ifdef GDUL_CQ_ENABLE_EXCEPTIONHANDLING
-	uint32_t throwTarget = gdul::rng() % 50000;
-#endif
-};
-
 
 int main()
 {
@@ -99,7 +48,7 @@ int main()
 	}
 
 	gdul::tracking_allocator<std::uint8_t> alloc;
-	gdul::queue_testrun<Thrower>(10000, alloc);
+	gdul::queue_testrun<uint32_t>(10000, alloc);
 
 
 	std::cout << "\nAfter runs finished, the allocated value is: " << gdul::s_allocated << '\n' << std::endl;
