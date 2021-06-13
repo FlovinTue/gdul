@@ -23,6 +23,7 @@
 #include <gdul/containers/concurrent_queue.h>
 #include <gdul/memory/atomic_shared_ptr.h>
 #include <gdul/memory/thread_local_member.h>
+#include <gdul/utility/packed_ptr.h>
 #include <gdul/math/math.h>
 
 #include <assert.h>
@@ -148,7 +149,7 @@ private:
 	{
 		atomic_shared_ptr<T[]> items;
 
-		std::uintptr_t blockKey = 0;
+		packed_ptr<T> itemBlock;
 
 		std::atomic<size_type> pushSync = 0;
 		std::atomic<size_type> livingItems = MaxCapacity;
@@ -197,10 +198,7 @@ private:
 
 	std::pair<size_type, size_type> update_index_cache(tl_container& tl);
 
-	static bool is_contained_within(const T* item, std::uintptr_t blockKey);
-	static size_type to_capacity(std::uintptr_t blockKey);
-	static const T* to_begin(std::uintptr_t blockKey);
-	static std::uintptr_t to_block_key(const T* begin, size_type capacity);
+	static bool is_contained_within(const T* item, packed_ptr<T> itemBlock, size_type rowLength);
 
 	bool is_up_to_date(const T* item) const;
 	void discard_item(const T* item);
@@ -335,7 +333,7 @@ inline void concurrent_guard_pool<T, Allocator>::unsafe_reset()
 {
 	const std::uint8_t blockCount(m_blocksEndIndex.exchange(0, std::memory_order_relaxed));
 	for (std::uint8_t i = 0; i < blockCount; ++i) {
-		m_blocks[i].blockKey = 0;
+		m_blocks[i].itemBlock = packed_ptr<T>(nullptr, 0);
 		m_blocks[i].items = shared_ptr<T[]>(nullptr);
 		m_blocks[i].items.unsafe_set_version(0);
 		m_blocks[i].pushSync = 0;
@@ -355,10 +353,10 @@ inline bool concurrent_guard_pool<T, Allocator>::is_up_to_date(const T* item) co
 	const size_type lastBlock(blocksEnd - 1);
 	const size_type nextBlock(lastBlock + 1); // Speculative, in case this item was allocated really recently
 
-	if (is_contained_within(item, m_blocks[lastBlock].blockKey)) {
+	if (is_contained_within(item, m_blocks[lastBlock].itemBlock, m_rowLength)) {
 		return true;
 	}
-	if (is_contained_within(item, m_blocks[nextBlock].blockKey) && blocksEnd < cgp_detail::CapacityBits) {
+	if (blocksEnd < cgp_detail::CapacityBits && is_contained_within(item, m_blocks[nextBlock].itemBlock, m_rowLength)) {
 		return true;
 	}
 	return false;
@@ -467,47 +465,21 @@ inline std::pair<typename concurrent_guard_pool<T, Allocator>::size_type, typena
 	return masks;
 }
 template<class T, class Allocator>
-inline bool concurrent_guard_pool<T, Allocator>::is_contained_within(const T* item, std::uintptr_t blockKey)
+inline bool concurrent_guard_pool<T, Allocator>::is_contained_within(const T* item, packed_ptr<T> itemBlock, size_type rowLength)
 {
-	const T* const begin(to_begin(blockKey));
-
-	return !(item < begin) && (item < (begin + to_capacity(blockKey)));
+	const size_type capacity(itemBlock.extra());
+	const T* const begin(itemBlock.ptr());
+	const T* const end(begin + capacity * rowLength);
+	return !(item < begin) && item < end;
 }
-template<class T, class Allocator>
-inline typename concurrent_guard_pool<T, Allocator>::size_type concurrent_guard_pool<T, Allocator>::to_capacity(std::uintptr_t blockKey)
-{
-	constexpr std::uintptr_t toShift(64 - cgp_detail::CapacityBits);
-	const std::uintptr_t capacity(blockKey >> toShift);
 
-	return (size_type)capacity;
-}
-template<class T, class Allocator>
-inline const T* concurrent_guard_pool<T, Allocator>::to_begin(std::uintptr_t blockKey)
-{
-	const std::uintptr_t noCapacity(blockKey << cgp_detail::CapacityBits);
-	const std::uintptr_t ptrBlock(noCapacity >> 16);
-
-	return (const T*)ptrBlock;
-}
-template<class T, class Allocator>
-inline std::uintptr_t concurrent_guard_pool<T, Allocator>::to_block_key(const T* begin, size_type capacity)
-{
-	constexpr std::uintptr_t toShift((sizeof(std::uintptr_t) * 8) - cgp_detail::CapacityBits);
-	const std::uintptr_t capacityBase(capacity);
-	const std::uintptr_t capacityShift(capacityBase << toShift);
-	const std::uintptr_t ptrBase((std::uintptr_t)begin);
-	const std::uintptr_t ptrShift(ptrBase >> 3);
-	const std::uintptr_t blockKey(ptrShift | capacityShift);
-
-	return blockKey;
-}
 template<class T, class Allocator>
 inline void concurrent_guard_pool<T, Allocator>::discard_item(const T* item)
 {
 	const std::uint8_t blockCount(m_blocksEndIndex.load(std::memory_order_acquire));
 
 	for (std::uint8_t i = 0; i < blockCount; ++i) {
-		if (is_contained_within(item, m_blocks[i].blockKey)) {
+		if (is_contained_within(item, m_blocks[i].itemBlock, m_rowLength)) {
 			if (m_blocks[i].livingItems.fetch_sub(1, std::memory_order_relaxed) == 1) {
 				m_blocks[i].items.store(gdul::shared_ptr<T[]>(nullptr));
 			}
@@ -529,22 +501,23 @@ inline void concurrent_guard_pool<T, Allocator>::try_alloc_block(std::uint8_t bl
 	if (expected.get_version() == 2)
 		return;
 
-	const size_type size((size_type)std::powf(2.f, (float)blockIndex + 1));
+	const size_type itemRows((size_type)std::powf(2.f, (float)blockIndex + 1));
 
 	if (expected.get_version() == 0) {
 
-		shared_ptr<T[]> desired(gdul::allocate_shared<T[]>(size * m_rowLength, m_allocator));
+		shared_ptr<T[]> desired(gdul::allocate_shared<T[]>(itemRows * m_rowLength, m_allocator));
 		if (m_blocks[blockIndex].items.compare_exchange_strong(expected, desired, std::memory_order_release)) {
 			expected = std::move(desired);
 		}
 	}
 
-	const std::uintptr_t blockKey(to_block_key(expected.get(), (size_type)expected.item_count()));
-	m_blocks[blockIndex].blockKey = blockKey;
+
+	const packed_ptr<T> itemBlock(expected.get(), (std::uint32_t)itemRows);
+	m_blocks[blockIndex].itemBlock = itemBlock;
 
 	// Divide into tl caches & add to cachepool
 	size_type pushIndex(m_blocks[blockIndex].pushSync.fetch_add(m_tlCacheSize, std::memory_order_relaxed));
-	while (pushIndex < size) {
+	while (pushIndex < itemRows) {
 		tl_cache cache(gdul::allocate_shared<T* []>(m_tlCacheSize, m_allocator));
 		for (size_type i = pushIndex; i < (pushIndex + m_tlCacheSize); ++i) {
 			cache[i - pushIndex] = &expected[i * m_rowLength];
