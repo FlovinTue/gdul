@@ -748,7 +748,7 @@ inline void atomic_shared_ptr<T>::try_fill_local_refs(compressed_storage& expect
 template <class T>
 inline union asp_detail::compressed_storage atomic_shared_ptr<T>::copy_internal(std::memory_order order) const noexcept
 {
-	compressed_storage initial(m_storage.fetch_sub(asp_detail::LocalRefStep, std::memory_order_relaxed));
+	compressed_storage initial(m_storage.fetch_sub(asp_detail::LocalRefStep, order));
 	initial.m_u8[asp_detail::storage_byte_local_ref] -= 1;
 
 	compressed_storage expected(initial);
@@ -756,14 +756,12 @@ inline union asp_detail::compressed_storage atomic_shared_ptr<T>::copy_internal(
 
 	initial.m_u8[asp_detail::storage_byte_local_ref] = 1;
 
-	std::atomic_thread_fence(order);
-
 	return initial;
 }
 template <class T>
 inline union asp_detail::compressed_storage atomic_shared_ptr<T>::unsafe_copy_internal(std::memory_order order) const
 {
-	compressed_storage storage(m_storage.load(std::memory_order_relaxed));
+	compressed_storage storage(m_storage.load(order));
 
 	compressed_storage newStorage(storage);
 	newStorage.m_u8[asp_detail::storage_byte_local_ref] -= 1;
@@ -773,8 +771,6 @@ inline union asp_detail::compressed_storage atomic_shared_ptr<T>::unsafe_copy_in
 
 	unsafe_fill_local_refs();
 
-	std::atomic_thread_fence(order);
-
 	return storage;
 }
 template<class T>
@@ -783,11 +779,9 @@ inline union asp_detail::compressed_storage atomic_shared_ptr<T>::unsafe_exchang
 	const compressed_storage old(m_storage.load(std::memory_order_relaxed));
 	const compressed_storage replacement(asp_detail::set_version(with, asp_detail::to_version(old) + 1));
 
-	m_storage.store(replacement.m_u64, std::memory_order_relaxed);
+	m_storage.store(replacement.m_u64, order);
 
 	unsafe_fill_local_refs();
-
-	std::atomic_thread_fence(order);
 
 	return old;
 }
@@ -797,7 +791,7 @@ inline void atomic_shared_ptr<T>::unsafe_store_internal(compressed_storage from,
 	const compressed_storage previous(m_storage.load(std::memory_order_relaxed));
 	const compressed_storage next(asp_detail::set_version(from, asp_detail::to_version(previous) + 1));
 
-	m_storage.store(next.m_u64, std::memory_order_relaxed);
+	m_storage.store(next.m_u64, order);
 
 	asp_detail::control_block_free_type_base<T>* const prevCb(to_control_block(previous));
 	if (prevCb)
@@ -806,8 +800,6 @@ inline void atomic_shared_ptr<T>::unsafe_store_internal(compressed_storage from,
 	}
 
 	unsafe_fill_local_refs();
-
-	std::atomic_thread_fence(order);
 }
 template<class T>
 inline void atomic_shared_ptr<T>::unsafe_fill_local_refs() const noexcept
