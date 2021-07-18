@@ -1146,19 +1146,12 @@ constexpr compressed_storage set_version(compressed_storage storage, std::uint16
 template<class T>
 constexpr void assert_alignment(std::uint8_t* block)
 {
-#if 201700 < __cplusplus || _HAS_CXX17
-	if ((std::uintptr_t)block % alignof(T) != 0)
-	{
-		throw std::runtime_error("conforming with C++17 alloc_shared expects alignof(T) allocates");
-	}
-#else
 	static_assert(!(std::numeric_limits<std::uint8_t>::max() < alignof(T)), "alloc_shared supports only supports up to std::numeric_limits<std::uint8_t>::max() byte aligned types");
 
 	if ((std::uintptr_t)block % alignof(std::max_align_t) != 0)
 	{
 		throw std::runtime_error("alloc_shared expects at least alignof(std::max_align_t) allocates");
 	}
-#endif
 }
 template <class T>
 class ptr_base
@@ -2007,7 +2000,7 @@ inline shared_ptr<T> allocate_shared(Allocator allocator, Args&& ...args)
 		const std::uintptr_t mod((std::uintptr_t)block % blockAlign);
 		const std::uintptr_t offset(mod ? blockAlign - mod : 0);
 
-		asp_detail::assert_alignment<T>(block);
+		asp_detail::assert_alignment<std::max_align_t>(block);
 
 		controlBlock = new (reinterpret_cast<std::uint8_t*>(block + offset)) asp_detail::control_block_make_shared<T, Allocator>(allocator, (std::uint8_t)offset, std::forward<Args>(args)...);
 	}
