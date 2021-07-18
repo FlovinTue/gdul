@@ -10,7 +10,6 @@
 #include "tester.h"
 #include "../Common/Timer.h"
 #include <type_traits>
-#include <gdul/WIP/index_pool.h>
 
 struct int_iter
 {
@@ -30,8 +29,6 @@ int int_iter::iters = 0;
 
 int main()
 {
-	gdul::index_pool<64> pool;
-
 	gdul::timer<float> time;
 
 	for ( uint32_t i = 0; i < 20; ++i ) {
