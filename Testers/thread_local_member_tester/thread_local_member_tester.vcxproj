@@ -96,6 +96,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\..\source\gdul\memory\thread_local_member.h" />
+    <ClInclude Include="..\..\source\gdul\WIP\index_pool.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="tester.h" />
   </ItemGroup>
